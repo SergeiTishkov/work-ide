@@ -456,7 +456,8 @@ def test_shipped_identity_is_complete_except_for_personal_data():
     нормальный сценарий.
     """
     problems = identity.readiness_problems("kisel")
-    non_personal = [p for p in problems if "помечено как личное" not in p]
+    non_personal = [p for p in problems
+                    if not p.startswith(identity.LOCAL_FIELDS_MISSING_PREFIX)]
     assert non_personal == [], (
         "в общей части идентичности не должно остаться незаполненного: "
         f"{non_personal}"

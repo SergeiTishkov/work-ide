@@ -233,6 +233,12 @@ def validate(prefix: str, *, strict_prefix_check: bool = True) -> List[str]:
     return problems
 
 
+# Начало сообщения о незаполненных ЛИЧНЫХ полях. Вынесено в константу, чтобы
+# тесты и вызывающий код отличали «не хватает личных данных» (нормальная стадия
+# на чужой машине) от «идентичность собрана неполно» (дефект самой идентичности),
+# не завися от точной формулировки текста.
+LOCAL_FIELDS_MISSING_PREFIX = "не заполнены личные поля"
+
 # Плейсхолдер шаблона: `<что-то>` в угловых скобках. Ровно так размечены поля,
 # которые человек должен заполнить своими ответами.
 PLACEHOLDER_RE = re.compile(r"<[^<>\n]{2,80}>")
@@ -267,7 +273,7 @@ def readiness_problems(prefix: str) -> List[str]:
         # как стена текста вместо понятной задачи.
         overlay_path = common.personal_dir(prefix) / f"{prefix}_owner.yaml"
         problems.append(
-            "не заполнены личные поля (помечены как `local`): "
+            f"{LOCAL_FIELDS_MISSING_PREFIX} (помечены как `local`): "
             + ", ".join(missing_local)
             + f".\n    Их место — {overlay_path}"
             + "\n    Заготовку этого файла создаёт `python tools/identity.py "
