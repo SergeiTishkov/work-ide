@@ -1,0 +1,15 @@
+# Скопируйте этот файл как active.yaml и заполните под себя.
+# Спецификация полей — docs/LOCAL_CONSTITUTION.md
+
+schema_version: 1
+
+# Обязателен, если активных идентичностей больше одной. Без него инструменты
+# откажутся угадывать и потребуют явного --identity.
+default_identity: <префикс>
+
+active_identities:
+  - prefix: <префикс>
+    activated_at: "<ГГГГ-ММ-ДД>"
+    relationship: owner          # owner | fork_of:<prefix> | using_shared
+    personal_dir: personal/<префикс>
+    note: "<зачем вам эта идентичность>"
