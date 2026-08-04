@@ -260,6 +260,16 @@ _TZ_WITHIN_RE = re.compile(
 
 _NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
 
+# Третья форма требования к поясу: явный ДИАПАЗОН смещений.
+# Реальная находка 2026-08-04: SuperPlane пишет "We currently work across
+# GMT+2 to GMT-3 and welcome candidates in that range". Ни "±N часов", ни
+# "within N hours of X" — а кандидат в UTC+4 в этот диапазон не попадает.
+_TZ_RANGE_RE = re.compile(
+    r"(?:gmt|utc)\s*(?P<a>[+-]\s*\d{1,2})\s*(?:to|through|\.\.|-)\s*"
+    r"(?:gmt|utc)?\s*(?P<b>[+-]\s*\d{1,2})"
+)
+
+
 
 def _check_timezone_requirement(text: str, criteria: dict, profile: dict):
     """Требование к часовому поясу кандидата.
@@ -289,10 +299,22 @@ def _check_timezone_requirement(text: str, criteria: dict, profile: dict):
     # Форма "within N hours of <TZ>" сама по себе является требованием —
     # отдельной запретительной фразы рядом с ней не бывает.
     within_matches = list(_TZ_WITHIN_RE.finditer(text))
-    if not exclusive_hits and not within_matches:
+    range_matches = list(_TZ_RANGE_RE.finditer(text))
+    if not exclusive_hits and not within_matches and not range_matches:
         return False, False, None
     if my_offset is None:
         return False, True, {"verdict": "no_utc_offset_in_profile", "phrases": exclusive_hits}
+
+    # Диапазон разбираем первым: он однозначнее любых окон вокруг названия.
+    for m in range_matches:
+        lo, hi = sorted(int(m.group(g).replace(" ", "")) for g in ("a", "b"))
+        detail = {
+            "verdict": "fits" if lo <= my_offset <= hi else "outside",
+            "range_utc": [lo, hi],
+            "my_utc_offset": my_offset,
+            "phrases": exclusive_hits,
+        }
+        return (detail["verdict"] == "outside"), False, detail
 
     zones = {common.normalize_for_matching(k): v for k, v in (cfg.get("zone_offsets") or {}).items()}
     matches = list(_TZ_WINDOW_RE.finditer(text)) + within_matches
@@ -465,10 +487,17 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     if tz_detail:
         breakdown["timezone_requirement"] = tz_detail
     if tz_dealbreaker:
-        dealbreakers.append(
-            f"timezone: requires {tz_detail['zone']} ±{tz_detail['window_hours']}h, "
-            f"candidate is at UTC+{tz_detail['my_utc_offset']}"
-        )
+        if "range_utc" in tz_detail:
+            lo, hi = tz_detail["range_utc"]
+            dealbreakers.append(
+                f"timezone: requires UTC{lo:+d}..{hi:+d}, "
+                f"candidate is at UTC{tz_detail['my_utc_offset']:+d}"
+            )
+        else:
+            dealbreakers.append(
+                f"timezone: requires {tz_detail['zone']} ±{tz_detail['window_hours']}h, "
+                f"candidate is at UTC{tz_detail['my_utc_offset']:+d}"
+            )
 
     points = 0
     if worldwide_hits:
@@ -614,17 +643,37 @@ def _score_role_relevance(text: str, title: str, criteria: dict):
     cfg = criteria["role_relevance_signal"]
     title_norm = common.normalize_for_matching(title)
 
+    # Если заголовок неинформативен, смотрим ещё и первую строку описания.
+    #
+    # Реальная находка 2026-08-04: запись с Hacker News приехала с заголовком
+    # "YC 19" и компанией "Ashby" — парсер треда разобрал строку
+    # "Ashby | YC 19 | REMOTE | Hiring Engineering Leaders | $200k-$275k"
+    # по разделителям и взял не тот кусок. Гейт профессии смотрит ЗАГОЛОВОК,
+    # а в заголовке "YC 19" нет ни одной профессии — вакансия менеджерская
+    # (Engineering Leaders), но прошла как обычная и заняла место в выдаче.
+    #
+    # Расширяем область поиска ТОЛЬКО когда в заголовке нет ни одного слова,
+    # означающего роль разработчика: у нормальной вакансии заголовок
+    # информативен, и первая строка описания (обычно рассказ о компании) в
+    # проверку не попадает — иначе слово "manager" из корпоративного блёрба
+    # начало бы выбрасывать нормальные вакансии.
+    developer_override_hits = [
+        p for p in cfg["developer_role_override_patterns"] if re.search(p, title_norm, re.IGNORECASE)
+    ]
+    search_area = title_norm
+    uninformative_title = not developer_override_hits
+    if uninformative_title:
+        # _vacancy_text уже схлопнул переносы, поэтому берём просто начало.
+        search_area = f"{title_norm} {(text or '')[:300]}"
+
     wrong_profession_hits = [
-        p for p in cfg["wrong_profession_title_patterns"] if re.search(p, title_norm, re.IGNORECASE)
+        p for p in cfg["wrong_profession_title_patterns"] if re.search(p, search_area, re.IGNORECASE)
     ]
     # Жёсткий уровень: менеджмент/продажи/GTM/пресейл — заведомо не роль
     # рядового разработчика, даже если в заголовке есть "engineer"/"architect".
     hard_wrong_hits = [
         p for p in cfg.get("hard_wrong_profession_title_patterns", [])
-        if re.search(p, title_norm, re.IGNORECASE)
-    ]
-    developer_override_hits = [
-        p for p in cfg["developer_role_override_patterns"] if re.search(p, title_norm, re.IGNORECASE)
+        if re.search(p, search_area, re.IGNORECASE)
     ]
     tech_agnostic_hits = _matches(text, cfg["tech_agnostic_override_keywords"])
 
@@ -677,6 +726,32 @@ def _score_language_fit(text: str, criteria: dict):
         "german_market_indicator_hits": german_market_hits,
         "german_market_flagged": german_market_flagged,
         "foreign_language_posting_hits": foreign_language_hits,
+    }
+
+
+def _check_industry_dealbreaker(text: str, criteria: dict):
+    """Отрасль, в которую человек не идёт принципиально — полный отсев.
+
+    Порог обязателен: вакансия обычной компании может упомянуть крипто среди
+    клиентов или интеграций, и одного слова недостаточно. Два и больше —
+    это уже про саму компанию.
+    """
+    cfg = criteria.get("industry_dealbreaker_gate")
+    if not cfg:
+        return False, {}
+    # Тот же срез "стекового спама", что и в оценке стека. Реальный случай
+    # 2026-08-04: гейт отсёк все вакансии Lemon.io, потому что их рекламный
+    # абзац "NOT YOUR TECH STACK?" перечисляет и Blockchain, и Ethereum, и
+    # Solana. Компания к крипте отношения не имеет — это перечень стеков,
+    # под которые они подбирают проекты. Ложный отказ прячет живые вакансии,
+    # что хуже, чем лишняя вакансия в выдаче.
+    text, _ = _strip_stack_noise_sections(text, criteria)
+    hits = _matches(text, cfg.get("keywords", []))
+    threshold = cfg.get("threshold_hits", 2)
+    return len(hits) >= threshold, {
+        "gate_triggered": len(hits) >= threshold,
+        "hits": hits,
+        "threshold": threshold,
     }
 
 
@@ -968,6 +1043,15 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         dealbreakers.append(
             "role: infrastructure/platform (DevOps) role despite a neutral title "
             f"({', '.join(infra_bd['hits'][:5])})"
+        )
+
+    industry_blocked, industry_bd = _check_industry_dealbreaker(text, criteria)
+    if industry_bd:
+        legacy_bd["industry_dealbreaker_gate"] = industry_bd
+    if industry_blocked:
+        dealbreakers.append(
+            "industry: отрасль, которую этот поиск избегает "
+            f"({', '.join(industry_bd['hits'][:4])})"
         )
 
     language_mismatch, language_bd = _score_language_fit(text, criteria)

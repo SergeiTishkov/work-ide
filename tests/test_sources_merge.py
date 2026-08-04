@@ -137,3 +137,21 @@ def test_fetcher_not_accepting_param_does_not_crash_pipeline(capsys):
     assert records == [{"ok": True}]
     assert err is None
     assert "не принимает часть параметров" in capsys.readouterr().err
+
+
+def test_himalayas_company_survives_a_renamed_api_field():
+    """Площадка меняла форму поля: `companyName`, потом `company` строкой,
+    когда-то — вложенным объектом. Реальный случай 2026-08-04: парсер читал
+    только `companyName`, поле стало пустым, и все 60 записей источника молча
+    отбрасывались — при HTTP 200 и «здоровом» источнике."""
+    import fetch_himalayas
+
+    for payload in (
+        {"companyName": "Acme"},
+        {"company": "Acme"},
+        {"company": {"name": "Acme"}},
+        {"organization": "Acme"},
+    ):
+        assert fetch_himalayas._extract_company(payload) == "Acme", payload
+
+    assert fetch_himalayas._extract_company({}) == ""

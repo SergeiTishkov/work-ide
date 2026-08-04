@@ -560,6 +560,10 @@ role_relevance_signal:
     - "\\bmanager,"
     - "senior manager"
     - "engineering manager"
+    - "engineering leader"
+    - "engineering leadership"
+    - "leadership team"
+    - "tech lead"
     - "\\bdirector\\b"
     - "\\bvp\\b"
     - "\\bhead of\\b"
@@ -779,6 +783,34 @@ language_requirement_signal:
       markers: ["cerchiamo", "requisiti", "esperienza", "azienda",
                 "competenze", "il candidato"]
 
+
+# Гейт отрасли: не «ниже приоритет», а полный отсев.
+#
+# Реальная находка 2026-08-04: вакансия Parity (Polkadot/Kusama, блокчейн-
+# инфраструктура) набрала 20 баллов и попала в выдачу, хотя профиль прямо
+# перечисляет crypto/web3 в том, чего человек избегает. Слова "web3" и
+# "blockchain" давали лишь -8 в low_intensity_signal, и этот минус утонул
+# в плюсах за worldwide-remote и стек.
+#
+# Правило владельца, подтверждённое трижды: случай с нулевым шансом должен
+# быть гейтом, а не штрафом. Порог в два совпадения — чтобы вакансия,
+# мимоходом упомянувшая крипто среди клиентов, не отсекалась.
+industry_dealbreaker_gate:
+  threshold_hits: 2
+  keywords:
+    - "web3"
+    - "blockchain"
+    - "crypto"
+    - "cryptocurrency"
+    - "defi"
+    - "nft"
+    - "smart contract"
+    - "polkadot"
+    - "ethereum"
+    - "solana"
+    - "token economics"
+    - "onchain"
+    - "on-chain"
 
 legacy_enterprise_signal:
   points_per_keyword: 3

@@ -83,11 +83,29 @@ def _format_location(item: dict) -> str:
     return ", ".join(names) + " only"
 
 
+def _extract_company(item: dict) -> str:
+    """Имя компании из записи Himalayas, в каком бы виде оно ни пришло.
+
+    Площадка меняла форму этого поля: раньше `companyName`, сейчас `company`
+    строкой, а когда-то — вложенным объектом `{"name": ...}`. Реальный случай
+    2026-08-04: парсер читал только `companyName`, поле стало приходить пустым,
+    и ВСЕ 60 записей источника молча отбрасывались как «без компании». Отказ
+    был совершенно тихим: источник числился рабочим и отдавал HTTP 200.
+
+    Отсюда правило: у внешнего API не бывает «того самого» имени поля.
+    Перебираем известные формы и берём первую непустую.
+    """
+    value = item.get("companyName") or item.get("company") or item.get("organization")
+    if isinstance(value, dict):
+        value = value.get("name") or value.get("title") or ""
+    return str(value or "").strip()
+
+
 def _to_common_schema(item: dict) -> Optional[dict]:
     if not isinstance(item, dict):
         return None
     title = (item.get("title") or "").strip()
-    company = (item.get("companyName") or "").strip()
+    company = _extract_company(item)
     url = (item.get("applicationLink") or item.get("guid") or "").strip()
     if not title or not company or not url:
         return None

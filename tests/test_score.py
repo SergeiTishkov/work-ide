@@ -1180,3 +1180,119 @@ def test_signing_bonus_is_not_treated_as_the_bottom_of_the_salary_range():
     comp = score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]["compensation_signal"]
     assert 20000.0 not in comp["annual_amounts_found"]
     assert 150000.0 in comp["annual_amounts_found"]
+
+
+# ============================================================================
+# Баги, найденные ручным чек-листом 2026-08-04.
+# ============================================================================
+
+
+def test_management_role_is_caught_when_the_title_is_garbage():
+    """Запись с Hacker News приехала с заголовком "YC 19" и компанией "Ashby":
+    парсер треда разобрал строку по разделителям и взял не тот кусок. Гейт
+    профессии смотрит заголовок — и в "YC 19" профессии нет, поэтому
+    менеджерская вакансия прошла как обычная."""
+    v = make_vacancy(
+        title="YC 19",
+        company="Ashby",
+        description_text=(
+            "Ashby | YC 19 | REMOTE | Hiring Engineering Leaders | $200k-$275k. "
+            "We are looking to scale our engineering leadership team. "
+            "Stack: TypeScript frontend and backend."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] == "rejected"
+    assert any(d.startswith("role:") for d in r["dealbreakers"])
+
+
+def test_informative_title_does_not_pull_words_from_the_description():
+    """Обратная страховка: у нормальной вакансии заголовок информативен, и
+    слово 'manager' из корпоративного блёрба не должно её выбрасывать."""
+    v = make_vacancy(
+        title="Senior C# Developer",
+        description_text=(
+            "Our hiring manager will contact you. Legacy ASP.NET maintenance, "
+            "insurance domain, worldwide remote."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] != "rejected"
+
+
+def test_crypto_company_is_a_dealbreaker_not_a_penalty():
+    """Parity (Polkadot/Kusama) набрала 20 баллов и попала в выдачу, хотя
+    профиль прямо избегает crypto/web3: слова давали лишь -8 в
+    low_intensity_signal, и минус утонул в плюсах за remote и стек."""
+    v = make_vacancy(
+        title="Senior Experience Engineer",
+        description_text=(
+            "Parity builds the core infrastructure behind blockchain. We develop "
+            "Polkadot and Kusama, key parts of the Web3 tech stack. TypeScript, React."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] == "rejected"
+    assert any(d.startswith("industry:") for d in r["dealbreakers"])
+
+
+def test_single_crypto_mention_is_not_enough_to_reject():
+    """Обычная компания может упомянуть крипто среди клиентов — порог в два
+    совпадения существует именно для этого."""
+    v = make_vacancy(
+        title="Senior C# Developer",
+        description_text=(
+            "Legacy insurance platform on ASP.NET. Among our clients there is one "
+            "crypto exchange. Worldwide remote."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] != "rejected"
+
+
+def test_timezone_stated_as_an_explicit_range():
+    """SuperPlane: 'We currently work across GMT+2 to GMT-3 and welcome
+    candidates in that range' — ни '±N часов', ни 'within N hours of X'."""
+    v = make_vacancy(
+        title="Product Engineer",
+        description_text=(
+            "This is a remote role. We currently work across GMT+2 to GMT-3 and "
+            "welcome candidates in that range. TypeScript and React."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] == "rejected"
+    assert any(d.startswith("timezone:") for d in r["dealbreakers"])
+
+
+def test_timezone_range_that_includes_the_candidate_is_accepted():
+    v = make_vacancy(
+        title="Senior C# Developer",
+        description_text=(
+            "Legacy ASP.NET maintenance. We work across UTC+2 to UTC+6 and welcome "
+            "candidates in that range."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    tz = r["score_breakdown"]["remote_location_fit"]["timezone_requirement"]
+    assert tz["verdict"] == "fits"
+    assert r["classification"] != "rejected"
+
+
+def test_keyword_stuffing_block_does_not_trigger_the_industry_gate():
+    """Гейт отрасли отсёк все вакансии Lemon.io: их рекламный абзац
+    "NOT YOUR TECH STACK?" перечисляет Blockchain, Ethereum и Solana.
+    Компания к крипте отношения не имеет — это список стеков, под которые
+    они подбирают проекты. Ложный отказ прячет живые вакансии."""
+    v = make_vacancy(
+        title="Senior C# Developer",
+        description_text=(
+            "Legacy insurance platform on ASP.NET, worldwide remote.\n"
+            "NOT YOUR TECH STACK?\n"
+            "We have a variety of projects, so if you have experience in "
+            "Blockchain (Ethereum/Solana), React, .NET & C#, we would be happy "
+            "to connect with you and match you with a project."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert not any(d.startswith("industry:") for d in r["dealbreakers"])
