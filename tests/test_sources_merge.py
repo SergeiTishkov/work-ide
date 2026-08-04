@@ -172,3 +172,54 @@ def test_himalayas_placeholder_company_falls_back_to_the_slug():
         {"companyName": "Acme", "companySlug": "acme-inc"}
     ) == "Acme"
     assert fetch_himalayas._extract_company({"companyName": "name"}) == ""
+
+
+def test_workable_and_smartrecruiters_parsers():
+    """Две ATS, добавленные 2026-08-04. SmartRecruiters проверен на живом
+    аккаунте (Visa, 2 вакансии); у Workable все проверенные аккаунты вернули
+    пустой список, поэтому парсер зафиксирован тестом на образце ответа —
+    иначе его корректность осталась бы непроверенной."""
+    import fetch_ats
+
+    workable = {
+        "name": "Acme Ltd",
+        "jobs": [{
+            "title": "Senior Backend Engineer",
+            "url": "https://apply.workable.com/acme/j/ABC123/",
+            "shortcode": "ABC123",
+            "city": "Tel Aviv", "country": "Israel",
+            "telecommuting": True,
+            "department": "R&D",
+            "description": "<p>Legacy .NET services</p>",
+            "published_on": "2026-08-01",
+        }],
+    }
+    records = fetch_ats._parse_workable(workable, "fallback", "acme")
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["company"] == "Acme Ltd", "имя из ответа важнее имени из конфига"
+    assert rec["location_raw"] == "Tel Aviv, Israel"
+    assert rec["remote"] is True
+    assert rec["external_id"] == "workable:acme:ABC123"
+
+    smart = {
+        "content": [{
+            "id": "744000133907678",
+            "name": "Senior Software Engineer",
+            "location": {"city": "Austin", "country": "us", "remote": False},
+            "department": {"label": "Technology"},
+            "releasedDate": "2026-08-01",
+        }],
+    }
+    records = fetch_ats._parse_smartrecruiters(smart, "Visa", "Visa")
+    assert len(records) == 1
+    assert records[0]["url"] == "https://jobs.smartrecruiters.com/Visa/744000133907678"
+    assert records[0]["location_raw"] == "Austin, us"
+
+
+def test_ats_parsers_skip_records_without_mandatory_fields():
+    """Общее для всех ATS: запись без заголовка или ссылки бесполезна."""
+    import fetch_ats
+
+    assert fetch_ats._parse_workable({"jobs": [{"title": "", "url": "x"}]}, "c", "t") == []
+    assert fetch_ats._parse_smartrecruiters({"content": [{"name": "X"}]}, "c", "t") == []

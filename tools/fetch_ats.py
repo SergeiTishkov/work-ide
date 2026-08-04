@@ -46,6 +46,13 @@ def _endpoint(provider: str, token: str) -> Optional[str]:
         return f"https://api.ashbyhq.com/posting-api/job-board/{token}"
     if provider == "recruitee":
         return f"https://{token}.recruitee.com/api/offers/"
+    if provider == "workable":
+        # Виджет карьерной страницы. Именно этой ATS пользуется большинство
+        # израильских технологических компаний — отсюда её ценность для
+        # проекта: собственные израильские борды (Drushim) отвечают 403.
+        return f"https://apply.workable.com/api/v1/widget/accounts/{token}?details=true"
+    if provider == "smartrecruiters":
+        return f"https://api.smartrecruiters.com/v1/companies/{token}/postings?limit=100"
     return None
 
 
@@ -150,8 +157,63 @@ def _parse_recruitee(payload, company: str, token: str) -> list:
     return records
 
 
+def _parse_workable(payload, company: str, token: str) -> list:
+    records = []
+    for j in (payload.get("jobs") or []):
+        title = (j.get("title") or "").strip()
+        url = (j.get("url") or j.get("shortlink") or "").strip()
+        if not title or not url:
+            continue
+        location = ", ".join(
+            str(part) for part in (j.get("city"), j.get("country")) if part
+        )
+        records.append({
+            "source": SOURCE_NAME,
+            "external_id": f"workable:{token}:{j.get('shortcode') or url}",
+            "title": title,
+            "company": payload.get("name") or company,
+            "url": url,
+            "location_raw": location,
+            "remote": True if j.get("telecommuting") else None,
+            "tags": [j["department"]] if j.get("department") else [],
+            "description_html": j.get("description") or "",
+            "posted_at": j.get("published_on"),
+            "salary_raw": None,
+        })
+    return records
+
+
+def _parse_smartrecruiters(payload, company: str, token: str) -> list:
+    records = []
+    for j in (payload.get("content") or []):
+        title = (j.get("name") or "").strip()
+        job_id = j.get("id")
+        if not title or not job_id:
+            continue
+        loc = j.get("location") or {}
+        location = ", ".join(
+            str(part) for part in (loc.get("city"), loc.get("country")) if part
+        )
+        records.append({
+            "source": SOURCE_NAME,
+            "external_id": f"smartrecruiters:{token}:{job_id}",
+            "title": title,
+            "company": (j.get("company") or {}).get("name") or company,
+            "url": f"https://jobs.smartrecruiters.com/{token}/{job_id}",
+            "location_raw": location,
+            "remote": True if loc.get("remote") else None,
+            "tags": [(j.get("department") or {}).get("label")] if j.get("department") else [],
+            "description_html": "",
+            "posted_at": j.get("releasedDate"),
+            "salary_raw": None,
+        })
+    return records
+
+
 _PARSERS = {
     "greenhouse": _parse_greenhouse,
+    "workable": _parse_workable,
+    "smartrecruiters": _parse_smartrecruiters,
     "lever": _parse_lever,
     "ashby": _parse_ashby,
     "recruitee": _parse_recruitee,
