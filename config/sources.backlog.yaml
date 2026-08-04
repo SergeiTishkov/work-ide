@@ -1,0 +1,262 @@
+# =============================================================================
+#  РЕЕСТР ИСТОЧНИКОВ — что подключено, что в очереди, что отклонено и почему
+# =============================================================================
+#  Этот файл существует, чтобы работа над источниками не начиналась каждый раз
+#  с нуля. Проверка «а можно ли взять вот этот борд» стоит запроса в сеть и
+#  двадцати минут разбора формата; без записи результата тот же борд будут
+#  проверять снова через месяц.
+#
+#  Поэтому здесь фиксируются ВСЕ три исхода, а не только успешные:
+#    implemented — подключён, есть фетчер
+#    pending     — годен, но ещё не подключён
+#    rejected    — проверен и не годится, с причиной и кодом ответа
+#
+#  Общий для всех идентичностей: доступность источника от профиля поиска не
+#  зависит. А вот ВКЛЮЧЁН ли источник у конкретной идентичности — это уже её
+#  дело, см. <префикс>_sources.yaml.
+#
+#  Замеры делаются живыми запросами с честным User-Agent проекта. Дата замера
+#  обязательна: борды меняют эндпоинты чаще, чем хотелось бы (реальный случай
+#  2026-08-04: Himalayas стал отдавать в поле companyName строку "name").
+# =============================================================================
+
+schema_version: 1
+last_survey: "2026-08-04"
+
+sources:
+
+  # --- Подключены ----------------------------------------------------------
+
+  - name: weworkremotely
+    status: implemented
+    kind: rss
+    measured: "242 вакансии за прогон (5 категорийных фидов)"
+    note: "Лучший источник проекта. Есть структурное поле region."
+
+  - name: remoteok
+    status: implemented
+    kind: json
+    measured: "~100, только последние"
+    note: "Периодически отдаёт нерелевантный мусор — парсер строго валидирует."
+
+  - name: jobicy
+    status: implemented
+    kind: json
+    measured: "~100"
+
+  - name: remotive
+    status: implemented
+    kind: json
+    measured: "~35"
+
+  - name: himalayas
+    status: implemented
+    kind: json
+    measured: "20-100; фид периодически занимает одна компания"
+    note: >
+      2026-08-04: отдаёт companyName: "name" — буквально имя поля вместо
+      значения. Настоящее имя в companySlug, парсер это учитывает.
+
+  - name: hn_whoishiring
+    status: implemented
+    kind: json
+    measured: "~22"
+    note: "Заголовки приходят из вольного текста треда и бывают мусорными."
+
+  - name: arbeitnow
+    status: implemented
+    kind: json
+    measured: "~175, полезный выход ~6%"
+    note: "Преимущественно немецкий рынок, большинство отсекается по языку."
+
+  - name: ats
+    status: implemented
+    kind: json
+    measured: "зависит от списка компаний"
+    providers: [greenhouse, lever, ashby, recruitee]
+
+  # --- В очереди: проверены живыми запросами 2026-08-04 ---------------------
+
+  - name: linkedin
+    status: pending
+    priority: 1
+    kind: html
+    endpoint: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+    measured: "HTTP 200, 30 карточек на страницу, пагинация start=0,25,50 работает"
+    geo_coverage: [israel, uae, saudi_arabia, singapore, switzerland, germany, netherlands, eu, us]
+    note: >
+      Гостевой эндпоинт, отдаётся анониму штатно — тот же, что использует
+      гостевой интерфейс самого LinkedIn. Это НЕ обход защиты: тем же запросом
+      Indeed отвечает 403, Glassdoor 403. Главный рычаг проекта: одним фетчером
+      закрывает все интересующие страны разом, тогда как страновые борды
+      (Bayt, GulfTalent, Drushim) закрыты наглухо.
+      ЦЕНА: недокументированный HTML. Парсер обязан возвращать 0 при смене
+      вёрстки, а не битые записи.
+
+  - name: devitjobs
+    status: pending
+    priority: 2
+    kind: json
+    endpoint: "https://devitjobs.uk/api/jobsLight и https://devitjobs.com/api/jobsLight"
+    measured: "UK 2449 записей, US 1590 — крупнейший улов из найденного"
+    note: "Есть annualSalaryFrom/To, expLevel, companyType."
+
+  - name: jobs_ch
+    status: pending
+    priority: 2
+    kind: json
+    endpoint: "https://www.jobs.ch/api/v1/public/search"
+    measured: "HTTP 200, поле documents"
+    note: "Главный швейцарский борд. Швейцария для контрактора реалистичнее США."
+
+  - name: mycareersfuture
+    status: pending
+    priority: 3
+    kind: json
+    endpoint: "https://api.mycareersfuture.gov.sg/v2/jobs"
+    measured: "919 по запросу software engineer"
+    note: "Государственный портал Сингапура. Данные чистые и структурные."
+
+  - name: landing_jobs
+    status: pending
+    priority: 3
+    kind: json
+    endpoint: "https://landing.jobs/api/v1/jobs"
+    measured: "HTTP 200"
+    note: "ЕС. Есть флаги remote и relocation_paid, вилка зарплаты."
+
+  - name: workingnomads
+    status: pending
+    priority: 3
+    kind: json
+    endpoint: "https://www.workingnomads.com/api/exposed_jobs/"
+    measured: "HTTP 200, 28 записей"
+
+  - name: jobspresso
+    status: pending
+    priority: 4
+    kind: rss
+    endpoint: "https://jobspresso.co/?feed=job_feed"
+    measured: "HTTP 200, RSS 93 КБ"
+
+  - name: berlinstartupjobs
+    status: pending
+    priority: 4
+    kind: rss
+    endpoint: "https://berlinstartupjobs.com/feed/"
+    measured: "HTTP 200, RSS 13 КБ"
+
+  - name: ats_workable
+    status: pending
+    priority: 2
+    kind: json
+    endpoint: "https://apply.workable.com/api/v1/widget/accounts/<account>"
+    measured: "HTTP 200, ключи name/description/jobs"
+    note: "Рычаг по Израилю: там Workable — стандарт де-факто."
+
+  - name: ats_smartrecruiters
+    status: pending
+    priority: 3
+    kind: json
+    endpoint: "https://api.smartrecruiters.com/v1/companies/<company>/postings"
+    measured: "HTTP 200, есть totalFound и пагинация"
+
+  # --- Отклонены: проверено, чтобы не проверять снова -----------------------
+
+  - name: eures
+    status: rejected
+    checked: "2026-08-04"
+    reason: >
+      Портал ЕС на SPA, публичного read-API нет. Найденный поиском API
+      предназначен для ЗАГРУЗКИ вакансий национальными службами занятости,
+      а не для чтения.
+
+  - name: arbeitsagentur
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 403 на всех версиях эндпоинта (v2, v3, v4), в том числе с их же X-API-Key."
+
+  - name: bayt
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 403. Крупнейший борд MENA, но закрыт. Залив покрывается через LinkedIn."
+
+  - name: gulftalent
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 404."
+
+  - name: drushim
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 403. Израиль покрывается через LinkedIn и Workable."
+
+  - name: nodeflair
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 403. Сингапур покрывается через MyCareersFuture."
+
+  - name: glints
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 403."
+
+  - name: justjoinit
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 404, эндпоинты сменились. Польша — не приоритетный рынок."
+
+  - name: nofluffjobs
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 400/405, требует недокументированного тела запроса."
+
+  - name: relocate_me
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 404."
+
+  - name: honeypot
+    status: rejected
+    checked: "2026-08-04"
+    reason: "ConnectionError, API недоступен."
+
+  - name: otta
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 404, публичного API нет."
+
+  - name: indeed
+    status: rejected
+    checked: "2026-08-04"
+    reason: >
+      HTTP 403 обычному запросу. Пройти можно только маскировкой под браузер —
+      это обход активной защиты, проект такого не делает (CLAUDE.md §5).
+
+  - name: glassdoor
+    status: rejected
+    checked: "2026-08-04"
+    reason: "HTTP 403, официальный API 410 Gone. Данные оттуда собирает агент веб-поиском."
+
+  # --- Требуют бесплатного ключа: последний приоритет -----------------------
+
+  - name: adzuna
+    status: pending
+    priority: 9
+    kind: json
+    reason_for_low_priority: >
+      Живой, широкое покрытие ЕС, но требует регистрации (app_id + app_key) и
+      отдаёт агрегированную выдачу с дублями других бордов. Ключ — только в
+      переменной окружения, никогда в репозитории (CLAUDE.md §7).
+
+  - name: jooble
+    status: pending
+    priority: 9
+    kind: json
+    reason_for_low_priority: "То же: нужен ключ, выдача агрегированная."
+
+  - name: careerjet
+    status: pending
+    priority: 9
+    kind: json
+    reason_for_low_priority: "То же: нужен affid."

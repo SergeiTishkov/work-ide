@@ -28,6 +28,7 @@ import fetch_ats  # noqa: E402
 import fetch_himalayas  # noqa: E402
 import fetch_hn_whoishiring  # noqa: E402
 import fetch_jobicy  # noqa: E402
+import fetch_linkedin  # noqa: E402
 import fetch_remoteok  # noqa: E402
 import fetch_remotive  # noqa: E402
 import fetch_wwr  # noqa: E402
@@ -46,6 +47,7 @@ FETCHERS = {
     "jobicy": fetch_jobicy.fetch,
     "himalayas": fetch_himalayas.fetch,
     "ats": fetch_ats.fetch,
+    "linkedin": fetch_linkedin.fetch,
 }
 
 
