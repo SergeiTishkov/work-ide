@@ -33,6 +33,15 @@
 #
 #  Пропущенный вопрос — это null в answer, а не удалённый пункт: по нему потом
 #  видно, что именно осталось невыясненным.
+
+#  ЛИЧНЫЕ ВОПРОСЫ (personal: true). Этот файл лежит в ОБЩЕМ репозитории —
+#  значит, ответы на них сюда не пишутся. В `answer` ставится `local`, а само
+#  значение уходит в local-constitution/personal/<префикс>/<префикс>_owner.yaml.
+#
+#  Смысл при этом не теряется: вопросник существует, чтобы объяснить, ПОЧЕМУ
+#  настройки именно такие, а для этого достаточно решения, а не личных
+#  обстоятельств. «Требование эксклюзивности — дисквалификация» объясняет
+#  конфиг; «у меня уже есть работа» не добавляет ничего, кроме утечки.
 # =============================================================================
 
 schema_version: 1
@@ -78,12 +87,14 @@ answers:
     drives: ["profile.owner.*", "profile.tech_stack"]
 
   - id: person.name
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: later
     q: "Имя — или псевдоним, если не хотите видеть настоящее в общем репозитории."
     answer: null
     drives: ["profile.owner.name"]
 
   - id: person.cv_location
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: later
     q: >
       Если есть CV файлом — положите его в local-constitution/personal/<префикс>/
@@ -95,12 +106,14 @@ answers:
     drives: ["profile.owner.cv_files"]
 
   - id: person.experience
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: later
     q: "Сколько лет опыта и какой у вас уровень (junior / middle / senior / lead)?"
     answer: null
     drives: ["profile.owner.years_experience", "profile.owner.role"]
 
   - id: person.contact
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: later
     q: >
       Контакт для User-Agent бота (чтобы владелец сайта мог понять, кто к нему
@@ -112,6 +125,7 @@ answers:
 
   # --- §2 Резидентство: порождает ВСЮ гео-логику ---------------------------
   - id: residency.country
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: essential
     q: "В какой стране вы физически живёте? (Резидентство, не гражданство.)"
     why: >
@@ -128,6 +142,7 @@ answers:
       - "profile.owner.location"
 
   - id: residency.citizenship
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: later
     q: "Гражданство (или гражданства)?"
     why: "Определяет, оставлять ли в дисквалификаторах фразы про гражданские цензы."
@@ -136,6 +151,7 @@ answers:
     drives: ["criteria.remote_location_fit.hard_dealbreakers"]
 
   - id: residency.permits
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: later
     q: "Есть ли разрешения на работу, визы, ВНЖ где-либо (США, ЕС, UK, Канада…)?"
     why: "Наличие разрешения переворачивает знак: 'US only' из отсева становится плюсом."
@@ -143,6 +159,7 @@ answers:
     drives: ["criteria.remote_location_fit (знак правил по регионам)"]
 
   - id: residency.timezone
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: later
     q: "Ваш часовой пояс. Какое пересечение с работодателем приемлемо?"
     answer: null
@@ -168,6 +185,7 @@ answers:
 
   # --- §4 Языки ------------------------------------------------------------
   - id: languages.spoken
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: essential
     q: "Какими языками владеете достаточно для работы?"
     why: >
@@ -228,9 +246,9 @@ answers:
     drives: ["criteria.remote_location_fit.restrictive_region_signal"]
 
   # --- §7 Тип занятости ----------------------------------------------------
-  - id: employment.second_job
+  - id: employment.exclusivity
     tier: later
-    q: "Планируете совмещать эту работу с другой занятостью?"
+    q: "Требования эксклюзивности занятости — приемлемы или дисквалификация?"
     why: >
       Если да, пункты об эксклюзивности занятости
       становятся дисквалификаторами.
@@ -287,6 +305,7 @@ answers:
 
   # --- §9 Деньги -----------------------------------------------------------
   - id: comp.range
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: later
     q: "Целевая вилка. Укажите в любом удобном виде: в месяц, в год, в час."
     answer: null
@@ -294,6 +313,7 @@ answers:
     drives: ["profile.goal.target_compensation"]
 
   - id: comp.floor
+    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
     tier: later
     q: "Есть ли жёсткий минимум, ниже которого вакансия не рассматривается вообще?"
     default: "нет, только штраф"

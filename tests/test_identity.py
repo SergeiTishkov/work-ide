@@ -568,3 +568,55 @@ def test_owner_skeleton_never_overwrites_a_filled_file(tmp_path, monkeypatch, sa
     skeleton.write_text("owner:\n  name: Уже заполнено\n", encoding="utf-8")
     identity.init_local_constitution("newp")
     assert "Уже заполнено" in skeleton.read_text(encoding="utf-8")
+
+
+# --- Клонирование идентичности ----------------------------------------------
+#
+# Частый случай: один и тот же поиск для разных стран. Стек, тип занятости и
+# признаки компании общие, различаются гео-правила, языки и часовой пояс.
+# Собирать вторую идентичность с нуля — переотвечать на 50 вопросов ради трёх.
+
+def test_clone_copies_every_file_under_the_new_prefix(sandbox_identities):
+    identity.scaffold_identity("srcp", "Source Search")
+    created = identity.clone_identity("srcp", "dstp", "Source Search for Germany")
+
+    assert created[0].parent.name == "dstp-source-search-for-germany"
+    names = {p.name for p in created}
+    for required in identity.REQUIRED_FILES:
+        assert f"dstp_{required}" in names
+
+
+def test_clone_rewrites_internal_references_to_the_source(sandbox_identities):
+    """Иначе клон нарушил бы правило «файлы одной идентичности не ссылаются на
+    другую» и был бы отвергнут валидатором."""
+    identity.scaffold_identity("srcp", "Source Search")
+    identity.identity_file("srcp", "identity.md").write_text(
+        "# srcp\nсмотри srcp_criteria.yaml\n", encoding="utf-8"
+    )
+    identity.clone_identity("srcp", "dstp", "Cloned Search")
+
+    text = identity.identity_file("dstp", "identity.md").read_text(encoding="utf-8")
+    assert "dstp_criteria.yaml" in text
+    assert "srcp_" not in text
+    assert identity.validate("dstp") == []
+
+
+def test_clone_refuses_a_taken_prefix(sandbox_identities):
+    identity.scaffold_identity("srcp", "Source Search")
+    identity.scaffold_identity("dstp", "Other Search")
+    with pytest.raises(identity.InvalidIdentityError) as exc:
+        identity.clone_identity("srcp", "dstp", "Cloned Search")
+    assert "занят" in str(exc.value)
+
+
+def test_clone_refuses_an_unknown_source(sandbox_identities):
+    with pytest.raises(identity.UnknownIdentityError):
+        identity.clone_identity("nosuch", "dstp", "Cloned Search")
+
+
+def test_clone_refuses_the_frozen_fixture():
+    """Фикстура откалибрована под тесты, а не под живой поиск — клон от неё
+    унаследовал бы калибровочные значения и молча искал бы не то."""
+    with pytest.raises(identity.InvalidIdentityError) as exc:
+        identity.clone_identity("ftf", "dstp", "Cloned Search")
+    assert "фикстура" in str(exc.value)

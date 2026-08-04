@@ -517,6 +517,95 @@ def cmd_list(_args) -> None:
         print(f"  {prefix:<8} kind={kind:<14} {describe(prefix)}{mark_str}")
 
 
+def clone_identity(source: str, prefix: str, full_name: str) -> List[Path]:
+    """Копирует существующую идентичность под новым префиксом.
+
+    ЗАЧЕМ. Самый частый случай — один и тот же поиск, привязанный к разным
+    странам: «то же самое, но для Германии» и «то же самое, но для Канады».
+    Стек, тип занятости, признаки подходящей компании у них общие, а
+    гео-правила, языковой фильтр и часовой пояс — разные. Собирать вторую
+    идентичность с нуля значит переотвечать на 50 вопросов ради изменения трёх.
+
+    Отличие от `new`: `new` даёт пустую заготовку, `clone` — заполненную копию,
+    в которой нужно поправить только то, что действительно отличается.
+
+    Все внутренние ссылки на префикс-источник переписываются на новый — иначе
+    клон нарушил бы правило «файлы одной идентичности не ссылаются на другую»
+    и был бы отвергнут валидатором.
+    """
+    if source == prefix:
+        raise InvalidIdentityError("исходный и новый префиксы совпадают")
+    src_dir = identity_folders().get(source)
+    if src_dir is None:
+        raise UnknownIdentityError(
+            f"идентичность '{source}' не найдена. Доступные: "
+            + (", ".join(list_identities(include_fixtures=True)) or "нет ни одной")
+        )
+    if _read_kind(source) == "fixture":
+        raise InvalidIdentityError(
+            f"'{source}' — замороженная тестовая фикстура, клонировать её нельзя: "
+            "она откалибрована под тесты, а не под живой поиск"
+        )
+    if not PREFIX_RE.match(prefix):
+        raise InvalidIdentityError(f"неверный формат префикса '{prefix}'. {PREFIX_RULE_TEXT}")
+    if prefix in identity_folders():
+        raise InvalidIdentityError(f"префикс '{prefix}' уже занят")
+
+    target = common.IDENTITIES_DIR / folder_name_for(prefix, full_name)
+    if target.exists():
+        raise InvalidIdentityError(f"папка {target} уже существует")
+
+    target.mkdir(parents=True)
+    created: List[Path] = []
+    for src in sorted(src_dir.iterdir()):
+        if not src.is_file() or not src.name.startswith(f"{source}_"):
+            continue
+        text = src.read_text(encoding="utf-8").replace(f"{source}_", f"{prefix}_")
+        dest = target / f"{prefix}_{src.name[len(source) + 1:]}"
+        dest.write_text(text, encoding="utf-8")
+        created.append(dest)
+    return created
+
+
+def cmd_clone(args) -> None:
+    try:
+        created = clone_identity(args.source, args.prefix, args.name)
+    except IdentityError as exc:
+        common.eprint(str(exc))
+        sys.exit(1)
+
+    print(f"Идентичность '{args.prefix}' склонирована из '{args.source}': "
+          f"{identity_dir(args.prefix)}")
+    for path in created:
+        print(f"  + {path.name}")
+
+    problems = validate(args.prefix)
+    if problems:
+        print("\n[FAIL] структурная проверка не прошла:")
+        for p in problems:
+            print(f"       - {p}")
+        sys.exit(1)
+    print("\n[ OK ] структура корректна (префиксы, обязательные файлы, чужие ссылки)")
+
+    print(
+        "\nЭто ПОЛНАЯ КОПИЯ — сейчас она ищет ровно то же, что и оригинал.\n"
+        "Проверьте и поправьте то, что должно отличаться:\n"
+        f"  1. {args.prefix}_profile.yaml -> identity.display_name, abbreviation,\n"
+        "     scoring_philosophy, target_regions;\n"
+        f"  2. {args.prefix}_criteria.yaml -> гео-блоки (restrictive_region_signal,\n"
+        "     acceptable_region_signal, hard_dealbreakers, timezone_gate,\n"
+        "     ambiguous_place_names) и языковой фильтр;\n"
+        f"  3. {args.prefix}_identity.md -> чем этот поиск отличается от исходного;\n"
+        f"  4. {args.prefix}_questionnaire.yaml -> ответы, которые изменились.\n"
+        "\nГео-правила ВЫВОДЯТСЯ по таблицам config/derivation/, а не правятся\n"
+        "на глаз: для резидента США фраза 'US only' — плюс, для нерезидента —\n"
+        "полная дисквалификация. Скопированное правило с неверным знаком тихо\n"
+        "выбросит половину рынка.\n"
+        f"\nДанные не копируются: у '{args.prefix}' своя пустая база.\n"
+        f"Активировать: python tools/identity.py init-local --identity {args.prefix}"
+    )
+
+
 def cmd_new(args) -> None:
     prefix = args.prefix
     try:
@@ -978,6 +1067,17 @@ def build_parser() -> argparse.ArgumentParser:
              "Станет частью имени папки: identities/<префикс>-<расшифровка>",
     )
     p_new.set_defaults(func=cmd_new)
+
+    p_clone = sub.add_parser(
+        "clone",
+        help="Скопировать существующую идентичность под новым префиксом",
+    )
+    p_clone.add_argument("--from", dest="source", required=True,
+                         help="Префикс идентичности-источника")
+    p_clone.add_argument("--prefix", required=True, help="Префикс новой идентичности")
+    p_clone.add_argument("--name", required=True,
+                         help='Расшифровка фразой, например "KISEL for Germany"')
+    p_clone.set_defaults(func=cmd_clone)
 
     p_init = sub.add_parser(
         "init-local",

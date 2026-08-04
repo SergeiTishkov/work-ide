@@ -28,28 +28,37 @@ contact:
   #   null           -> без контакта (doctor выдаст предупреждение)
   user_agent_contact: "local"
 
+# ==== ЛИЧНОЕ И ОБЩЕЕ ====
+#
+# Значение `local` означает: настоящее значение лежит в
+# local-constitution/personal/<префикс>/<префикс>_owner.yaml (вне гита) и
+# подставляется при активации идентичности.
+#
+# Проверочный вопрос, что куда: «изменится ли это, если тем же поиском
+# воспользуется другой человек?» Да -> local. Нет -> пишите значение здесь.
+#
+# Заготовку owner.yaml создаёт `python tools/identity.py init-local`.
 owner:
-  name: "<имя или псевдоним>"
-  role: "<должность>"
-  years_experience: 0
-  linkedin: "<ссылка или null>"
-  # Личные документы — только в Малой Конституции, вне гита. Имя файла
-  # оставляется владельческое: правило префиксов на чужие документы не
-  # распространяется (см. docs/LOCAL_CONSTITUTION.md). Пробелы в пути — норма.
-  cv_files:
-    - "local-constitution/personal/<префикс>/CV Ivan Petrov Software Engineer.pdf"
-  # Языки, которыми владеете достаточно для работы. В языковой фильтр попадут
-  # те, которых здесь НЕТ (см. config/derivation/languages.yaml).
-  languages:
-    - "English"
-  location:
-    country: "<страна проживания>"
-    # Если название страны/города неоднозначно — предупредите здесь явно.
-    disambiguation_warning: >
-      <например: в вакансиях "Georgia" почти всегда означает штат США, а не
-      страну. Если у вас такой проблемы нет — уберите это поле.>
-  timezone_notes: >
-    <ваш часовой пояс и с какими регионами он удобно пересекается>
+  name: local
+  linkedin: local
+  years_experience: local        # стаж личный; уровень — в role ниже
+  role: "<должность: senior backend, lead QA…>"   # характеристика ПОИСКА
+  # CV лежит в Малой Конституции под своим исходным именем (правило префиксов
+  # на чужие документы не распространяется, см. docs/LOCAL_CONSTITUTION.md).
+  cv_files: local
+  # Языки: в языковой фильтр попадут те, которых человек НЕ знает
+  # (см. config/derivation/languages.yaml).
+  languages: local
+  # Резидентство обычно личное: другой человек с тем же поиском живёт в
+  # другом месте. НО если поиск привязан к стране по существу («ищу работу
+  # именно в Германии»), страна — определение идентичности, и тогда её пишут
+  # литерально вместо `local`:
+  #     location:
+  #       country: "Germany"
+  #       utc_offset: 1
+  # См. docs/IDENTITIES.md, «Граница: что личное, что характеристика поиска».
+  location: local
+  timezone_notes: local
 
 target_regions:
   # Различайте: "компания находится в X" ≠ "нужно резидентство в X".
@@ -63,14 +72,9 @@ goal:
     <зачем этот поиск, одним абзацем>
   hours_per_day_target: [0, 0]
   ai_assisted: true
-  target_compensation:
-    currency: USD
-    monthly_parttime_usd: [0, 0]
-    annual_parttime_usd: [0, 0]
-    hourly_contractor_usd: [0, 0]
-    priority_note: >
-      <что важнее: спокойствие или деньги. Это определяет соотношение весов
-      low_intensity_signal и compensation_signal в criteria.>
+  # Зарплатные ожидания зависят от обстоятельств человека, а не от типа
+  # поиска — поэтому личные. Структуру заготовит `identity.py init-local`.
+  target_compensation: local
 
 employment_type_priority:
   high: []
