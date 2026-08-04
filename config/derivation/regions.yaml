@@ -1,0 +1,184 @@
+# =============================================================================
+#  ВЫВОД ГЕО-ПРАВИЛ ИЗ РЕЗИДЕНТСТВА
+# =============================================================================
+#  Самая важная таблица проекта, и самая опасная при копипасте.
+#
+#  Гео-дисквалификаторы — это НЕ предпочтение человека, а СЛЕДСТВИЕ его
+#  резидентства. Одна и та же фраза "US only" для резидента Грузии — полная
+#  дисквалификация, а для резидента США — наоборот, плюс. Поэтому копировать
+#  чужой restrictive_region_signal нельзя: он молча выбросит половину рынка
+#  или, наоборот, наполнит выдачу вакансиями, куда человека не возьмут.
+#
+#  Правило генерации (реализовано в identity.py build):
+#
+#    для каждого региона R:
+#      если человек резидент/имеет разрешение в R:
+#        residency_required_phrases -> acceptable_region_signal   (ПЛЮС)
+#        citizenship_phrases        -> не добавляются в дисквалификаторы
+#      иначе:
+#        residency_required_phrases -> restrictive_region_signal  (ОТСЕВ)
+#        citizenship_phrases        -> hard_dealbreakers          (ОТСЕВ)
+#      если R в целевых регионах И человек НЕ резидент:
+#        company_located_phrases    -> acceptable_region_signal   (небольшой плюс)
+#
+#  Различие двух последних наборов принципиально: "компания находится в X" ≠
+#  "нужно резидентство в X". Проект уже обжигался на этом — фраза "EU Remote"
+#  сначала попала в плюсы как "европейская компания", хотя означает требование
+#  резидентства в ЕС.
+#
+#  Список регионов заведомо неполон — мир большой. Дополнять по мере
+#  необходимости; неизвестный регион просто не породит правил, и его поймает
+#  ручная проверка по docs/VACANCY_CHECKLIST.md.
+# =============================================================================
+
+schema_version: 1
+
+regions:
+  united_states:
+    display_name: "США"
+    residency_required_phrases:
+      - "us only"
+      - "usa only"
+      - "remote (us)"
+      - "remote - us"
+      - "us remote only"
+      - "must be located in the united states"
+      - "must reside in the us"
+      - "must be based in the us"
+      - "us-based only"
+    citizenship_phrases:
+      - "us citizen required"
+      - "us citizenship required"
+      - "must be a us citizen"
+      - "u.s. person required"
+      - "united states person required"
+      - "itar"              # экспортный контроль: де-факто требует US person
+      - "security clearance"
+    company_located_phrases:
+      - "united states"
+      - "usa"
+      - "u.s."
+
+  canada:
+    display_name: "Канада"
+    residency_required_phrases:
+      - "canada only"
+      - "must be based in canada"
+      - "must reside in canada"
+      - "remote (canada)"
+      - "canadian residents only"
+    citizenship_phrases:
+      - "canadian citizenship required"
+      - "must be a canadian citizen"
+    company_located_phrases:
+      - "canada"
+      - "toronto"
+      - "vancouver"
+      - "montreal"
+
+  european_union:
+    display_name: "Европейский союз"
+    residency_required_phrases:
+      - "eu remote"
+      - "remote (eu)"
+      - "remote europe"
+      - "eu only"
+      - "europe only"
+      - "must be based in the eu"
+      - "eu residents only"
+      - "eastern europe only"
+      - "western europe only"
+      - "nordics only"
+      - "dach only"
+      - "benelux only"
+    citizenship_phrases:
+      - "eu citizenship required"
+      - "must be eu resident"
+      - "eu work permit required"
+      - "right to work in the eu"
+    company_located_phrases:
+      - "european union"
+      - "europe"
+
+  united_kingdom:
+    display_name: "Великобритания"
+    residency_required_phrases:
+      - "uk only"
+      - "remote (uk)"
+      - "must be based in the uk"
+      - "must be located in the uk"
+      - "uk residents only"
+    citizenship_phrases:
+      - "right to work in the uk"
+      - "uk work permit required"
+    company_located_phrases:
+      - "united kingdom"
+      - "london"
+
+  latam:
+    display_name: "Латинская Америка"
+    residency_required_phrases:
+      - "remote latam"
+      - "latam only"
+      - "latin america only"
+      - "mexico only"
+      - "must be based in mexico"
+      - "brazil only"
+      - "argentina only"
+    citizenship_phrases: []
+    company_located_phrases:
+      - "latam"
+      - "latin america"
+
+  apac:
+    display_name: "Азиатско-Тихоокеанский регион"
+    residency_required_phrases:
+      - "remote apac"
+      - "apac only"
+      - "asia pacific only"
+      - "australia and new zealand only"
+      - "anz only"
+      - "india only"
+      - "must be based in india"
+      - "philippines only"
+    citizenship_phrases: []
+    company_located_phrases:
+      - "apac"
+      - "asia pacific"
+
+  israel:
+    display_name: "Израиль"
+    residency_required_phrases:
+      - "israel only"
+      - "must be based in israel"
+      - "israeli residents only"
+    citizenship_phrases:
+      - "israeli citizenship required"
+    company_located_phrases:
+      - "israel"
+      - "tel aviv"
+
+  uae:
+    display_name: "ОАЭ"
+    residency_required_phrases:
+      - "uae only"
+      - "must be based in uae"
+    citizenship_phrases:
+      - "uae residency required"
+    company_located_phrases:
+      - "uae"
+      - "united arab emirates"
+      - "dubai"
+      - "abu dhabi"
+
+# Фразы, означающие "нанимаем откуда угодно". Не зависят от резидентства и
+# попадают в worldwide_remote любой идентичности.
+worldwide_phrases:
+  - "remote worldwide"
+  - "remote - anywhere"
+  - "remote anywhere"
+  - "work from anywhere"
+  - "hire anywhere"
+  - "globally remote"
+  - "international remote"
+  - "remote (global)"

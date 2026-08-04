@@ -1,0 +1,147 @@
+# =============================================================================
+#  КАТАЛОГ ИСТОЧНИКОВ — общая машинерия, одинаковая для всех пользователей
+# =============================================================================
+#  Здесь описано, ЧТО умеет каждый источник: эндпоинт, тип, признак remote-only,
+#  какие параметры принимает и чего от него ждать по качеству данных.
+#
+#  Здесь НЕТ ничего личного: включён источник или нет и с какими параметрами —
+#  решает идентичность в своём файле `<префикс>_sources.yaml`. Разделение
+#  проведено по границе «факт о мире» / «предпочтение человека»: устаревший URL
+#  — это баг для всех сразу, а отключённый arbeitnow — чей-то осознанный выбор.
+#
+#  Идентичность НЕ МОЖЕТ переопределить url/kind/remote_only: это свойства
+#  площадки, а не настройка. Может — enabled и params.
+#
+#  Как читать поле params_schema: перечислены параметры, которые фетчер
+#  принимает от идентичности, с типом и смыслом. Полное описание для сборки
+#  своей идентичности — в docs/BUILDING_BLOCKS.md.
+# =============================================================================
+
+schema_version: 1
+
+sources:
+  - name: weworkremotely
+    kind: rss_multi
+    remote_only: true
+    urls:
+      - "https://weworkremotely.com/categories/remote-programming-jobs.rss"
+      - "https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss"
+      - "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss"
+      - "https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss"
+      - "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss"
+    params_schema:
+      urls: "список RSS-фидов; по умолчанию все пять категорий"
+    yield_notes: >
+      Лучший источник проекта по соотношению сигнал/шум. ~242 вакансии за
+      прогон, только удалённые, англоязычные. Даёт структурное поле region
+      ("Anywhere in the World" / "USA Only") — самый надёжный гео-сигнал среди
+      всех источников. Замер 2026-07-30: одна категория programming даёт 25
+      вакансий, все пять — 242.
+    caveats: >
+      Воронку отклика держит у себя: в 71% вакансий "To apply" ведёт обратно на
+      weworkremotely.com. Фетчер извлекает сайт компании из блока
+      "Headquarters/URL", чтобы можно было откликнуться напрямую.
+
+  - name: remoteok
+    kind: json_api
+    remote_only: true
+    url: "https://remoteok.com/api"
+    params_schema:
+      url: "эндпоинт API"
+    yield_notes: "~100 последних вакансий за вызов, только удалённые. Глубины по времени нет."
+    caveats: >
+      Фид зашумлён: наблюдались новостные заметки вместо вакансий. Парсер строго
+      валидирует обязательные поля (position, company, apply_url) и молча
+      отбрасывает мусор — не считать сырое количество записей числом вакансий.
+
+  - name: remotive
+    kind: json_api
+    remote_only: true
+    url: "https://remotive.com/api/remote-jobs?limit=200"
+    params_schema:
+      url: "эндпоинт API"
+    yield_notes: >
+      ~35 вакансий за вызов. Даёт candidate_required_location — явное структурное
+      гео-ограничение.
+    caveats: "Параметры limit/search/category на практике игнорируются — берём что дают."
+
+  - name: jobicy
+    kind: json_api
+    remote_only: true
+    url: "https://jobicy.com/api/v2/remote-jobs?count=100&industry=dev"
+    params_schema:
+      url: "эндпоинт API; industry=dev даёт максимальную долю разработки"
+    yield_notes: >
+      ~100 вакансий. Отдаёт структурированную зарплату (salaryMin/Max/Currency/
+      Period) и гео (jobGeo) — надёжнее парсинга текста.
+    caveats: "Параметр tag= возвращает пусто, использовать бесполезно."
+
+  - name: himalayas
+    kind: json_api
+    remote_only: true
+    url: "https://himalayas.app/jobs/api?limit=100"
+    params_schema:
+      url: "эндпоинт API"
+    yield_notes: >
+      ~20 вакансий за вызов независимо от limit. locationRestrictions — список
+      разрешённых стран (пустой = worldwide), самый явный гео-сигнал из всех.
+    caveats: "Мало вакансий, но бесплатно и без ключа."
+
+  - name: ats
+    kind: ats_boards
+    remote_only: false
+    params_schema:
+      targets: >
+        список компаний вида {company, provider, token}; по умолчанию берётся из
+        <префикс>_ats_targets.yaml
+    yield_notes: >
+      Вакансии напрямую от работодателей через официальные публичные API их ATS
+      (Greenhouse / Lever / Ashby / Recruitee) — те самые, на которых работают
+      виджеты вакансий на сайтах компаний. Без чужой воронки отклика, без
+      подписок, без посредника. Замер: Stripe 546 вакансий, Cloudflare 284,
+      GitLab 185, Notion 111.
+    caveats: >
+      Главный рычаг качества — СПИСОК КОМПАНИЙ, а не сам источник. Технологические
+      компании из стартового списка не дают .NET-вакансий; под конкретный профиль
+      список нужно наполнять релевантными работодателями.
+
+  - name: hn_whoishiring
+    kind: hn_algolia
+    remote_only: false
+    url: "http://hn.algolia.com/api/v1/search"
+    params_schema:
+      keywords: >
+        список ключевых слов для поиска по треду; ПО УМОЛЧАНИЮ берётся из
+        profile.tech_stack.core активной идентичности. Каждое слово = один
+        HTTP-запрос к Algolia, поэтому список короткий (бюджет стоимости).
+      hits_per_keyword: "сколько комментариев запрашивать на слово (по умолчанию 50)"
+    yield_notes: >
+      Легаси/enterprise вакансии часто попадают именно сюда, а не на джоб-борды.
+      Иногда здесь встречаются "тихие" вакансии без конкуренции.
+    caveats: "Формат вольный, много шума, компания и локация парсятся эвристически."
+
+  - name: arbeitnow
+    kind: json_api
+    remote_only: false
+    url: "https://www.arbeitnow.com/api/job-board-api"
+    params_schema:
+      url: "эндпоинт API"
+    yield_notes: "~175 вакансий за вызов."
+    caveats: >
+      ВНИМАНИЕ: по факту это преимущественно НЕМЕЦКИЙ рынок труда. Замер
+      2026-07-30: давал 68% всей базы при ~6% полезного выхода — подавляющее
+      большинство вакансий немецкоязычные ("m/w/d", "Deutschkenntnisse") и
+      отсеиваются языковым фильтром, remote среди них меньшинство. Полезен
+      только тем, кто читает по-немецки или готов терпеть низкий выход.
+
+  - name: manual
+    kind: manual_ingest
+    remote_only: false
+    params_schema: {}
+    yield_notes: >
+      Не автоматический источник. Через tools/ingest_manual.py агент заносит
+      находки, полученные обычным веб-поиском — прежде всего с LinkedIn, Indeed,
+      Dice и карьерных страниц компаний.
+    caveats: >
+      Единственный легальный способ использовать площадки, которые нельзя читать
+      программно (403 за анти-бот защитой). См. docs/SOURCES.md.

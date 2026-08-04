@@ -1,0 +1,240 @@
+# =============================================================================
+#  KISEL — профиль идентичности
+# =============================================================================
+#  Человекочитаемая "истина" о том, кто ищет и что именно.
+#  tools/score.py читает kisel_criteria.yaml; этот файл — контекст для агента и
+#  человека, который не должен потеряться в коде.
+#
+#  Полное описание идентичности — в kisel_identity.md.
+#  Почему настройки именно такие — в kisel_questionnaire.yaml.
+# =============================================================================
+
+identity:
+  kind: personal
+  display_name: "Спокойная легаси-удалёнка на неполный день (.NET/JS)"
+  abbreviation: "KISEL = Keep It Simple, Easy, Legacy (читается как «кисель»)"
+  created_at: "2026-07-31"
+  # Как объяснить человеку шкалу score в его отчёте. У каждой идентичности она
+  # своя: то, что здесь плюс, для поиска онсайта в стартапе — минус.
+  scoring_philosophy: >
+    Чем выше score (0-100), тем больше вакансия похожа на "скучную, легаси,
+    хорошо оплачиваемую, с низкой конкуренцией" — именно то, что нужно.
+
+contact:
+  # "local" = контакт лежит в Малой Конституции, вне гита:
+  #   local-constitution/personal/kisel/kisel_contact.yaml -> user_agent_contact
+  # Так личная почта не попадает в общий репозиторий, но User-Agent остаётся
+  # честным (инженерное обязательство проекта, см. Большую Конституцию).
+  user_agent_contact: "local"
+
+# ==== ЛИЧНОЕ: значения живут в Малой Конституции, вне гита ====
+#
+# Сентинел `local` означает: настоящее значение лежит в
+# `local-constitution/personal/kisel/kisel_owner.yaml` и подмешивается при
+# активации идентичности (common.resolve_local_fields).
+#
+# Почему так: эта папка — в общем репозитории и описывает ПОИСК, а не человека.
+# Имя, LinkedIn, резидентство, CV и зарплатные ожидания к описанию поиска не
+# относятся; без разделения каждый, кто склонирует проект, получал бы личное
+# дело автора. Без заполненного оверлея идентичность считается незаполненной и
+# поиск по ней не запускается — см. identity.readiness_problems().
+owner:
+  # Роль — часть профиля ПОИСКА: она объясняет, на какие вакансии он нацелен.
+  role: "Senior Software Engineer (.NET / C#)"
+  years_experience: local
+  name: local
+  linkedin: local
+  cv_files: local
+  # Языки: из них выводится языковой фильтр (какие языки человек НЕ знает).
+  languages: local
+  # Резидентство: из него выводятся гео-правила. Для резидента США фраза
+  # "US only" — плюс, для резидента Грузии — дисквалификация; поэтому страна
+  # обязана быть личной, а правила в criteria.yaml описывают тип поиска.
+  location: local
+  timezone_notes: local
+
+target_regions:
+  # Подтверждено человеком явно (2026-07-30). США/Канада — приоритет
+  # ("мечта"), но реальный, гарантированный вариант — контракт с компанией
+  # из Израиля/ОАЭ на ~$5k/мес: ниже потолок, зато выше вероятность
+  # реального найма. Оба варианта равноценно валидны для системы — это не
+  # "план Б хуже", а "то же самое качество, другая вероятность".
+  dream:
+    - "United States"
+    - "Canada"
+  solid_realistic:
+    - "Israel"        # реальный опыт работы с израильской компанией (реальный опыт сотрудничества) — не гипотеза
+    - "UAE"
+  # ИСПРАВЛЕНО 2026-07-30 (вечер): "Europe" здесь БЫЛО ошибочно — в реальной
+  # найденной вакансии "(EU Remote)" в заголовке означает требование
+  # резидентства В ЕС, что дисквалифицирует человека (Грузия не в ЕС)
+  # ровно так же, как "US Remote". Просто "компания из Европы" не
+  # отслеживается отдельным плюсом (слишком легко перепутать с
+  # резидентским требованием) — см. criteria.yaml →
+  # remote_location_fit.restrictive_region_signal, куда переехали "eu
+  # remote"/"remote europe" как dealbreaker.
+  note: >
+    Важно: "компания базируется в регионе X" ≠ "компания требует резидентство
+    в X". Israel/UAE ценны именно как ДОПОЛНИТЕЛЬНЫЕ реалистичные
+    регионы найма, а не как замена гео-фильтрации — жёсткое требование
+    резидентства/гражданства в ЛЮБОЙ стране (включая эти две и включая
+    США/Канаду) при отсутствии у человека такого резидентства — всегда
+    dealbreaker (полный отсев), см. criteria.yaml →
+    remote_location_fit.restrictive_region_signal.
+
+goal:
+  purpose: >
+    Спокойная неполная занятость: 2-4 часа в день. Ценятся предсказуемость,
+    низкая когнитивная нагрузка, устоявшиеся процессы и низкая конкуренция за
+    место. Интересные задачи и карьерный рост здесь НЕ являются целью — это
+    осознанный выбор, а не компромисс.
+  hours_per_day_target: [2, 4]
+  ai_assisted: true
+  ai_tools_note: >
+    Планируется активно использовать AI (Claude/Cursor/Copilot) для
+    эффективности. Поэтому особенно хорошо подходят технологии, которые
+    современные LLM понимают отлично: ASP.NET (Framework и Core),
+    ASP.NET MVC/WebForms, EF6/EF Core, jQuery, Angular(JS), SQL Server,
+    C#, классический REST/SOAP — то есть распространённый, хорошо
+    задокументированный стек в его "устаревшем" изводе.
+  # Зарплатные ожидания — личные: они зависят от человека и его обстоятельств,
+  # а не от типа поиска. Значения — в Малой Конституции (см. owner выше).
+  target_compensation: local
+
+employment_type_priority:
+  high: ["contractor", "1099", "part-time", "fractional", "freelance", "hourly"]
+  medium: ["W-2 part-time", "temporary", "contract-to-hire"]
+  low_but_possible: ["W-2 full-time remote with clear low workload signals"]
+  dealbreaker_signals:
+    - "exclusive employment"
+    - "no other employment"
+    - "moonlighting prohibited"
+    - "sole and primary employer"
+    - "must not hold other employment"
+    - "security clearance required"
+    - "must relocate"
+    - "on-site required"
+    - "in-office"
+
+# Пересчитано по фактической частоте в CV (2026-07-30): 3 уровня отражают,
+# в скольких из 8 последних мест работы (2018-2026) реально встречалась
+# технология, а не субъективное "это тоже вроде подходит". Вакансия,
+# совпадающая только с familiar-технологиями, не должна оцениваться так же,
+# как вакансия, совпадающая с core — см. criteria.yaml → stack_fit.
+tech_stack:
+  # core: встречается в подавляющем большинстве ролей (6-8 из 8) — это
+  # буквально то, чем человек занимается почти без перерыва 7+ лет.
+  # ПРИМЕЧАНИЕ: голого ".NET" здесь намеренно нет. Он "поймал" бы .NET Core/
+  # .NET Framework и всё остальное как подстроку, но заодно и "VB.NET" —
+  # технологию, с которой человек не работал (см. CLAUDE.md §2a). Более
+  # специфичные ключи (.NET Core/.NET Framework/ASP.NET/C#) уже покрывают
+  # реальные случаи без этого побочного эффекта.
+  core:
+    - ".NET Core"
+    - ".NET Framework"
+    - "C#"
+    - "ASP.NET"
+    - "ASP.NET MVC"
+    - "ASP.NET Core"
+    - "ASP.NET Web API"
+    - "SQL Server"
+    - "MS SQL"
+    - "Angular"
+    - "AngularJS"
+  # strong: регулярно, но не в каждой роли (2-4 из 8) — реальная, но не
+  # ежедневная экспертиза.
+  strong:
+    - "Entity Framework"
+    - "EF6"
+    - "EF Core"
+    - "TypeScript"
+    - "JavaScript"
+    - "React"
+    - "Azure"
+    - "Docker"
+    - "Microservices"
+    - "CQRS"
+    - "DDD"
+    - "Event Sourcing"
+    - "HTML"
+    - "CSS"
+  # familiar: было в 1-2 ролях за всю карьеру — реальный опыт, но узкий,
+  # не стоит считать наравне с core.
+  # ПРИМЕЧАНИЕ: "Express" здесь именно "Express.js" (без .js рискует ложно
+  # совпасть с обычным английским словом "express"); "LESS" убран совсем —
+  # реальный найденный баг (2026-07-30): CSS-препроцессор "LESS" ложно
+  # совпадал с обычным английским словом "less" в финансовой вакансии
+  # ("no less than...") и давал ей незаслуженный stack_fit. SCSS уже
+  # покрывает тот же класс задач и не имеет такого риска.
+  # "Java"/"Scala" — подтверждено человеком явно (2026-07-30): САМИ ПО СЕБЕ
+  # не считаются релевантными (Java web-разработка — не то, на что человек
+  # может рассчитывать), но Java/Scala ДЛЯ ДАТА-ПАЙПЛАЙНОВ (Spark/
+  # Databricks/ETL) — желанный вариант (реальный опыт, предыдущего места работы
+  # Engineering). Особая обработка — в criteria.yaml → stack_fit →
+  # data_pipeline_language_keywords / data_pipeline_context_keywords.
+  familiar:
+    - "Node.js"
+    - "Express.js"
+    - "MongoDB"
+    - "Cosmos DB"
+    - "DynamoDB"
+    - "Apache Spark"
+    - "Databricks"
+    - "Delta Lake"
+    - "Python"
+    - "SASS"
+    - "SCSS"
+    - "jQuery"
+    - "SOAP"
+    - "XSLT"
+    - "PHP"
+    - "GraphQL"
+    - "DevExpress"
+    - "Scala"
+    - "Java"
+    - "NgRx"
+    - "Redux"
+    - "MobX"
+  # ПРИМЕЧАНИЕ: "WebForms"/"VB.NET"/"Classic ASP" сознательно НЕ входят в
+  # tech_stack (нет подтверждения в CV, что человек с ними реально
+  # работал) — но остаются в criteria.yaml → legacy_enterprise_signal,
+  # потому что это сигнал о характере ВАКАНСИИ (легаси), а не о личном
+  # навыке. Не путать эти две разные оси при будущих правках.
+
+ideal_company_traits:
+  high_priority:
+    - "remote-first or fully distributed"
+    - "US or Canada based (dream scenario)"
+    - "Israel, UAE, or Europe based and open to hiring outside their home country (solid, realistic scenario — see target_regions)"
+    - "mature company (10+ years old)"
+    - "enterprise / corporate software"
+    - "legacy system maintenance / support"
+    - "calm engineering culture"
+    - "good work-life balance"
+    - "low stress"
+    - "few meetings"
+    - "well-understood, boring technology"
+    - "hires internationally via EOR (Deel, Remote.com, Oyster, Papaya Global, Multiplier, G-P/Globalization Partners) or as 1099 contractor"
+  low_priority_avoid:
+    - "startup"
+    - "AI-first company"
+    - "crypto"
+    - "web3"
+    - "constant deadlines"
+    - "high pace of change"
+    - "chronic overtime"
+    - "hero culture"
+    - "move fast and break things"
+    - "wear many hats"
+
+eor_platforms_signal:
+  # Упоминание одной из этих платформ в вакансии/на карьерной странице —
+  # сильный сигнал, что компания реально готова оформить контрактора вне США.
+  - "Deel"
+  - "Remote.com"
+  - "Oyster HR"
+  - "Papaya Global"
+  - "Multiplier"
+  - "Globalization Partners"
+  - "G-P"
+  - "Velocity Global"

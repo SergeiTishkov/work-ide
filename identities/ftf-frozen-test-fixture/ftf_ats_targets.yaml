@@ -1,0 +1,72 @@
+# Карьерные страницы компаний через их ATS (системы найма).
+#
+# Читается tools/fetch_ats.py. Это вакансии "от первого лица", напрямую от
+# работодателя: без чужой воронки отклика (в отличие от WWR), без платных
+# подписок, без посредника. Все эндпоинты — официальные публичные JSON API
+# этих ATS, по которым работают виджеты вакансий на сайтах самих компаний:
+# обычный GET, без авторизации и без анти-бот защиты.
+#
+# provider: greenhouse | lever | ashby | recruitee
+# token:    идентификатор доски компании в этой ATS. Обычно виден прямо в
+#           URL карьерной страницы, например:
+#             boards.greenhouse.io/<token>
+#             jobs.lever.co/<token>
+#             jobs.ashbyhq.com/<token>
+#             <token>.recruitee.com
+#
+# КАК РАСШИРЯТЬ (это главный рычаг роста качества выдачи):
+# добавлять сюда зрелые enterprise-компании, которые реально нанимают на
+# .NET/C# и работают удалённо. Кандидатов брать из data/knowledge/
+# companies.json (у кого высокие legacy_enterprise_hits и возраст 10+ лет
+# по Wikidata) либо находить веб-поиском. Проверить токен можно одной
+# командой:
+#   curl https://boards-api.greenhouse.io/v1/boards/<token>/jobs
+#
+# Начальный список ниже — это проверенные рабочие доски (замер
+# 2026-07-31). Он намеренно небольшой и составлен из технологических
+# компаний, которые точно нанимают удалённо; его нужно достраивать под
+# профиль человека — банками, страховыми, healthcare и господрядчиками,
+# то есть теми, у кого водятся спокойные легаси-проекты.
+
+targets:
+  - company: "Stripe"
+    provider: greenhouse
+    token: stripe
+    enabled: true
+
+  - company: "Cloudflare"
+    provider: greenhouse
+    token: cloudflare
+    enabled: true
+
+  - company: "GitLab"
+    provider: greenhouse
+    token: gitlab
+    enabled: true
+    notes: "Полностью удалённая компания (all-remote), нанимает по всему миру."
+
+  - company: "Airtable"
+    provider: greenhouse
+    token: airtable
+    enabled: true
+
+  - company: "Notion"
+    provider: ashby
+    token: notion
+    enabled: true
+
+  - company: "Ramp"
+    provider: ashby
+    token: ramp
+    enabled: true
+
+  - company: "Linear"
+    provider: ashby
+    token: linear
+    enabled: true
+
+  - company: "Tether"
+    provider: recruitee
+    token: tether
+    enabled: true
+    notes: "Найдена через WWR: описание вело на tether.recruitee.com."

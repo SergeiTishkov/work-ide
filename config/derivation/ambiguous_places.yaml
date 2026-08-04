@@ -1,0 +1,86 @@
+# =============================================================================
+#  НЕОДНОЗНАЧНЫЕ ТОПОНИМЫ — заготовки правил
+# =============================================================================
+#  Одно название — два разных места на карте. В тексте вакансии это регулярно
+#  приводит к неверным выводам о том, где работа.
+#
+#  Правило подставляется в идентичность, если её страна или город совпадает с
+#  одним из значений. Механизм в score.py помечает вакансию на ручную проверку,
+#  только если сработал контекст ОБОИХ значений или НИ ОДНОГО: одно ясное
+#  значение — не повод дёргать человека.
+#
+#  Историческая справка: изначально в проекте был захардкожен единственный
+#  случай — Georgia (страна vs штат США) — потому что так сложилось у первого
+#  пользователя. Обобщено, когда стало ясно, что ловушка не уникальна.
+# =============================================================================
+
+schema_version: 1
+
+places:
+  - name: georgia
+    trigger_keywords: ["georgia"]
+    meaning_a:
+      label: "страна Грузия (Кавказ)"
+      context_keywords: ["tbilisi", "batumi", "kutaisi", "caucasus",
+                         "country of georgia", "sakartvelo"]
+    meaning_b:
+      label: "штат США Georgia (GA)"
+      context_keywords: ["ga,", "georgia, usa", "atlanta", "savannah",
+                         "georgia (state)"]
+
+  - name: cambridge
+    trigger_keywords: ["cambridge"]
+    meaning_a:
+      label: "Cambridge, Великобритания"
+      context_keywords: ["cambridgeshire", "united kingdom", "england", "uk"]
+    meaning_b:
+      label: "Cambridge, Массачусетс, США"
+      context_keywords: ["massachusetts", "ma,", "boston", "harvard", "mit"]
+
+  - name: washington
+    trigger_keywords: ["washington"]
+    meaning_a:
+      label: "штат Вашингтон (северо-запад США)"
+      context_keywords: ["seattle", "tacoma", "spokane", "wa,", "washington state"]
+    meaning_b:
+      label: "Вашингтон, округ Колумбия"
+      context_keywords: ["dc", "district of columbia", "washington, d.c."]
+
+  - name: ontario
+    trigger_keywords: ["ontario"]
+    meaning_a:
+      label: "провинция Онтарио, Канада"
+      context_keywords: ["toronto", "ottawa", "canada", "on,"]
+    meaning_b:
+      label: "Онтарио, Калифорния, США"
+      context_keywords: ["california", "ca,", "los angeles", "san bernardino"]
+
+  - name: odessa
+    trigger_keywords: ["odessa", "odesa"]
+    meaning_a:
+      label: "Одесса, Украина"
+      context_keywords: ["ukraine", "ukrainian", "чорне море", "black sea"]
+    meaning_b:
+      label: "Одесса, Техас, США"
+      context_keywords: ["texas", "tx,", "midland", "permian"]
+
+  - name: birmingham
+    trigger_keywords: ["birmingham"]
+    meaning_a:
+      label: "Бирмингем, Англия"
+      context_keywords: ["west midlands", "united kingdom", "england", "uk"]
+    meaning_b:
+      label: "Бирмингем, Алабама, США"
+      context_keywords: ["alabama", "al,", "united states"]
+
+  - name: victoria
+    trigger_keywords: ["victoria"]
+    meaning_a:
+      label: "штат Виктория, Австралия"
+      context_keywords: ["melbourne", "australia", "vic,"]
+    meaning_b:
+      label: "Виктория, Британская Колумбия, Канада"
+      context_keywords: ["british columbia", "bc,", "canada", "vancouver island"]
+
+# Это только частые случаи, а не полный список. Если ваше место не здесь —
+# допишите правило в свою идентичность вручную, формат тот же.

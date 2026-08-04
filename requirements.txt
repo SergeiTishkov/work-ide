@@ -1,0 +1,9 @@
+# Work IDE — минимальные зависимости. Сознательно избегаем тяжёлых
+# библиотек (feedparser, bs4, rapidfuzz) — RSS парсится stdlib
+# xml.etree.ElementTree, HTML чистится собственным regex-стриппером
+# (tools/common.py:strip_html), нечёткое сравнение строк — stdlib difflib.
+# Чем меньше зависимостей, тем надёжнее `pip install` через годы.
+
+requests>=2.31,<3
+PyYAML>=6.0,<7
+pytest>=7.4,<9

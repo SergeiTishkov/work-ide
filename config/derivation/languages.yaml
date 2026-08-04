@@ -1,0 +1,138 @@
+# =============================================================================
+#  ВЫВОД ЯЗЫКОВЫХ ФИЛЬТРОВ
+# =============================================================================
+#  Как и с географией, языковой фильтр — следствие, а не предпочтение:
+#  в criteria попадают ТОЛЬКО те языки, которых человек НЕ знает.
+#
+#  Правило генерации (identity.py build):
+#    для каждого языка L:
+#      если человек НЕ владеет L:
+#        requirement_phrases -> language_requirement_signal.explicit_requirement_keywords
+#      иначе:
+#        ничего не добавляется
+#
+#  То есть у говорящего по-немецки в файле просто не будет немецкого блока.
+#  Копировать чужой языковой фильтр нельзя по той же причине, что и гео.
+#
+#  Отдельно: market_indicator_keywords — эвристика "вакансия целиком написана
+#  на этом языке". Нужна потому, что многие объявления не содержат явной фразы
+#  "German required", но сами написаны по-немецки; для не владеющего языком это
+#  такой же стоп-сигнал.
+# =============================================================================
+
+schema_version: 1
+
+languages:
+  german:
+    display_name: "Немецкий"
+    requirement_phrases:
+      - "fluent german"
+      - "german required"
+      - "german language required"
+      - "advanced german"
+      - "native german speaker"
+      - "german speaker required"
+      - "german c1"
+      - "german c2"
+      - "sehr gute deutschkenntnisse"
+      - "gute deutschkenntnisse"
+      - "deutschkenntnisse"
+      - "verhandlungssicheres deutsch"
+      - "muttersprache deutsch"
+      - "fließend deutsch"
+    # Слова и разметка, типичные для немецкоязычных объявлений. "m/w/d" —
+    # стандартное немецкое гендерное уточнение в заголовке вакансии.
+    market_indicator_keywords:
+      - "m/w/d"
+      - "w/m/d"
+      - "wir suchen"
+      - "ihre aufgaben"
+      - "ihr profil"
+      - "kenntnisse"
+      - "bewerbung"
+      - "unser unternehmen"
+      - "homeoffice"
+      - "vollzeit"
+      - "teilzeit"
+      - "arbeitszeit"
+      - "mitarbeiter"
+      - "unternehmen"
+    market_indicator_threshold: 3
+
+  french:
+    display_name: "Французский"
+    requirement_phrases:
+      - "fluent french"
+      - "french required"
+      - "native french speaker"
+      - "français courant"
+      - "maîtrise du français"
+    market_indicator_keywords:
+      - "nous recherchons"
+      - "vos missions"
+      - "votre profil"
+      - "entreprise"
+      - "poste"
+      - "compétences"
+    market_indicator_threshold: 3
+
+  spanish:
+    display_name: "Испанский"
+    requirement_phrases:
+      - "fluent spanish"
+      - "spanish required"
+      - "native spanish speaker"
+      - "español nativo"
+    market_indicator_keywords:
+      - "buscamos"
+      - "tus funciones"
+      - "tu perfil"
+      - "requisitos"
+      - "empresa"
+    market_indicator_threshold: 3
+
+  italian:
+    display_name: "Итальянский"
+    requirement_phrases:
+      - "fluent italian"
+      - "italian required"
+      - "native italian speaker"
+    market_indicator_keywords:
+      - "cerchiamo"
+      - "il tuo profilo"
+      - "requisiti"
+      - "azienda"
+    market_indicator_threshold: 3
+
+  dutch:
+    display_name: "Голландский"
+    requirement_phrases:
+      - "fluent dutch"
+      - "dutch required"
+      - "native dutch speaker"
+      - "nederlands vereist"
+    market_indicator_keywords:
+      - "wij zoeken"
+      - "jouw profiel"
+      - "functie-eisen"
+      - "bedrijf"
+    market_indicator_threshold: 3
+
+  english:
+    display_name: "Английский"
+    requirement_phrases:
+      - "fluent english"
+      - "english required"
+      - "native english speaker"
+      - "english c1"
+    market_indicator_keywords: []
+    market_indicator_threshold: 99   # английский — язык по умолчанию, не эвристим
+
+  russian:
+    display_name: "Русский"
+    requirement_phrases:
+      - "russian required"
+      - "fluent russian"
+      - "native russian speaker"
+    market_indicator_keywords: []
+    market_indicator_threshold: 99

@@ -1,0 +1,991 @@
+# Рубрика скоринга вакансий. Читается tools/score.py.
+# Итоговый score — 0..100, плюс отдельный список dealbreaker-флагов и
+# needs_manual_review. Каждый компонент объясняется в score_breakdown.
+#
+# Философия: обычная система поиска работы штрафует за "legacy", "boring",
+# "bureaucracy" — здесь всё наоборот. Мы намеренно ищем то, что отпугивает
+# большинство кандидатов, потому что там ниже конкуренция и выше готовность
+# платить за скучную стабильность.
+
+weights:
+  remote_location_fit: 25
+  stack_fit: 15
+  legacy_enterprise_signal: 25
+  low_intensity_signal: 20
+  compensation_signal: 10
+  contractor_friendliness: 5
+# сумма = 100
+#
+# ВАЖНО (подтверждено человеком явно, 2026-07-30): low_intensity_signal
+# (20) намеренно весит вдвое больше compensation_signal (10), а разброс
+# low_intensity_signal (-20..+20) вчетверо шире разброса compensation_signal
+# (примерно +2..+10). Это осознанно: "гарантированно скучную и лёгкую
+# работу за $5k/мес возьму, чем стрессовую за $8k/мес". Не выравнивать эти
+# веса, даже если захочется "починить" низкий score денежной, но стрессовой
+# вакансии — это работает как задумано.
+
+remote_location_fit:
+  worldwide_remote:
+    points: 25
+    keywords:
+      - "remote worldwide"
+      - "remote - anywhere"
+      - "remote anywhere"
+      - "work from anywhere"
+      - "hire anywhere"
+      - "globally remote"
+      - "international remote"
+      - "remote (global)"
+  eor_or_contractor_international:
+    points: 18
+    keywords: []  # заполняется из profile.yaml eor_platforms_signal + слова contractor/1099/freelance
+  acceptable_region_signal:
+    # Подтверждено человеком явно (2026-07-30): Израиль/ОАЭ — реалистичные,
+    # "гарантированные" целевые регионы найма (не хуже США/Канады, просто
+    # другой потолок ЗП). Это описание МЕСТОПОЛОЖЕНИЯ КОМПАНИИ, а не
+    # требование резидентства — поэтому "EU Remote"/"Remote Europe" здесь
+    # намеренно НЕТ (см. restrictive_region_signal ниже: это была ошибка в
+    # первой версии — "EU Remote" в реальной вакансии означает требование
+    # резидентства В ЕС, что дисквалифицирует человека ровно так же, как
+    # "US Remote", а не является плюсом).
+    points: 16
+    keywords:
+      - "israel"
+      - "tel aviv"
+      - "uae"
+      - "united arab emirates"
+      - "dubai"
+      - "abu dhabi"
+  restrictive_region_signal:
+    # ЖЁСТКОЕ требование резидентства/присутствия в конкретном регионе,
+    # который не Грузия/Кавказ — это ПОЛНЫЙ ОТСЕВ (dealbreaker), а не
+    # просто "ниже приоритет" (подтверждено человеком явно дважды,
+    # 2026-07-30: сначала на примере "remote LATAM", затем на примере
+    # "(EU Remote)" в реальной найденной вакансии — обе физически
+    # недоступны человеку из Грузии). Список заведомо не исчерпывающий
+    # (регионов бесконечно много) — needs_manual_review и собственное
+    # чтение агентом остаются последней линией защиты для того, что список
+    # не поймал. Если ОДНОВРЕМЕННО есть worldwide/EOR-сигнал — не считаем
+    # dealbreaker (скорее всего, компания гибче, чем формулировка одного
+    # requisition).
+    keywords:
+      - "remote (us)"
+      - "remote - us"
+      - "us remote only"
+      - "us only"
+      - "must be located in the united states"
+      - "must reside in the us"
+      - "must be based in the us"
+      - "remote latam"
+      - "latam only"
+      - "latin america only"
+      - "remote apac"
+      - "apac only"
+      - "asia pacific only"
+      - "remote (uk)"
+      - "uk only"
+      - "must be based in the uk"
+      - "must be located in the uk"
+      - "canada only"
+      - "must be based in canada"
+      - "must reside in canada"
+      - "india only"
+      - "must be based in india"
+      - "philippines only"
+      - "eastern europe only"
+      - "western europe only"
+      - "nordics only"
+      - "dach only"
+      - "benelux only"
+      - "australia and new zealand only"
+      - "anz only"
+      - "mexico only"
+      - "must be based in mexico"
+      - "eu remote"
+      - "remote (eu)"
+      - "remote europe"
+      - "eu only"
+      - "europe only"
+      - "must be based in the eu"
+      - "must be based in israel"
+      - "israel only"
+      - "must be based in uae"
+      - "uae only"
+  hard_dealbreakers:
+    points: -1000  # эффективно исключает вакансию из "hot" категорий
+    keywords:
+      - "must relocate"
+      - "on-site required"
+      - "in-office"
+      - "hybrid required"
+      - "security clearance"
+      - "us citizen required"
+      - "us citizenship required"
+      - "must be a us citizen"
+      - "eu citizenship required"
+      - "must be eu resident"
+      - "eu work permit required"
+      - "israeli citizenship required"
+      - "uae residency required"
+      # Реальный найденный баг (2026-07-30): вакансия Rangeview буквально
+      # писала "ONSITE" (без "required") и "ITAR: must be a U.S. person" -
+      # ни то, ни другое не ловилось прежним списком.
+      - "onsite"
+      - "on-site"
+      - "on site"
+      - "in office"
+      - "in-person"
+      - "must work from our office"
+      - "office-based"
+      - "office based"
+      - "no remote work"
+      - "not a remote"
+      - "itar"
+      - "must be a u.s. person"
+      - "u.s. person required"
+      - "united states person required"
+  structured_location_gate:
+    # КРИТИЧНО (реальный найденный баг, 2026-07-30): многие источники отдают
+    # гео-ограничение СТРУКТУРНЫМ полем (WWR region, Remotive
+    # candidate_required_location, Jobicy jobGeo, Himalayas
+    # locationRestrictions), а не фразой в тексте. Раньше проверялся только
+    # текст, поэтому вакансии с location_raw = "USA" / "Canada only" /
+    # "Brazil" / "Costa Rica" / "Texas" спокойно проходили фильтр — ~20 из
+    # 32 кандидатов оказались недоступны человеку по гео.
+    #
+    # Логика: если поле локации заполнено и НЕ содержит явного маркера
+    # "весь мир" — это гео-ограничение, то есть dealbreaker (кроме случая,
+    # когда одновременно есть worldwide/EOR-сигнал в тексте, который это
+    # перевешивает).
+    worldwide_markers:
+      - "anywhere"
+      - "worldwide"
+      - "world wide"
+      - "global"
+      - "globally"
+      - "remote (global)"
+      - "no restriction"
+      - "any location"
+      - "any country"
+    # Перечисление континентов (Remotive: "Americas, Europe, Asia, Africa,
+    # Oceania") — фактически "весь мир", хотя слова "worldwide" там нет.
+    # Если в поле локации упомянуто >= continent_threshold континентов,
+    # считаем это отсутствием ограничения.
+    continent_names:
+      - "americas"
+      - "north america"
+      - "south america"
+      - "europe"
+      - "asia"
+      - "africa"
+      - "oceania"
+      - "emea"
+      - "apac"
+      - "latam"
+    continent_threshold: 3
+    # Значения локации, которые означают просто "удалённо", БЕЗ указания
+    # страны — это не гео-ограничение. Реальный найденный баг (2026-07-31,
+    # после подключения ATS): Greenhouse/Ashby пишут "Remote job" (209
+    # вакансий), GitLab — "Distributed" (39, так они обозначают all-remote
+    # компанию), и всё это резалось как "источник ограничивает найм".
+    # Если после вычёркивания этих слов от значения ничего не остаётся —
+    # ограничения нет, дальше работает обычная логика (неизвестная
+    # локация -> needs_manual_review, а не отказ).
+    remote_without_country_tokens:
+      - "remote"
+      - "job"
+      - "jobs"
+      - "distributed"
+      - "telecommute"
+      - "work from home"
+      - "wfh"
+      - "flexible"
+      - "n/a"
+      - "na"
+      - "-"
+
+  # Подтверждено человеком явно (2026-07-30): "мне нужны ТОЛЬКО РЕМОУТ
+  # позиции" - по умолчанию вакансия должна быть ПОДТВЕРЖДЕНА как remote,
+  # иначе это dealbreaker, а не просто "неизвестно, но пусть будет". Раньше
+  # отсутствие сигнала о локации давало лишь мягкое needs_manual_review;
+  # теперь оно ведёт к отклонению, если нет НИ явного worldwide/EOR/region
+  # сигнала, НИ хотя бы намёка на remote в тексте, НИ флага remote=true от
+  # источника.
+  header_scope_gate:
+    # Реальный найденный баг 2026-07-31 (ручной чек-лист, два кандидата из
+    # топа выдачи): Stripe и Airtable пришли с WWR с region-полем "Anywhere
+    # in the World", а в первой строке описания стояло "Headquarters: US
+    # Remote" и "Headquarters: … ; Remote - US" соответственно. Обе — только
+    # для резидентов США, обе были в hot_lead.
+    #
+    # Причина расхождения: WWR-фиды категорийные ("Programming"), их region
+    # заполняется размашисто; строку Headquarters пишет сам работодатель.
+    # Поэтому при конфликте верим заголовку работодателя.
+    #
+    # Смотрим ТОЛЬКО заголовочные строки: фраза "our US remote team" в теле
+    # описания — рассказ о компании, а не требование к кандидату.
+    scan_first_lines: 6
+    header_line_patterns:
+      - "^headquarters\\s*:"
+      - "^location\\s*:"
+      - "^hiring in\\s*:"
+    # Ограничение — только связка "remote + страна/регион". Просто
+    # "Headquarters: Saudi Arabia" ограничением НЕ является: это адрес
+    # компании, а не заявление о том, где она нанимает.
+    # Выводится из config/derivation/regions.yaml (residency_required_phrases
+    # тех регионов, где человек не резидент).
+    restriction_patterns:
+      - "remote\\s*[-–—/(,]*\\s*(us|usa|u\\.s\\.|united states|america)\\b"
+      - "\\b(us|usa|u\\.s\\.|united states)\\s*[-–—/(,]*\\s*remote\\b"
+      - "remote\\s*[-–—/(,]*\\s*(eu|europe|european union)\\b"
+      - "\\b(eu|europe|european union)\\s*[-–—/(,]*\\s*remote\\b"
+      - "remote\\s*[-–—/(,]*\\s*(uk|united kingdom|canada|latam|apac|india)\\b"
+      - "\\b(uk|united kingdom|canada|latam|apac|india)\\s*[-–—/(,]*\\s*remote\\b"
+
+  timezone_gate:
+    # Требование к часовому поясу — отдельная ось от страны, и раньше не
+    # проверялась ничем. Реальный случай 2026-07-31: пять вакансий Proxify
+    # содержат "Located in CET timezone (+/- 3 hours), we are unable to
+    # consider applications from candidates in other time zones". Человек
+    # в UTC+4 в это окно попадает (CET+3 = UTC+4), но узнали мы это чтением
+    # глазами, а не проверкой.
+    #
+    # Разбирается только явная форма "<TZ> +/- N часов". Вольные
+    # формулировки ("significant overlap with PST") дают needs_manual_review,
+    # а не отказ: скрыть настоящую вакансию хуже, чем показать сомнительную.
+    exclusive_phrases:
+      - "unable to consider applications from candidates in other time zones"
+      - "candidates in other time zones"
+      - "must be located in"
+      - "must be based in the"
+      - "only considering candidates in"
+      - "required to work in the"
+    zone_offsets:
+      utc: 0
+      gmt: 0
+      wet: 0
+      cet: 1
+      cest: 2
+      eet: 2
+      eest: 3
+      msk: 3
+      gst: 4
+      ist: 5
+      sgt: 8
+      jst: 9
+      aest: 10
+      est: -5
+      edt: -4
+      cst: -6
+      cdt: -5
+      mst: -7
+      mdt: -6
+      pst: -8
+      pdt: -7
+      pacific: -8
+      eastern: -5
+      central: -6
+      mountain: -7
+
+  remote_synonym_keywords:
+    - "remote"
+    - "work from home"
+    - "distributed team"
+    - "distributed workforce"
+    - "remote-first"
+    - "wfh"
+    - "home-based"
+    - "telecommute"
+    - "telework"
+    - "work remotely"
+  # ЗАМОРОЖЕНО вместе с остальной фикстурой. Обобщённый механизм неоднозначных
+  # топонимов; тесты проверяют и это правило, и работу механизма на другом
+  # примере (Cambridge), чтобы он не был "заточен под Georgia".
+  ambiguous_place_names:
+    - name: georgia
+      trigger_keywords: ["georgia"]
+      meaning_a:
+        label: "страна Грузия (Кавказ)"
+        context_keywords: ["tbilisi", "batumi", "kutaisi", "caucasus",
+                           "country of georgia", "sakartvelo"]
+      meaning_b:
+        label: "штат США Georgia (GA)"
+        context_keywords: ["ga,", "georgia, usa", "atlanta", "savannah",
+                           "georgia (state)"]
+      on_ambiguous: needs_manual_review
+    - name: cambridge
+      trigger_keywords: ["cambridge"]
+      meaning_a:
+        label: "Cambridge, Великобритания"
+        context_keywords: ["cambridgeshire", "united kingdom", "england", "uk"]
+      meaning_b:
+        label: "Cambridge, Массачусетс, США"
+        context_keywords: ["massachusetts", "ma,", "boston", "harvard", "mit"]
+      on_ambiguous: needs_manual_review
+
+stack_fit:
+  # ==== IDENTITY TUNING ====
+  # Как называть стек этой идентичности в сообщениях об отказе. Появляется в
+  # поле dealbreakers, которое читает человек, поэтому пишется по-человечески.
+  stack_label: ".NET/JS"
+
+  # Веса намеренно отражают РЕАЛЬНУЮ частоту технологий в CV человека (см.
+  # profile.yaml → tech_stack), а не общее "это тоже .NET-совместимо".
+  # core — встречается почти в каждой роли за 7+ лет; strong — регулярно, но
+  # не всегда; familiar — было в 1-2 ролях. Подтверждено человеком явно
+  # (2026-07-30): технологии, с которыми реально работал чаще, должны
+  # весить больше тех, с которыми пересекался мало.
+  points_per_core_keyword: 3
+  points_per_strong_keyword: 2
+  points_per_familiar_keyword: 1
+  cap: 15
+  # "Стековый спам": блоки, перечисляющие все технологии мира ради попадания
+  # в любой поиск. Реальный найденный случай 2026-07-31: у Lemon.io в конце
+  # КАЖДОГО объявления идёт абзац "NOT YOUR TECH STACK?" со списком ~60
+  # технологий, включая ".NET & C#" и Angular. Из-за него их "Senior Graphic
+  # Designer" получал core_hits ["C#", "Angular"], максимальные 15 баллов за
+  # стек и проходил гейт релевантности. Текст отрезается по маркеру ТОЛЬКО
+  # для оценки стека — гео и язык по-прежнему читают описание целиком
+  # (в этом же блоке у Lemon.io перечислены страны найма).
+  noise_section_markers:
+    - "NOT YOUR TECH STACK?"
+    - "We have a variety of projects, so if you have"
+    - "we would be happy to connect with you and match you with a project"
+  # ключевые слова стека берутся из profile.yaml tech_stack.core/.strong/.familiar
+  #
+  # Гейт релевантности (см. score.py → score_vacancy): вакансия допускается
+  # дальше только если есть хотя бы одно core ИЛИ strong совпадение — одного
+  # familiar-совпадения недостаточно (иначе, например, случайное совпадение
+  # "LESS" с обычным английским словом "less" в финансовой вакансии проходит
+  # фильтр — реальный найденный баг, 2026-07-30).
+  #
+  # ИСКЛЮЧЕНИЕ (подтверждено человеком явно, 2026-07-30): Java/Scala сами
+  # по себе НЕ считаются релевантными (Java web-разработка — не то, на что
+  # человек может рассчитывать), НО Java/Scala В КОНТЕКСТЕ дата-пайплайнов
+  # (Spark/Databricks/ETL — реальный опыт, предыдущего места работы) —
+  # приемлемый, желанный вариант. Поэтому: Java/Scala + хотя бы одно слово
+  # из data_pipeline_context_keywords тоже проходит гейт релевантности.
+  # Гейт основного языка (подтверждено человеком явно, 2026-07-30: "не
+  # дотнет/js ... — выкинуть"). Общие инфраструктурные технологии (Docker,
+  # Azure, HTML, CSS, микросервисы) встречаются практически в любой
+  # вакансии и НЕ являются доказательством, что роль подходит .NET/JS
+  # разработчику. Реальная находка: две вакансии Canonical (embedded/Linux
+  # systems engineering) прошли гейт только по слову "Docker".
+  #
+  # Требование: в тексте должен встретиться хотя бы один НАСТОЯЩИЙ язык/
+  # фреймворк из стека человека, а не только инфраструктурное слово.
+  primary_language_keywords:
+    - ".NET Core"
+    - ".NET Framework"
+    - "C#"
+    - "ASP.NET"
+    - "ASP.NET MVC"
+    - "ASP.NET Core"
+    - "ASP.NET Web API"
+    - "Entity Framework"
+    - "EF Core"
+    - "EF6"
+    - "JavaScript"
+    - "TypeScript"
+    - "Angular"
+    - "AngularJS"
+    - "React"
+    - "Node.js"
+    - "jQuery"
+  data_pipeline_language_keywords:
+    - "java"
+    - "scala"
+  data_pipeline_context_keywords:
+    - "apache spark"
+    - "spark"
+    - "databricks"
+    - "delta lake"
+    - "data pipeline"
+    - "data engineer"
+    - "etl"
+    - "big data"
+
+role_complexity_signal:
+  # Подтверждено человеком явно (2026-07-30) на реальных находках:
+  # "Principal Machine Learning Scientist", "Staff Software Engineer,
+  # Agentic Platform" — это НЕ простая работа на 2-4ч/день, даже если в
+  # описании компании мелькают "enterprise"/"banking" как рынок сбыта.
+  # Это отдельная ось от legacy_enterprise_signal: одно дело — легаси
+  # поддержка в банке, совсем другое — R&D/новая архитектура с нуля в
+  # той же компании. При срабатывании гейта классификация не может
+  # подняться выше low_priority, независимо от остальных компонентов
+  # (тот же механизм, что stack_fit gate в score.py).
+  #
+  # Совпадение в TITLE вакансии — гейтит сразу (1 попадание достаточно).
+  title_red_flag_patterns:
+    - "principal.*scientist"
+    - "staff.*scientist"
+    - "principal.*research"
+    - "staff.*research"
+    - "research scientist"
+    - "applied scientist"
+    - "machine learning scientist"
+    - "machine learning engineer"
+    - "\\bml engineer\\b"
+    - "data scientist"
+    - "founding engineer"
+    - "head of ai"
+    - "director of ai"
+    - "chief ai officer"
+    - "agentic"
+    - "llm engineer"
+    - "ai engineer"
+    - "artificial intelligence engineer"
+    - "genai engineer"
+  # Совпадения в описании — нужно минимум threshold_hits штук (одно случайное
+  # модное словечко в бойлерплейте не должно гейтить нормальную легаси-роль).
+  description_red_flag_keywords:
+    - "build from scratch"
+    - "greenfield"
+    - "0 to 1"
+    - "0->1"
+    - "own the technical vision"
+    - "own the entire architecture"
+    - "cutting-edge"
+    - "cutting edge"
+    - "state-of-the-art"
+    - "state of the art"
+    - "novel algorithms"
+    - "publish papers"
+    - "phd preferred"
+    - "phd required"
+    - "research new methods"
+    - "large-scale distributed systems"
+    - "hyperscale"
+  threshold_hits: 2
+  # Реальный найденный случай (2026-07-30, через ручной чек-лист —
+  # docs/VACANCY_CHECKLIST.md): "Staff/Senior Software Engineer (AI CICD)"
+  # @ Chainguard — venture-backed стартап, строящий "agentic AI" продукты
+  # с нуля ("Extend Chainguard's agentic AI foundation..."). "Agentic"/
+  # "LLM systems"/"GenAI" — однозначные, недвусмысленные сигналы
+  # AI/R&D-фокуса; одного упоминания достаточно, порог threshold_hits для
+  # них не нужен (в отличие от более расплывчатых "cutting-edge" и т.п.,
+  # которые могут быть маркетинговым бойлерплейтом).
+  description_red_flag_keywords_strong_single_hit:
+    - "agentic"
+    - "agentic ai"
+    - "llm systems"
+    - "genai"
+
+role_relevance_signal:
+  # ПОЛНЫЙ ОТСЕВ (dealbreaker), не просто минус в баллах. Подтверждено
+  # человеком явно (2026-07-30) на реальных находках: "CFO Controller",
+  # "Product Manager, Mapping and Weather Visualization" — это НЕ роли
+  # разработчика ПО, шанс попасть на такую вакансию для .NET/JS-разработчика
+  # 0%, независимо от того, что в описании компании могут мелькать
+  # legacy/enterprise-слова. Срабатывает по НАЗВАНИЮ вакансии: если
+  # заголовок matches профессию из wrong_profession_title_patterns и НЕ
+  # matches ни одного developer_role_override_patterns — dealbreaker.
+  # tech_agnostic_override_keywords — если компания явно говорит "любой
+  # стек ОК" где-то в тексте, гейт стека/языка/профессии не применяется
+  # (доверяем явному заявлению компании).
+  wrong_profession_title_patterns:
+    - "\\bcfo\\b"
+    - "chief financial officer"
+    - "\\bcontroller\\b"
+    - "\\baccountant\\b"
+    - "bookkeeper"
+    - "product manager"
+    - "product owner"
+    - "account executive"
+    - "account manager"
+    # Реальная находка 2026-07-31: "Technical Account Manager 2 - South
+    # Africa" @ Datadog — клиентская роль, не разработка. В заголовке нет
+    # ни "engineer", ни "developer", поэтому мягкого списка достаточно.
+    - "technical account manager"
+    - "sales executive"
+    - "sales manager"
+    - "business development"
+    - "customer support"
+    - "customer service"
+    - "support consultant"
+    - "\\brecruiter\\b"
+    - "talent acquisition"
+    - "hr generalist"
+    - "human resources"
+    - "marketing manager"
+    - "content writer"
+    - "copywriter"
+    - "office manager"
+    - "administrative assistant"
+    - "executive assistant"
+    - "\\bwebmaster\\b"
+    - "web administration"
+    - "web administrator"
+    - "network administrator"
+    - "database administrator"
+    - "country manager"
+    - "commercial manager"
+    - "solution sales"
+    - "operations manager"
+    # Реальный найденный случай (2026-07-30, найдено ручным чек-листом):
+    # "Web Publisher Half time US Timezone" - работа с CMS/Figma/контентом
+    # (не программирование), прошла фильтр только из-за упоминания
+    # HTML/CSS (слишком общий, слабый сигнал стека сам по себе).
+    - "web publisher"
+    - "content editor"
+    - "content management"
+    - "cms administrator"
+    - "\\bpublisher\\b"
+  # ЖЁСТКИЙ уровень: эти паттерны НЕ снимаются developer_role_override
+  # (в отличие от списка выше). Причина — реальные находки 2026-07-30
+  # (ручной чек-лист после подключения новых источников): "GTM Operations
+  # Process Architect" @ Stripe, "Partner Solutions Architect" @ Nebius,
+  # "Senior Manager, DevOps" @ Modivcare. Все они содержат
+  # "architect"/"engineer"/"devops" в заголовке, из-за чего обычный
+  # override снимал гейт — хотя это заведомо не роли рядового разработчика
+  # (go-to-market операции, пресейл-архитектура, менеджмент людей).
+  hard_wrong_profession_title_patterns:
+    - "\\bgtm\\b"
+    - "go[- ]to[- ]market"
+    - "operations process"
+    - "process architect"
+    - "solutions architect"
+    - "solution architect"
+    - "presales"
+    - "pre-sales"
+    - "sales engineer"
+    # Реальная находка 2026-07-31: "Principal Partner Solutions
+    # Engineer, SAARC (Based in Bangalore)" @ Cloudflare — пресейл,
+    # в списке был только "solutions architect".
+    - "solutions engineer"
+    - "solution engineer"
+    - "customer engineer"
+    - "customer success"
+    - "\\bmanager,"
+    - "senior manager"
+    - "engineering manager"
+    - "\\bdirector\\b"
+    - "\\bvp\\b"
+    - "\\bhead of\\b"
+    - "chief .* officer"
+    # DevRel: "Developer Advocate"/"Developer Relations" — публичные
+    # выступления, статьи, работа с сообществом, а не разработка ПО.
+    # Реальная находка 2026-07-30: "Senior Developer Advocate - Data
+    # Observability" @ Datadog прошла гейт из-за слова "Developer".
+    - "developer advocate"
+    - "developer relations"
+    - "devrel"
+    - "technical evangelist"
+    - "community manager"
+    # DevOps/SRE/инфраструктура — подтверждено человеком явно
+    # (2026-07-30): "выкинь девопсов, это не моя вакансия". Человек —
+    # прикладной .NET/JS разработчик, а не инженер эксплуатации. Слово
+    # "engineer" в заголовке раньше снимало гейт, поэтому паттерны здесь,
+    # в жёстком списке.
+    - "devops"
+    - "dev ops"
+    - "\\bsre\\b"
+    - "site reliability"
+    - "infrastructure engineer"
+    - "platform engineer"
+    - "sysadmin"
+    - "system administrator"
+    - "systems administrator"
+    - "cloud engineer"
+    - "cloud infrastructure"
+    - "cloud operations"
+    - "release engineer"
+    - "build engineer"
+    # Дизайн — не программирование. Реальная находка 2026-07-31: "Senior
+    # Graphic Designer" @ Lemon.io попала в worth_a_look со score 27 (стек
+    # засчитался из рекламного блока, см. stack_fit.noise_section_markers).
+    # В жёстком списке, потому что заголовки вида "Design Engineer" тоже не
+    # являются ролью прикладного разработчика.
+    - "\\bdesigner\\b"
+    - "graphic design"
+    - "\\bux\\b"
+    - "\\bui/ux\\b"
+    - "product design"
+    - "brand design"
+    - "motion design"
+    - "\\billustrator\\b"
+  # Гейт "DevOps под нейтральным заголовком". Списки выше проверяют ЗАГОЛОВОК;
+  # реальная находка 2026-07-31 — "Software Engineer, Compute (8+ YOE)" @
+  # Airtable: заголовок нейтральный, тело целиком про Kubernetes-платформу
+  # (~70 кластеров, миграция CNI-плагина, операторы, Terraform, ArgoCD, SLO).
+  # Score 45, второе место в выдаче.
+  #
+  # Порог обязателен: одно-два упоминания Kubernetes/Docker/CI-CD есть почти
+  # в любой вакансии прикладного разработчика. Отсекаем только плотную
+  # концентрацию, означающую, что роль ИМЕННО про эксплуатацию.
+  infrastructure_role_gate:
+    threshold_hits: 4
+    description_keywords:
+      - "kubernetes"
+      - "terraform"
+      - "opentofu"
+      - "pulumi"
+      - "cloudformation"
+      - "argocd"
+      - "spinnaker"
+      - "helm chart"
+      - "cni plugin"
+      - "service mesh"
+      - "istio"
+      - "infrastructure as code"
+      - "cluster architecture"
+      - "kubernetes operator"
+      - "control plane"
+      - "internal platform"
+      - "platform maturity"
+      - "developer experience"
+      - "on-call rotation"
+      - "incident response"
+      - "observability"
+      - "prometheus"
+      - "grafana"
+      - "slo"
+      - "eks"
+      - "gke"
+    # Заголовки, при которых гейт не применяется: если человека прямо зовут
+    # прикладным разработчиком на его стеке, инфраструктурная лексика в
+    # описании — это окружение проекта, а не суть роли.
+    title_exemption_patterns:
+      - "\\.net"
+      - "\\bc#\\b"
+      - "full[ -]?stack"
+      - "front[ -]?end"
+      - "back[ -]?end developer"
+      - "web developer"
+  developer_role_override_patterns:
+    - "developer"
+    - "engineer"
+    - "programmer"
+    - "\\bswe\\b"
+    - "software"
+    - "full[ -]?stack"
+    - "back[ -]?end"
+    - "front[ -]?end"
+    - "\\.net"
+    - "architect"
+  tech_agnostic_override_keywords:
+    - "tech agnostic"
+    - "technology agnostic"
+    - "stack agnostic"
+    - "language agnostic"
+    - "any programming language"
+    - "any tech stack"
+    - "polyglot team"
+    - "polyglot environment"
+
+language_requirement_signal:
+  # ПОЛНЫЙ ОТСЕВ (dealbreaker). Подтверждено человеком явно (2026-07-30):
+  # человек говорит только на русском и английском (см. profile.yaml →
+  # owner.languages). Явное требование другого языка — например, немецкого
+  # ("Web-Administration / Webmaster TYPO3" требовал sehr gute
+  # Deutschkenntnisse) — дисквалифицирует вакансию полностью.
+  explicit_requirement_keywords:
+    - "fluent german"
+    - "german required"
+    - "german language required"
+    - "advanced german"
+    - "sehr gute deutschkenntnisse"
+    - "gute deutschkenntnisse"
+    - "verhandlungssicheres deutsch"
+    - "muttersprache deutsch"
+    - "native german speaker"
+    - "german speaker required"
+    - "fließend deutsch"
+    - "deutschkenntnisse"
+    - "german c1"
+    - "german c2"
+    - "fluent french"
+    - "french required"
+    - "native french speaker"
+    - "fluent spanish"
+    - "spanish required"
+    - "native spanish speaker"
+    - "fluent italian"
+    - "italian required"
+    - "fluent dutch"
+    - "dutch required"
+    - "native dutch speaker"
+  # Многие вакансии с немецких джоб-бордов (в частности arbeitnow) целиком
+  # написаны по-немецки, без явной англоязычной фразы "German required" -
+  # сам факт того, что описание написано по-немецки, уже означает рабочий
+  # язык не английский/русский. threshold_hits штук из этого списка -
+  # эвристика "это немецкоязычная вакансия" (использует стандартную для
+  # немецких вакансий разметку "m/w/d"/"w/m/d" и частые слова объявлений).
+  german_market_indicator_keywords:
+    - "m/w/d"
+    - "w/m/d"
+    # Реальная находка 2026-07-31: две вакансии Hygraph "Senior
+    # Fullstack Engineer (f/m/d) - Berlin I Germany, EMEA I Remote"
+    # — тот же немецкий гендерный маркер, просто другая буква.
+    - "(f/m/d)"
+    - "(d/f/m)"
+    - "(m/f/d)"
+    - "(m/w/x)"
+    - "wir suchen"
+    - "ihre aufgaben"
+    - "ihr profil"
+    - "kenntnisse"
+    - "bewerbung"
+    - "unser unternehmen"
+    - "homeoffice"
+    - "vollzeit"
+    - "teilzeit"
+    - "arbeitszeit"
+    - "mitarbeiter"
+    - "unternehmen"
+  german_market_indicator_threshold: 3
+
+  # Однозначные маркеры немецкоязычного объявления: одного достаточно.
+  german_market_strong_single_markers:
+    - "m/w/d"
+    - "w/m/d"
+    - "(f/m/d)"
+    - "(d/f/m)"
+    - "(m/f/d)"
+    - "(m/w/x)"
+    - "deutschkenntnisse"
+
+  # Тот же приём, что и с немецким, но для остальных языков. Реальные
+  # находки 2026-07-31 (ручной чек-лист): "Website Builder / WordPress
+  # Specialist" @ Work and Study Travel — объявление целиком на испанском
+  # (и оплата 16 000 MXN/мес), "Full-Stack Developer (React + AWS)" @
+  # Base.com — целиком на польском. Обе прошли фильтр только потому, что
+  # эвристика существовала ровно для одного языка.
+  #
+  # Маркеры подобраны так, чтобы не встречаться в английском тексте:
+  # это служебные слова объявлений о работе, а не общая лексика.
+  foreign_language_posting_indicators:
+    - language: spanish
+      threshold: 3
+      markers: ["buscamos", "responsabilidades", "conocimientos", "ofrecemos",
+                "experiencia en", "nuestro equipo", "empresa", "puesto",
+                "requisitos", "trabajo remoto"]
+    - language: polish
+      threshold: 3
+      markers: ["szukamy", "twoje zadania", "oferujemy", "doswiadczenie",
+                "doświadczenie", "zespol", "zespół", "wymagania", "praca",
+                "firma", "naszą misją"]
+    - language: french
+      threshold: 3
+      markers: ["nous recherchons", "vos missions", "votre profil",
+                "compétences", "entreprise", "poste", "expérience"]
+    - language: portuguese
+      threshold: 3
+      markers: ["estamos à procura", "responsabilidades", "experiência",
+                "equipe", "vaga", "requisitos"]
+    - language: italian
+      threshold: 3
+      markers: ["cerchiamo", "requisiti", "esperienza", "azienda",
+                "competenze", "il candidato"]
+
+
+legacy_enterprise_signal:
+  points_per_keyword: 3
+  cap: 25
+  keywords:
+    - "legacy"
+    - "maintenance"
+    - "maintain existing"
+    - "support existing system"
+    - "enterprise"
+    - "back office"
+    - "internal tool"
+    - "internal tools"
+    - "on-premise"
+    - "on-premises"
+    - "monolith"
+    - "webforms"
+    - "winforms"
+    - "vb.net"
+    - "classic asp"
+    - "soap"
+    - "mainframe"
+    - "cobol"
+    - "insurance"
+    - "bank"
+    - "banking"
+    - "government"
+    - "public sector"
+    - "utility"
+    - "utilities"
+    - "healthcare"
+    - "logistics"
+    - "manufacturing"
+    - "higher education"
+    - "erp"
+    - "payroll system"
+    - "stable and mature codebase"
+    - "well-established"
+
+low_intensity_signal:
+  positive_points_per_keyword: 4
+  negative_points_per_keyword: -6
+  cap: 20
+  floor: -20
+  positive_keywords:
+    - "part-time"
+    - "part time"
+    - "flexible hours"
+    - "flexible schedule"
+    - "asynchronous"
+    - "async-first"
+    - "no on-call"
+    - "no on call"
+    - "low stress"
+    - "work-life balance"
+    - "work/life balance"
+    - "20 hours"
+    - "25 hours"
+    - "30 hours"
+    - "few meetings"
+    - "minimal meetings"
+    - "self-paced"
+    - "contractor"
+    - "freelance"
+    - "1099"
+    - "fractional"
+    - "moonlighting ok"
+    - "side project friendly"
+  negative_keywords:
+    - "fast-paced"
+    - "fast paced"
+    - "high growth"
+    - "move fast"
+    - "wear many hats"
+    - "rockstar"
+    - "ninja"
+    - "10x engineer"
+    - "24/7 on-call"
+    - "on-call rotation"
+    - "unlimited pto" # часто маркер стартап-культуры "бери отпуск, если выживешь"
+    - "hustle"
+    - "startup"
+    - "high-pressure"
+    - "tight deadlines"
+    - "crunch"
+    # profile.yaml → ideal_company_traits.low_priority_avoid: crypto/web3 —
+    # прямая противоположность искомой "скучной легаси стабильности".
+    # Реальная находка 2026-07-30: "Senior DevOps Engineer (Web3)" попала
+    # в кандидаты.
+    - "web3"
+    - "crypto"
+    - "blockchain"
+    - "defi"
+    - "nft"
+
+compensation_signal:
+  has_explicit_range_points: 8
+  # Подтверждено человеком явно (2026-07-30): если ЗП не указана в самой
+  # вакансии, но агент нашёл примерный рендж из стороннего источника
+  # (Glassdoor и т.п.) через ручное исследование — это маленький плюс,
+  # меньше, чем явно указанная в вакансии ставка. Заполняется через
+  # `tools/kb.py set-salary-estimate` в vacancy.external_signals.
+  external_estimate_points: 3
+  no_range_points: 0
+  below_target_penalty: -6
+  above_target_bonus: 2
+  # диапазон таргета берётся из profile.yaml goal.target_compensation
+
+company_reputation_signal:
+  # Репутация работодателя по внешним источникам (Glassdoor, Indeed reviews,
+  # Trustpilot, отзывы на профильных площадках). КРИТИЧНО именно для этого
+  # проекта: цель — спокойное место с хорошим work-life balance, а это ровно
+  # то, чего в тексте вакансии никогда не напишут, зато честно пишут
+  # бывшие сотрудники в отзывах.
+  #
+  # Заполняется ВРУЧНУЮ агентом через `tools/kb.py set-company-reputation`
+  # (Glassdoor и подобные нельзя скрейпить автоматически — ToS; агент ищет
+  # их через обычный веб-поиск, как это сделал бы человек, см.
+  # docs/SOURCES.md). Хранится в companies.json → reputation и применяется
+  # ко ВСЕМ вакансиям этой компании сразу.
+  #
+  # Шкала рейтинга предполагается 1..5 (как у Glassdoor/Indeed).
+  overall_rating:
+    excellent_threshold: 4.0    # >= — заметный плюс
+    excellent_points: 8
+    decent_threshold: 3.5       # >= — небольшой плюс
+    decent_points: 4
+    poor_threshold: 2.8         # <= — штраф
+    poor_points: -10
+    # Совсем низкий рейтинг — это не просто минус в баллах, а красный флаг:
+    # вакансия помечается needs_manual_review, чтобы человек точно прочитал
+    # причину, прежде чем тратить время на отклик.
+    alarming_threshold: 2.5
+  work_life_balance:
+    # Отдельная ось, и для ЭТОГО проекта она важнее общего рейтинга:
+    # компания может быть "хорошей" по общему баллу за счёт зарплат и
+    # карьерного роста, но при этом выжимать людей — а нужно ровно обратное.
+    excellent_threshold: 4.0
+    excellent_points: 10
+    poor_threshold: 3.0
+    poor_points: -12
+  # Свободные пометки агента по итогам чтения отзывов. Наличие любой из них
+  # — красный флаг для ручной проверки, независимо от цифр.
+  red_flag_keywords:
+    - "layoffs"
+    - "mass layoff"
+    - "unpaid overtime"
+    - "does not pay"
+    - "late payments"
+    - "toxic"
+    - "micromanagement"
+    - "constant crunch"
+    - "high turnover"
+    - "burnout"
+    - "return to office"
+    - "rto mandate"
+  no_data_points: 0   # нет данных — строго нейтрально, как и с зарплатой
+
+  # Зрелость компании — собирается АВТОМАТИЧЕСКИ из Wikidata
+  # (`tools/company_intel.py`), в отличие от рейтингов выше.
+  # profile.yaml → ideal_company_traits упоминает "mature company (10+
+  # years old)": у старой компании обычно устоявшиеся процессы, легаси-
+  # системы и спокойный темп — ровно то, что нужно. До 2026-07-31 этот
+  # признак был записан в профиле, но нигде не проверялся.
+  company_age:
+    mature_threshold_years: 10
+    mature_points: 6
+    established_threshold_years: 5
+    established_points: 3
+    very_young_threshold_years: 3
+    very_young_points: -4   # компания моложе 3 лет — обычно ещё стартап-режим
+
+contractor_friendliness:
+  points_per_keyword: 5
+  cap: 5
+  keywords:
+    - "1099"
+    - "contractor"
+    - "eor"
+    - "deel"
+    - "remote.com"
+    - "oyster"
+    - "papaya global"
+    - "multiplier"
+    - "globalization partners"
+    - "velocity global"
+
+classification_thresholds:
+  # ПЕРЕСМОТРЕНО 2026-07-30 (важное изменение логики).
+  #
+  # Пороги 65/45/25 достались с той эпохи, когда score был ЕДИНСТВЕННЫМ
+  # фильтром — тогда высокий порог защищал от мусора. Сейчас фильтрацию
+  # делают жёсткие гейты (стек, локация, язык, профессия, сложность роли):
+  # всё непроходное уже отсеяно в "rejected". Для того, что ГЕЙТЫ ПРОПУСТИЛИ,
+  # балл должен РАНЖИРОВАТЬ, а не выбрасывать.
+  #
+  # Найденная проблема (реальные данные): вакансии, прошедшие все гейты
+  # (worldwide remote, JS/.NET стек, английский, роль разработчика) —
+  # например "Staff Software Engineer (Magic Containers)" (18 баллов),
+  # "Senior Vue Developer" (15), "Senior React Full-stack Developer" (15) —
+  # не попадали в отчёт вообще. Обычная нормальная remote-вакансия без слов
+  # "legacy"/"part-time"/явной вилки набирает всего ~15 баллов: бонусы
+  # начисляются за скуку и низкую нагрузку, а их мало кто пишет в тексте.
+  # В результате из 966 вакансий человеку показывалась 1 — при том что
+  # ~50 реально прошли все проверки на пригодность.
+  hot_lead: 45
+  worth_a_look: 25
+  long_shot: 8
+  # ниже long_shot -> low_priority
+  # наличие hard dealbreaker keyword -> статус "rejected" независимо от очков

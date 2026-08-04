@@ -1,0 +1,45 @@
+# Источники тестовой фикстуры.
+#
+# ЗАМОРОЖЕНО: менять только вместе с осознанным обновлением тестов
+# (см. ftf_identity.md).
+#
+# Что описывает этот файл: ТОЛЬКО предпочтения — какие источники включены и с
+# какими параметрами. Эндпоинты, тип источника и признак remote_only живут в
+# общем каталоге config/sources.catalog.yaml и идентичностью не переопределяются:
+# устаревший URL — это баг для всех сразу, а не чья-то настройка.
+
+schema_version: 1
+
+sources:
+  - name: weworkremotely
+    enabled: true
+
+  - name: remoteok
+    enabled: true
+
+  - name: remotive
+    enabled: true
+
+  - name: jobicy
+    enabled: true
+
+  - name: himalayas
+    enabled: true
+
+  - name: ats
+    enabled: true
+
+  - name: hn_whoishiring
+    enabled: true
+    params:
+      # В бою по умолчанию берётся из profile.tech_stack.core активной
+      # идентичности; здесь задано явно, чтобы фикстура не зависела от правок
+      # профиля.
+      keywords: [".NET", "C#", "ASP.NET", "legacy", "SQL Server"]
+      hits_per_keyword: 50
+
+  - name: arbeitnow
+    enabled: true
+
+  - name: manual
+    enabled: true
