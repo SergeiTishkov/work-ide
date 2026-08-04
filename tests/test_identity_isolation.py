@@ -53,6 +53,11 @@ def two_identities(tmp_path, monkeypatch):
 
     monkeypatch.setattr(common, "IDENTITIES_DIR", identities_dir)
     monkeypatch.setattr(common, "DATA_ROOT", tmp_path / "data")
+    # И REPORTS_ROOT тоже. Реальный случай 2026-08-04: подменялся только
+    # DATA_ROOT, и тест создавал reports/archive/aaaa и .../bbbb прямо в
+    # настоящей папке отчётов человека. Пустые папки, но они месяцами
+    # мозолили глаза в единственном месте, куда человек реально смотрит.
+    monkeypatch.setattr(common, "REPORTS_ROOT", tmp_path / "reports")
     yield tmp_path
     # Возвращаем процесс в состояние, которое ожидают остальные тесты
     monkeypatch.undo()

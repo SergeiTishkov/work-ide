@@ -64,3 +64,38 @@ def isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(common, "INSIGHTS_PATH", knowledge_dir / f"{prefix}insights.md")
     common.ensure_dirs()
     return data_dir
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _no_test_writes_into_real_folders():
+    """Страховка от того, что тесты пишут в НАСТОЯЩИЕ папки данных и отчётов.
+
+    Ловит целый класс ошибок, а не один случай: тест изолирует данные, забывает
+    изолировать отчёты (или наоборот) — и мусор появляется там, куда человек
+    реально смотрит. Именно так в reports/archive/ завелись пустые папки
+    `aaaa` и `bbbb` от тестов изоляции (2026-08-04).
+
+    Сравниваем состав папок до и после прогона; про них известно, что обычный
+    pytest их вообще не должен касаться.
+    """
+    def snapshot():
+        result = {}
+        for root in (common.REPORTS_ROOT, common.DATA_ROOT):
+            result[root] = sorted(p.name for p in root.iterdir()) if root.exists() else None
+            archive = root / "archive"
+            if archive.exists():
+                result[archive] = sorted(p.name for p in archive.iterdir())
+        return result
+
+    before = snapshot()
+    yield
+    after = snapshot()
+    for path, names_before in before.items():
+        names_after = after.get(path)
+        if names_before is None and names_after is None:
+            continue
+        appeared = sorted(set(names_after or []) - set(names_before or []))
+        assert not appeared, (
+            f"тесты создали {appeared} в настоящей папке {path}. "
+            "Изолируйте и DATA_ROOT, и REPORTS_ROOT — см. tests/test_identity_isolation.py"
+        )
