@@ -471,6 +471,63 @@ role_complexity_signal:
     - "llm systems"
     - "genai"
 
+# Гейт «заголовок называет чужой стек».
+#
+# Реальная находка 2026-08-04, замеченная человеком прямо в готовой выдаче:
+# "Senior Ruby on Rails Developer", "Senior Fullstack Developer (Python)" и
+# "Senior Vue Developer" прошли фильтр стека. Механизм протечки: гейт
+# релевантности искал знакомый язык ПО ВСЕМУ тексту, а в Rails-вакансии
+# мимоходом перечислены HTML/CSS/JavaScript как смежные навыки. Формально
+# совпадение есть — фактически роль совсем про другое.
+#
+# Правило: роль определяет ЗАГОЛОВОК. Если он называет технологию, которой
+# нет в core/strong (familiar недостаточно — это «трогал пару раз за карьеру»),
+# вакансия отсекается независимо от того, что упомянуто в теле.
+title_stack_gate:
+  # Технологии, которые в заголовке ОПРЕДЕЛЯЮТ роль. Список не про то, что
+  # человек знает, а про то, какие слова в заголовке вообще задают стек —
+  # поэтому он одинаков для всех идентичностей.
+  role_defining_technologies:
+    - ruby on rails
+    - ruby
+    - rails
+    - vue
+    - nuxt
+    - svelte
+    - python
+    - django
+    - flask
+    - fastapi
+    - php
+    - laravel
+    - symfony
+    - golang
+    - rust
+    - elixir
+    - phoenix
+    - scala
+    - spring boot
+    - kotlin
+    - swift
+    - objective-c
+    - flutter
+    - dart
+    - unity
+    - unreal
+    - wordpress
+    - drupal
+    - shopify
+    - salesforce
+    - abap
+    - cobol
+    - delphi
+    - perl
+    - haskell
+    - clojure
+    - magento
+    - umbraco
+    - sitecore
+
 role_relevance_signal:
   # ПОЛНЫЙ ОТСЕВ (dealbreaker), не просто минус в баллах. Подтверждено
   # человеком явно (2026-07-30) на реальных находках: "CFO Controller",

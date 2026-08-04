@@ -83,6 +83,20 @@ def _format_location(item: dict) -> str:
     return ", ".join(names) + " only"
 
 
+# Значения, которые площадка отдаёт вместо настоящих данных.
+#
+# Замер 2026-08-04: Himalayas возвращает `companyName: "name"` и
+# `companyLogo: "thumbnail_url"` — буквально НАЗВАНИЯ ПОЛЕЙ вместо значений,
+# то есть у них сломана сериализация ответа. В базе из-за этого завелись
+# вакансии от компании с именем «name», и человек увидел их в отчёте.
+#
+# Настоящее имя при этом доступно в `companySlug`. Отсюда общее правило для
+# любых внешних API: пустое значение — не единственная форма отсутствия
+# данных, плейсхолдер выглядит как валидная строка и молча проходит проверки.
+_PLACEHOLDER_VALUES = {"name", "title", "company", "companyname", "null", "none",
+                       "undefined", "string", "thumbnail_url", "n/a"}
+
+
 def _extract_company(item: dict) -> str:
     """Имя компании из записи Himalayas, в каком бы виде оно ни пришло.
 
@@ -95,10 +109,17 @@ def _extract_company(item: dict) -> str:
     Отсюда правило: у внешнего API не бывает «того самого» имени поля.
     Перебираем известные формы и берём первую непустую.
     """
-    value = item.get("companyName") or item.get("company") or item.get("organization")
-    if isinstance(value, dict):
-        value = value.get("name") or value.get("title") or ""
-    return str(value or "").strip()
+    for key in ("companyName", "company", "organization"):
+        value = item.get(key)
+        if isinstance(value, dict):
+            value = value.get("name") or value.get("title") or ""
+        value = str(value or "").strip()
+        if value and value.lower() not in _PLACEHOLDER_VALUES:
+            return value
+
+    # Запасной путь: слаг компании. Он же используется в URL вакансии.
+    slug = str(item.get("companySlug") or "").strip()
+    return slug
 
 
 def _to_common_schema(item: dict) -> Optional[dict]:

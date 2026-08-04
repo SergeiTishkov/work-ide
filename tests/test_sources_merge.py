@@ -155,3 +155,20 @@ def test_himalayas_company_survives_a_renamed_api_field():
         assert fetch_himalayas._extract_company(payload) == "Acme", payload
 
     assert fetch_himalayas._extract_company({}) == ""
+
+
+def test_himalayas_placeholder_company_falls_back_to_the_slug():
+    """Замер 2026-08-04: площадка отдаёт companyName: "name" и
+    companyLogo: "thumbnail_url" — буквально названия полей вместо значений.
+    В базе завелись вакансии от компании «name», и человек увидел их в отчёте.
+    Плейсхолдер выглядит валидной строкой и молча проходит проверку на пустоту.
+    """
+    import fetch_himalayas
+
+    assert fetch_himalayas._extract_company(
+        {"companyName": "name", "companySlug": "micro1"}
+    ) == "micro1"
+    assert fetch_himalayas._extract_company(
+        {"companyName": "Acme", "companySlug": "acme-inc"}
+    ) == "Acme"
+    assert fetch_himalayas._extract_company({"companyName": "name"}) == ""

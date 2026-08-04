@@ -632,6 +632,43 @@ def _check_stack_relevance(text: str, core_hits: list, strong_hits: list, criter
     }
 
 
+def _check_title_stack(title: str, criteria: dict, profile: dict):
+    """Заголовок называет технологию, которой у человека нет — полный отсев.
+
+    Реальная протечка 2026-08-04, замеченная человеком в готовой выдаче:
+    "Senior Ruby on Rails Developer", "Senior Fullstack Developer (Python)",
+    "Senior Vue Developer". Гейт релевантности искал знакомый язык по ВСЕМУ
+    тексту, а в Rails-вакансии среди смежных навыков перечислены HTML, CSS и
+    JavaScript. Совпадение формально есть, роль — совсем про другое.
+
+    Роль определяет заголовок. Поэтому: если он называет хотя бы одну
+    роль-образующую технологию и НИ ОДНА из названных не входит в core/strong
+    — вакансия отсекается. Familiar-уровень намеренно не считается: это
+    «трогал пару раз за карьеру», на такую роль человека не возьмут.
+    """
+    cfg = criteria.get("title_stack_gate")
+    if not cfg:
+        return False, {}
+
+    title_norm = common.normalize_for_matching(title)
+    named = [tech for tech in cfg.get("role_defining_technologies", [])
+             if common.normalize_for_matching(tech) in title_norm]
+    if not named:
+        return False, {"named_technologies": []}
+
+    stack = profile.get("tech_stack") or {}
+    known = [common.normalize_for_matching(k)
+             for k in (stack.get("core") or []) + (stack.get("strong") or [])]
+    mine = [tech for tech in named
+            if any(k and k in common.normalize_for_matching(tech) for k in known)
+            or any(common.normalize_for_matching(tech) in k for k in known)]
+
+    return (not mine), {
+        "named_technologies": named,
+        "known_among_them": mine,
+    }
+
+
 def _score_role_relevance(text: str, title: str, criteria: dict):
     """Гейт "это вообще роль разработчика ПО" — ПОЛНЫЙ ОТСЕВ (dealbreaker).
     Подтверждено человеком явно (2026-07-30) на реальных находках: "CFO
@@ -1035,6 +1072,19 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     if role_irrelevant:
         dealbreakers.append(
             f"role: title suggests non-developer profession ({', '.join(role_relevance_bd['wrong_profession_hits'])})"
+        )
+
+    title_mismatch, title_stack_bd = _check_title_stack(
+        vacancy.get("title") or "", criteria, profile
+    )
+    if title_stack_bd:
+        stack_bd["title_stack_gate"] = title_stack_bd
+    # Дата-пайплайны — задокументированное исключение: Scala/Java в заголовке
+    # при контексте Spark/Databricks/ETL остаются желанным вариантом.
+    if title_mismatch and not stack_bd.get("data_pipeline_exception_applied"):
+        dealbreakers.append(
+            "stack: title names technology outside the core/strong stack "
+            f"({', '.join(title_stack_bd['named_technologies'][:3])})"
         )
 
     infra_role, infra_bd = _check_infrastructure_role(text, vacancy.get("title") or "", criteria)

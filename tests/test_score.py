@@ -1296,3 +1296,49 @@ def test_keyword_stuffing_block_does_not_trigger_the_industry_gate():
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert not any(d.startswith("industry:") for d in r["dealbreakers"])
+
+
+def test_title_naming_a_foreign_technology_is_rejected():
+    """Протечка, замеченная человеком прямо в выдаче 2026-08-04: гейт искал
+    знакомый язык по всему тексту, а в Rails-вакансии среди смежных навыков
+    перечислены HTML/CSS/JavaScript."""
+    for title in ("Senior Ruby on Rails Developer",
+                  "Senior Fullstack Developer (Python)",
+                  "Senior Vue Developer"):
+        v = make_vacancy(
+            title=title,
+            description_text=(
+                "Worldwide remote. Proficiency in HTML, CSS, JavaScript and modern "
+                "frontend tooling. Strong knowledge of Git."
+            ),
+        )
+        r = score.score_vacancy(v, CRITERIA, PROFILE)
+        assert r["classification"] == "rejected", title
+        assert any(d.startswith("stack: title names") for d in r["dealbreakers"]), title
+
+
+def test_title_naming_a_known_technology_still_passes():
+    """Обратная страховка: гейт не должен резать вакансии на своём стеке."""
+    for title in ("Senior C# Developer",
+                  "Senior Fullstack Developer (React.js / Node.js)",
+                  "Software engineer"):
+        v = make_vacancy(
+            title=title,
+            description_text="Legacy enterprise platform, worldwide remote. C# and TypeScript.",
+        )
+        r = score.score_vacancy(v, CRITERIA, PROFILE)
+        assert r["classification"] != "rejected", title
+
+
+def test_data_pipeline_exception_survives_the_title_gate():
+    """Scala/Java в заголовке при контексте Spark/Databricks — задокументированное
+    исключение, оно не должно погибнуть под новым гейтом."""
+    v = make_vacancy(
+        title="Scala Data Engineer",
+        description_text=(
+            "Build ETL pipelines with Scala and Apache Spark on Databricks. "
+            "Legacy data warehouse migration. Worldwide remote."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] != "rejected"
