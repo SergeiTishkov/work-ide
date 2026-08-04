@@ -78,8 +78,9 @@ sources:
   # --- В очереди: проверены живыми запросами 2026-08-04 ---------------------
 
   - name: linkedin
-    status: pending
-    priority: 1
+    status: implemented
+    implemented_at: "2026-08-04"
+    measured_after_wiring: "621 записи за прогон (3 слова × 28 стран × 2 стр.), из них 150 с догруженным описанием"
     kind: html
     endpoint: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
     measured: "HTTP 200, 30 карточек на страницу, пагинация start=0,25,50 работает"
@@ -94,7 +95,9 @@ sources:
       вёрстки, а не битые записи.
 
   - name: devitjobs
-    status: pending
+    status: implemented
+    implemented_at: "2026-08-04"
+    measured_after_wiring: "UK+US 4033 записи — крупнейший источник проекта"
     priority: 2
     kind: json
     endpoint: "https://devitjobs.uk/api/jobsLight и https://devitjobs.com/api/jobsLight"
@@ -102,7 +105,9 @@ sources:
     note: "Есть annualSalaryFrom/To, expLevel, companyType."
 
   - name: jobs_ch
-    status: pending
+    status: implemented
+    implemented_at: "2026-08-04"
+    measured_after_wiring: "336 записей (4 запроса × 5 страниц)"
     priority: 2
     kind: json
     endpoint: "https://www.jobs.ch/api/v1/public/search"
@@ -110,7 +115,9 @@ sources:
     note: "Главный швейцарский борд. Швейцария для контрактора реалистичнее США."
 
   - name: mycareersfuture
-    status: pending
+    status: implemented
+    implemented_at: "2026-08-04"
+    measured_after_wiring: "384 записи"
     priority: 3
     kind: json
     endpoint: "https://api.mycareersfuture.gov.sg/v2/jobs"
@@ -118,7 +125,9 @@ sources:
     note: "Государственный портал Сингапура. Данные чистые и структурные."
 
   - name: landing_jobs
-    status: pending
+    status: implemented
+    implemented_at: "2026-08-04"
+    measured_after_wiring: "50 записей"
     priority: 3
     kind: json
     endpoint: "https://landing.jobs/api/v1/jobs"
@@ -126,21 +135,27 @@ sources:
     note: "ЕС. Есть флаги remote и relocation_paid, вилка зарплаты."
 
   - name: workingnomads
-    status: pending
+    status: implemented
+    implemented_at: "2026-08-04"
+    measured_after_wiring: "28 записей"
     priority: 3
     kind: json
     endpoint: "https://www.workingnomads.com/api/exposed_jobs/"
     measured: "HTTP 200, 28 записей"
 
   - name: jobspresso
-    status: pending
+    status: implemented
+    implemented_at: "2026-08-04"
+    measured_after_wiring: "в составе rss_boards"
     priority: 4
     kind: rss
     endpoint: "https://jobspresso.co/?feed=job_feed"
     measured: "HTTP 200, RSS 93 КБ"
 
   - name: berlinstartupjobs
-    status: pending
+    status: implemented
+    implemented_at: "2026-08-04"
+    measured_after_wiring: "в составе rss_boards"
     priority: 4
     kind: rss
     endpoint: "https://berlinstartupjobs.com/feed/"

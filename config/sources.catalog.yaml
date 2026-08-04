@@ -90,7 +90,6 @@ sources:
   - name: linkedin
     kind: html_guest_search
     remote_only: false
-    url: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
     params_schema:
       keywords: "список ключевых слов; каждое умножается на каждую страну"
       locations: "список стран; по умолчанию — ярусы из profile.target_markets"
@@ -107,6 +106,54 @@ sources:
       описания, только заголовок/компания/локация: гейты, читающие описание,
       по этим вакансиям работают вслепую, поэтому ручной чек-лист для них
       особенно важен.
+
+
+  - name: devitjobs
+    kind: json_api
+    remote_only: false
+    params_schema:
+      boards: "список досок: uk и/или us"
+    yield_notes: "Замер 2026-08-04: UK 2447 записей, US 1590. Крупнейший по объёму источник."
+    caveats: >
+      В ответе НЕТ текста описания — только заголовок, теги и структурные поля.
+      Гейты, читающие описание, по этим записям работают вслепую.
+
+  - name: jobs_ch
+    kind: json_api
+    remote_only: false
+    params_schema:
+      queries: "поисковые запросы"
+      pages: "страниц на запрос, по 20 записей (площадка игнорирует rows)"
+    yield_notes: "Замер 2026-08-04: 250 записей за 3 запроса по 5 страниц."
+    caveats: "Национальный борд: большинство вакансий локальные и на немецком."
+
+  - name: mycareersfuture
+    kind: json_api
+    remote_only: false
+    params_schema:
+      queries: "поисковые запросы"
+      pages: "страниц на запрос по 100 записей"
+    yield_notes: "Замер 2026-08-04: 384 записи. Государственный портал Сингапура."
+    caveats: "Национальный портал: удалёнка определяется текстом, а не флагом."
+
+  - name: landing_jobs
+    kind: json_api
+    remote_only: false
+    yield_notes: "Замер 2026-08-04: 50 записей. Есть флаг remote и вилка зарплаты."
+    caveats: "Часть вакансий публикуется анонимно — компания достаётся из URL."
+
+  - name: workingnomads
+    kind: json_api
+    remote_only: true
+    yield_notes: "Замер 2026-08-04: 28 записей. Курируемая подборка."
+
+  - name: rss_boards
+    kind: rss
+    remote_only: false
+    params_schema:
+      boards: "jobspresso и/или berlinstartupjobs"
+    yield_notes: "Замер 2026-08-04: 22 записи суммарно."
+    caveats: "Записи без распознанной компании отбрасываются — их нечем дедуплицировать."
 
 
   - name: ats

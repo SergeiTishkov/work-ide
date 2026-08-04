@@ -51,6 +51,12 @@ API_URL = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/searc
 REMOTE_WORKPLACE_TYPE = "2"
 
 PAGE_SIZE = 25          # столько LinkedIn отдаёт на один запрос
+# Сколько карточек за прогон догружать полным описанием. В карточке описания
+# нет — только заголовок, компания и локация. Без описания гейт стека отсекает
+# три четверти найденного (замер: 447 из 621), потому что не видит ни одного
+# знакомого языка. Страница вакансии открывается тем же обычным GET и отдаёт
+# полный текст, но это отдельный запрос на каждую вакансию — отсюда потолок.
+ENRICH_LIMIT = 120
 MAX_PAGES = 4           # 100 вакансий на пару (запрос × страна) — разумный потолок
 PAUSE_SECONDS = 1.5     # вежливость: не долбим чужой сервер
 
@@ -61,6 +67,8 @@ _LOCATION_RE = re.compile(r'job-search-card__location[^>]*>(.*?)</span>', re.S)
 _URL_RE = re.compile(r'href="(https://[a-z]{0,3}\.?linkedin\.com/jobs/view/[^"?]+)')
 _DATE_RE = re.compile(r'datetime="([\d-]+)"')
 _TAG_RE = re.compile(r"<[^>]+>")
+_DESCRIPTION_RE = re.compile(r'description__text[^>]*>(.*?)</div>\s*</section>', re.S)
+_DESCRIPTION_FALLBACK_RE = re.compile(r'description__text[^>]*>(.*?)</div>', re.S)
 
 
 def _clean(fragment: Optional[str]) -> str:
@@ -116,9 +124,42 @@ def _fetch_page(keyword: str, location: str, start: int, timeout: int):
     return resp.text
 
 
+_DEV_TITLE_RE = re.compile(
+    r"develop|engineer|programm|architect|\.net|dotnet|c#|javascript|typescript|"
+    r"backend|back-end|frontend|front-end|full[ -]?stack|software",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_dev_role(title: str) -> bool:
+    return bool(_DEV_TITLE_RE.search(title or ""))
+
+
+def _fetch_description(url: str, timeout: int) -> str:
+    """Полный текст вакансии со страницы объявления.
+
+    Страница отдаётся анониму обычным GET — так же, как страница поиска.
+    Пустая строка означает «не получилось»: это не ошибка прогона, вакансия
+    просто останется с оценкой по заголовку.
+    """
+    import requests
+
+    try:
+        resp = requests.get(url, headers={"User-Agent": common.USER_AGENT}, timeout=timeout)
+        resp.raise_for_status()
+    except Exception:  # noqa: BLE001
+        return ""
+
+    match = _DESCRIPTION_RE.search(resp.text) or _DESCRIPTION_FALLBACK_RE.search(resp.text)
+    if not match:
+        return ""
+    return " ".join(_clean(match.group(1)).split())
+
+
 def fetch(keywords: Optional[List[str]] = None,
           locations: Optional[List[str]] = None,
           max_pages: int = MAX_PAGES,
+          enrich_limit: int = ENRICH_LIMIT,
           timeout: int = common.DEFAULT_TIMEOUT):
     """Обходит пары (ключевое слово × страна) и возвращает (записи, заметка).
 
@@ -176,7 +217,20 @@ def fetch(keywords: Optional[List[str]] = None,
             "не удалось разобрать ни одной"
         )
 
-    note_parts = [f"карточек {cards_seen}, записей {len(records)}"]
+    # Догрузка описаний. Порядок важен: сначала те, чей заголовок вообще
+    # похож на разработку — если лимит закончится, он закончится на менее
+    # интересных записях, а не на первой попавшейся.
+    enriched = 0
+    if enrich_limit:
+        records.sort(key=lambda r: 0 if _looks_like_dev_role(r["title"]) else 1)
+        for rec in records[:enrich_limit]:
+            description = _fetch_description(rec["url"], timeout)
+            if description:
+                rec["description_text"] = description
+                enriched += 1
+            time.sleep(PAUSE_SECONDS)
+
+    note_parts = [f"карточек {cards_seen}, записей {len(records)}, с описанием {enriched}"]
     if errors:
         note_parts.append("ошибки: " + "; ".join(errors[:3]))
     return records, "; ".join(note_parts)

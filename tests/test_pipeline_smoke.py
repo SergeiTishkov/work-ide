@@ -208,3 +208,44 @@ def test_ingest_manual_merges_into_same_kb_and_reruns_report(isolated_data_dir, 
 
     report_text = (common.REPORTS_DIR / f"{common.FILE_PREFIX}latest.md").read_text(encoding="utf-8")
     assert "Big Slow Bank" in report_text
+
+
+def test_company_enrichment_runs_for_the_shortlist(isolated_data_dir, monkeypatch):
+    """Ревизия 2026-08-04: company_intel был написан, задокументирован и
+    упомянут в отчёте — но не вызывался ниоткуда. Из 1083 компаний возраст
+    знали у 22, и все они попали туда ручными запусками. При этом признак
+    «зрелая компания 10+ лет» прямо записан в ideal_company_traits: система
+    просила то, чего не собирала."""
+    import company_intel
+    import pipeline
+
+    called = {}
+
+    def fake_enrich(companies, only_names=None, **kwargs):
+        called["names"] = set(only_names or [])
+        return {"checked": len(called["names"]), "found": 0, "skipped": 0}
+
+    monkeypatch.setattr(company_intel, "enrich_companies", fake_enrich)
+    monkeypatch.setattr(pipeline.link_check, "check_links", lambda *_a, **_k: {})
+    # Скоринг здесь не проверяется: он перезаписал бы выставленные вручную
+    # классификации, а тест ровно про то, ЧЬИ компании попадают в обогащение.
+    monkeypatch.setattr(pipeline, "rescore_all", lambda *_a, **_k: None)
+
+    vacancies = {
+        "a": {"id": "a", "company": "Shortlisted Co", "title": "Senior C# Developer",
+              "url": "https://example.com/a", "source": "test",
+              "computed": {"classification": "worth_a_look", "score": 40,
+                           "score_breakdown": {}, "dealbreakers": [],
+                           "needs_manual_review": False}},
+        "b": {"id": "b", "company": "Rejected Co", "title": "Chef",
+              "url": "https://example.com/b", "source": "test",
+              "computed": {"classification": "rejected", "score": 0,
+                           "score_breakdown": {}, "dealbreakers": ["role: no"],
+                           "needs_manual_review": False}},
+    }
+    pipeline.finalize_and_report(vacancies, {}, {})
+
+    assert called["names"] == {"Shortlisted Co"}, (
+        "обогащаем только видимую часть выдачи: остальные компании всё равно "
+        "отсеяны, а внешний API не заслуживает сотен запросов впустую"
+    )

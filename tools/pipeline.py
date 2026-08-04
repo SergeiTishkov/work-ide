@@ -29,10 +29,17 @@ import fetch_himalayas  # noqa: E402
 import fetch_hn_whoishiring  # noqa: E402
 import fetch_jobicy  # noqa: E402
 import fetch_linkedin  # noqa: E402
+import fetch_devitjobs  # noqa: E402
+import fetch_jobs_ch  # noqa: E402
+import fetch_landing_jobs  # noqa: E402
+import fetch_mycareersfuture  # noqa: E402
+import fetch_rss_boards  # noqa: E402
+import fetch_workingnomads  # noqa: E402
 import fetch_remoteok  # noqa: E402
 import fetch_remotive  # noqa: E402
 import fetch_wwr  # noqa: E402
 import kb  # noqa: E402
+import company_intel  # noqa: E402
 import link_check  # noqa: E402
 import normalize  # noqa: E402
 import report  # noqa: E402
@@ -48,6 +55,12 @@ FETCHERS = {
     "himalayas": fetch_himalayas.fetch,
     "ats": fetch_ats.fetch,
     "linkedin": fetch_linkedin.fetch,
+    "devitjobs": fetch_devitjobs.fetch,
+    "jobs_ch": fetch_jobs_ch.fetch,
+    "mycareersfuture": fetch_mycareersfuture.fetch,
+    "landing_jobs": fetch_landing_jobs.fetch,
+    "workingnomads": fetch_workingnomads.fetch,
+    "rss_boards": fetch_rss_boards.fetch,
 }
 
 
@@ -141,6 +154,34 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
     link_stats = link_check.check_links(vacancies)
     state["last_link_check"] = link_stats
     companies = kb.build_companies_from_vacancies(vacancies, prev_companies)
+
+    # Обогащение компаний из выдачи фактами из Wikidata (год основания, размер).
+    #
+    # Раньше этот модуль существовал, был задокументирован и упоминался в
+    # отчёте — но не вызывался ниоткуда. Ревизия 2026-08-04: из 1083 компаний
+    # возраст был известен у 22, и все они попали туда ручными запусками.
+    # Признак "зрелая компания 10+ лет" при этом прямо записан в
+    # ideal_company_traits, то есть система просила то, чего не собирала.
+    #
+    # Обогащаем ТОЛЬКО компании из видимой части выдачи: остальные всё равно
+    # отсеяны, а Wikidata не заслуживает сотен запросов впустую. Кэш на 30
+    # дней — по тому же принципу, что и в link_check.
+    shortlist_companies = {
+        v.get("company")
+        for v in vacancies.values()
+        if (v.get("computed") or {}).get("classification") in
+           ("hot_lead", "worth_a_look", "long_shot")
+        and not v.get("duplicate_of") and v.get("company")
+    }
+    if shortlist_companies:
+        try:
+            state["last_company_intel"] = company_intel.enrich_companies(
+                companies, only_names=shortlist_companies, limit=60
+            )
+        except Exception as exc:  # noqa: BLE001 — обогащение не должно ронять цикл
+            state["last_company_intel"] = {"error": f"{type(exc).__name__}: {exc}"}
+        # Пересчёт после обогащения: возраст компании участвует в score.
+        rescore_all(vacancies, criteria, profile, companies)
 
     kb.save_vacancies(vacancies)
     kb.save_companies(companies)

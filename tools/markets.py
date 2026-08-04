@@ -23,10 +23,6 @@ import common  # noqa: E402
 
 TIERS_FILE = "market_tiers.yaml"
 
-# Ярус русскоязычного рынка включается отдельным флагом, а не перечислением
-# в списке ярусов: у него своя оговорка (платежи), и её видно в профиле.
-RU_TIER = "ru_speaking"
-
 
 def load_tiers() -> dict:
     path = common.SHARED_CONFIG_DIR / "derivation" / TIERS_FILE
@@ -50,11 +46,6 @@ def target_locations(profile: dict) -> List[str]:
 
     for tier in cfg.get("tiers") or []:
         for country in tier_countries(tier):
-            if country not in names:
-                names.append(country)
-
-    if cfg.get("include_ru_speaking"):
-        for country in tier_countries(RU_TIER):
             if country not in names:
                 names.append(country)
 
