@@ -1551,3 +1551,102 @@ def test_engineering_support_role_counts_as_legacy_signal():
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert r["classification"] != "rejected"
     assert (r["score_breakdown"]["legacy_enterprise_signal"].get("hits") or [])
+
+
+# --- Личные веса технологий и список технологий в отчёте (2026-08-05) --------
+
+def test_personal_tech_bonus_prefers_one_known_stack_over_another():
+    """stack_fit отвечает «умеет ли человек это вообще» и одинаков для всех,
+    кто пользуется идентичностью. Насколько один знакомый стек предпочтительнее
+    другого — вопрос личного опыта, поэтому веса живут в Малой Конституции."""
+    profile = dict(PROFILE)
+    profile["personal_tech_bonus"] = {
+        "dotnet": {"points": 12, "keywords": ["c#", "asp.net"]},
+        "js_backend": {"points": -10, "keywords": ["node.js", "nestjs"],
+                       "unless": ["c#", "asp.net"]},
+    }
+    dotnet = make_vacancy(title="Senior C# Developer",
+                          description_text="Legacy ASP.NET Core maintenance, worldwide remote.")
+    node = make_vacancy(title="Senior Backend Engineer",
+                        description_text="Node.js and NestJS backend, TypeScript, worldwide remote.")
+
+    r_dotnet = score.score_vacancy(dotnet, CRITERIA, profile)
+    r_node = score.score_vacancy(node, CRITERIA, profile)
+
+    assert r_dotnet["score"] > r_node["score"]
+    assert r_dotnet["score_breakdown"]["personal_tech_bonus"]["points"] == 12
+    assert r_node["score_breakdown"]["personal_tech_bonus"]["points"] == -10
+    assert r_node["classification"] != "rejected", "это штраф, а не дисквалификация"
+
+
+def test_node_mentioned_next_to_dotnet_is_not_penalised():
+    """«ASP.NET Core с React и Node в тулинге» — это .NET-вакансия с соседним
+    стеком, а не бэкенд на JS."""
+    profile = dict(PROFILE)
+    profile["personal_tech_bonus"] = {
+        "js_backend": {"points": -10, "keywords": ["node.js"], "unless": ["asp.net"]},
+    }
+    v = make_vacancy(title="Fullstack Developer",
+                     description_text="ASP.NET Core backend with React and Node.js tooling.")
+    assert score.score_vacancy(v, CRITERIA, profile)["score_breakdown"]["personal_tech_bonus"] == {}
+
+
+def test_tech_group_is_counted_once_regardless_of_spellings():
+    """Вакансия, перечислившая пять форм написания Node, не должна получать
+    пятикратный штраф."""
+    profile = dict(PROFILE)
+    profile["personal_tech_bonus"] = {
+        "js_backend": {"points": -10, "keywords": ["node.js", "nodejs", "node js", "nestjs"]},
+    }
+    v = make_vacancy(title="Backend Engineer",
+                     description_text="We use Node.js, NodeJS, node js and NestJS across services.")
+    assert score.score_vacancy(v, CRITERIA, profile)["score_breakdown"]["personal_tech_bonus"]["points"] == -10
+
+
+def test_report_lists_expected_technologies_including_unknown_ones():
+    """Требование глобальное, для всех идентичностей: увидеть в отчёте
+    незнакомую технологию не менее полезно, чем знакомую — по ней сразу видно,
+    подходит вакансия или нет, без открытия ссылки."""
+    import report
+
+    v = make_vacancy(
+        title="Senior Engineer",
+        description_text=(
+            "You will work with C#, ASP.NET Core and SQL Server, plus Kafka, "
+            "Terraform and a legacy Delphi module."
+        ),
+    )
+    techs = report.expected_technologies(v)
+    assert "C#" in techs and "SQL Server" in techs
+    assert "Delphi" in techs, "незнакомая технология тоже должна попасть в список"
+    assert "Kafka" in techs and "Terraform" in techs
+
+
+def test_tech_vocabulary_avoids_short_ambiguous_forms():
+    """Правило, купленное опытом: короткие общие слова в словаре запрещены —
+    на них проект обжигался пять раз («LESS» в «no less than», «ssis» в
+    «ai-assisted», «java» в «javascript»)."""
+    import report
+
+    v = make_vacancy(title="Support Agent",
+                     description_text="We assist customers and handle assistance requests daily.")
+    techs = report.expected_technologies(v)
+    assert techs == [], f"ложные технологии из обычных слов: {techs}"
+
+
+def test_keyword_stuffing_block_does_not_grant_a_personal_tech_bonus():
+    """Аутстаф-компания с абзацем «NOT YOUR TECH STACK?» перечисляет .NET & C#
+    в каждой вакансии — и получала надбавку за .NET даже на чистом React.
+    Тот же срез, что уже стоит на оценке стека и гейте отрасли."""
+    profile = dict(PROFILE)
+    profile["personal_tech_bonus"] = {"dotnet": {"points": 12, "keywords": ["c#", ".net"]}}
+    v = make_vacancy(
+        title="Senior React Developer",
+        description_text=(
+            "React and TypeScript for our clients.\n"
+            "NOT YOUR TECH STACK?\n"
+            "We have a variety of projects, so if you have experience in .NET & C#, "
+            "Golang, Ruby, we would be happy to connect with you."
+        ),
+    )
+    assert score.score_vacancy(v, CRITERIA, profile)["score_breakdown"]["personal_tech_bonus"] == {}

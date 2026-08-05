@@ -89,6 +89,49 @@ def _fmt_reputation(rep_bd: dict) -> str:
     return f"{text} _(источник: {source}{retrieval_note})_{alarming}{flag_str}"
 
 
+_TECH_VOCABULARY_CACHE = {}
+
+
+def _tech_vocabulary() -> dict:
+    """Словарь технологий: каноническое имя -> формы написания.
+
+    Общий для всех идентичностей: список того, что бывает в вакансиях, не
+    зависит от того, кто ищет. Лежит в config/tech_vocabulary.yaml.
+    """
+    if not _TECH_VOCABULARY_CACHE:
+        path = common.SHARED_CONFIG_DIR / "tech_vocabulary.yaml"
+        data = (common.load_yaml(path) or {}).get("technologies") or {}
+        _TECH_VOCABULARY_CACHE.update(data)
+    return _TECH_VOCABULARY_CACHE
+
+
+def expected_technologies(vacancy: dict, limit: int = 24) -> list:
+    """Технологии, которых ждут на проекте — включая незнакомые человеку.
+
+    Отдельно от stack_fit: тот показывает совпадения со стеком конкретного
+    человека, а здесь нужен состав проекта как он есть. Увидеть в отчёте
+    незнакомую технологию не менее полезно, чем знакомую: по ней сразу видно,
+    подходит вакансия или нет, без открытия ссылки.
+    """
+    haystack = common.normalize_for_matching(chr(10).join([
+        vacancy.get("title") or "",
+        " ".join(vacancy.get("tags") or []),
+        vacancy.get("description_text") or "",
+    ]))
+    if not haystack:
+        return []
+
+    found = []
+    for canonical, forms in _tech_vocabulary().items():
+        for form in (forms or []):
+            if common.normalize_for_matching(form) in haystack:
+                found.append(canonical)
+                break
+        if len(found) >= limit:
+            break
+    return found
+
+
 def _fmt_vacancy_line(v: dict) -> str:
     c = v.get("computed", {})
     score = c.get("score", 0)
@@ -134,6 +177,9 @@ def _fmt_vacancy_line(v: dict) -> str:
     company_url = v.get("company_url")
     if company_url:
         lines.append(f"  - 🏢 сайт компании (отклик напрямую): {company_url}")
+    techs = expected_technologies(v)
+    if techs:
+        lines.append(f"  - 🧰 технологии: {', '.join(techs)}")
     lines.append(f"  - ⭐ репутация: {_fmt_reputation(bd.get('company_reputation_signal', {}))}")
     age_bd = bd.get("company_age_signal", {})
     if age_bd.get("has_data"):

@@ -1,0 +1,144 @@
+# =============================================================================
+#  СЛОВАРЬ ТЕХНОЛОГИЙ — что вообще бывает в вакансиях
+# =============================================================================
+#  Используется отчётом, чтобы показать строкой, какой стек ждут на проекте.
+#  Это ГЛОБАЛЬНОЕ требование: список технологий полезен любому пользователю
+#  проекта независимо от того, что он ищет, поэтому словарь общий и лежит в
+#  config/, а не в идентичности.
+#
+#  Важно: словарь описывает МИР, а не человека. Здесь есть технологии, которых
+#  никто из пользователей не знает — и это правильно: увидеть в отчёте
+#  незнакомый стек не менее полезно, чем знакомый.
+#
+#  ФОРМАТ
+#    <Каноническое имя>: [форма, форма, …]
+#  Каноническое имя попадает в отчёт, формы — то, чем технологию называют в
+#  тексте вакансии. Поиск идёт подстрокой по нормализованному тексту.
+#
+#  ПРАВИЛО, КУПЛЕННОЕ ОПЫТОМ: никаких коротких общих слов.
+#  На этом проекте уже ловились: "LESS" внутри "no less than", "eor" внутри
+#  "theoretical", "Multiplier" внутри "productivity multiplier", "ssis" внутри
+#  "ai-assisted" (1057 ложных срабатываний), "ssas" внутри португальского
+#  "nossas", "java" внутри "javascript". Поэтому:
+#    * формы короче 4 символов пишутся с уточнением (".net core", а не ".net");
+#    * акронимы — полностью ("sql server integration services", а не "ssis");
+#    * названия-омонимы получают суффикс (".js", " framework", " language").
+# =============================================================================
+
+schema_version: 1
+
+technologies:
+
+  # --- .NET / Microsoft ----------------------------------------------------
+  "C#": ["c#", "c-sharp", "csharp"]
+  ".NET Core": [".net core", "dotnet core", "net core"]
+  ".NET Framework": [".net framework", "dotnet framework"]
+  ".NET": ["dotnet", ".net 6", ".net 7", ".net 8", ".net 9"]
+  "ASP.NET Core": ["asp.net core", "aspnet core"]
+  "ASP.NET MVC": ["asp.net mvc", "aspnet mvc"]
+  "ASP.NET Web API": ["asp.net web api", "web api 2"]
+  "ASP.NET": ["asp.net", "aspnet"]
+  "Entity Framework": ["entity framework", "ef core", "ef6"]
+  "WCF": ["wcf"]
+  "WebForms": ["web forms", "webforms"]
+  "WinForms": ["winforms", "windows forms"]
+  "WPF": ["wpf"]
+  "Blazor": ["blazor"]
+  "VB.NET": ["vb.net", "visual basic"]
+  "SharePoint": ["sharepoint"]
+  "BizTalk": ["biztalk"]
+  "Dynamics": ["dynamics 365", "dynamics ax", "dynamics nav", "navision"]
+  "Azure": ["azure"]
+  "SQL Server": ["sql server", "mssql", "ms sql", "t-sql", "transact-sql"]
+  "SSIS": ["sql server integration services", "ssis package"]
+  "SSRS": ["sql server reporting services", "ssrs"]
+
+  # --- JavaScript / TypeScript ---------------------------------------------
+  "JavaScript": ["javascript", "java script"]
+  "TypeScript": ["typescript"]
+  "React": ["react.js", "reactjs", "react native", "react "]
+  "Next.js": ["next.js", "nextjs"]
+  "Vue": ["vue.js", "vuejs", "vue 3", "vue3"]
+  "Nuxt": ["nuxt.js", "nuxtjs", "nuxt 3"]
+  "Angular": ["angular", "angularjs"]
+  "Svelte": ["svelte", "sveltekit"]
+  "Node.js": ["node.js", "nodejs", "node js"]
+  "Express.js": ["express.js", "expressjs"]
+  "NestJS": ["nest.js", "nestjs"]
+  "Deno": ["deno runtime", "deno.js"]
+  "jQuery": ["jquery"]
+  "Redux": ["redux"]
+  "Tailwind": ["tailwind"]
+  "Webpack": ["webpack"]
+  "Vite": ["vite build", "vite.js"]
+
+  # --- Другие языки ---------------------------------------------------------
+  "Java": ["java se", "java ee", "core java", "java 8", "java 11", "java 17", "java 21"]
+  "Spring": ["spring boot", "spring framework"]
+  "Kotlin": ["kotlin"]
+  "Python": ["python"]
+  "Django": ["django"]
+  "Flask": ["flask"]
+  "FastAPI": ["fastapi"]
+  "Go": ["golang", "go language"]
+  "Rust": ["rust language", "rust developer", "rust engineer"]
+  "PHP": ["php"]
+  "Laravel": ["laravel"]
+  "Symfony": ["symfony"]
+  "Ruby": ["ruby on rails", "ruby language"]
+  "Scala": ["scala"]
+  "Elixir": ["elixir"]
+  "Swift": ["swift ui", "swiftui", "swift language"]
+  "Objective-C": ["objective-c"]
+  "C++": ["c++"]
+  "COBOL": ["cobol"]
+  "Delphi": ["delphi"]
+  "Perl": ["perl"]
+  "PL/SQL": ["pl/sql"]
+
+  # --- Базы данных ----------------------------------------------------------
+  "PostgreSQL": ["postgresql", "postgres"]
+  "MySQL": ["mysql"]
+  "Oracle": ["oracle database", "oracle db", "oracle forms"]
+  "MongoDB": ["mongodb", "mongo db"]
+  "Redis": ["redis"]
+  "Elasticsearch": ["elasticsearch", "opensearch"]
+  "DynamoDB": ["dynamodb"]
+  "Cosmos DB": ["cosmos db", "cosmosdb"]
+  "Snowflake": ["snowflake"]
+  "ClickHouse": ["clickhouse"]
+
+  # --- Инфраструктура -------------------------------------------------------
+  "AWS": ["amazon web services", "aws "]
+  "GCP": ["google cloud", "gcp "]
+  "Docker": ["docker"]
+  "Kubernetes": ["kubernetes", "k8s"]
+  "Terraform": ["terraform"]
+  "Jenkins": ["jenkins"]
+  "GitLab CI": ["gitlab ci"]
+  "GitHub Actions": ["github actions"]
+  "Kafka": ["kafka"]
+  "RabbitMQ": ["rabbitmq"]
+  "GraphQL": ["graphql"]
+  "gRPC": ["grpc"]
+  "REST": ["rest api", "restful"]
+  "SOAP": ["soap"]
+  "Microservices": ["microservices", "micro-services"]
+
+  # --- Данные и аналитика ---------------------------------------------------
+  "Spark": ["apache spark", "pyspark"]
+  "Databricks": ["databricks"]
+  "Airflow": ["apache airflow"]
+  "dbt": ["dbt core", "dbt cloud"]
+  "Power BI": ["power bi", "powerbi"]
+  "Tableau": ["tableau"]
+
+  # --- CMS и платформы ------------------------------------------------------
+  "WordPress": ["wordpress"]
+  "Drupal": ["drupal"]
+  "Shopify": ["shopify"]
+  "Salesforce": ["salesforce"]
+  "SAP": ["sap erp", "sap hana", "abap"]
+  "Magento": ["magento"]
+  "Umbraco": ["umbraco"]
+  "Sitecore": ["sitecore"]

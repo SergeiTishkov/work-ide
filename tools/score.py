@@ -1117,6 +1117,48 @@ def _score_title_role_penalty(title: str, criteria: dict):
     return points, ({"points": points, "hits": hits} if hits else {})
 
 
+def _score_personal_tech_bonus(text: str, title: str, profile: dict, criteria: dict = None):
+    """Личные надбавки и штрафы за конкретные технологии.
+
+    ЗАЧЕМ ОТДЕЛЬНО ОТ stack_fit. Тот отвечает на вопрос «умеет ли человек это
+    вообще» и одинаков для всех, кто пользуется идентичностью. А вот насколько
+    один знакомый стек предпочтительнее другого — вопрос личного опыта: два
+    разработчика с одинаковой строчкой ".NET/JS" в резюме могут быть сильны в
+    разном. Поэтому значения живут в Малой Конституции, вне гита.
+
+    Вес считается ОДИН РАЗ на группу, а не за каждое совпадение: иначе
+    вакансия, перечислившая пять форм написания Node, получила бы пятикратный
+    штраф, а упомянувшая .NET один раз — одинарную надбавку.
+    """
+    groups = (profile or {}).get("personal_tech_bonus")
+    if not isinstance(groups, dict) or not groups:
+        return 0, {}
+
+    # Срез "стекового спама" — тот же, что в оценке стека и в гейте отрасли.
+    # Без него аутстаф-компания с абзацем "NOT YOUR TECH STACK?" получает
+    # надбавку за .NET на любой своей вакансии, включая чистый React.
+    if criteria:
+        text, _ = _strip_stack_noise_sections(text, criteria)
+    haystack = f"{common.normalize_for_matching(title)} {text}"
+    total = 0
+    hits = {}
+    for name, cfg in groups.items():
+        if not isinstance(cfg, dict):
+            continue
+        matched = _matches(haystack, cfg.get("keywords") or [])
+        if not matched:
+            continue
+        # Исключения нужны там, где технология упомянута как соседняя, а не
+        # как суть роли: "React + .NET" — это .NET-вакансия, а не Node.
+        if _matches(haystack, cfg.get("unless") or []):
+            continue
+        points = cfg.get("points", 0)
+        total += points
+        hits[name] = {"points": points, "matched": matched[:4]}
+
+    return total, ({"points": total, "groups": hits} if hits else {})
+
+
 def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optional[dict] = None) -> dict:
     criteria = criteria or load_criteria()
     profile = profile or load_profile()
@@ -1138,6 +1180,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         needs_review = True
     age_points, age_bd = _score_company_age(vacancy, criteria)
     market_points, market_bd = _score_personal_market_bonus(vacancy, profile)
+    tech_points, tech_bd = _score_personal_tech_bonus(
+        text, vacancy.get("title") or "", profile, criteria)
     title_penalty, title_penalty_bd = _score_title_role_penalty(vacancy.get("title") or "", criteria)
 
     # Три ПОЛНЫХ ОТСЕВА (0% шанс попасть в выдачу), подтверждённых
@@ -1214,6 +1258,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         + reputation_points
         + age_points
         + market_points
+        + tech_points
         + title_penalty
     )
     total = max(0, min(100, round(raw_total)))
@@ -1253,6 +1298,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "company_reputation_signal": reputation_bd,
         "company_age_signal": age_bd,
         "personal_market_bonus": market_bd,
+        "personal_tech_bonus": tech_bd,
         "title_role_penalty": title_penalty_bd,
         "raw_total_before_clamp": raw_total,
     }
