@@ -155,15 +155,11 @@ def test_default_identity_used(monkeypatch, tmp_path):
     assert identity.resolve_identity() == "chosen"
 
 
-def test_single_active_identity_used_silently(monkeypatch, tmp_path):
-    monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
-    lc = tmp_path / "local-constitution"
-    lc.mkdir()
-    (lc / "active.yaml").write_text(
-        "active_identities:\n  - prefix: onlyone\n", encoding="utf-8"
-    )
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
-    assert identity.resolve_identity() == "onlyone"
+# Тест «единственная запись в active.yaml выбирается молча» удалён
+# 2026-08-05: списка активных идентичностей больше не существует. Его
+# заменил реестр, которым невозможно соврать, — сами папки в
+# local-identities/. Соответствующее поведение проверяет
+# test_a_single_identity_is_chosen_without_asking ниже.
 
 
 def test_several_identities_without_a_choice_refuses(monkeypatch, tmp_path):
