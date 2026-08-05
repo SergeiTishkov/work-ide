@@ -52,6 +52,9 @@ def two_identities(tmp_path, monkeypatch):
         )
 
     monkeypatch.setattr(common, "IDENTITIES_DIR", identities_dir)
+    # Фикстуры тоже находятся при обходе идентичностей; на время этого теста
+    # их надо убрать, иначе в песочнице окажется ещё и ftf.
+    monkeypatch.setattr(common, "FIXTURES_DIR", tmp_path / "no-fixtures")
     monkeypatch.setattr(common, "DATA_ROOT", tmp_path / "data")
     # И REPORTS_ROOT тоже. Реальный случай 2026-08-04: подменялся только
     # DATA_ROOT, и тест создавал reports/archive/aaaa и .../bbbb прямо в

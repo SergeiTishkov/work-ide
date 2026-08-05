@@ -78,6 +78,19 @@ REQUIRED_FILES = (
 # Папки в identities/, которые идентичностями не являются.
 NON_IDENTITY_DIRS = {"__pycache__"}
 
+# Служебные имена внутри локальной идентичности. Правило единого префикса на
+# них не распространяется: они одинаковы у всех идентичностей и потому не
+# могут быть перепутаны между собой — а именно от этого правило и защищает.
+KNOWN_SUBDIRS = {
+    "template",    # дословная копия шаблона; не редактируется
+    "documents",   # личные файлы (CV и прочее) под своими именами
+    "__pycache__",
+}
+KNOWN_FILES = {
+    "identity.yaml",   # какой шаблон, какая версия
+    "CHANGELOG.md",    # журнал изменений этой идентичности
+}
+
 
 class IdentityError(RuntimeError):
     """Базовая ошибка системы идентичностей."""
@@ -112,23 +125,26 @@ def identity_folders() -> dict:
     """Отображение префикс -> папка. Единственное место, которое знает, что
     имя папки длиннее префикса; всё остальное работает с префиксами."""
     result = {}
-    if not common.IDENTITIES_DIR.exists():
-        return result
-    for path in sorted(common.IDENTITIES_DIR.iterdir()):
-        if not path.is_dir() or path.name.startswith("_") or path.name in NON_IDENTITY_DIRS:
+    roots = [common.IDENTITIES_DIR, common.FIXTURES_DIR]
+    for root in roots:
+        if not root.exists():
             continue
-        prefix = folder_prefix(path.name)
-        if prefix is None:
-            continue  # мусор в identities/ — про него скажет validate_layout()
-        if prefix in result:
-            # Две папки с одним префиксом — неразрешимая неоднозначность:
-            # какая из них "та самая", определить нечем, а тихий выбор одной
-            # из двух даст перемешанные данные.
-            raise InvalidIdentityError(
-                f"две папки с префиксом '{prefix}': {result[prefix].name} и {path.name}. "
-                "Префикс обязан быть уникальным — переименуйте одну из папок."
-            )
-        result[prefix] = path
+        for path in sorted(root.iterdir()):
+            if not path.is_dir() or path.name.startswith("_") or path.name in NON_IDENTITY_DIRS:
+                continue
+            prefix = folder_prefix(path.name)
+            if prefix is None:
+                continue  # мусор в папке — про него скажет validate_layout()
+            if prefix in result:
+                # Две папки с одним префиксом — неразрешимая неоднозначность:
+                # какая из них "та самая", определить нечем, а тихий выбор
+                # одной из двух даст перемешанные данные.
+                raise InvalidIdentityError(
+                    f"две папки с префиксом '{prefix}': {result[prefix].name} "
+                    f"и {path.name}. Префикс обязан быть уникальным — "
+                    "переименуйте одну из папок."
+                )
+            result[prefix] = path
     return result
 
 
@@ -155,8 +171,22 @@ def identity_dir(prefix: str) -> Path:
 
 
 def identity_file(prefix: str, name: str) -> Path:
-    """('kisel', 'criteria.yaml') -> identities/kisel/kisel_criteria.yaml"""
-    return identity_dir(prefix) / f"{prefix}_{name}"
+    """Путь к документу идентичности для ЧТЕНИЯ.
+
+    Файл может лежать в двух местах: в корне папки (личные настройки) или в
+    `template/` (дословная копия шаблона, снятая при клонировании). Для чтения
+    берётся личный, если он есть, иначе шаблонный — так работает код, которому
+    нужен один файл целиком (проверки, готовность, отчёт о раскладке).
+
+    Полное послойное значение даёт settings.resolve(): личный файл содержит
+    только отличия, и читать его как весь профиль нельзя.
+    """
+    folder = identity_dir(prefix)
+    own = folder / f"{prefix}_{name}"
+    if own.exists():
+        return own
+    from_template = folder / "template" / f"{prefix}_{name}"
+    return from_template if from_template.exists() else own
 
 
 def _read_kind(prefix: str) -> Optional[str]:
@@ -218,10 +248,14 @@ def validate(prefix: str, *, strict_prefix_check: bool = True) -> List[str]:
     if strict_prefix_check:
         for path in sorted(d.iterdir()):
             if path.is_dir():
+                if path.name in KNOWN_SUBDIRS:
+                    continue
                 problems.append(
-                    f"вложенная папка '{path.name}' в идентичности — не поддерживается, "
-                    "все файлы идентичности должны лежать плоско и иметь префикс"
+                    f"вложенная папка '{path.name}' в идентичности — не поддерживается. "
+                    f"Разрешены только: {', '.join(sorted(KNOWN_SUBDIRS))}"
                 )
+                continue
+            if path.name in KNOWN_FILES:
                 continue
             if not path.name.startswith(f"{prefix}_"):
                 problems.append(
@@ -264,8 +298,13 @@ def readiness_problems(prefix: str) -> List[str]:
     if not d.is_dir():
         return [f"папка идентичности не найдена: {d}"]
 
-    profile_raw = common.load_yaml(identity_file(prefix, "profile.yaml")) or {}
-    profile, missing_local = common.resolve_local_fields(prefix, profile_raw)
+    # Профиль собирается ИЗ СЛОЁВ: копия шаблона даёт тип поиска, личный файл
+    # рядом — обстоятельства человека. Проверять один файл бессмысленно: в
+    # шаблоне намеренно нет резидентства, а в личном файле — стека.
+    import settings
+
+    profile, _ = settings.resolve("profile", prefix)
+    profile, missing_local = common.resolve_local_fields(prefix, profile)
 
     if missing_local:
         # Одной строкой, а не по строке на поле: на свежем клоне таких полей
@@ -876,8 +915,8 @@ def cmd_validate(args) -> None:
     print("\nВсе идентичности в порядке.")
 
 
-TEMPLATE_DIR_NAME = "_template"
-TEMPLATE_PREFIX = "tmpl"
+TEMPLATE_DIR_NAME = "blank-start-from-scratch"
+TEMPLATE_PREFIX = "blank"
 
 # Плейсхолдер префикса внутри файлов шаблона.
 TEMPLATE_PREFIX_PLACEHOLDER = "<префикс>"
@@ -938,7 +977,7 @@ def scaffold_identity(prefix: str, full_name: str) -> List[Path]:
     if target.exists():
         raise InvalidIdentityError(f"папка {target} уже существует")
 
-    template = common.IDENTITIES_DIR / TEMPLATE_DIR_NAME
+    template = common.TEMPLATES_DIR / TEMPLATE_DIR_NAME
     if not template.is_dir():
         raise InvalidIdentityError(f"нет папки шаблона: {template}")
 

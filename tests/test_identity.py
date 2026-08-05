@@ -40,7 +40,8 @@ def test_invalid_prefixes_rejected(prefix):
 def test_template_dir_is_not_an_identity():
     # Папки с "_" в начале — заготовки, а не идентичности. Иначе агент попытался
     # бы искать работу по шаблону.
-    assert "_template" not in identity.list_identities(include_fixtures=True)
+    assert identity.TEMPLATE_DIR_NAME not in identity.list_identities(
+        include_fixtures=True)
 
 
 def test_fixture_hidden_from_normal_listing():
@@ -284,10 +285,15 @@ def sandbox_identities(tmp_path, monkeypatch):
     не оставляли мусор в настоящем репозитории."""
     import shutil
 
-    sandbox = tmp_path / "identities"
+    sandbox = tmp_path / "local-identities"
     sandbox.mkdir()
-    shutil.copytree(common.IDENTITIES_DIR / "_template", sandbox / "_template")
+    templates_root = tmp_path / "identity-templates"
+    templates_root.mkdir()
+    shutil.copytree(common.TEMPLATES_DIR / identity.TEMPLATE_DIR_NAME,
+                    templates_root / identity.TEMPLATE_DIR_NAME)
+    monkeypatch.setattr(common, "TEMPLATES_DIR", templates_root)
     monkeypatch.setattr(common, "IDENTITIES_DIR", sandbox)
+    monkeypatch.setattr(common, "FIXTURES_DIR", tmp_path / "no-fixtures")
     return sandbox
 
 
@@ -309,7 +315,8 @@ def test_scaffold_substitutes_template_placeholders(sandbox_identities):
     identity.scaffold_identity("newp", "New Product Search")
     for path in (sandbox_identities / "newp-new-product-search").iterdir():
         text = path.read_text(encoding="utf-8")
-        assert "tmpl_" not in text, f"в {path.name} остался префикс шаблона"
+        assert f"{identity.TEMPLATE_PREFIX}_" not in text, \
+            f"в {path.name} остался префикс шаблона"
         assert identity.TEMPLATE_PREFIX_PLACEHOLDER not in text, (
             f"в {path.name} остался плейсхолдер префикса — агент пойдёт по битому пути"
         )
@@ -324,7 +331,7 @@ def test_scaffold_refuses_to_overwrite_existing_identity(sandbox_identities):
     assert "уже существует" in str(exc.value)
 
 
-@pytest.mark.parametrize("bad", ["ab", "KISEL", "1abc", "ka-lm", "tmpl"])
+@pytest.mark.parametrize("bad", ["ab", "KISEL", "1abc", "ka-lm", "blank"])
 def test_scaffold_refuses_bad_prefix(sandbox_identities, bad):
     with pytest.raises(identity.InvalidIdentityError):
         identity.scaffold_identity(bad, "Some Search")
@@ -353,7 +360,7 @@ def test_scaffold_does_not_touch_the_local_constitution(sandbox_identities, tmp_
     ("jvst-java-startup-onsite", "jvst"),
     ("ftf-frozen-test-fixture", "ftf"),
     ("abcd", "abcd"),                     # без расшифровки — распознаётся, но validate ругнётся
-    ("_template", None),                  # заготовка
+    ("blank-start-from-scratch", "blank"),   # пустой шаблон — тоже валидное имя
     ("Kisel-Keep-It", None),              # заглавные
     ("kisel_keep_it", None),              # подчёркивания — это разделитель ФАЙЛОВ, не папок
 ])

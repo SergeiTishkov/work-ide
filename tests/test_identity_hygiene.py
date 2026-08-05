@@ -36,8 +36,26 @@ def test_every_file_carries_its_own_prefix(prefix):
     """Главное правило системы: перепутать kisel_notes.md и jvst_notes.md
     практически невозможно, а два файла notes.md — вопрос времени."""
     d = identity.identity_dir(prefix)
-    offenders = [p.name for p in d.iterdir() if p.is_file() and not p.name.startswith(f"{prefix}_")]
+    offenders = [
+        p.name for p in d.iterdir()
+        if p.is_file()
+        and p.name not in identity.KNOWN_FILES
+        and not p.name.startswith(f"{prefix}_")
+    ]
     assert not offenders, f"файлы без префикса '{prefix}_': {offenders}"
+
+    # Внутри template/ действует то же правило: копия шаблона переименована
+    # под префикс идентичности при клонировании, и если там остались чужие
+    # имена — значит клонирование сделало не то.
+    copy_dir = d / "template"
+    if copy_dir.is_dir():
+        stray = [
+            p.name for p in copy_dir.iterdir()
+            if p.is_file()
+            and p.name not in identity.KNOWN_FILES
+            and not p.name.startswith(f"{prefix}_")
+        ]
+        assert not stray, f"в копии шаблона файлы без префикса '{prefix}_': {stray}"
 
 
 @pytest.mark.parametrize("prefix", ALL_IDENTITIES)
@@ -49,7 +67,9 @@ def test_no_references_to_other_identities(prefix):
 
 @pytest.mark.parametrize("prefix", ALL_IDENTITIES)
 def test_profile_declares_kind(prefix):
-    profile = common.load_yaml(identity.identity_file(prefix, "profile.yaml")) or {}
+    import settings
+
+    profile, _ = settings.resolve("profile", prefix)
     kind = (profile.get("identity") or {}).get("kind")
     assert kind in ("personal", "shared_example", "fixture"), (
         f"{prefix}: identity.kind должен быть personal | shared_example | fixture, а не {kind!r}"
@@ -61,8 +81,8 @@ def test_profile_declares_kind(prefix):
 def test_template_dir_exists_and_is_complete():
     """Шаблон — точка входа для нового пользователя; неполный шаблон означает,
     что онбординг упрётся в отсутствующий файл."""
-    template_dir = common.IDENTITIES_DIR / identity.TEMPLATE_DIR_NAME
-    assert template_dir.is_dir(), "нет identities/_template/"
+    template_dir = common.TEMPLATES_DIR / identity.TEMPLATE_DIR_NAME
+    assert template_dir.is_dir(), "нет пустого шаблона в identity-templates/"
 
     for name in identity.REQUIRED_FILES:
         path = template_dir / f"{identity.TEMPLATE_PREFIX}_{name}"
@@ -70,10 +90,12 @@ def test_template_dir_exists_and_is_complete():
 
 
 def test_template_files_all_prefixed():
-    template_dir = common.IDENTITIES_DIR / identity.TEMPLATE_DIR_NAME
+    template_dir = common.TEMPLATES_DIR / identity.TEMPLATE_DIR_NAME
     offenders = [
         p.name for p in template_dir.iterdir()
-        if p.is_file() and not p.name.startswith(f"{identity.TEMPLATE_PREFIX}_")
+        if p.is_file()
+        and p.name not in {"template.yaml", "CHANGELOG.md"}
+        and not p.name.startswith(f"{identity.TEMPLATE_PREFIX}_")
     ]
     assert not offenders, f"файлы шаблона без префикса: {offenders}"
 
@@ -84,14 +106,21 @@ def test_template_is_not_listed_as_identity():
 
 
 @pytest.mark.parametrize("prefix", ALL_IDENTITIES)
-def test_identity_criteria_structure_matches_template(prefix):
-    """Отсутствующий у идентичности ключ означает, что до неё не доехало
-    улучшение машинерии. Это отчётный тест: он именно ловит рассинхрон, ради
-    которого выбран подход 'полные копии вместо наследования'."""
-    result = identity.diff_template(prefix, "criteria.yaml")
-    assert not result["missing"], (
-        f"{prefix}: нет ключей, которые есть в шаблоне: {result['missing']}. "
-        f"Перенести вручную: python tools/identity.py diff-template --identity {prefix}"
+def test_identity_is_not_behind_its_template(prefix):
+    """Локальная идентичность не должна молча отставать от своего шаблона.
+
+    Раньше этот тест сравнивал структуру ключей: идентичности были полными
+    копиями, и «не доехавшее улучшение» выглядело как отсутствующий ключ.
+    Теперь структура приезжает из копии шаблона автоматически, и отставание
+    выражается ЧИСЛОМ ВЕРСИИ — сравнением, а не разбором.
+    """
+    import templates
+
+    update = templates.update_available(prefix)
+    assert update is None, (
+        f"{prefix}: шаблон '{update['template']}' ушёл с v{update['from']} "
+        f"на v{update['to']}. Обновить: python tools/templates.py update "
+        f"--identity {prefix}"
     )
 
 

@@ -30,7 +30,7 @@ def layered(tmp_path, monkeypatch):
     _write(policy, "frozen:\n  identity.kind: нельзя менять вид идентичности\n")
 
     def fake_paths(document, prefix):
-        return [("defaults", defaults), ("identity", identity), ("local", local)]
+        return [("defaults", defaults), ("template", identity), ("local", local)]
 
     monkeypatch.setattr(settings, "layer_paths", fake_paths)
     monkeypatch.setattr(settings, "frozen_keys",
@@ -44,7 +44,7 @@ def test_later_layer_wins_and_provenance_says_which(layered):
     _write(identity, "thresholds:\n  hot: 45\n")
     merged, provenance = settings.resolve("criteria", "aaa")
     assert merged["thresholds"] == {"hot": 45, "cold": 10}
-    assert provenance["thresholds.hot"] == "identity"
+    assert provenance["thresholds.hot"] == "template"
     assert provenance["thresholds.cold"] == "defaults"
 
 
@@ -102,7 +102,7 @@ def test_conflicts_lists_every_key_set_by_more_than_one_layer(layered):
     keys = {item["key"]: item for item in found}
     assert set(keys) == {"a"}
     assert keys["a"]["winner"] == "local"
-    assert [layer for layer, _ in keys["a"]["setters"]] == ["defaults", "identity", "local"]
+    assert [layer for layer, _ in keys["a"]["setters"]] == ["defaults", "template", "local"]
 
 
 def test_explain_shows_the_whole_chain_including_missing_layers(layered):
@@ -112,6 +112,6 @@ def test_explain_shows_the_whole_chain_including_missing_layers(layered):
     chain = {step["layer"]: step for step in
              settings.explain("criteria", "aaa", "thresholds.hot")}
     assert chain["defaults"]["value"] == 60
-    assert chain["identity"]["value"] == 45
+    assert chain["template"]["value"] == 45
     assert chain["local"]["exists"] is False
     assert chain["local"]["has_key"] is False

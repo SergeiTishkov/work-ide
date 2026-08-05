@@ -39,16 +39,16 @@ contact:
 #
 # Заготовку owner.yaml создаёт `python tools/identity.py init-local`.
 owner:
-  name: local
-  linkedin: local
-  years_experience: local        # стаж личный; уровень — в role ниже
+  name: "<ваше имя>"
+  linkedin: "<ссылка на ваш LinkedIn>"
+  years_experience: 0            # ваш стаж в годах        # стаж личный; уровень — в role ниже
   role: "<должность: senior backend, lead QA…>"   # характеристика ПОИСКА
   # CV лежит в Малой Конституции под своим исходным именем (правило префиксов
   # на чужие документы не распространяется, см. docs/LOCAL_CONSTITUTION.md).
-  cv_files: local
+  cv_files: []           # пути к файлам резюме в documents/
   # Языки: в языковой фильтр попадут те, которых человек НЕ знает
   # (см. config/derivation/languages.yaml).
-  languages: local
+  languages: []           # языки, которыми владеете
   # Резидентство обычно личное: другой человек с тем же поиском живёт в
   # другом месте. НО если поиск привязан к стране по существу («ищу работу
   # именно в Германии»), страна — определение идентичности, и тогда её пишут
@@ -57,8 +57,8 @@ owner:
   #       country: "Germany"
   #       utc_offset: 1
   # См. docs/IDENTITIES.md, «Граница: что личное, что характеристика поиска».
-  location: local
-  timezone_notes: local
+  location: {}           # страна, часовой пояс: из них выводятся гео-правила
+  timezone_notes: ""
 
 target_regions:
   # Различайте: "компания находится в X" ≠ "нужно резидентство в X".
@@ -74,7 +74,7 @@ goal:
   ai_assisted: true
   # Зарплатные ожидания зависят от обстоятельств человека, а не от типа
   # поиска — поэтому личные. Структуру заготовит `identity.py init-local`.
-  target_compensation: local
+  target_compensation: {}
 
 employment_type_priority:
   high: []

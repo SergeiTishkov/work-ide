@@ -51,8 +51,23 @@ except ImportError:  # pragma: no cover — проверяется отдель�
 # --- Пути уровня репозитория (не зависят от идентичности) ----------------
 
 ROOT = Path(__file__).resolve().parent.parent
-IDENTITIES_DIR = ROOT / "identities"
 SHARED_CONFIG_DIR = ROOT / "config"  # только общая машинерия, ничего личного
+
+# Шаблоны идентичностей — в гите, общие для всех, без единого личного факта.
+# Из них КЛОНИРУЮТ, ими не пользуются напрямую.
+TEMPLATES_DIR = ROOT / "identity-templates"
+
+# Рабочие идентичности — вне гита. Их количество и есть количество подборок,
+# которые делает система: отдельного реестра активных идентичностей нет и не
+# должно быть, потому что реестр умеет расходиться с реальностью, а папки нет.
+IDENTITIES_DIR = Path(
+    os.environ.get("WORK_IDE_IDENTITIES") or (ROOT / "local-identities")
+)
+
+# Замороженные фикстуры лежат рядом с тем, что их использует. Они находятся
+# при обходе так же, как рабочие идентичности, но клонировать их нельзя и
+# в списке шаблонов их нет.
+FIXTURES_DIR = ROOT / "tests" / "fixtures"
 
 # Оба переопределяются переменными окружения — нужно для тестов и для случая,
 # когда данные лежат вне репозитория (например на другом диске).
@@ -147,7 +162,8 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
             + "\n".join(f"  - {p}" for p in problems)
         )
 
-    raw_profile = load_yaml(identity_mod.identity_file(prefix, "profile.yaml")) or {}
+    import settings
+    raw_profile, _ = settings.resolve("profile", prefix)
     kind = (raw_profile.get("identity") or {}).get("kind")
     if kind == "fixture" and not allow_fixture:
         raise identity_mod.InvalidIdentityError(
@@ -337,7 +353,12 @@ def load_profile(prefix: Optional[str] = None) -> dict:
     if prefix is None:
         require_identity()
         prefix = ACTIVE_IDENTITY
-    raw = load_yaml(identity_mod.identity_file(prefix, "profile.yaml")) or {}
+    # Профиль СОБИРАЕТСЯ ИЗ СЛОЁВ: копия шаблона даёт тип поиска, личный файл
+    # рядом — обстоятельства человека. Читать один файл нельзя: в шаблоне нет
+    # резидентства, а в личном файле нет стека.
+    import settings
+
+    raw, _ = settings.resolve("profile", prefix)
     merged, _ = resolve_local_fields(prefix, raw)
     return merged
 
@@ -365,9 +386,22 @@ def _build_user_agent(prefix: str, profile: dict) -> str:
 
 
 def identity_config(name: str) -> Path:
-    """'criteria.yaml' -> identities/kisel/kisel_criteria.yaml"""
+    """Путь к документу идентичности для чтения целиком.
+
+    Документ может лежать в двух местах: личный файл в корне папки или копия
+    шаблона в `template/`. Возвращается личный, если он есть, иначе шаблонный.
+
+    Для документов, которые СОБИРАЮТСЯ ИЗ СЛОЁВ (профиль, критерии), этого
+    недостаточно — там нужен settings.resolve(): личный файл содержит только
+    отличия. Здесь путь нужен тем, кто читает документ целиком и без слоёв —
+    например источники и ATS-цели.
+    """
     require_identity()
-    return IDENTITY_DIR / f"{FILE_PREFIX}{name}"
+    own = IDENTITY_DIR / f"{FILE_PREFIX}{name}"
+    if own.exists():
+        return own
+    from_template = IDENTITY_DIR / "template" / f"{FILE_PREFIX}{name}"
+    return from_template if from_template.exists() else own
 
 
 def shared_config(name: str) -> Path:

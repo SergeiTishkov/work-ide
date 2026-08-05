@@ -19,8 +19,8 @@
 Один порядок слоёв, одно правило слияния и происхождение КАЖДОГО значения:
 
     defaults   config/defaults/<документ>.yaml            общее для всех
-    identity   identities/<префикс>/<префикс>_<док>.yaml   про этот поиск
-    local      local-constitution/personal/<префикс>/...   про этого человека
+    template   <локальная>/template/<префикс>_<док>.yaml   тип поиска (копия шаблона)
+    local      <локальная>/<префикс>_<док>.yaml            мои настройки
 
 Побеждает более поздний слой. Порядок фиксирован и не зависит от того, кто
 вызывает — в этом вся суть детерминизма.
@@ -38,8 +38,8 @@
 3. Явный `null` удаляет ключ. Единственный способ сказать «у меня этого нет»,
    когда нижний слой это задал.
 
-4. Замороженные ключи (config/settings_policy.yaml) верхние слои менять НЕ
-   могут — попытка это сделать роняет загрузку с объяснением. Слоистость без
+4. Замороженные ключи (config/settings_policy.yaml) ЛОКАЛЬНЫЙ слой менять НЕ
+   может — попытка это сделать роняет загрузку с объяснением. Слоистость без
    такого исключения означала бы, что личный файл может отключить, например,
    запрет на обход антибот-защиты. Приоритет частного над общим — правило для
    ПРЕДПОЧТЕНИЙ, а не для границ.
@@ -61,7 +61,7 @@ from typing import Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 
-LAYER_ORDER = ("defaults", "identity", "local")
+LAYER_ORDER = ("defaults", "template", "local")
 
 DELETED = object()
 
@@ -79,11 +79,26 @@ def layer_paths(document: str, prefix: str) -> List[Tuple[str, Path]]:
     их отсутствие тоже факт, который полезно видеть в explain."""
     import identity as identity_mod
 
+    folder = identity_mod.identity_dir(prefix)
     return [
+        # Общее для всех пользователей проекта.
         ("defaults", common.ROOT / "config" / "defaults" / f"{document}.yaml"),
-        ("identity", identity_mod.identity_file(prefix, f"{document}.yaml")),
-        ("local", common.personal_dir(prefix) / f"{prefix}_{document}.yaml"),
+        # Дословная копия шаблона, снятая при клонировании. Не редактируется:
+        # её целиком заменяет обновление шаблона (templates.apply_update).
+        ("template", folder / "template" / f"{prefix}_{document}.yaml"),
+        # Мои настройки. Именно сюда пишет человек и агент.
+        ("local", folder / f"{prefix}_{document}.yaml"),
     ]
+
+
+def local_override_keys(prefix: str, documents=("profile", "criteria")) -> set:
+    """Ключи, заданные лично, поверх шаблона. Нужны при обновлении шаблона."""
+    keys = set()
+    for document in documents:
+        for layer, path in layer_paths(document, prefix):
+            if layer == "local" and path.exists():
+                keys |= set(_flatten(common.load_yaml(path) or {}))
+    return keys
 
 
 def frozen_keys() -> Dict[str, str]:
@@ -138,14 +153,29 @@ def resolve(document: str, prefix: str) -> Tuple[dict, Dict[str, str]]:
         if not data:
             continue
 
-        if layer != "defaults":
-            flat = _flatten(data)
-            for key in flat:
+        # Заморозка защищает от файлов ВНЕ ГИТА: смысл её в том, чтобы
+        # ненаблюдаемый файл не мог тихо снять границу. Общая конфигурация,
+        # копия шаблона и тестовые фикстуры лежат в репозитории и проходят
+        # ревью наравне с кодом — фикстура, например, обязана объявить себя
+        # фикстурой, иначе её нечем отличить от живой идентичности.
+        if layer == "local":
+            # Запрещено ПЕРЕОПРЕДЕЛЯТЬ, а не объявлять. Если ни один слой ниже
+            # ключ не задавал, это первое объявление, и запрещать его нечем и
+            # незачем: идентичность, у которой нет копии шаблона, обязана
+            # объявить свой вид сама, иначе фикстуру нечем отличить от живой.
+            #
+            # Именно эта разница и делает заморозку правилом об override, а не
+            # запретом на упоминание ключа.
+            already = _flatten(merged)
+            for key, value in _flatten(data).items():
                 for frozen_key, reason in frozen.items():
-                    if key == frozen_key or key.startswith(frozen_key + "."):
+                    if not (key == frozen_key or key.startswith(frozen_key + ".")):
+                        continue
+                    if key in already and already[key] != value:
                         raise FrozenSettingError(
-                            f"Слой '{layer}' ({path}) пытается изменить '{key}', "
-                            f"а этот ключ заморожен.\n  Причина: {reason}\n"
+                            f"Слой '{layer}' ({path}) меняет '{key}' "
+                            f"с {already[key]!r} на {value!r}, а этот ключ "
+                            f"заморожен.\n  Причина: {reason}\n"
                             "  Замороженные ключи перечислены в "
                             "config/settings_policy.yaml."
                         )
