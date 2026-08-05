@@ -26,7 +26,7 @@ contact:
   #   "local"        -> читать из local-constitution/personal/<p>/<p>_contact.yaml
   #   "you@mail.com" -> прямо здесь (попадёт в общий репозиторий!)
   #   null           -> без контакта (doctor выдаст предупреждение)
-  user_agent_contact: "local"
+  user_agent_contact: ""   # ваша почта; заполняется в локальной идентичности
 
 # ==== ЛИЧНОЕ И ОБЩЕЕ ====
 #
