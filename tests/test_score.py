@@ -1465,3 +1465,43 @@ def test_marketing_global_does_not_count_as_worldwide_hiring():
     hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
             ["remote_location_fit"].get("worldwide_remote_hits") or [])
     assert hits == []
+
+
+def test_java_title_is_rejected_again():
+    """Регресс, который я сам и внёс: java, golang и c++ выпали из гейта
+    заголовка при обходе YAML-экранирования, и «Java Engineer» снова начал
+    проходить. Поймано ручным чек-listом 2026-08-05 на вакансии Azumo."""
+    v = make_vacancy(title="Java Engineer - Latin America",
+                     description_text="Backend infrastructure, JavaScript on the frontend.")
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] == "rejected"
+    assert any(d.startswith("stack: title names") for d in r["dealbreakers"])
+
+
+def test_project_manager_is_not_a_developer_role():
+    """«Product / Technical Project Manager (100% Remote, Worldwide)» прошла:
+    в списке профессий был только «product manager»."""
+    v = make_vacancy(title="Product / Technical Project Manager (100% Remote, Worldwide)",
+                     description_text="We are redefining the internet architecture. C# and TypeScript.")
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] == "rejected"
+    assert any(d.startswith("role:") for d in r["dealbreakers"])
+
+
+def test_residency_stated_without_the_word_only():
+    """Требование резидентства формулируют по-разному. Реальный текст:
+    «The position is fully remote based in Latin America. We will only be
+    considering candidates based in Latin America» — ни одной фразы из
+    прежнего списка там нет."""
+    v = make_vacancy(
+        title="Senior C# Developer",
+        location_raw="Anywhere in the World",
+        description_text=(
+            "The position is fully remote based in Latin America. We will only be "
+            "considering candidates based in Latin America, as most of our engineers "
+            "are there. C# and TypeScript."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] == "rejected"
+    assert any(d.startswith("location:") for d in r["dealbreakers"])

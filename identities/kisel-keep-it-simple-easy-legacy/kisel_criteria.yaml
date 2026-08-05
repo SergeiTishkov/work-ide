@@ -115,6 +115,14 @@ remote_location_fit:
       - "remote latam"
       - "latam only"
       - "latin america only"
+      - "based in latin america"
+      - "candidates based in latin america"
+      - "remote based in latin america"
+      - "must be based in latin america"
+      - "based in the united states"
+      - "candidates based in the us"
+      - "based in europe"
+      - "candidates based in europe"
       - "remote apac"
       - "apac only"
       - "asia pacific only"
@@ -147,6 +155,34 @@ remote_location_fit:
       - "israel only"
       - "must be based in uae"
       - "uae only"
+    # Формулировки, которые НЕ перебиваются маркетинговым "worldwide".
+    #
+    # Реальная находка 2026-08-05 (ручной чек-лист): вакансия Azumo пришла с
+    # WeWorkRemotely с полем region "Anywhere in the World", а в тексте стояло
+    # "The position is fully remote based in Latin America. We will only be
+    # considering candidates based in Latin America". Прежняя логика снимала
+    # ограничение, если где-то в тексте нашлось слово про worldwide — и
+    # обобщённая подпись площадки перебила прямое слово работодателя.
+    #
+    # Тот же принцип, что с заголовком Headquarters: когда работодатель прямо
+    # называет требование, площадочная подпись значения не имеет.
+    absolute_residency_phrases:
+      - "only be considering candidates based in"
+      - "only considering candidates based in"
+      - "only accept candidates based in"
+      - "candidates must be based in"
+      - "must be based in"
+      - "must reside in"
+      - "must be a resident of"
+      - "residency in"
+      - "you must live in"
+      - "applicants must be based in"
+      - "we can only hire in"
+      - "we can only employ"
+      - "eligible to work in"
+      - "authorized to work in"
+      - "authorised to work in"
+      - "work authorization in"
   hard_dealbreakers:
     points: -1000  # эффективно исключает вакансию из "hot" категорий
     keywords:
@@ -542,6 +578,9 @@ title_stack_gate:
     - elixir
     - phoenix
     - scala
+    - java
+    - golang
+    - c++
     - spring boot
     - kotlin
     - swift
@@ -600,6 +639,10 @@ role_relevance_signal:
     - "bookkeeper"
     - "product manager"
     - "product owner"
+    - "project manager"
+    - "delivery manager"
+    - "scrum master"
+    - "program manager"
     - "account executive"
     - "account manager"
     # Реальная находка 2026-07-31: "Technical Account Manager 2 - South

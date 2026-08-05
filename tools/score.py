@@ -445,6 +445,13 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     # перевешивал (подтверждено человеком явно 2026-07-30: вакансия
     # "remote LATAM" физически недоступна человеку из Грузии, убирать её
     # надо, а не просто занижать приоритет).
+    # Прямое требование резидентства от работодателя не перебивается ничем —
+    # ни маркетинговым "worldwide" в тексте, ни размашистой подписью площадки.
+    absolute_hits = _matches(text, rl["restrictive_region_signal"].get("absolute_residency_phrases", []))
+    if absolute_hits:
+        dealbreakers.extend(f"location: explicit residency requirement ('{h}')" for h in absolute_hits)
+        breakdown["absolute_residency_hits"] = absolute_hits
+
     restrictive_hits = _matches(text, rl["restrictive_region_signal"]["keywords"])
     if restrictive_hits and not (worldwide_hits or eor_hits):
         dealbreakers.extend(f"location: restricted to '{h}'" for h in restrictive_hits)
@@ -657,11 +664,13 @@ def _check_title_stack(title: str, criteria: dict, profile: dict):
         return False, {"named_technologies": []}
 
     stack = profile.get("tech_stack") or {}
-    known = [common.normalize_for_matching(k)
-             for k in (stack.get("core") or []) + (stack.get("strong") or [])]
-    mine = [tech for tech in named
-            if any(k and k in common.normalize_for_matching(tech) for k in known)
-            or any(common.normalize_for_matching(tech) in k for k in known)]
+    known = {common.normalize_for_matching(k)
+             for k in (stack.get("core") or []) + (stack.get("strong") or [])}
+    # Сравнение ТОЧНОЕ, а не по вхождению подстроки. Реальный баг 2026-08-05:
+    # "java" считалась знакомой, потому что является подстрокой "javascript"
+    # из strong-уровня, и "Java Engineer" снова проходил гейт. Тот же класс
+    # ошибки, что ".NET" внутри "VB.NET" и "LESS" внутри "no less than".
+    mine = [tech for tech in named if common.normalize_for_matching(tech) in known]
 
     return (not mine), {
         "named_technologies": named,
