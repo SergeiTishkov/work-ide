@@ -1894,3 +1894,58 @@ def test_dotnet_pattern_lives_in_the_global_vocabulary_not_in_identities():
         text = open(path, encoding="utf-8").read()
         assert "core_patterns" not in text, path
         assert "primary_language_patterns" not in text, path
+
+
+def test_red_flag_weight_comes_from_the_shared_catalogue():
+    """Свободнотекстовый флаг из отзывов относится к категории общего
+    каталога, и вес берётся оттуда, а не один на все флаги."""
+    assert score.classify_red_flag("late payments") == "late_payment"
+    assert score.classify_red_flag("unpredictable work availability") == "unstable_workload"
+    assert score.classify_red_flag("чтототакое") is None
+
+    points, detail = score._score_red_flags(["late payments"], {})
+    assert points < 0 and detail[0]["source"] == "catalogue"
+
+
+def test_local_override_can_soften_a_red_flag_and_even_flip_its_sign():
+    """Вопрос владельца 2026-08-05: «глобально это красный флаг, а локально мы
+    переопределяем как нормальную вещь или даже как приоритет — сработает?»
+
+    Сработает, и смена знака — законный случай, а не ошибка ввода:
+    «непредсказуемая загрузка» для одного риск остаться без денег, для
+    другого именно то, что нужно, потому что грузить не будут."""
+    flags = ["late payments", "unpredictable work availability"]
+    plain = score._score_red_flags(flags, {})[0]
+    softened = score._score_red_flags(
+        flags, {"company_red_flag_severity": {"late_payment": -4,
+                                              "unstable_workload": 6}})[0]
+    assert plain < 0
+    assert softened > plain
+    per_flag = {d["category"]: d for d in score._score_red_flags(
+        flags, {"company_red_flag_severity": {"unstable_workload": 6}})[1]}
+    assert per_flag["unstable_workload"]["points"] == 6
+    assert per_flag["unstable_workload"]["source"] == "override"
+    # Категория, которую не переопределяли, остаётся на весе каталога.
+    assert per_flag["late_payment"]["source"] == "catalogue"
+
+
+def test_unfilled_local_sentinel_does_not_break_scoring():
+    """Если Малая Конституция ничего не сказала, сентинел `local` доезжает до
+    скоринга строкой. Это не словарь весов, и падать на нём нельзя."""
+    points, _ = score._score_red_flags(["late payments"],
+                                       {"company_red_flag_severity": "local"})
+    assert points < 0
+
+
+def test_an_override_cannot_rescue_a_vacancy_killed_by_a_gate():
+    """Граница механизма, которую важно держать явной: переопределения меняют
+    БАЛЛ, а гейты работают независимо от балла. Никакая личная надбавка не
+    делает непроходную вакансию проходной — иначе личные настройки начали бы
+    возвращать в выдачу то, что отсеяно по существу."""
+    v = make_vacancy(title="Senior QA Engineer", location_raw="Anywhere in the World",
+                     description_text="Worldwide remote. C# and TypeScript.")
+    v["_company_reputation"] = {"overall_rating": 4.8, "work_life_balance": 5.0}
+    generous = dict(PROFILE)
+    generous["personal_market_bonus"] = {"Anywhere": {"points": 100}}
+    r = score.score_vacancy(v, CRITERIA, generous)
+    assert r["classification"] == "rejected"

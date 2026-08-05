@@ -205,7 +205,7 @@ def _matches(text: str, keywords: list) -> list:
     return found
 
 
-def _check_structured_location(vacancy: dict, criteria: dict):
+def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = None):
     """Проверяет СТРУКТУРНОЕ поле локации (location_raw), которое источники
     отдают отдельно от текста описания. Возвращает (is_restricted, detail).
 
@@ -249,6 +249,15 @@ def _check_structured_location(vacancy: dict, criteria: dict):
     # Back End Developer @ Abu Dhabi" и "Backend Developer @ Israel" как
     # "вакансия привязана к стране". Одна часть настроек противоречила
     # другой, и побеждала та, что срабатывает раньше.
+    # Явная исключительность перебивает всё, что ниже. Реальная находка
+    # 2026-08-05: поле локации "United States only" содержит "United States",
+    # то есть целевой рынок, и вакансия проходила по правилу целевого рынка.
+    # Слово работодателя сильнее совпадения по названию страны.
+    exclusivity_hits = [m for m in cfg.get("exclusivity_markers", []) if m in loc]
+    if exclusivity_hits:
+        return True, {"verdict": "restricted_explicitly", "matched": exclusivity_hits,
+                      "value": loc_raw}
+
     acceptable = (criteria["remote_location_fit"]
                   .get("acceptable_region_signal", {}).get("keywords", []))
     acceptable_hits = [k for k in acceptable
@@ -257,6 +266,21 @@ def _check_structured_location(vacancy: dict, criteria: dict):
         return False, {"verdict": "acceptable_region", "matched": acceptable_hits,
                        "value": loc_raw}
 
+    # Целевой рынок самой идентичности — тоже не ограничение, а совпадение.
+    #
+    # Замер 2026-08-05: `config/derivation/market_tiers.yaml` относит Германию,
+    # Швейцарию, Британию, Нидерланды, Ирландию и Скандинавию к importer_prime
+    # («первый приоритет для поиска»), а гейт локации отбрасывал их вакансии
+    # как привязанные к стране. Из 3281 европейской вакансии в выдачу попадала
+    # ОДНА. Шапка market_tiers.yaml при этом утверждала, что ярусы читает
+    # скоринг, — на деле их читали только фетчер LinkedIn и markets.py.
+    #
+    # Тот же класс ошибки, что с Абу-Даби: одна часть настроек противоречит
+    # другой, и побеждает та, что срабатывает раньше.
+    market = _target_market_of(vacancy, profile)
+    if market:
+        return False, {"verdict": "target_market", "market": market, "value": loc_raw}
+
     continent_hits = [c for c in cfg["continent_names"] if c in loc]
     if len(continent_hits) >= cfg["continent_threshold"]:
         # Перечислены почти все континенты — фактически "весь мир"
@@ -264,6 +288,43 @@ def _check_structured_location(vacancy: dict, criteria: dict):
         return False, {"verdict": "worldwide_by_continents", "continents": continent_hits, "value": loc_raw}
 
     return True, {"verdict": "restricted", "value": loc_raw}
+
+
+_TARGET_MARKETS_CACHE = {}
+
+
+def _target_market_of(vacancy: dict, profile: dict):
+    """Целевой рынок вакансии, если он есть, иначе None.
+
+    Сначала по тегу площадки (`market:United Kingdom` — фетчер LinkedIn
+    записывает страну, по которой делался запрос: это факт, а не догадка),
+    затем по названию страны в поле локации.
+    """
+    if not profile:
+        return None
+    key = id(profile)
+    if key not in _TARGET_MARKETS_CACHE:
+        import markets as markets_mod
+
+        names = markets_mod.target_locations(profile)
+        _TARGET_MARKETS_CACHE[key] = (
+            set(names),
+            {common.normalize_for_matching(n): n for n in names},
+        )
+    names, normalized = _TARGET_MARKETS_CACHE[key]
+    if not names:
+        return None
+
+    for tag in vacancy.get("tags") or []:
+        tag = str(tag)
+        if tag.startswith("market:") and tag[7:] in names:
+            return tag[7:]
+
+    loc = common.normalize_for_matching(vacancy.get("location_raw") or "")
+    for needle, name in normalized.items():
+        if needle and needle in loc:
+            return name
+    return None
 
 
 def _check_header_hiring_scope(vacancy: dict, criteria: dict):
@@ -562,7 +623,7 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     # Структурное поле локации от источника (WWR region / Remotive
     # candidate_required_location / Jobicy jobGeo / Himalayas
     # locationRestrictions) — более надёжный сигнал, чем фразы в тексте.
-    structured_restricted, structured_detail = _check_structured_location(vacancy, criteria)
+    structured_restricted, structured_detail = _check_structured_location(vacancy, criteria, profile)
     if structured_detail:
         breakdown["structured_location"] = structured_detail
     # ВАЖНО: структурное ограничение НЕ снимается ничем из текста описания —
@@ -1126,7 +1187,68 @@ def _score_compensation(text: str, vacancy: dict, criteria: dict, profile: dict)
     }
 
 
-def _score_company_reputation(vacancy: dict, criteria: dict):
+_RED_FLAG_CATALOGUE_CACHE = {}
+
+
+def red_flag_catalogue() -> dict:
+    """Общий каталог красных флагов (config/derivation/company_red_flags.yaml)."""
+    if "data" not in _RED_FLAG_CATALOGUE_CACHE:
+        path = common.ROOT / "config" / "derivation" / "company_red_flags.yaml"
+        _RED_FLAG_CATALOGUE_CACHE["data"] = common.load_yaml(path) if path.exists() else {}
+    return _RED_FLAG_CATALOGUE_CACHE["data"] or {}
+
+
+def classify_red_flag(flag: str):
+    """Категория свободнотекстового флага, либо None."""
+    text = common.normalize_for_matching(flag)
+    for name, spec in (red_flag_catalogue().get("categories") or {}).items():
+        if any(common.normalize_for_matching(p) in text for p in spec.get("phrases") or []):
+            return name
+    return None
+
+
+def _score_red_flags(flags: list, profile: dict):
+    """Сумма весов красных флагов с учётом переопределений.
+
+    Порядок приоритета — от общего к частному, побеждает частное:
+      1. вес по умолчанию из общего каталога;
+      2. `company_red_flag_severity` из профиля идентичности;
+      3. то же поле, но со значением `local` — тогда веса приходят из Малой
+         Конституции и в общий репозиторий не попадают.
+
+    Переопределение работает В ЛЮБУЮ СТОРОНУ. Положительное значение —
+    законный случай, а не ошибка: «непредсказуемая загрузка» бывает ровно
+    тем, что человек ищет. Клампа на неположительные значения здесь
+    сознательно нет.
+    """
+    catalogue = red_flag_catalogue()
+    categories = catalogue.get("categories") or {}
+    overrides = (profile or {}).get("company_red_flag_severity")
+    # Незаполненный сентинел `local` доезжает сюда строкой — это не словарь
+    # весов, а признак того, что Малая Конституция ничего не сказала.
+    if not isinstance(overrides, dict):
+        overrides = {}
+
+    total = 0
+    detail = []
+    for flag in flags:
+        category = classify_red_flag(flag)
+        if category is None:
+            points = catalogue.get("unrecognised_points", -5)
+            source = "unrecognised"
+        elif category in overrides:
+            points = overrides[category]
+            source = "override"
+        else:
+            points = (categories.get(category) or {}).get("default_points", -5)
+            source = "catalogue"
+        total += points
+        detail.append({"flag": flag, "category": category,
+                       "points": points, "source": source})
+    return total, detail
+
+
+def _score_company_reputation(vacancy: dict, criteria: dict, profile: dict = None):
     """Репутация работодателя по внешним источникам (Glassdoor и т.п.),
     собранная агентом вручную и хранящаяся на уровне компании.
 
@@ -1178,17 +1300,15 @@ def _score_company_reputation(vacancy: dict, criteria: dict):
         # Красный флаг обязан стоить баллов, а не только пометки. Реальный
         # случай 2026-08-05: платформа с отзывами "late payments" и
         # "unpredictable work availability" получала +14 за рейтинг 3.5 и
-        # work-life balance 4.0 — и выходила на первое место в выдаче. Для
-        # подрядчика задержка оплаты — не нюанс, а суть сделки: пометки
-        # «посмотрите внимательно» тут недостаточно.
-        per_flag = cfg.get("red_flag_points", 0)
-        if per_flag:
-            penalty = per_flag * len(red_flags)
-            floor = cfg.get("red_flag_penalty_cap")
-            if floor is not None:
-                penalty = max(penalty, floor)
-            points += penalty
-            detail["red_flag_penalty"] = penalty
+        # work-life balance 4.0 — и выходила на первое место в выдаче.
+        #
+        # Вес зависит от того, ЧТО именно за флаг, и берётся из общего
+        # каталога, а идентичность или Малая Конституция могут перебить его
+        # в любую сторону, включая плюс (docs/OVERRIDES.md).
+        flag_points, flag_detail = _score_red_flags(red_flags, profile)
+        points += flag_points
+        detail["red_flag_penalty"] = flag_points
+        detail["red_flag_breakdown"] = flag_detail
 
     detail["points"] = points
     return points, detail, needs_review
@@ -1363,7 +1483,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     comp_points, comp_bd = _score_compensation(text, vacancy, criteria, profile)
     contractor_points, contractor_bd = _score_contractor_friendliness(text, criteria)
     reputation_points, reputation_bd, reputation_needs_review = _score_company_reputation(
-        vacancy, criteria
+        vacancy, criteria, profile
     )
     if reputation_needs_review:
         needs_review = True

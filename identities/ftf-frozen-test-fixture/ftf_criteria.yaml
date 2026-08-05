@@ -217,6 +217,16 @@ remote_location_fit:
       - "u.s. person required"
       - "united states person required"
   structured_location_gate:
+    # Формулировки, при которых поле локации означает "и только здесь".
+    # Перебивают правило целевого рынка: "United States only" содержит
+    # "United States", то есть целевой рынок, и без этой проверки вакансия
+    # проходила бы (реальная находка 2026-08-05).
+    exclusivity_markers:
+      - " only"
+      - "only)"
+      - "-only"
+      - "residents only"
+      - "citizens only"
     # КРИТИЧНО (реальный найденный баг, 2026-07-30): многие источники отдают
     # гео-ограничение СТРУКТУРНЫМ полем (WWR region, Remotive
     # candidate_required_location, Jobicy jobGeo, Himalayas

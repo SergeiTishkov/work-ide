@@ -1,0 +1,113 @@
+# =============================================================================
+#  КРАСНЫЕ ФЛАГИ РАБОТОДАТЕЛЯ — каталог и вес по умолчанию
+# =============================================================================
+#  Красные флаги приходят из отзывов бывших сотрудников свободным текстом
+#  ("late payments", "unpredictable work availability") — их собирает агент
+#  вручную через `tools/kb.py set-company-reputation`. Свободный текст нельзя
+#  оценивать одним весом на всё: «задерживают зарплату» и «шумный опенспейс»
+#  для соискателя не одно и то же.
+#
+#  Здесь каждая категория получает распознавание по фразам и вес ПО УМОЛЧАНИЮ.
+#  Веса общие: они описывают, насколько плоха вещь сама по себе, безотносительно
+#  того, кто ищет работу.
+#
+#  ПЕРЕОПРЕДЕЛЕНИЕ. Любой вес отсюда перебивается на уровне идентичности или
+#  Малой Конституции — полем `company_red_flag_severity` в профиле. Причём
+#  перебивается В ЛЮБУЮ СТОРОНУ, включая плюс: для одного человека
+#  «непредсказуемая загрузка» — риск остаться без денег, для другого —
+#  ровно то, что нужно, потому что нагрузка низкая. Механика и границы
+#  переопределения: docs/OVERRIDES.md.
+#
+#  ФРАЗЫ. Действует общее правило проекта про короткие слова: фраза короче
+#  четырёх символов или совпадающая с обычным словом даст ложные срабатывания.
+#  См. docs/TECH_MATCHING.md.
+# =============================================================================
+
+schema_version: 1
+last_reviewed: "2026-08-05"
+
+# Вес флага, который не удалось отнести ни к одной категории. Умеренно
+# отрицательный: раз человек счёл нужным это записать, что-то там есть, но
+# гадать о серьёзности мы не вправе.
+unrecognised_points: -5
+
+categories:
+
+  late_payment:
+    display_name: "Задержки и проблемы с выплатами"
+    # Для подрядчика это не нюанс условий, а суть сделки: работа сделана,
+    # деньги не пришли. Поэтому вес самый тяжёлый в каталоге.
+    default_points: -14
+    phrases:
+      - "late payment"
+      - "delayed payment"
+      - "payment delay"
+      - "payment issue"
+      - "problems with payment"
+      - "not paid on time"
+      - "unpaid invoice"
+      - "withheld payment"
+      - "salary delay"
+
+  unstable_workload:
+    display_name: "Непредсказуемая или нерегулярная загрузка"
+    # Двусмысленная вещь по своей природе: для того, кто живёт на эти деньги,
+    # это риск; для того, у кого доход не зависит от этой работы, — признак
+    # низкой нагрузки. Ровно тот случай, ради которого сделано
+    # переопределение весов.
+    default_points: -8
+    phrases:
+      - "unpredictable work"
+      - "irregular work"
+      - "inconsistent work"
+      - "unstable workload"
+      - "no guaranteed hours"
+      - "sporadic work"
+      - "work availability"
+
+  overwork:
+    display_name: "Переработки и выгорание"
+    default_points: -16
+    phrases:
+      - "long hours"
+      - "overwork"
+      - "burnout"
+      - "unpaid overtime"
+      - "crunch"
+      - "always on call"
+      - "no work-life balance"
+      - "poor work-life balance"
+
+  toxic_management:
+    display_name: "Токсичное руководство"
+    default_points: -14
+    phrases:
+      - "toxic management"
+      - "toxic culture"
+      - "micromanagement"
+      - "micromanaging"
+      - "bullying"
+      - "high turnover"
+      - "constant reorg"
+
+  instability:
+    display_name: "Нестабильность компании"
+    default_points: -10
+    phrases:
+      - "layoff"
+      - "mass redundancies"
+      - "financial trouble"
+      - "running out of runway"
+      - "hiring freeze"
+
+  process_chaos:
+    display_name: "Хаос в процессах"
+    # Для поиска спокойной легаси-работы это скорее шум, чем беда, — но
+    # решать не каталогу, а идентичности через переопределение.
+    default_points: -6
+    phrases:
+      - "no processes"
+      - "chaotic"
+      - "constantly changing priorities"
+      - "unclear expectations"
+      - "no onboarding"
