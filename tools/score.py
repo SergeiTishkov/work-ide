@@ -87,7 +87,17 @@ def _remote_only_sources() -> set:
 
 
 def load_criteria() -> dict:
-    return common.load_yaml(common.identity_config("criteria.yaml"))
+    """Критерии со всеми слоями, наложенными в фиксированном порядке.
+
+    До 2026-08-05 читался ровно один файл — файл идентичности. Из-за этого
+    Малая Конституция могла влиять только на профиль (через сентинел `local`)
+    и не могла тронуть ни одного порога или списка в критериях, хотя ровно
+    там живёт большая часть решений. Порядок и правила слияния — settings.py.
+    """
+    import settings
+
+    merged, _ = settings.resolve("criteria", common.ACTIVE_IDENTITY)
+    return merged
 
 
 def load_profile() -> dict:

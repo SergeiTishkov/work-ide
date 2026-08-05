@@ -89,3 +89,44 @@ def test_scoring_philosophy_falls_back_to_a_neutral_line(monkeypatch):
     text = report._scoring_philosophy()
     assert "профилю этой идентичности" in text
     assert "легаси" not in text, "нейтральный дефолт не должен навязывать чужую философию"
+
+
+def test_hiring_country_prefers_the_office_that_posted_over_company_hq():
+    """Просьба владельца 2026-08-05: у международной компании нужна страна
+    ОФИСА, разместившего вакансию, а не родина компании. Швейцарский офис
+    Google нанимает в Швейцарии — там договор, оттуда платят, тот часовой
+    пояс."""
+    swiss_office = {
+        "title": "Software Engineer",
+        "company": "Google",
+        "location_raw": "Zurich, Zurich, Switzerland",
+        "computed": {"score_breakdown": {"remote_location_fit": {
+            "header_scope": {"header_lines": ["headquarters: united states"]}}}},
+    }
+    assert report.hiring_country(swiss_office) == ("Switzerland", "офис найма")
+
+
+def test_hiring_country_trusts_the_market_tag_over_the_location_string():
+    """Тег `market:<страна>` записывает фетчер — это страна, по которой он
+    делал запрос, то есть факт, а не разбор строки."""
+    v = {"tags": ["market:United Kingdom"], "location_raw": "Remote"}
+    assert report.hiring_country(v) == ("United Kingdom", "офис найма")
+
+
+def test_hiring_country_falls_back_to_headquarters_and_says_so():
+    """Когда офис неизвестен, штаб-квартира лучше пустоты — но человек должен
+    видеть, что это другое."""
+    v = {
+        "location_raw": "Anywhere in the World",
+        "computed": {"score_breakdown": {"remote_location_fit": {
+            "header_scope": {"header_lines": ["headquarters: sweden"]}}}},
+    }
+    assert report.hiring_country(v) == ("Sweden", "штаб-квартира компании")
+
+
+def test_hiring_country_handles_common_platform_spellings():
+    for raw, expected in [("USA", "United States"),
+                          ("London, England, United Kingdom", "United Kingdom"),
+                          ("Dubai, Dubai, United Arab Emirates", "United Arab Emirates"),
+                          ("Remote, Israel", "Israel")]:
+        assert report.hiring_country({"location_raw": raw})[0] == expected, raw

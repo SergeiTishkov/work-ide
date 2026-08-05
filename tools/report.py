@@ -132,6 +132,93 @@ def expected_technologies(vacancy: dict, limit: int = 24) -> list:
     return found
 
 
+# Страны в тех написаниях, которыми их называют площадки.
+_COUNTRY_ALIASES = {
+    "usa": "United States", "us": "United States", "u.s.": "United States",
+    "united states of america": "United States", "america": "United States",
+    "uk": "United Kingdom", "u.k.": "United Kingdom", "england": "United Kingdom",
+    "scotland": "United Kingdom", "wales": "United Kingdom",
+    "northern ireland": "United Kingdom", "great britain": "United Kingdom",
+    "uae": "United Arab Emirates", "u.a.e.": "United Arab Emirates",
+    "ksa": "Saudi Arabia", "holland": "Netherlands", "deutschland": "Germany",
+    "schweiz": "Switzerland", "suisse": "Switzerland", "österreich": "Austria",
+    "españa": "Spain", "italia": "Italy", "sverige": "Sweden", "norge": "Norway",
+    "danmark": "Denmark", "suomi": "Finland", "éire": "Ireland",
+    "czechia": "Czech Republic", "czech republic": "Czech Republic",
+}
+
+_COUNTRY_INDEX_CACHE = {}
+
+
+def _country_index() -> dict:
+    """Нормализованное название страны -> каноническое.
+
+    Список стран берётся из общей таблицы рынков: она и так перечисляет всё,
+    что проекту интересно, и поддерживать второй список незачем.
+    """
+    if "data" not in _COUNTRY_INDEX_CACHE:
+        import markets
+
+        index = {}
+        for spec in (markets.load_tiers() or {}).values():
+            for country in spec.get("countries") or []:
+                name = country.get("name")
+                if name:
+                    index[common.normalize_for_matching(name)] = name
+        for alias, canonical in _COUNTRY_ALIASES.items():
+            index.setdefault(alias, canonical)
+        _COUNTRY_INDEX_CACHE["data"] = index
+    return _COUNTRY_INDEX_CACHE["data"]
+
+
+def hiring_country(vacancy: dict):
+    """(страна, откуда узнали) — или (None, None).
+
+    Нужна СТРАНА НАЙМА, а не родина компании. У международной компании это
+    разные вещи: швейцарский офис Google нанимает в Швейцарии, и человеку
+    важна именно Швейцария — там оформляют договор, оттуда платят, тот
+    часовой пояс. Поэтому порядок источников такой:
+
+      1. тег площадки `market:<страна>` — страна, по которой фетчер делал
+         запрос, то есть офис, разместивший вакансию. Это факт, а не догадка;
+      2. последний элемент поля локации ("Barendrecht, South Holland,
+         Netherlands");
+      3. любое упоминание страны в поле локации ("Remote, Israel");
+      4. заголовок "Headquarters:" из описания — уже штаб-квартира, а не
+         офис найма, поэтому идёт последним и помечается явно.
+    """
+    index = _country_index()
+
+    for tag in vacancy.get("tags") or []:
+        tag = str(tag)
+        if tag.startswith("market:"):
+            name = index.get(common.normalize_for_matching(tag[7:]), tag[7:])
+            return name, "офис найма"
+
+    location = (vacancy.get("location_raw") or "").strip()
+    if location:
+        parts = [p.strip() for p in location.split(",") if p.strip()]
+        if parts:
+            direct = index.get(common.normalize_for_matching(parts[-1]))
+            if direct:
+                return direct, "офис найма"
+        normalized = common.normalize_for_matching(location)
+        for needle, canonical in index.items():
+            if needle and needle in normalized:
+                return canonical, "офис найма"
+
+    header = (vacancy.get("computed", {}).get("score_breakdown", {})
+              .get("remote_location_fit", {}).get("header_scope", {}))
+    for line in header.get("header_lines") or []:
+        if not line.startswith("headquarters:"):
+            continue
+        for needle, canonical in index.items():
+            if needle and needle in line:
+                return canonical, "штаб-квартира компании"
+
+    return None, None
+
+
 def _fmt_vacancy_line(v: dict) -> str:
     c = v.get("computed", {})
     score = c.get("score", 0)
@@ -151,8 +238,6 @@ def _fmt_vacancy_line(v: dict) -> str:
         highlights.append("worldwide remote")
     if rl.get("eor_or_contractor_hits"):
         highlights.append("EOR/contractor: " + ", ".join(rl["eor_or_contractor_hits"][:3]))
-    if rl.get("acceptable_region_hits"):
-        highlights.append("приемлемый регион найма: " + ", ".join(rl["acceptable_region_hits"][:3]))
     intensity = bd.get("low_intensity_signal", {})
     if intensity.get("positive_hits"):
         highlights.append("низкая нагрузка: " + ", ".join(intensity["positive_hits"][:4]))
@@ -181,6 +266,21 @@ def _fmt_vacancy_line(v: dict) -> str:
     if techs:
         lines.append(f"  - 🧰 технологии: {', '.join(techs)}")
     lines.append(f"  - ⭐ репутация: {_fmt_reputation(bd.get('company_reputation_signal', {}))}")
+    country, country_source = hiring_country(v)
+    if country:
+        suffix = "" if country_source == "офис найма" else f" _({country_source})_"
+        lines.append(f"  - 🌍 страна найма: {country}{suffix}")
+    else:
+        # Отсутствие страны бывает двух разных видов, и путать их не стоит:
+        # либо вакансия сознательно без географии, либо площадка не сказала.
+        verdict = (bd.get("remote_location_fit", {})
+                   .get("structured_location", {}).get("verdict"))
+        location = (v.get("location_raw") or "").strip()
+        if verdict in ("worldwide", "worldwide_by_continents", "remote_without_country"):
+            lines.append("  - 🌍 страна найма: без привязки к стране")
+        else:
+            lines.append("  - 🌍 страна найма: не определена"
+                         + (f" _(площадка указала «{location}»)_" if location else ""))
     age_bd = bd.get("company_age_signal", {})
     if age_bd.get("has_data"):
         emp = f", ~{age_bd['employees']} сотрудников" if age_bd.get("employees") else ""
