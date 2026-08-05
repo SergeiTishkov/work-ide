@@ -432,9 +432,11 @@ def resolve_identity(cli_value: Optional[str] = None) -> str:
 
       1. --identity <префикс>            (явное намерение всегда побеждает)
       2. WORK_IDE_IDENTITY            (подпроцессы, CI, тесты)
-      3. active.yaml -> default_identity
-      4. active.yaml -> единственная активная
-      5. отказ
+      3. единственная папка в local-identities/
+      4. отказ
+
+    Отдельного реестра активных идентичностей нет намеренно: файл со списком
+    умеет расходиться с тем, что лежит на диске, а папки — нет.
 
     Никогда не угадывает при нескольких активных без дефолта: молчаливый выбор
     "не той" идентичности — ровно тот отказ, ради предотвращения которого вся
@@ -447,31 +449,38 @@ def resolve_identity(cli_value: Optional[str] = None) -> str:
     if env_value:
         return env_value
 
+    # Малая Конституция ещё может существовать у тех, кто не мигрировал:
+    # если в ней явно назван дефолт, он уважается.
     default = default_identity()
     if default:
         return default
 
-    active = active_identities()
-    if len(active) == 1:
-        return active[0]
+    available = list_identities()
+    if len(available) == 1:
+        return available[0]
 
-    if not active:
+    if not available:
         raise IdentityError(_no_identity_message())
-    raise IdentityError(_ambiguous_identity_message(active))
+    raise IdentityError(_ambiguous_identity_message(available))
 
 
 def _no_identity_message() -> str:
-    available = list_identities()
-    available_str = ", ".join(available) if available else "(в репозитории пока нет ни одной)"
+    import templates as templates_mod
+
+    known = ", ".join(sorted(templates_mod.template_folders())) or "(шаблонов нет)"
     return (
-        "Не выбрана поисковая идентичность — работать без неё запрещено "
+        "Нет ни одного настроенного поиска — работать без него запрещено "
         "(Большая Конституция, правило №0).\n"
-        f"  Идентичности в репозитории: {available_str}\n"
-        f"  Малая Конституция ожидается здесь: {common.LOCAL_CONSTITUTION_DIR}\n"
-        "  Что делать: провести онбординг по docs/ONBOARDING.md — спросить у человека "
-        "CV/LinkedIn/описание, заполнить вопросник, создать идентичность и "
-        "зарегистрировать её в local-constitution/active.yaml.\n"
-        "  Разово можно указать явно: --identity <префикс>"
+        f"  Поиски ожидаются здесь: {common.IDENTITIES_DIR}\n"
+        f"  Готовые шаблоны: {known}\n"
+        "\n"
+        "  Как начать (подробно — docs/ONBOARDING.md):\n"
+        "    1. python tools/templates.py list\n"
+        "    2. python tools/templates.py clone <шаблон> <префикс> \"<расшифровка>\"\n"
+        "    3. заполнить личный слой вместе с агентом\n"
+        "\n"
+        "  Ни один шаблон не подходит — берите blank: полный набор файлов с\n"
+        "  комментариями и без готовых решений."
     )
 
 
