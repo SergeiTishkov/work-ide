@@ -520,6 +520,9 @@ title_stack_gate:
     - drupal
     - shopify
     - salesforce
+    - servicenow
+    - workday
+    - sap
     - abap
     - cobol
     - delphi
@@ -566,6 +569,35 @@ role_relevance_signal:
     - "bookkeeper"
     - "product manager"
     - "product owner"
+    # Профессии, которые до сих пор отсеивались СЛУЧАЙНО — за офис или гео, а
+    # не за суть роли. Реальная жалоба человека 2026-08-05: «Sales Manager,
+    # Business Partner Analyst» в выдаче. Проверка показала, что все они
+    # действительно отклонены, но по location: сделай такую вакансию удалённой
+    # — и она бы прошла.
+    #
+    # Аналитика и сопровождение клиентов — не разработка ПО, независимо от
+    # формата работы. Формулировки точные, а не общее слово "analyst":
+    # "Analytics Engineer" — это дата-инженерия, которую человек как раз умеет
+    # (Spark/Databricks в CV), и отсекать её нельзя.
+    - "business analyst"
+    - "business partner"
+    - "compliance analyst"
+    - "financial analyst"
+    - "risk analyst"
+    - "operations analyst"
+    - "onboarding manager"
+    - "onboarding specialist"
+    - "outreach specialist"
+    - "implementation specialist"
+    - "data entry"
+    - "data annotation"
+    - "annotator"
+    - "video generalist"
+    - "content specialist"
+    - "community specialist"
+    - "success manager"
+    - "partnerships manager"
+    - "office administrator"
     - "project manager"
     - "delivery manager"
     - "scrum master"

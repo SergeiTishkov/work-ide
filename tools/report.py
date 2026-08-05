@@ -327,7 +327,18 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     hot = by_class("hot_lead")
     worth = by_class("worth_a_look")
     long_shot = by_class("long_shot")
-    review_items = [v for v in items if v.get("computed", {}).get("needs_manual_review")]
+    # Ручной проверки требуют только те вакансии, судьба которых ещё не решена.
+    #
+    # Реальная жалоба человека 2026-08-05: в этой секции лежали Sales Manager,
+    # Business Partner Analyst, Patient Outreach Specialist и Data Entry — все
+    # ОТКЛОНЁННЫЕ. Флаг «нужна проверка» ставится независимо от классификации,
+    # и секция собирала отсеянное вместе с сомнительным. Проверять в
+    # отклонённой вакансии нечего: гейт уже принял решение, а человек тратит
+    # внимание на мусор в единственном месте, куда смотрит.
+    visible = {"hot_lead", "worth_a_look", "long_shot"}
+    review_items = [v for v in items
+                    if v.get("computed", {}).get("needs_manual_review")
+                    and v.get("computed", {}).get("classification") in visible]
     review_items.sort(key=lambda v: -v.get("computed", {}).get("score", 0))
 
     class_counts = {}

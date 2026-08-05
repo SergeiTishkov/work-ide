@@ -1650,3 +1650,35 @@ def test_keyword_stuffing_block_does_not_grant_a_personal_tech_bonus():
         ),
     )
     assert score.score_vacancy(v, CRITERIA, profile)["score_breakdown"]["personal_tech_bonus"] == {}
+
+
+def test_non_developer_professions_are_rejected_on_merit_not_by_accident():
+    """Жалоба человека 2026-08-05: в отчёте лежали Sales Manager, Business
+    Partner Analyst, Patient Outreach Specialist, Data Entry. Проверка
+    показала, что все отклонены — но по location (офис, гео). Сделай такую
+    вакансию удалённой, и она бы прошла: суть роли гейт не видел."""
+    for title in ("Business Partner Analyst", "Senior Compliance Analyst",
+                  "Client Onboarding Manager", "Patient Outreach Specialist",
+                  "Video Data Entry Specialist", "Data-Video Generalist"):
+        v = make_vacancy(
+            title=title,
+            location_raw="Anywhere in the World",
+            description_text="Worldwide remote role. We work with C# and TypeScript teams.",
+        )
+        r = score.score_vacancy(v, CRITERIA, PROFILE)
+        assert r["classification"] == "rejected", f"прошла: {title}"
+        assert any(d.startswith("role:") for d in r["dealbreakers"]), (
+            f"'{title}' отклонена не за профессию, а случайно: {r['dealbreakers']}"
+        )
+
+
+def test_analytics_engineer_is_not_caught_by_the_analyst_patterns():
+    """«Analytics Engineer» — дата-инженерия, которую человек умеет (Spark и
+    Databricks в CV). Формулировки в списке профессий точные именно поэтому:
+    общее слово «analyst» выбросило бы подходящую роль."""
+    v = make_vacancy(
+        title="Analytics Engineer",
+        description_text="Build ETL pipelines with Apache Spark on Databricks. Worldwide remote.",
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert not any(d.startswith("role:") for d in r["dealbreakers"])
