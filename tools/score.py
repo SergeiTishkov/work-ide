@@ -15,6 +15,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
+import textclean  # noqa: E402
 
 _AMOUNT_RE = re.compile(
     r"\$\s?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*"
@@ -97,6 +98,11 @@ def load_profile() -> dict:
 
 
 def _vacancy_text(vacancy: dict) -> str:
+    # Почта и ссылки вырезаются ДО поиска ключевых слов: домен внутри адреса
+    # неотличим от названия технологии (".net" в "harnly.net"), а внутри
+    # ссылки — от чего угодно ("react-native" в пути к вакансии).
+    # См. tools/textclean.py: там же объяснено, почему это не валидация
+    # адреса и почему библиотека-валидатор здесь не подходит.
     parts = [
         vacancy.get("title") or "",
         vacancy.get("company") or "",
@@ -105,10 +111,50 @@ def _vacancy_text(vacancy: dict) -> str:
         vacancy.get("description_text") or "",
         vacancy.get("salary_raw") or "",
     ]
-    return common.normalize_for_matching(" \n ".join(parts))
+    return common.normalize_for_matching(
+        textclean.strip_contact_noise(" \n ".join(parts))
+    )
 
 
-def _matches_patterns(text: str, patterns: list) -> list:
+_TECH_PATTERNS_CACHE = {}
+
+
+def tech_matching_patterns() -> dict:
+    """Общий словарь "как найти технологию в тексте" (config/tech_vocabulary.yaml).
+
+    Знание ГЛОБАЛЬНОЕ: как пишется ".NET", одинаково для всех пользователей
+    проекта, поэтому живёт в config/, а не в идентичности (CLAUDE.md §13).
+    Идентичность называет технологию каноническим именем в своём tech_stack —
+    и получает правильный поиск бесплатно.
+    """
+    if "data" not in _TECH_PATTERNS_CACHE:
+        path = common.ROOT / "config" / "tech_vocabulary.yaml"
+        data = common.load_yaml(path) if path.exists() else {}
+        _TECH_PATTERNS_CACHE["data"] = (data or {}).get("matching_patterns") or {}
+    return _TECH_PATTERNS_CACHE["data"]
+
+
+def _substring_unsafe_names() -> set:
+    """Технологии, которые НЕЛЬЗЯ искать подстрокой ни в каком списке."""
+    return {name for name, spec in tech_matching_patterns().items()
+            if spec.get("substring_unsafe")}
+
+
+def _pattern_specs_for(names: list) -> list:
+    """Записи глобального словаря для технологий, названных идентичностью."""
+    vocabulary = tech_matching_patterns()
+    specs = []
+    for name in names or []:
+        spec = vocabulary.get(name)
+        if not spec:
+            continue
+        for pattern in spec.get("patterns") or []:
+            specs.append({"name": name, "pattern": pattern,
+                          "redundant_if": spec.get("redundant_if")})
+    return specs
+
+
+def _matches_patterns(text: str, patterns: list, already_found: list = ()) -> list:
     """Совпадение по регулярному выражению, а не по подстроке.
 
     Нужно там, где название технологии невозможно записать безопасной
@@ -120,17 +166,39 @@ def _matches_patterns(text: str, patterns: list) -> list:
 
     Цена ошибки измерена 2026-08-05: 754 вакансии с .NET в заголовке,
     отклонены все до единой, 325 из них — с формулировкой "не .NET/JS роль".
+
+    Формат записи — {name, pattern, redundant_if}: в отчёт попадает `name`
+    (человекочитаемое ".NET", а не сырая регулярка), а `redundant_if`
+    перечисляет ключи, при наличии которых совпадение не засчитывается.
+    Последнее обязательно: ".NET" совпадает и внутри "ASP.NET", и без этой
+    оговорки одна и та же технология считалась бы дважды.
     """
     found = []
-    for pattern in patterns or []:
-        if re.search(pattern, text, re.IGNORECASE) and pattern not in found:
-            found.append(pattern)
+    for spec in patterns or []:
+        if isinstance(spec, str):  # краткая форма: сама регулярка и есть имя
+            spec = {"name": spec, "pattern": spec}
+        name, pattern = spec.get("name"), spec.get("pattern")
+        if not pattern or name in found or name in already_found:
+            continue
+        if any(key in already_found for key in spec.get("redundant_if") or []):
+            continue
+        if re.search(pattern, text, re.IGNORECASE):
+            found.append(name)
     return found
 
 
 def _matches(text: str, keywords: list) -> list:
+    """Поиск подстрокой. Технологии, помеченные в общем словаре как
+    `substring_unsafe`, пропускаются: их ищет только _matches_patterns.
+
+    Без этой оговорки ".NET" в списке ключей снова начинает ловиться внутри
+    "asp.net" — то есть ровно та ошибка, ради которой словарь и заведён.
+    """
+    unsafe = _substring_unsafe_names()
     found = []
     for kw in keywords or []:
+        if kw in unsafe:
+            continue
         needle = common.normalize_for_matching(kw)
         if needle and needle in text and kw not in found:
             found.append(kw)
@@ -174,6 +242,20 @@ def _check_structured_location(vacancy: dict, criteria: dict):
     residual = re.sub(r"[^a-z]+", "", residual)
     if not residual:
         return False, {"verdict": "remote_without_country", "value": loc_raw}
+
+    # Регион, который идентичность САМА назвала приемлемым, не является
+    # ограничением. Реальная находка 2026-08-05: профиль kisel перечисляет
+    # Израиль и ОАЭ целевыми рынками, а структурный гейт отбрасывал ".NET
+    # Back End Developer @ Abu Dhabi" и "Backend Developer @ Israel" как
+    # "вакансия привязана к стране". Одна часть настроек противоречила
+    # другой, и побеждала та, что срабатывает раньше.
+    acceptable = (criteria["remote_location_fit"]
+                  .get("acceptable_region_signal", {}).get("keywords", []))
+    acceptable_hits = [k for k in acceptable
+                       if common.normalize_for_matching(k) in loc]
+    if acceptable_hits:
+        return False, {"verdict": "acceptable_region", "matched": acceptable_hits,
+                       "value": loc_raw}
 
     continent_hits = [c for c in cfg["continent_names"] if c in loc]
     if len(continent_hits) >= cfg["continent_threshold"]:
@@ -583,7 +665,8 @@ def _score_stack_fit(text: str, criteria: dict, profile: dict):
     # Технологии, чьё название невозможно записать безопасной подстрокой —
     # см. _matches_patterns. Без этого ".NET Developer" в заголовке давал
     # ровно ноль баллов за стек.
-    core_hits += _matches_patterns(text, profile["tech_stack"].get("core_patterns", []))
+    core_hits += _matches_patterns(
+        text, _pattern_specs_for(profile["tech_stack"].get("core", [])), core_hits)
     strong_hits = _matches(text, profile["tech_stack"]["strong"])
     familiar_hits = _matches(text, profile["tech_stack"]["familiar"])
     raw = (
@@ -665,7 +748,8 @@ def _check_stack_relevance(text: str, core_hits: list, strong_hits: list, criter
     # судить, что роль подходит .NET/JS-разработчику).
     primary_language_hits = _matches(text, cfg.get("primary_language_keywords", []))
     primary_language_hits += _matches_patterns(
-        text, cfg.get("primary_language_patterns", []))
+        text, _pattern_specs_for(cfg.get("primary_language_keywords", [])),
+        primary_language_hits)
 
     relevant = bool(primary_language_hits) or data_pipeline_relevant or bool(tech_agnostic_hits)
     return relevant, {
@@ -1388,7 +1472,27 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
 
     thresholds = criteria["classification_thresholds"]
 
-    if dealbreakers:
+    # Вакансия, у которой ЕДИНСТВЕННОЕ возражение — страна в структурном поле
+    # локации, не отбрасывается молча, а выделяется в свой класс.
+    #
+    # Почему так, а не "отказ" (пересмотрено 2026-08-05 по прямому возражению
+    # владельца). Замер: 501 вакансия с .NET в заголовке отклонена ровно по
+    # этой причине и ни по какой другой, и ВСЕ 501 помечены источником как
+    # remote. Из тех 78, у кого есть описание, работодатель сам ограничивает
+    # право работать лишь в 16 случаях — в остальных 62 отказ выносится по
+    # догадке "вакансия в стране N значит для резидентов N".
+    #
+    # Догадка чаще всего верна, и смешивать эти вакансии с основной выдачей
+    # нельзя: их сотни, они утопят десяток настоящих кандидатов. Но и решать
+    # за человека, что B2B-контракт с нидерландской компанией ему недоступен,
+    # система не вправе — это его решение, а не её. Поэтому отдельный класс и
+    # отдельный раздел отчёта.
+    country_only = bool(dealbreakers) and all(
+        d.startswith("location: source restricts hiring to") for d in dealbreakers
+    )
+    if country_only:
+        classification = "national_market"
+    elif dealbreakers:
         classification = "rejected"
     elif complexity_gate:
         classification = "low_priority"

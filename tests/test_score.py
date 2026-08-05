@@ -243,9 +243,25 @@ def test_webforms_not_claimed_as_personal_skill():
     # WebForms/VB.NET убраны из tech_stack (нет подтверждения в CV) -
     # упоминание одного только WebForms не должно засчитываться в stack_fit,
     # хотя остаётся сигналом легаси в legacy_enterprise_signal.
+    # Пересмотрено 2026-08-05. Первая редакция требовала за такую вакансию
+    # РОВНО 0 за стек. Это было слишком: WebForms человек действительно не
+    # знает, но VB.NET — это .NET, тот же рантайм и та же экосистема, а .NET
+    # у него семь лет в ядре. Поддержка легаси на VB.NET — вообще образцовая
+    # вакансия для этого поиска: скучно, стабильно, мало конкурентов.
+    #
+    # Поэтому проверяется то, что и требовалось на самом деле: WebForms сам
+    # по себе навыком НЕ считается, а .NET-платформа засчитывается скромно.
     v = make_vacancy(title="Application Support", description_text="Maintaining a legacy WebForms VB.NET application.")
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    assert r["score_breakdown"]["stack_fit"]["points"] == 0
+    stack = r["score_breakdown"]["stack_fit"]
+    assert "WebForms" not in stack["core_hits"] + stack["strong_hits"]
+    assert stack["core_hits"] == [".NET"], stack["core_hits"]
+
+    only_webforms = make_vacancy(
+        title="Application Support",
+        description_text="Maintaining a legacy WebForms application.")
+    assert score.score_vacancy(only_webforms, CRITERIA, PROFILE)[
+        "score_breakdown"]["stack_fit"]["points"] == 0
     assert len(r["score_breakdown"]["legacy_enterprise_signal"]["hits"]) > 0
 
 
@@ -429,13 +445,19 @@ def test_structured_location_country_name_is_rejected():
     # locationRestrictions=["Canada"], Remotive
     # candidate_required_location="Brazil"), а проверялся только текст
     # описания. ~20 из 32 кандидатов оказались недоступны по гео.
-    for loc in ["USA", "Canada only", "Brazil", "Costa Rica", "Texas", "Virginia"]:
+    for loc in ["USA", "Brazil", "Costa Rica", "Texas", "Virginia"]:
         v = make_vacancy(
             location_raw=loc,
             description_text="C# ASP.NET SQL Server developer role.",
         )
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] == "rejected", f"{loc} должна отклоняться"
+        # Пересмотрено 2026-08-05: вакансия, у которой ЕДИНСТВЕННОЕ
+        # возражение — страна, больше не отбрасывается молча, а попадает
+        # в класс national_market и отдельный раздел отчёта. Из основной
+        # выдачи она по-прежнему исключена; решение "писать ли им" — за
+        # человеком, а не за системой. Причина: 501 .NET-вакансия
+        # отклонялась ровно так, и все они помечены источником как remote.
+        assert r["classification"] == "national_market", loc
         assert any("source restricts hiring" in d for d in r["dealbreakers"]), loc
 
 
@@ -488,7 +510,9 @@ def test_structured_location_not_overridden_by_marketing_worldwide_phrase():
         ),
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    assert r["classification"] == "rejected"
+    # Не в основной выдаче, но и не выброшена: класс national_market,
+    # отдельный раздел отчёта. См. пометку 2026-08-05 выше.
+    assert r["classification"] == "national_market"
     assert any("source restricts hiring" in d for d in r["dealbreakers"])
 
 
@@ -514,7 +538,9 @@ def test_structured_location_not_overridden_by_eor_mention():
         description_text="C# TypeScript React role. We hire via Multiplier as a contractor.",
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    assert r["classification"] == "rejected"
+    # Не в основной выдаче, но и не выброшена: класс national_market,
+    # отдельный раздел отчёта. См. пометку 2026-08-05 выше.
+    assert r["classification"] == "national_market"
     assert any("source restricts hiring" in d for d in r["dealbreakers"])
 
 
@@ -1823,3 +1849,48 @@ def test_a_dot_net_email_domain_is_not_a_dotnet_vacancy():
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert not r["score_breakdown"]["stack_fit"]["core_hits"], \
         "почтовый домен засчитан как .NET"
+
+
+def test_explicit_only_wording_is_still_a_hard_rejection():
+    """Различие, которое стоит держать явным (2026-08-05).
+
+    Поле локации "Canada" — это догадка площадки: вакансия может быть
+    открыта и контрактору снаружи. Формулировка "Canada only" — это слова
+    работодателя, и они однозначны. Первое попадает в national_market и
+    остаётся на глазах, второе отклоняется совсем."""
+    guess = make_vacancy(location_raw="Canada",
+                         description_text="C# ASP.NET SQL Server developer role.")
+    stated = make_vacancy(location_raw="Canada only",
+                          description_text="C# ASP.NET SQL Server developer role.")
+    assert score.score_vacancy(guess, CRITERIA, PROFILE)["classification"] == "national_market"
+    assert score.score_vacancy(stated, CRITERIA, PROFILE)["classification"] == "rejected"
+
+
+def test_email_and_url_are_removed_before_technology_search():
+    """Реальная запись с Hacker News, приехавшая заголовком вакансии:
+    "Please email me ... (firstname)@harnly.net". Раньше её ".net" считался
+    упоминанием технологии. Убирается вычисткой контактов, а не запретом на
+    ".net" — иначе вместе с почтой отсекается и "asp.net"."""
+    v = make_vacancy(
+        title="Please email me so I know which role (firstname)@harnly.net",
+        description_text="Reach out at jobs@example.net or https://careers.example.net",
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert not r["score_breakdown"]["stack_fit"]["core_hits"]
+
+    real = make_vacancy(title="Senior ASP.NET Developer",
+                        description_text="ASP.NET and .NET Core work. Contact jobs@example.net")
+    hits = score.score_vacancy(real, CRITERIA, PROFILE)["score_breakdown"]["stack_fit"]["core_hits"]
+    assert "ASP.NET" in hits and ".NET Core" in hits
+
+
+def test_dotnet_pattern_lives_in_the_global_vocabulary_not_in_identities():
+    """Как пишется технология — знание общее (CLAUDE.md §13). Идентичность
+    называет ".NET" каноническим именем, регулярку хранит config/."""
+    import glob
+    patterns = score.tech_matching_patterns()
+    assert ".NET" in patterns and patterns[".NET"].get("substring_unsafe")
+    for path in glob.glob("identities/*/*.yaml"):
+        text = open(path, encoding="utf-8").read()
+        assert "core_patterns" not in text, path
+        assert "primary_language_patterns" not in text, path
