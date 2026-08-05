@@ -1342,3 +1342,126 @@ def test_data_pipeline_exception_survives_the_title_gate():
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert r["classification"] != "rejected"
+
+
+# --- Личная надбавка за рынок и штраф за роль (2026-08-05) -------------------
+
+def test_personal_market_bonus_comes_from_the_local_constitution(monkeypatch):
+    """Причина надбавки — обстоятельства конкретного человека (налоги, пенсия,
+    семья), а не рынок и не профиль поиска. Поэтому значения живут вне гита, и
+    сам механизм обязан работать без них: у другого человека их просто нет."""
+    profile = dict(PROFILE)
+    profile["personal_market_bonus"] = {"Belarus": {"points": 12, "remote_only": True}}
+
+    v = make_vacancy(title="Senior C# Developer", location_raw="Minsk, Belarus",
+                     description_text="Legacy ASP.NET, worldwide remote.")
+    with_bonus = score.score_vacancy(v, CRITERIA, profile)
+
+    without = dict(PROFILE)
+    without.pop("personal_market_bonus", None)
+    baseline = score.score_vacancy(v, CRITERIA, without)
+
+    assert with_bonus["score"] > baseline["score"]
+    assert with_bonus["score_breakdown"]["personal_market_bonus"]["hits"] == {"Belarus": 12}
+    assert baseline["score_breakdown"]["personal_market_bonus"] == {}
+
+
+def test_market_bonus_marked_remote_only_ignores_onsite_vacancies():
+    """Смысл надбавки — работать откуда угодно, оставаясь налоговым резидентом.
+    Для офисной вакансии он теряется."""
+    profile = dict(PROFILE)
+    profile["personal_market_bonus"] = {"Belarus": {"points": 12, "remote_only": True}}
+    v = make_vacancy(title="Senior C# Developer", location_raw="Minsk, Belarus",
+                     remote=False, description_text="Legacy ASP.NET in our office.")
+    assert score.score_vacancy(v, CRITERIA, profile)["score_breakdown"]["personal_market_bonus"] == {}
+
+
+def test_market_bonus_does_not_rescue_a_disqualified_vacancy():
+    """Надбавка мягкая: она двигает вакансию вверх, но не делает непроходную
+    проходной. Гейты обязаны отрабатывать раньше и независимо."""
+    profile = dict(PROFILE)
+    profile["personal_market_bonus"] = {"Belarus": {"points": 99}}
+    v = make_vacancy(title="Senior Ruby on Rails Developer", location_raw="Minsk, Belarus",
+                     description_text="Ruby on Rails, HTML, CSS, JavaScript.")
+    assert score.score_vacancy(v, CRITERIA, profile)["classification"] == "rejected"
+
+
+def test_pure_frontend_role_is_penalised_but_not_rejected():
+    """Подтверждено человеком (2026-08-05): «чистый Frontend Developer я
+    закрою, но опыт в основном фуллстек, там меня вряд ли наймут». Выбрасывать
+    неправильно — понижаем."""
+    front = make_vacancy(title="Frontend Developer",
+                         description_text="React and TypeScript, worldwide remote.")
+    full = make_vacancy(title="Fullstack Developer",
+                        description_text="React and TypeScript, worldwide remote.")
+    r_front = score.score_vacancy(front, CRITERIA, PROFILE)
+    r_full = score.score_vacancy(full, CRITERIA, PROFILE)
+
+    assert r_front["classification"] != "rejected", "вакансию человек закрыть может"
+    assert r_front["score"] < r_full["score"]
+    assert r_front["score_breakdown"]["title_role_penalty"]["points"] < 0
+
+
+def test_fullstack_title_mentioning_frontend_is_not_penalised():
+    """«Fullstack (Frontend focus)» — это фуллстек, а не чистый фронтенд."""
+    v = make_vacancy(title="Fullstack Developer (Frontend focus)",
+                     description_text="React, C#, worldwide remote.")
+    assert score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]["title_role_penalty"] == {}
+
+
+def test_eor_platform_names_do_not_match_ordinary_words():
+    """Замер 2026-08-05 на базе из 9527 вакансий: 345 ложных EOR-сигналов.
+    «Multiplier» ловился в «productivity multiplier» и «Talent Multiplier»
+    (266 раз), «G-P» — внутри немецкого «Mentoring-Programm» (79 раз). EOR —
+    самый крупный плюс рубрики (+18), поэтому ложное срабатывание тут дороже
+    всех прочих."""
+    for text in (
+        "We embrace AI as a core productivity multiplier across the team.",
+        "Talent Multiplier: mentor and coach mid-level engineers.",
+        "Einarbeitung inkl. Mentoring-Programm und Chancengleichheit.",
+    ):
+        v = make_vacancy(title="Senior C# Developer", description_text=text)
+        hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
+                ["remote_location_fit"].get("eor_or_contractor_hits") or [])
+        assert hits == [], f"ложное EOR-срабатывание на: {text[:40]}"
+
+
+def test_real_eor_mentions_are_still_detected():
+    """Обратная страховка к фиксу выше: настоящие упоминания обязаны ловиться."""
+    for text in (
+        "Payments are issued in partnership with Remote.com for contractors.",
+        "We hire internationally through an Employer of Record.",
+        "Contract of service through the professional Deel platform.",
+    ):
+        v = make_vacancy(title="Senior C# Developer", description_text=text)
+        hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
+                ["remote_location_fit"].get("eor_or_contractor_hits") or [])
+        assert hits, f"настоящий EOR-сигнал пропущен: {text[:40]}"
+
+
+def test_worldwide_vocabulary_covers_common_phrasings():
+    """Замер 2026-08-05: прежний список ловил 75 вакансий из 9527 — не потому,
+    что таких мало, а потому что формулировок много, а в списке было десять.
+    После расширения — 389."""
+    for text in (
+        "We are hiring anywhere in the world.",
+        "Our globally distributed team works across time zones.",
+        "This is a remote-first company; work from any location.",
+        "We hire regardless of location.",
+    ):
+        v = make_vacancy(title="Senior C# Developer", description_text=text)
+        hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
+                ["remote_location_fit"].get("worldwide_remote_hits") or [])
+        assert hits, f"формулировка не распознана: {text}"
+
+
+def test_marketing_global_does_not_count_as_worldwide_hiring():
+    """«Global leader» и «global team» — маркетинг, а не готовность нанимать
+    откуда угодно. Поэтому все фразы в списке минимум из двух слов."""
+    v = make_vacancy(
+        title="Senior C# Developer",
+        description_text="We are a global leader in payments with a global team of experts.",
+    )
+    hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
+            ["remote_location_fit"].get("worldwide_remote_hits") or [])
+    assert hits == []

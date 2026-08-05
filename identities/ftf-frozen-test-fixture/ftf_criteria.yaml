@@ -27,8 +27,16 @@ weights:
 remote_location_fit:
   worldwide_remote:
     points: 25
+    # Главный признак для подрядчика из третьей страны: компания готова
+    # нанимать откуда угодно. Замер 2026-08-05: прежний список ловил всего 75
+    # вакансий из 9527 — не потому, что таких мало, а потому что формулировок
+    # у этой мысли много, а в списке было десять.
+    #
+    # Все фразы длиной от двух слов: короткие формы вроде "global" дают ложные
+    # срабатывания на "global leader", "global team" и прочем маркетинге.
     keywords:
       - "remote worldwide"
+      - "worldwide remote"
       - "remote - anywhere"
       - "remote anywhere"
       - "work from anywhere"
@@ -36,6 +44,34 @@ remote_location_fit:
       - "globally remote"
       - "international remote"
       - "remote (global)"
+      - "anywhere in the world"
+      - "anywhere in the globe"
+      - "from any country"
+      - "in any country"
+      - "any location in the world"
+      - "no location requirement"
+      - "no geographic restriction"
+      - "no geographical restriction"
+      - "location independent"
+      - "location agnostic"
+      - "we hire globally"
+      - "hiring globally"
+      - "hire from anywhere"
+      - "work from any location"
+      - "fully distributed team"
+      - "globally distributed team"
+      - "distributed worldwide"
+      - "team across the globe"
+      - "any time zone"
+      - "any timezone"
+      - "timezone agnostic"
+      - "regardless of location"
+      - "wherever you are"
+      - "wherever you live"
+      - "live anywhere"
+      - "100% remote worldwide"
+      - "remote first company"
+      - "remote-first company"
   eor_or_contractor_international:
     points: 18
     keywords: []  # заполняется из profile.yaml eor_platforms_signal + слова contractor/1099/freelance
@@ -528,6 +564,22 @@ title_stack_gate:
     - magento
     - umbraco
     - sitecore
+
+# Мягкий штраф за роли, которые человек закрыть может, но шансы получить
+# меньше. Не гейт: вопрос вероятности, а не возможности.
+title_role_penalty:
+  rules:
+    # Подтверждено человеком явно (2026-08-05): «чистый Frontend Developer я
+    # закрою, но опыт в основном фуллстек, там меня вряд ли наймут». Удалять
+    # такие вакансии неправильно — понижаем.
+    - pattern: "front[ -]?end"
+      label: "чистый фронтенд при фуллстек-опыте"
+      points: -8
+      unless:
+        - "full[ -]?stack"
+        - "back[ -]?end"
+        - '\.net'
+        - 'c#'
 
 role_relevance_signal:
   # ПОЛНЫЙ ОТСЕВ (dealbreaker), не просто минус в баллах. Подтверждено

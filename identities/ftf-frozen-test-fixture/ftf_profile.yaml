@@ -253,13 +253,27 @@ ideal_company_traits:
     - "wear many hats"
 
 eor_platforms_signal:
-  # Упоминание одной из этих платформ в вакансии/на карьерной странице —
-  # сильный сигнал, что компания реально готова оформить контрактора вне США.
-  - "Deel"
+  # Упоминание платформы найма — сильный сигнал, что компания реально готова
+  # оформить подрядчика вне своей страны (это +18, самый крупный плюс рубрики).
+  #
+  # ОСТОРОЖНО С КОРОТКИМИ И ОБЩИМИ ФОРМАМИ. Замер 2026-08-05 на базе из 9527
+  # вакансий показал 345 ложных срабатываний:
+  #   * "Multiplier" (266) ловился в "productivity multiplier", "Talent
+  #     Multiplier", "operating as a multiplier" — обычное английское слово;
+  #   * "G-P" (79) ловился внутри немецкого "Mentorin-G-P-rogramm" и подобных.
+  # Тот же класс ошибки, что "LESS" внутри "no less than" и "eor" внутри
+  # "theoretical". Поэтому названия, совпадающие с обычными словами, пишутся
+  # доменом: домен в тексте вакансии однозначен.
+  - "Deel"                      # проверено: 17 срабатываний, все настоящие
   - "Remote.com"
   - "Oyster HR"
   - "Papaya Global"
-  - "Multiplier"
+  - "multiplier.com"            # вместо голого "Multiplier"
   - "Globalization Partners"
-  - "G-P"
+  - "g-p.com"                   # вместо голого "G-P"
   - "Velocity Global"
+  - "Employer of Record"        # общий термин, надёжнее любого бренда
+  - "EOR provider"
+  - "Remofirst"
+  - "Rippling EOR"
+  - "Safeguard Global"

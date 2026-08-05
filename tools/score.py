@@ -1035,6 +1035,79 @@ def _score_contractor_friendliness(text: str, criteria: dict):
     return points, {"points": points, "hits": hits}
 
 
+def _score_personal_market_bonus(vacancy: dict, profile: dict):
+    """Личная надбавка за конкретный рынок.
+
+    ЗАЧЕМ ОТДЕЛЬНЫЙ СИГНАЛ И ПОЧЕМУ ЕГО ЗНАЧЕНИЯ ЖИВУТ ВНЕ РЕПОЗИТОРИЯ.
+    Бывают причины предпочесть страну, которых нет ни в рынке, ни в профиле
+    поиска: налоговое резидентство, пенсионный стаж, семья, планы на переезд.
+    Это обстоятельства КОНКРЕТНОГО человека — они не должны попадать ни в
+    общую машинерию (там им не место по определению), ни в идентичность
+    (её может переиспользовать кто угодно другой).
+
+    Поэтому в профиле идентичности стоит сентинел `local`, а сами страны и
+    веса лежат в Малой Конституции, вне гита. Идентичность лишь объявляет,
+    что такая надбавка может быть.
+
+    Надбавка намеренно МЯГКАЯ: она двигает вакансию вверх в выдаче, но не
+    делает непроходную проходной — гейты отрабатывают раньше и независимо.
+    """
+    bonuses = (profile or {}).get("personal_market_bonus")
+    if not isinstance(bonuses, dict) or not bonuses:
+        return 0, {}
+
+    haystack = " ".join(str(x) for x in (
+        vacancy.get("location_raw") or "",
+        " ".join(vacancy.get("tags") or []),
+    )).lower()
+
+    hits = {}
+    for country, cfg in bonuses.items():
+        if common.normalize_for_matching(country) not in haystack:
+            continue
+        points = cfg.get("points", 0) if isinstance(cfg, dict) else cfg
+        # Часть надбавок имеет смысл только для удалённой работы: «платить
+        # налоги дома» работает, если работать можно откуда угодно.
+        if isinstance(cfg, dict) and cfg.get("remote_only") and not vacancy.get("remote"):
+            continue
+        hits[country] = points
+
+    if not hits:
+        return 0, {}
+    total = sum(hits.values())
+    return total, {"points": total, "hits": hits}
+
+
+def _score_title_role_penalty(title: str, criteria: dict):
+    """Мягкий штраф за роли, которые человек закрыть может, но на которые его
+    возьмут с меньшей вероятностью.
+
+    Не гейт: это вопрос шансов, а не возможности. Реальный случай 2026-08-05:
+    чистый Frontend Developer — работу человек сделает, но опыт у него в
+    основном фуллстек, и в конкуренции с профильными фронтендерами он
+    проигрывает. Выбрасывать такие вакансии неправильно, показывать наравне
+    с профильными — тоже.
+    """
+    cfg = criteria.get("title_role_penalty")
+    if not cfg:
+        return 0, {}
+    title_norm = common.normalize_for_matching(title)
+
+    hits = []
+    points = 0
+    for rule in cfg.get("rules", []):
+        pattern = rule.get("pattern")
+        if not pattern or not re.search(pattern, title_norm, re.IGNORECASE):
+            continue
+        # Исключения: «Fullstack (React)» не должен считаться чистым фронтендом.
+        if any(re.search(x, title_norm, re.IGNORECASE) for x in rule.get("unless", [])):
+            continue
+        hits.append(rule.get("label") or pattern)
+        points += rule.get("points", 0)
+
+    return points, ({"points": points, "hits": hits} if hits else {})
+
+
 def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optional[dict] = None) -> dict:
     criteria = criteria or load_criteria()
     profile = profile or load_profile()
@@ -1055,6 +1128,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     if reputation_needs_review:
         needs_review = True
     age_points, age_bd = _score_company_age(vacancy, criteria)
+    market_points, market_bd = _score_personal_market_bonus(vacancy, profile)
+    title_penalty, title_penalty_bd = _score_title_role_penalty(vacancy.get("title") or "", criteria)
 
     # Три ПОЛНЫХ ОТСЕВА (0% шанс попасть в выдачу), подтверждённых
     # человеком явно 2026-07-30 — не понижение приоритета, а dealbreaker:
@@ -1129,6 +1204,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         + contractor_points
         + reputation_points
         + age_points
+        + market_points
+        + title_penalty
     )
     total = max(0, min(100, round(raw_total)))
 
@@ -1166,6 +1243,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "contractor_friendliness": contractor_bd,
         "company_reputation_signal": reputation_bd,
         "company_age_signal": age_bd,
+        "personal_market_bonus": market_bd,
+        "title_role_penalty": title_penalty_bd,
         "raw_total_before_clamp": raw_total,
     }
 
