@@ -204,6 +204,21 @@ remote_location_fit:
       - "on-site required"
       - "in-office"
       - "hybrid required"
+      # Гибрид и работа из офиса. Найдено 2026-08-05 чтением выдачи: восемь
+      # вакансий с "Hybrid Position", "hybrid working model" и "(WFO)" —
+      # Work From Office. Прежний список содержал "hybrid required", а так
+      # почти никто не пишет.
+      - "hybrid position"
+      - "hybrid role"
+      - "hybrid working model"
+      - "hybrid work model"
+      - "hybrid setup"
+      - "hybrid model"
+      - "work from office"
+      - "(wfo)"
+      - "office-based role"
+      - "days in the office"
+      - "days from the office"
       - "security clearance"
       - "us citizen required"
       - "us citizenship required"
@@ -702,6 +717,19 @@ role_relevance_signal:
     - "polyglot environment"
 
 language_requirement_signal:
+  # Письменности, которые человек читает. Всё остальное — полный отсев:
+  # объявление на иврите или китайском нечитаемо, и перечислять его частые
+  # слова бессмысленно, алфавит виден сразу.
+  #
+  # Найдено 2026-08-05 чтением выдачи: вакансия на иврите стояла на 13-м
+  # месте. Списки слов существовали для пяти европейских языков и другую
+  # письменность не могли поймать в принципе.
+  #
+  # Порог долевой: пара слов на иврите бывает и в англоязычной вакансии
+  # израильской компании (название, адрес), целиком написанное объявление
+  # даёт десятки процентов.
+  readable_scripts: ["latin", "cyrillic"]
+  unreadable_script_threshold: 0.15
   # ПОЛНЫЙ ОТСЕВ (dealbreaker). Подтверждено человеком явно (2026-07-30):
   # владелец говорит только на русском и английском (см. profile.yaml →
   # owner.languages). Явное требование другого языка — например, немецкого

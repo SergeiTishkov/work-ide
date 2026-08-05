@@ -1981,3 +1981,69 @@ def test_a_filled_compensation_range_still_penalises_a_low_offer():
     low_points = score.score_vacancy(low, CRITERIA, profile)["score_breakdown"]["compensation_signal"]["points"]
     fit_points = score.score_vacancy(fit, CRITERIA, profile)["score_breakdown"]["compensation_signal"]["points"]
     assert low_points < fit_points
+
+
+def test_a_posting_in_an_unreadable_script_is_rejected():
+    """Найдено чтением выдачи 2026-08-05: вакансия на иврите стояла на 13-м
+    месте. Списки частых слов существовали для пяти европейских языков и
+    другую письменность поймать не могли в принципе — а алфавит виден сразу."""
+    v = make_vacancy(
+        title="מפתח/ת C#/.NET",
+        location_raw="Anywhere in the World",
+        description_text=(
+            "אנחנו מחפשים מפתח תוכנה לצוות הפיתוח שלנו לפיתוח תחזוקה ושדרוג "
+            "מערכות תוכנה מתקדמות הפועלות מול חומרה בתפקיד תעבוד בשיתוף פעולה "
+            "הדוק עם צוותי הנדסה ופיתוח C# .NET"
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert any("language" in d for d in r["dealbreakers"]), r["dealbreakers"]
+
+
+def test_a_few_foreign_words_do_not_disqualify_an_english_posting():
+    """Порог долевой: израильская компания может назвать себя на иврите в
+    англоязычном объявлении, и это не повод его выбрасывать."""
+    v = make_vacancy(
+        title="Senior .NET Developer",
+        description_text=(
+            "We are סנטריקל, a company based in Tel Aviv. We build enterprise "
+            "software in C# and ASP.NET Core with SQL Server. The team works "
+            "remotely and asynchronously across several time zones, and we are "
+            "looking for an experienced backend engineer to join us."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert not any("language" in d for d in r["dealbreakers"]), r["dealbreakers"]
+
+
+def test_hybrid_and_office_wording_is_a_dealbreaker():
+    """Найдено 2026-08-05: восемь вакансий с «Hybrid Position», «hybrid working
+    model» и «(WFO)» стояли в выдаче. Список содержал «hybrid required» — так
+    почти никто не пишет."""
+    for wording in ("Category: Full time, Hybrid Position",
+                    "We follow a hybrid working model",
+                    "Location - Dubai (WFO)",
+                    "This is an office-based role"):
+        v = make_vacancy(
+            title="Senior .NET Developer",
+            location_raw="Anywhere in the World",
+            description_text=f"C# and ASP.NET Core role. {wording}.",
+        )
+        r = score.score_vacancy(v, CRITERIA, PROFILE)
+        assert r["classification"] == "rejected", f"прошла: {wording}"
+
+
+def test_the_crowdwork_gate_catches_a_reworded_version_of_the_same_platform():
+    """Та же площадка вернулась под другим названием и с переписанным текстом.
+    Гейт, ловящий одну редакцию, ловит редакцию, а не жанр."""
+    v = make_vacancy(
+        title="Freelance Agent Evaluation Engineer",
+        location_raw="Anywhere in the World",
+        description_text=(
+            "Mindrift connects specialists with project-based AI opportunities "
+            "for leading tech companies, focused on testing, evaluating, and "
+            "improving AI systems. You will work with C# and Python."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert any("crowdwork" in d for d in r["dealbreakers"]), r["dealbreakers"]

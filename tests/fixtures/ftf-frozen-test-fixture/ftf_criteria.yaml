@@ -190,6 +190,17 @@ remote_location_fit:
       - "on-site required"
       - "in-office"
       - "hybrid required"
+      - "hybrid position"
+      - "hybrid role"
+      - "hybrid working model"
+      - "hybrid work model"
+      - "hybrid setup"
+      - "hybrid model"
+      - "work from office"
+      - "(wfo)"
+      - "office-based role"
+      - "days in the office"
+      - "days from the office"
       - "security clearance"
       - "us citizen required"
       - "us citizenship required"
@@ -903,6 +914,8 @@ role_relevance_signal:
     - "polyglot environment"
 
 language_requirement_signal:
+  readable_scripts: ["latin", "cyrillic"]
+  unreadable_script_threshold: 0.15
   # ПОЛНЫЙ ОТСЕВ (dealbreaker). Подтверждено человеком явно (2026-07-30):
   # человек говорит только на русском и английском (см. profile.yaml →
   # owner.languages). Явное требование другого языка — например, немецкого
@@ -984,6 +997,12 @@ language_requirement_signal:
   # Маркеры подобраны так, чтобы не встречаться в английском тексте:
   # это служебные слова объявлений о работе, а не общая лексика.
   foreign_language_posting_indicators:
+    - language: dutch
+      threshold: 4
+      markers: [wil jij, 'jouw ', 'onze ', wij zoeken, vacature, werkzaamheden, functie-eisen, ervaring
+    met, bij ons, wat wij bieden, sollicitatie, medewerker, bedrijf, opdrachtgevers,
+  dienstverband, ' je ', ' het ', ' van de ', ' in de ', ' voor de ', ' met een ',
+  ' zijn ', ' worden ', ' ontwikkelaar ']
     - language: spanish
       threshold: 3
       markers: ["buscamos", "responsabilidades", "conocimientos", "ofrecemos",
@@ -1383,6 +1402,12 @@ ai_training_crowdwork_gate:
   # себе не напишет. Короткие ("ai", "training") поймали бы половину рынка.
   keywords:
     - "not a traditional software engineering role"
+    - "project-based ai opportunities"
+    - "agent evaluation"
+    - "evaluating and improving ai"
+    - "testing, evaluating, and improving ai"
+    - "improving ai systems"
+    - "ai training data"
     - "reinforcement learning environments"
     - "ai training project"
     - "ai trainer"

@@ -956,14 +956,75 @@ def _score_language_fit(text: str, criteria: dict):
         if len(hits) >= entry.get("threshold", 3):
             foreign_language_hits[entry["language"]] = hits
 
-    gate_triggered = bool(explicit_hits) or german_market_flagged or bool(foreign_language_hits)
+    # Письменность надёжнее списка слов. Объявление на иврите, арабском,
+    # китайском или греческом нечитаемо для того, кто знает только латиницу и
+    # кириллицу, — и выяснять это перечислением частых слов бессмысленно:
+    # алфавит виден сразу и целиком.
+    #
+    # Реальная находка 2026-08-05 (чтение выдачи глазами): вакансия
+    # "מפתח/ת C#/.NET — מערכות תוכנה-חומרה" стояла в выдаче на 13-м месте.
+    # Списки слов существовали для пяти европейских языков, и ни один из них
+    # не мог поймать другую письменность в принципе.
+    script_detail = _check_unreadable_script(text, cfg)
+
+    gate_triggered = (bool(explicit_hits) or german_market_flagged
+                      or bool(foreign_language_hits) or bool(script_detail))
     return gate_triggered, {
         "gate_triggered": gate_triggered,
         "explicit_requirement_hits": explicit_hits,
         "german_market_indicator_hits": german_market_hits,
         "german_market_flagged": german_market_flagged,
         "foreign_language_posting_hits": foreign_language_hits,
+        "unreadable_script": script_detail,
     }
+
+
+# Диапазоны кодов письменностей, которые встречаются в объявлениях о работе.
+# Латиница и кириллица сюда не входят: их читает владелец любой идентичности,
+# где английский или русский указан в языках.
+_SCRIPT_RANGES = (
+    ("hebrew", 0x0590, 0x05FF),
+    ("arabic", 0x0600, 0x06FF),
+    ("greek", 0x0370, 0x03FF),
+    ("thai", 0x0E00, 0x0E7F),
+    ("devanagari", 0x0900, 0x097F),
+    ("hangul", 0xAC00, 0xD7AF),
+    ("cjk", 0x4E00, 0x9FFF),
+    ("kana", 0x3040, 0x30FF),
+)
+
+
+def _check_unreadable_script(text: str, cfg: dict):
+    """Доля текста в письменности, которой человек не читает.
+
+    Порог долевой, а не абсолютный: одно-два слова на иврите может содержать
+    и англоязычная вакансия израильской компании (название, адрес). Целиком
+    написанное объявление даёт долю в десятки процентов.
+    """
+    readable = set(cfg.get("readable_scripts") or ["latin", "cyrillic"])
+    threshold = cfg.get("unreadable_script_threshold", 0.15)
+
+    counts = {}
+    letters = 0
+    for char in text:
+        if not char.isalpha():
+            continue
+        letters += 1
+        code = ord(char)
+        for name, low, high in _SCRIPT_RANGES:
+            if low <= code <= high:
+                counts[name] = counts.get(name, 0) + 1
+                break
+
+    if letters < 80:
+        return None
+    for name, count in counts.items():
+        if name in readable:
+            continue
+        share = count / letters
+        if share >= threshold:
+            return {"script": name, "share": round(share, 3)}
+    return None
 
 
 def _check_industry_dealbreaker(text: str, criteria: dict):
