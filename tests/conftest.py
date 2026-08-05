@@ -90,12 +90,33 @@ def _no_test_writes_into_real_folders():
     before = snapshot()
     yield
     after = snapshot()
+
+    appeared_all = []
     for path, names_before in before.items():
         names_after = after.get(path)
         if names_before is None and names_after is None:
             continue
-        appeared = sorted(set(names_after or []) - set(names_before or []))
-        assert not appeared, (
-            f"тесты создали {appeared} в настоящей папке {path}. "
-            "Изолируйте и DATA_ROOT, и REPORTS_ROOT — см. tests/test_identity_isolation.py"
-        )
+        for name in sorted(set(names_after or []) - set(names_before or [])):
+            appeared_all.append((path, name))
+
+    # Сначала УБИРАЕМ следы фикстуры, потом уже ругаемся.
+    #
+    # Обнаружения оказалось мало. 2026-08-04 эта страховка честно уронила
+    # прогон, причину я устранил — а сам ftf_latest.md остался лежать в папке
+    # отчётов, и человек нашёл его через сутки. Мусор в единственном месте,
+    # куда человек реально смотрит, недопустим, даже если о нём предупредили.
+    cleaned = []
+    try:
+        import clean_fixture_artifacts
+        cleaned = clean_fixture_artifacts.clean()
+    except Exception as exc:  # noqa: BLE001 — уборка не должна прятать причину
+        cleaned = [f"(уборка не удалась: {type(exc).__name__})"]
+
+    # Ругаемся всё равно: запись в реальные папки — дефект теста, и он должен
+    # быть виден, даже когда последствия уже подчищены.
+    assert not appeared_all, (
+        "тесты создали в настоящих папках: "
+        + ", ".join(f"{name} в {path}" for path, name in appeared_all)
+        + (f". Убрано автоматически: {cleaned}." if cleaned else ".")
+        + " Изолируйте и DATA_ROOT, и REPORTS_ROOT — см. tests/test_identity_isolation.py"
+    )
