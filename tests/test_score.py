@@ -1795,3 +1795,31 @@ def test_reputation_red_flags_cost_points_not_only_a_review_flag():
     clean_pts = score._score_company_reputation(clean, CRITERIA)[0]
     flagged_pts = score._score_company_reputation(flagged, CRITERIA)[0]
     assert flagged_pts < clean_pts, f"{flagged_pts} не меньше {clean_pts}"
+
+
+def test_dotnet_in_the_title_is_recognised_as_the_core_stack():
+    """Замер 2026-08-05: 754 вакансии с .NET в заголовке, отклонены ВСЕ, из
+    них 325 — с формулировкой «не .NET/JS роль». Причина: голого ".NET" не
+    было ни в одном списке, все ключи длиннее (".NET Core", "ASP.NET", "C#"),
+    и заголовок «Senior .NET Backend Developer» не совпадал ни с одним."""
+    for title in ("Senior .NET Backend Developer", ".Net Backend Engineer",
+                  "Dotnet Developer", "Senior .NET Engineer"):
+        v = make_vacancy(title=title, location_raw="Anywhere in the World",
+                         description_text="Worldwide remote contract position.")
+        r = score.score_vacancy(v, CRITERIA, PROFILE)
+        assert not any(d.startswith("stack:") for d in r["dealbreakers"]), \
+            f"'{title}' отклонена как не-дотнет: {r['dealbreakers']}"
+        assert r["score_breakdown"]["stack_fit"]["core_hits"], title
+
+
+def test_a_dot_net_email_domain_is_not_a_dotnet_vacancy():
+    """Почему регулярка, а не подстрока: ".net" есть в любом почтовом домене.
+    Реальная запись с Hacker News, приехавшая как заголовок вакансии:
+    "Please email me ... (firstname)@harnly.net"."""
+    v = make_vacancy(
+        title="Please email me so I know which role (firstname)@harnly.net",
+        description_text="Reach out about roles at our company.",
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert not r["score_breakdown"]["stack_fit"]["core_hits"], \
+        "почтовый домен засчитан как .NET"

@@ -108,6 +108,26 @@ def _vacancy_text(vacancy: dict) -> str:
     return common.normalize_for_matching(" \n ".join(parts))
 
 
+def _matches_patterns(text: str, patterns: list) -> list:
+    """Совпадение по регулярному выражению, а не по подстроке.
+
+    Нужно там, где название технологии невозможно записать безопасной
+    подстрокой. Канонический случай — ".NET": подстрока ".net" есть в любом
+    почтовом домене ("(firstname)@harnly.net" — реальная запись с Hacker
+    News), поэтому её нельзя просто добавить в список ключей. А без неё
+    заголовок "Senior .NET Backend Developer" не совпадает НИ С ОДНИМ ключом
+    ядра, потому что все они длиннее (".NET Core", "ASP.NET", "C#").
+
+    Цена ошибки измерена 2026-08-05: 754 вакансии с .NET в заголовке,
+    отклонены все до единой, 325 из них — с формулировкой "не .NET/JS роль".
+    """
+    found = []
+    for pattern in patterns or []:
+        if re.search(pattern, text, re.IGNORECASE) and pattern not in found:
+            found.append(pattern)
+    return found
+
+
 def _matches(text: str, keywords: list) -> list:
     found = []
     for kw in keywords or []:
@@ -560,6 +580,10 @@ def _score_stack_fit(text: str, criteria: dict, profile: dict):
     cfg = criteria["stack_fit"]
     text, noise_markers = _strip_stack_noise_sections(text, criteria)
     core_hits = _matches(text, profile["tech_stack"].get("core", []))
+    # Технологии, чьё название невозможно записать безопасной подстрокой —
+    # см. _matches_patterns. Без этого ".NET Developer" в заголовке давал
+    # ровно ноль баллов за стек.
+    core_hits += _matches_patterns(text, profile["tech_stack"].get("core_patterns", []))
     strong_hits = _matches(text, profile["tech_stack"]["strong"])
     familiar_hits = _matches(text, profile["tech_stack"]["familiar"])
     raw = (
@@ -640,6 +664,8 @@ def _check_stack_relevance(text: str, core_hits: list, strong_hits: list, criter
     # (Docker/Azure/HTML/CSS есть почти в любой вакансии — по ним нельзя
     # судить, что роль подходит .NET/JS-разработчику).
     primary_language_hits = _matches(text, cfg.get("primary_language_keywords", []))
+    primary_language_hits += _matches_patterns(
+        text, cfg.get("primary_language_patterns", []))
 
     relevant = bool(primary_language_hits) or data_pipeline_relevant or bool(tech_agnostic_hits)
     return relevant, {
