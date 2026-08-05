@@ -166,31 +166,43 @@ def test_single_active_identity_used_silently(monkeypatch, tmp_path):
     assert identity.resolve_identity() == "onlyone"
 
 
-def test_several_active_without_default_refuses(monkeypatch, tmp_path):
+def test_several_identities_without_a_choice_refuses(monkeypatch, tmp_path):
     """Молчаливый выбор 'не той' идентичности — ровно тот отказ, ради которого
-    вся система и построена. Лучше отказать и спросить."""
+    вся система и построена. Лучше отказать и спросить.
+
+    Источник истины — ПАПКИ в local-identities/, а не файл-реестр: реестр
+    умеет расходиться с диском, папки нет.
+    """
     monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
-    lc = tmp_path / "local-constitution"
-    lc.mkdir()
-    (lc / "active.yaml").write_text(
-        "active_identities:\n  - prefix: aaaa\n  - prefix: bbbb\n", encoding="utf-8"
-    )
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
+    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "nonexistent")
+    monkeypatch.setattr(identity, "list_identities", lambda *a, **k: ["aaaa", "bbbb"])
 
     with pytest.raises(identity.IdentityError) as exc:
         identity.resolve_identity()
     assert "aaaa" in str(exc.value) and "bbbb" in str(exc.value)
 
 
+def test_a_single_identity_is_chosen_without_asking(monkeypatch, tmp_path):
+    """Одна папка — вопроса нет: неоднозначности не существует."""
+    monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
+    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "nonexistent")
+    monkeypatch.setattr(identity, "list_identities", lambda *a, **k: ["only"])
+    assert identity.resolve_identity() == "only"
+
+
 def test_no_identity_at_all_refuses_with_onboarding_hint(monkeypatch, tmp_path):
     monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "nonexistent")
+
+    monkeypatch.setattr(identity, "list_identities", lambda *a, **k: [])
 
     with pytest.raises(identity.IdentityError) as exc:
         identity.resolve_identity()
     message = str(exc.value)
     assert "ONBOARDING" in message.upper()
-    assert "--identity" in message
+    # Новичку нужно не «укажите --identity», а «вот шаблоны, вот как клонировать».
+    assert "templates.py clone" in message
+    assert "blank" in message
 
 
 # --- Активация ------------------------------------------------------------
