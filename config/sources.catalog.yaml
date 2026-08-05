@@ -156,6 +156,23 @@ sources:
     caveats: "Записи без распознанной компании отбрасываются — их нечем дедуплицировать."
 
 
+  - name: 4dayweek
+    kind: json_api
+    remote_only: false
+    params_schema:
+      categories: "категории площадки, для разработки — engineering"
+      pages: "страниц по 100 записей на категорию"
+    yield_notes: >
+      Замер 2026-08-05: 23 182 вакансии на площадке, ~21% engineering.
+      Единственный источник проекта, который ищет по ОСИ НАГРУЗКИ, а не по
+      стеку: поле schedule_type приходит структурным (4_day_week,
+      compressed_week, 9_day_fortnight, flexible_hours…).
+    caveats: >
+      В списочном ответе нет текста описания — гейты, читающие описание,
+      работают по заголовку и тегам. Зато режим работы приходит доказанным,
+      а не угаданным из текста.
+
+
   - name: ats
     kind: ats_boards
     remote_only: false

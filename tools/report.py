@@ -220,6 +220,42 @@ def _format_link_check_stats(stats: Optional[dict]) -> str:
     )
 
 
+def _source_usefulness(vacancies: dict) -> str:
+    """Сколько вакансий источник принёс и сколько из них дошло до выдачи.
+
+    ЗАЧЕМ. Реестр источников хранит ОБЪЁМ, и по нему источники выглядят
+    совершенно иначе, чем они есть. Замер 2026-08-05: devitjobs дал 4033
+    записи и НОЛЬ в выдаче, а weworkremotely с его 251 записью дал больше
+    половины всех кандидатов. Объём без пользы — это только время прогона и
+    раздутая база.
+
+    Поэтому считаем «выход на 100 записей». Источник с нулём в выдаче не
+    отключается автоматически: у редких источников выдача появляется рывками,
+    и одно решение по одному прогону было бы поспешным. Но цифра должна быть
+    перед глазами.
+    """
+    stats = {}
+    for v in vacancies.values():
+        if v.get("duplicate_of"):
+            continue
+        src = v.get("source") or "?"
+        entry = stats.setdefault(src, {"total": 0, "shortlist": 0})
+        entry["total"] += 1
+        if (v.get("computed") or {}).get("classification") in (
+                "hot_lead", "worth_a_look", "long_shot"):
+            entry["shortlist"] += 1
+
+    if not stats:
+        return "_нет данных_"
+
+    rows = sorted(stats.items(), key=lambda kv: -kv[1]["shortlist"])
+    lines = ["| Источник | Записей | В выдаче | На 100 записей |", "|---|---:|---:|---:|"]
+    for name, s in rows:
+        rate = (100.0 * s["shortlist"] / s["total"]) if s["total"] else 0.0
+        lines.append(f"| {name} | {s['total']} | {s['shortlist']} | {rate:.1f} |")
+    return chr(10).join(lines)
+
+
 def build_report_markdown(vacancies: dict, companies: dict, state: dict,
                           criteria: Optional[dict] = None) -> str:
     import score
@@ -308,6 +344,13 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         "## 📡 Здоровье источников",
         "",
         "\n".join(source_lines) or "_нет данных_",
+        "",
+        "## 📈 Польза источников",
+        "",
+        "Объём и польза — разные вещи. Источник, приносящий тысячи записей и "
+        "ноль кандидатов, стоит только времени прогона.",
+        "",
+        _source_usefulness(vacancies),
         "",
         "## 🔗 Проверка ссылок",
         "",

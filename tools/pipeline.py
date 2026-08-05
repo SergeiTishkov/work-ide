@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
+import fetch_4dayweek  # noqa: E402
 import fetch_arbeitnow  # noqa: E402
 import fetch_ats  # noqa: E402
 import fetch_himalayas  # noqa: E402
@@ -55,6 +56,7 @@ FETCHERS = {
     "himalayas": fetch_himalayas.fetch,
     "ats": fetch_ats.fetch,
     "linkedin": fetch_linkedin.fetch,
+    "4dayweek": fetch_4dayweek.fetch,
     "devitjobs": fetch_devitjobs.fetch,
     "jobs_ch": fetch_jobs_ch.fetch,
     "mycareersfuture": fetch_mycareersfuture.fetch,
