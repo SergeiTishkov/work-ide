@@ -1023,8 +1023,17 @@ legacy_enterprise_signal:
     - "xslt"
     - "crystal reports"
     - "ssrs"
-    - "ssis"
-    - "ssas"
+    # НЕ "ssis": это подстрока в "ai-assisted", "assist", "assistance".
+    # Замер 2026-08-05: 1057 ложных срабатываний, и они подняли на первое
+    # место выдачи вакансию, где никакого SSIS нет. Тот же класс ошибки, что
+    # "LESS" внутри "no less than" и "Multiplier" внутри "productivity
+    # multiplier" — короткий акроним обязан писаться полностью.
+    - "sql server integration services"
+    - "ssis package"
+    # НЕ "ssas": ловится в португальском "nossas" (наши). Источники отдают
+    # тексты на многих языках, и трёхбуквенный акроним рано или поздно
+    # совпадёт с чужим словом.
+    - "sql server analysis services"
     - "team foundation server"
     - "tfs"
     - "subversion"

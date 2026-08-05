@@ -176,6 +176,42 @@ sources:
     endpoint: "https://api.smartrecruiters.com/v1/companies/<company>/postings"
     measured: "HTTP 200, есть totalFound и пагинация"
 
+
+  - name: 4dayweek
+    status: implemented
+    implemented_at: "2026-08-05"
+    kind: json
+    endpoint: "https://4dayweek.io/api/jobs"
+    measured: "23 182 вакансии на площадке, ~21% engineering"
+    measured_after_wiring: "200 записей за 2 страницы категории engineering"
+    note: >
+      Единственный источник, который ищет по ОСИ НАГРУЗКИ, а не по стеку.
+      schedule_type приходит структурным полем (4_day_week, compressed_week,
+      9_day_fortnight, flexible_hours) — это доказанный признак режима, а не
+      догадка по тексту.
+
+  - name: arc_dev
+    status: pending
+    priority: 2
+    kind: html_next_data
+    endpoint: "https://arc.dev/remote-jobs"
+    measured: >
+      HTTP 200, 30 вакансий в __NEXT_DATA__. Поля исключительно уместные для
+      этого поиска: clientTimeZoneRestriction, overlapHours, jobType,
+      minHourlyRate/maxHourlyRate, experienceLevel.
+    note: >
+      Маркетплейс контрактной удалённой работы — та же категория, что Proxify и
+      Lemon.io, которые дают непропорционально много в выдаче (3 из 18 при двух
+      компаниях из тысячи в базе). Парсинг встроенного JSON, а не вёрстки, —
+      надёжнее HTML, но всё ещё зависит от чужой структуры.
+
+  - name: gun_io
+    status: rejected
+    checked: "2026-08-05"
+    reason: >
+      HTTP 200, но вакансий на странице нет: биржа показывает их только после
+      регистрации. Парсить нечего.
+
   # --- Отклонены: проверено, чтобы не проверять снова -----------------------
 
   - name: eures

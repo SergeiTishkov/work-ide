@@ -1505,3 +1505,49 @@ def test_residency_stated_without_the_word_only():
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert r["classification"] == "rejected"
     assert any(d.startswith("location:") for d in r["dealbreakers"])
+
+
+def test_short_legacy_acronyms_do_not_match_ordinary_words():
+    """Замер 2026-08-05: «ssis» дал 1057 ложных срабатываний — он подстрока в
+    «ai-assisted» и «assistance» — и поднял на первое место выдачи вакансию,
+    где никакого SSIS нет. «ssas» ловился в португальском «nossas».
+
+    Ровно тот класс ошибки, что «LESS» внутри «no less than» и «Multiplier»
+    внутри «productivity multiplier». Короткий акроним пишется полностью."""
+    for text in (
+        "We use AI as an assisted tooling layer for the team.",
+        "Providing assistance to customers and internal teams.",
+        "Nossas lojas físicas estão em todo o país.",
+    ):
+        v = make_vacancy(title="Senior C# Developer", description_text=text)
+        hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
+                ["legacy_enterprise_signal"].get("hits") or [])
+        assert "ssis" not in hits and "ssas" not in hits, f"ложный legacy-сигнал на: {text[:40]}"
+
+
+def test_real_legacy_stack_is_detected():
+    """Обратная страховка: никто не пишет «у нас легаси», но старый стек в
+    требованиях виден — и говорит о характере работы точнее слов о культуре."""
+    v = make_vacancy(
+        title="Senior C# Developer",
+        description_text=(
+            "Maintaining applications built with WCF services, Web Forms and MVC. "
+            "Reporting via Crystal Reports and SSRS. Source control in TFS."
+        ),
+    )
+    hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
+            ["legacy_enterprise_signal"].get("hits") or [])
+    assert len(hits) >= 3, f"старый стек не распознан: {hits}"
+
+
+def test_engineering_support_role_counts_as_legacy_signal():
+    """Саппорт — плюс для этого поиска: поддержка работающей системы это ровно
+    тот характер работы, который ищется. Клиентский саппорт при этом остаётся
+    в дисквалификаторах профессий."""
+    v = make_vacancy(
+        title="Application Support Engineer",
+        description_text="Production support for our C# platform, incident resolution, bug fixing.",
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] != "rejected"
+    assert (r["score_breakdown"]["legacy_enterprise_signal"].get("hits") or [])
