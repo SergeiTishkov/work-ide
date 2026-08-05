@@ -568,6 +568,16 @@ def _score_stack_fit(text: str, criteria: dict, profile: dict):
         + len(familiar_hits) * cfg["points_per_familiar_keyword"]
     )
     points = min(raw, cfg["cap"])
+    # Глубина совпадения важнее широты перечня. Замер 2026-08-05: вакансия на
+    # чистом C#/ASP.NET набирала 7 баллов за стек, а объявление кадрового
+    # агентства, перечислившее TypeScript, JavaScript, React, HTML и CSS, —
+    # 14. Формула "балл за каждое совпадение" систематически поднимает наверх
+    # тех, кто перечисляет технологии списком, над теми, у кого стек ровно
+    # тот, который нужен. Поэтому без единого core-совпадения стек не может
+    # набрать больше, чем даёт настоящее попадание в ядро.
+    cap_no_core = cfg.get("cap_when_no_core")
+    if cap_no_core is not None and not core_hits:
+        points = min(points, cap_no_core)
     breakdown = {
         "points": points,
         "core_hits": core_hits,
@@ -801,6 +811,61 @@ def _check_industry_dealbreaker(text: str, criteria: dict):
     }
 
 
+def _check_mobile_role(text: str, title: str, criteria: dict):
+    """Мобильная разработка за нейтральным заголовком — полный отсев.
+
+    Тот же класс, что и `_check_infrastructure_role`: заголовок говорит
+    "Lead Full-stack Developer", а продукт — приложение на React Native и
+    Expo, и вся работа состоит в нём. Гейт заголовка такое не видит.
+
+    Порог обязателен: обычная веб-вакансия может упомянуть мобильное
+    приложение среди прочих продуктов компании. Срез рекламных блоков —
+    тоже: перечни стеков кадровых агентств содержат и React Native, и
+    Flutter, из-за чего без него под гейт попадали "Senior Vue Developer" и
+    "Senior Graphic Designer" от Lemon.io.
+    """
+    cfg = criteria.get("mobile_role_gate")
+    if not cfg:
+        return False, {}
+    text, _ = _strip_stack_noise_sections(text, criteria)
+    hits = _matches(common.normalize_for_matching(title) + " " + text,
+                    cfg.get("keywords", []))
+    threshold = cfg.get("threshold_hits", 2)
+    triggered = len(hits) >= threshold
+    return triggered, {
+        "gate_triggered": triggered,
+        "hits": hits,
+        "threshold": threshold,
+    }
+
+
+def _check_ai_training_crowdwork(text: str, criteria: dict):
+    """Краудворк по обучению ИИ, замаскированный под инженерную вакансию.
+
+    Отдельный жанр, появившийся на бордах в 2024–2026 годах: площадка
+    набирает разработчиков не строить софт, а порождать обучающие данные —
+    писать эталонные решения, размечать, оценивать ответы модели, собирать
+    RL-окружения. Формально это «Senior Software Engineer», по сути —
+    сдельная подработка без проекта, команды и продукта.
+
+    Такие объявления систематически побеждают в скоринге, и не случайно:
+    они перечисляют все языки сразу («JavaScript, Python, Go, C++, Ruby»),
+    честно пишут «no set schedules» (читается как низкая нагрузка) и почти
+    всегда указывают почасовую ставку. Замер 2026-08-05: четыре из девяти
+    верхних позиций выдачи, включая первую.
+
+    Гейт, а не штраф: работа со сдельной оплатой за задачу — не то, что
+    ищет человек с постоянным местом, и никакая сумма баллов этого не
+    компенсирует. Маркеры намеренно длинные: короткие («ai», «training»)
+    поймали бы половину рынка.
+    """
+    cfg = criteria.get("ai_training_crowdwork_gate")
+    if not cfg:
+        return False, {}
+    hits = _matches(text, cfg.get("keywords", []))
+    return bool(hits), {"gate_triggered": bool(hits), "hits": hits}
+
+
 def _score_legacy_enterprise(text: str, criteria: dict):
     cfg = criteria["legacy_enterprise_signal"]
     hits = _matches(text, cfg["keywords"])
@@ -1000,6 +1065,20 @@ def _score_company_reputation(vacancy: dict, criteria: dict):
     if red_flags:
         detail["red_flags"] = red_flags
         needs_review = True
+        # Красный флаг обязан стоить баллов, а не только пометки. Реальный
+        # случай 2026-08-05: платформа с отзывами "late payments" и
+        # "unpredictable work availability" получала +14 за рейтинг 3.5 и
+        # work-life balance 4.0 — и выходила на первое место в выдаче. Для
+        # подрядчика задержка оплаты — не нюанс, а суть сделки: пометки
+        # «посмотрите внимательно» тут недостаточно.
+        per_flag = cfg.get("red_flag_points", 0)
+        if per_flag:
+            penalty = per_flag * len(red_flags)
+            floor = cfg.get("red_flag_penalty_cap")
+            if floor is not None:
+                penalty = max(penalty, floor)
+            points += penalty
+            detail["red_flag_penalty"] = penalty
 
     detail["points"] = points
     return points, detail, needs_review
@@ -1230,6 +1309,24 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         dealbreakers.append(
             "industry: отрасль, которую этот поиск избегает "
             f"({', '.join(industry_bd['hits'][:4])})"
+        )
+
+    mobile_role, mobile_bd = _check_mobile_role(text, vacancy.get("title") or "", criteria)
+    if mobile_bd:
+        role_relevance_bd["mobile_role_gate"] = mobile_bd
+    if mobile_role:
+        dealbreakers.append(
+            "role: mobile app development despite a neutral title "
+            f"({', '.join(mobile_bd['hits'][:4])})"
+        )
+
+    crowdwork, crowdwork_bd = _check_ai_training_crowdwork(text, criteria)
+    if crowdwork_bd:
+        role_relevance_bd["ai_training_crowdwork_gate"] = crowdwork_bd
+    if crowdwork:
+        dealbreakers.append(
+            "role: AI-training crowdwork, not a software engineering job "
+            f"({', '.join(crowdwork_bd['hits'][:3])})"
         )
 
     language_mismatch, language_bd = _score_language_fit(text, criteria)

@@ -409,6 +409,13 @@ stack_fit:
   points_per_strong_keyword: 2
   points_per_familiar_keyword: 1
   cap: 15
+  # Потолок для случая, когда ни одна технология ЯДРА не названа. Замер
+  # 2026-08-05: вакансия на чистом C#/ASP.NET получала за стек 7 баллов, а
+  # объявление агентства, перечислившее TypeScript, JavaScript, React, HTML и
+  # CSS, — 14. Балл за каждое совпадение вознаграждает длину перечня, а не
+  # попадание в стек, и раз за разом поднимает наверх тех, кто перечисляет
+  # технологии списком. Профильный стек обязан выигрывать у широкого.
+  cap_when_no_core: 8
 
   # "Стековый спам": блоки, перечисляющие все технологии мира ради попадания
   # в любой поиск. Реальный найденный случай 2026-07-31: у Lemon.io в конце
@@ -724,6 +731,27 @@ role_relevance_signal:
   # override снимал гейт — хотя это заведомо не роли рядового разработчика
   # (go-to-market операции, пресейл-архитектура, менеджмент людей).
   hard_wrong_profession_title_patterns:
+    # QA и тестирование — отдельная профессия. Слово "engineer" в заголовке
+    # снимало мягкий гейт, поэтому здесь, в жёстком списке. Реальная жалоба
+    # человека 2026-08-05: "Senior QA Engineer @ Cortes 23 - мусор". В CV
+    # семь лет разработки и ни одной роли в тестировании.
+    - '\bqa\b'
+    - "quality assurance"
+    - "test engineer"
+    - '\bsdet\b'
+    - "engineer in test"
+    - '\btester\b'
+    - "test automation"
+    # Мобильная разработка — тоже другая профессия. React Native выглядит
+    # похоже на React, но опыта нет ни одного дня, а конкуренция на удалённые
+    # мобильные роли высокая: шанс тот же нулевой.
+    - "react native"
+    - '\bios\b'
+    - '\bandroid\b'
+    - "mobile engineer"
+    - "mobile developer"
+    - "mobile application"
+    - '\bflutter\b'
     - "\\bgtm\\b"
     - "go[- ]to[- ]market"
     - "operations process"
@@ -1216,6 +1244,13 @@ compensation_signal:
   # диапазон таргета берётся из profile.yaml goal.target_compensation
 
 company_reputation_signal:
+  # Цена красного флага в баллах, а не только пометка "проверьте вручную".
+  # Реальный случай 2026-08-05: площадка с отзывами "late payments" и
+  # "unpredictable work availability" получала +14 за рейтинг 3.5 и
+  # work-life balance 4.0 и выходила на первое место выдачи. Для подрядчика
+  # задержка оплаты — не нюанс, а суть сделки.
+  red_flag_points: -8
+  red_flag_penalty_cap: -20   # ниже этого штраф не опускается
   # Репутация работодателя по внешним источникам (Glassdoor, Indeed reviews,
   # Trustpilot, отзывы на профильных площадках). КРИТИЧНО именно для этого
   # проекта: цель — спокойное место с хорошим work-life balance, а это ровно
@@ -1317,3 +1352,67 @@ classification_thresholds:
   long_shot: 8
   # ниже long_shot -> low_priority
   # наличие hard dealbreaker keyword -> статус "rejected" независимо от очков
+
+ai_training_crowdwork_gate:
+  # Жанр, появившийся на бордах в 2024-2026: площадка нанимает разработчиков
+  # не строить софт, а производить обучающие данные для моделей — писать
+  # эталонные решения, размечать, оценивать ответы, собирать RL-окружения.
+  # Заголовок при этом обычный: "Senior Software Engineer".
+  #
+  # Почему это гейт, а не штраф: сдельная работа без проекта, команды и
+  # продукта — не то, ради чего человек ищет постоянное место. Замер
+  # 2026-08-05: такие объявления заняли четыре из девяти верхних позиций,
+  # включая первую, потому что перечисляют все языки сразу, пишут "no set
+  # schedules" (читается как низкая нагрузка) и указывают почасовую ставку.
+  #
+  # Маркеры длинные и однозначные: одного достаточно для отсева, поэтому
+  # каждый обязан быть таким, который добросовестная продуктовая компания о
+  # себе не напишет. Короткие ("ai", "training") поймали бы половину рынка.
+  keywords:
+    - "not a traditional software engineering role"
+    - "reinforcement learning environments"
+    - "ai training project"
+    - "ai trainer"
+    - "ai tutor"
+    - "help train and improve"
+    - "train and improve next-generation"
+    - "training data for ai"
+    - "improve ai models"
+    - "ai model's ability"
+    - "no minimum time or task commitments"
+    - "no minimum time commitment"
+    - "connects specialists with ai projects"
+    - "rate ai responses"
+    - "evaluate model responses"
+    - "rate model responses"
+    - "annotate training data"
+    - "data labeling project"
+
+mobile_role_gate:
+  # Мобильная разработка за нейтральным заголовком. Реальная находка
+  # 2026-08-05: "Lead Full-stack Developer (Full-Time Remote Contractor)" @
+  # Khibraty — по описанию это существующее приложение на React Native и
+  # Expo, вся работа внутри него. Гейт заголовка такое не видит, как не
+  # видел DevOps за нейтральным заголовком до infrastructure_role_gate.
+  #
+  # Порог два: обычная веб-вакансия может упомянуть мобильное приложение
+  # среди продуктов компании. Рекламные блоки кадровых агентств срезаются
+  # тем же механизмом, что и в оценке стека — иначе перечень "React Native,
+  # Flutter, ..." отправлял бы в отсев вообще всё от Lemon.io.
+  #
+  # Слова длинные: "expo" отброшено намеренно, оно является подстрокой
+  # "exposure" и "export" (тот же класс ошибки, что "java" в "javascript").
+  threshold_hits: 2
+  keywords:
+    - "react native"
+    - "app store"
+    - "google play"
+    - "flutter"
+    - "swiftui"
+    - "xcode"
+    - "testflight"
+    - "ios and android"
+    - "android and ios"
+    - "mobile application"
+    - "native app"
+    - "mobile app"

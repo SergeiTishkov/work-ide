@@ -1682,3 +1682,116 @@ def test_analytics_engineer_is_not_caught_by_the_analyst_patterns():
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert not any(d.startswith("role:") for d in r["dealbreakers"])
+
+
+def test_ai_training_crowdwork_is_rejected_however_engineering_the_title_looks():
+    """Замер 2026-08-05: четыре из девяти верхних позиций выдачи занимали
+    площадки, нанимающие разработчиков производить обучающие данные, а не
+    строить софт. Заголовки при этом обычные — «Senior Software Engineer»,
+    «Frontend Software Engineer». Они выигрывали закономерно: перечисляют
+    все языки сразу, пишут «no set schedules» (читается как низкая нагрузка)
+    и указывают почасовую ставку."""
+    cases = [
+        ("Senior Software Engineer",
+         "Open-ended contract with no minimum time or task commitments. "
+         "Help advance AI research. We work with C# and TypeScript."),
+        ("Frontend Software Engineer",
+         "This is not a traditional software engineering role. Instead of building "
+         "production applications you will help train and improve next-generation "
+         "AI systems. TypeScript and CSS required."),
+        ("Open Source Contributor",
+         "You will create Reinforcement Learning Environments which test an AI "
+         "model's ability to solve software workflows using C# and Python."),
+    ]
+    for title, description in cases:
+        v = make_vacancy(title=title, location_raw="Anywhere in the World",
+                         description_text=description + " Worldwide remote.")
+        r = score.score_vacancy(v, CRITERIA, PROFILE)
+        assert r["classification"] == "rejected", f"прошла: {title}"
+        assert any("crowdwork" in d for d in r["dealbreakers"]), r["dealbreakers"]
+
+
+def test_ordinary_company_building_an_ai_product_is_not_caught_as_crowdwork():
+    """Маркеры краудворка длинные именно поэтому: половина рынка сегодня
+    что-то делает с ИИ, и короткое слово выбросило бы нормальные вакансии."""
+    v = make_vacancy(
+        title="Senior .NET Developer",
+        description_text="We build an AI-powered analytics product in C# and ASP.NET. "
+                         "Worldwide remote, permanent position.",
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert not any("crowdwork" in d for d in r["dealbreakers"]), r["dealbreakers"]
+
+
+def test_qa_and_mobile_titles_survive_the_engineer_override():
+    """Жалоба человека 2026-08-05: «Senior QA Engineer — мусор». Слово
+    "engineer" в заголовке снимало мягкий гейт профессии, поэтому тестирование
+    и мобильная разработка лежат в ЖЁСТКОМ списке, который override не
+    снимает — там же, где devops с 2026-07-30."""
+    for title in ("Senior QA Engineer", "QA Automation Engineer",
+                  "Software Development Engineer in Test",
+                  "Senior Mobile Engineer (React Native)",
+                  "iOS Developer", "Android Engineer"):
+        v = make_vacancy(title=title, location_raw="Anywhere in the World",
+                         description_text="Worldwide remote. We use C# and TypeScript.")
+        r = score.score_vacancy(v, CRITERIA, PROFILE)
+        assert r["classification"] == "rejected", f"прошла: {title}"
+        assert any(d.startswith("role:") for d in r["dealbreakers"]), r["dealbreakers"]
+
+
+def test_mobile_product_behind_a_neutral_title_is_rejected():
+    """Реальная находка 2026-08-05: «Lead Full-stack Developer» @ Khibraty —
+    по описанию существующее приложение на React Native, вся работа внутри
+    него. Тот же класс, что DevOps за нейтральным заголовком."""
+    v = make_vacancy(
+        title="Lead Full-stack Developer",
+        location_raw="Anywhere in the World",
+        description_text="Take ownership of an existing mobile app codebase built with "
+                         "React Native, shipping to the App Store. Worldwide remote.",
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert r["classification"] == "rejected"
+    assert any("mobile" in d for d in r["dealbreakers"]), r["dealbreakers"]
+
+
+def test_a_web_role_mentioning_a_mobile_app_once_is_not_rejected():
+    """Порог у гейта обязателен: у компании может быть мобильное приложение
+    среди продуктов, а вакансия — про веб."""
+    v = make_vacancy(
+        title="Senior .NET Developer",
+        description_text="Our platform serves web and a companion mobile app. "
+                         "You will work on the C# and ASP.NET backend. Worldwide remote.",
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert not any("mobile" in d for d in r["dealbreakers"]), r["dealbreakers"]
+
+
+def test_matching_the_core_stack_beats_listing_many_familiar_technologies():
+    """Замер 2026-08-05: вакансия на чистом C#/ASP.NET получала за стек 7
+    баллов, а перечень TypeScript/JavaScript/React/HTML/CSS — 14. Балл за
+    каждое совпадение вознаграждает длину списка, а не попадание в стек."""
+    core = score._score_stack_fit(
+        score.common.normalize_for_matching("Senior developer. C# and ASP.NET Core, Entity Framework."),
+        CRITERIA, PROFILE)[0]
+    breadth = score._score_stack_fit(
+        score.common.normalize_for_matching(
+            "TypeScript, JavaScript, React, HTML, CSS, Redux, GraphQL, Docker."),
+        CRITERIA, PROFILE)[0]
+    assert core > breadth, f"ядро {core} не выиграло у перечня {breadth}"
+
+
+def test_reputation_red_flags_cost_points_not_only_a_review_flag():
+    """Реальный случай 2026-08-05: площадка с отзывами «late payments» и
+    «unpredictable work availability» получала +14 за рейтинг 3.5 и
+    work-life balance 4.0 и выходила на ПЕРВОЕ место выдачи. Для подрядчика
+    задержка оплаты — не нюанс, а суть сделки."""
+    clean = make_vacancy(title="Senior .NET Developer")
+    clean["_company_reputation"] = {"overall_rating": 3.5, "work_life_balance": 4.0}
+    flagged = make_vacancy(title="Senior .NET Developer")
+    flagged["_company_reputation"] = {
+        "overall_rating": 3.5, "work_life_balance": 4.0,
+        "red_flags": ["late payments", "unpredictable work availability"],
+    }
+    clean_pts = score._score_company_reputation(clean, CRITERIA)[0]
+    flagged_pts = score._score_company_reputation(flagged, CRITERIA)[0]
+    assert flagged_pts < clean_pts, f"{flagged_pts} не меньше {clean_pts}"
