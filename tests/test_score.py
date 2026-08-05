@@ -416,7 +416,9 @@ def test_low_intensity_weight_intentionally_dominates_compensation_weight():
     # Явно подтверждённый владельцем приоритет (2026-07-30): гарантированно
     # низкая нагрузка важнее более высокой оплаты. Защита от случайного
     # "выравнивания" весов в будущем.
-    assert CRITERIA["weights"]["low_intensity_signal"] >= 2 * CRITERIA["weights"]["compensation_signal"]
+    # Пересмотрено 2026-08-05: блок `weights` удалён — он не читался ни одной
+    # строкой кода и был декларацией, с которой реальность разошлась.
+    # Настоящий вес компонента — его ПОТОЛОК, по нему и сравниваем.
     intensity_swing = CRITERIA["low_intensity_signal"]["cap"] - CRITERIA["low_intensity_signal"]["floor"]
     comp_swing = CRITERIA["compensation_signal"]["has_explicit_range_points"] + max(
         CRITERIA["compensation_signal"]["above_target_bonus"],
@@ -440,26 +442,42 @@ def test_score_is_always_clamped_between_0_and_100():
     assert 0 <= r["score"] <= 100
 
 
-def test_structured_location_country_name_is_rejected():
-    # Реальный найденный баг (2026-07-30): источники отдают гео-ограничение
-    # СТРУКТУРНЫМ полем (Jobicy jobGeo="USA", Himalayas
-    # locationRestrictions=["Canada"], Remotive
-    # candidate_required_location="Brazil"), а проверялся только текст
-    # описания. ~20 из 32 кандидатов оказались недоступны по гео.
-    for loc in ["USA", "Brazil", "Costa Rica", "Texas", "Virginia"]:
+def test_a_named_country_is_not_an_objection_by_itself():
+    """Пересмотрено 2026-08-05 по прямому указанию владельца: «целевой регион
+    — да пофиг, что мне даст регион? важна не география, а сама работа».
+
+    История: сначала любая страна в поле локации была полным отсевом — из 3281
+    европейской вакансии в выдачу попадала одна. Потом появился ярус «целевых
+    рынков», и мир разделился на страны с плюсом и страны с отказом. Обе
+    редакции решали за человека, куда ему можно. Теперь не решают.
+    """
+    for loc in ["USA", "Brazil", "Costa Rica", "Texas", "Virginia", "Dublin, Ireland"]:
         v = make_vacancy(
             location_raw=loc,
             description_text="C# ASP.NET SQL Server developer role.",
         )
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        # Пересмотрено 2026-08-05: вакансия, у которой ЕДИНСТВЕННОЕ
-        # возражение — страна, больше не отбрасывается молча, а попадает
-        # в класс national_market и отдельный раздел отчёта. Из основной
-        # выдачи она по-прежнему исключена; решение "писать ли им" — за
-        # человеком, а не за системой. Причина: 501 .NET-вакансия
-        # отклонялась ровно так, и все они помечены источником как remote.
-        assert r["classification"] == "national_market", loc
-        assert any("source restricts hiring" in d for d in r["dealbreakers"]), loc
+        assert not any(d.startswith("location:") for d in r["dealbreakers"]), \
+            f"{loc}: {r['dealbreakers']}"
+
+
+def test_a_net_exporter_country_costs_points_but_is_not_excluded():
+    """«Есть понятие НЕцелевого региона — Индия, Пакистан, Филиппины, им
+    минус. Даже в Индии можно что-нибудь было бы найти, просто там большинство
+    вакансий будет не в моём стиле» (владелец, 2026-08-05).
+
+    Поэтому штраф, а не отсев: вакансия оттуда должна быть лучше по существу.
+    """
+    neutral = make_vacancy(location_raw="Portugal",
+                           description_text="C# ASP.NET SQL Server developer role.")
+    exporter = make_vacancy(location_raw="Bengaluru, India",
+                            description_text="C# ASP.NET SQL Server developer role.")
+    r_neutral = score.score_vacancy(neutral, CRITERIA, PROFILE)
+    r_exporter = score.score_vacancy(exporter, CRITERIA, PROFILE)
+
+    assert r_exporter["score"] < r_neutral["score"]
+    assert r_exporter["classification"] != "rejected"
+    assert r_exporter["score_breakdown"]["net_exporter_penalty"]["country"] == "India"
 
 
 def test_structured_location_worldwide_markers_pass():
@@ -511,10 +529,12 @@ def test_structured_location_not_overridden_by_marketing_worldwide_phrase():
         ),
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    # Не в основной выдаче, но и не выброшена: класс national_market,
-    # отдельный раздел отчёта. См. пометку 2026-08-05 выше.
-    assert r["classification"] == "national_market"
-    assert any("source restricts hiring" in d for d in r["dealbreakers"])
+    # Пересмотрено 2026-08-05: страна сама по себе больше не возражение, и
+    # проверять тут стало нечего кроме одного — что маркетинговая фраза в
+    # тексте не превратилась в ПЛЮС за всемирную удалёнку. Именно этим она
+    # была опасна: "work from anywhere for a few weeks a year" в блоке
+    # бенефитов читалось как готовность нанимать откуда угодно.
+    assert not r["score_breakdown"]["remote_location_fit"].get("worldwide_remote_hits")
 
 
 def test_ml_engineer_titles_are_gated_as_complex():
@@ -539,10 +559,12 @@ def test_structured_location_not_overridden_by_eor_mention():
         description_text="C# TypeScript React role. We hire via Multiplier as a contractor.",
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    # Не в основной выдаче, но и не выброшена: класс national_market,
-    # отдельный раздел отчёта. См. пометку 2026-08-05 выше.
-    assert r["classification"] == "national_market"
-    assert any("source restricts hiring" in d for d in r["dealbreakers"])
+    # Пересмотрено 2026-08-05: страна сама по себе больше не возражение, и
+    # проверять тут стало нечего кроме одного — что маркетинговая фраза в
+    # тексте не превратилась в ПЛЮС за всемирную удалёнку. Именно этим она
+    # была опасна: "work from anywhere for a few weeks a year" в блоке
+    # бенефитов читалось как готовность нанимать откуда угодно.
+    assert not r["score_breakdown"]["remote_location_fit"].get("worldwide_remote_hits")
 
 
 def test_remote_only_source_is_trusted_without_remote_word():
@@ -1863,7 +1885,10 @@ def test_explicit_only_wording_is_still_a_hard_rejection():
                          description_text="C# ASP.NET SQL Server developer role.")
     stated = make_vacancy(location_raw="Canada only",
                           description_text="C# ASP.NET SQL Server developer role.")
-    assert score.score_vacancy(guess, CRITERIA, PROFILE)["classification"] == "national_market"
+    # Пересмотрено 2026-08-05: догадка площадки («Canada») больше не значит
+    # ничего, а слово работодателя («Canada only») по-прежнему значит отказ.
+    # Разница между догадкой и утверждением — единственное, что здесь важно.
+    assert score.score_vacancy(guess, CRITERIA, PROFILE)["classification"] != "rejected"
     assert score.score_vacancy(stated, CRITERIA, PROFILE)["classification"] == "rejected"
 
 

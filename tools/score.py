@@ -268,36 +268,82 @@ def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = No
         return True, {"verdict": "restricted_explicitly", "matched": exclusivity_hits,
                       "value": loc_raw}
 
-    acceptable = (criteria["remote_location_fit"]
-                  .get("acceptable_region_signal", {}).get("keywords", []))
-    acceptable_hits = [k for k in acceptable
-                       if common.normalize_for_matching(k) in loc]
-    if acceptable_hits:
-        return False, {"verdict": "acceptable_region", "matched": acceptable_hits,
-                       "value": loc_raw}
-
-    # Целевой рынок самой идентичности — тоже не ограничение, а совпадение.
-    #
-    # Замер 2026-08-05: `config/derivation/market_tiers.yaml` относит Германию,
-    # Швейцарию, Британию, Нидерланды, Ирландию и Скандинавию к importer_prime
-    # («первый приоритет для поиска»), а гейт локации отбрасывал их вакансии
-    # как привязанные к стране. Из 3281 европейской вакансии в выдачу попадала
-    # ОДНА. Шапка market_tiers.yaml при этом утверждала, что ярусы читает
-    # скоринг, — на деле их читали только фетчер LinkedIn и markets.py.
-    #
-    # Тот же класс ошибки, что с Абу-Даби: одна часть настроек противоречит
-    # другой, и побеждает та, что срабатывает раньше.
-    market = _target_market_of(vacancy, profile)
-    if market:
-        return False, {"verdict": "target_market", "market": market, "value": loc_raw}
-
     continent_hits = [c for c in cfg["continent_names"] if c in loc]
     if len(continent_hits) >= cfg["continent_threshold"]:
         # Перечислены почти все континенты — фактически "весь мир"
         # (Remotive: "Americas, Europe, Asia, Africa, Oceania").
         return False, {"verdict": "worldwide_by_continents", "continents": continent_hits, "value": loc_raw}
 
-    return True, {"verdict": "restricted", "value": loc_raw}
+    # СТРАНА САМА ПО СЕБЕ БОЛЬШЕ НЕ ЯВЛЯЕТСЯ ОГРАНИЧЕНИЕМ.
+    #
+    # Пересмотрено 2026-08-05 по прямому указанию владельца: «целевой регион —
+    # да пофиг, что мне даст регион? важна не география, а сама работа».
+    #
+    # История вопроса стоит того, чтобы её тут держать. Сначала любая страна в
+    # поле локации была полным отсевом — из 3281 европейской вакансии в выдачу
+    # попадала одна. Потом появилось исключение для «целевых рынков», и мир
+    # разделился на страны, дающие плюс, и страны, дающие отказ. Обе редакции
+    # решали за человека одно и то же: куда ему можно, а куда нельзя.
+    #
+    # Теперь география не даёт НИЧЕГО. Ранжируют признаки самой работы: стек,
+    # деньги, устаревшие технологии, отзывы про work-life balance. Страна
+    # влияет ровно в одном месте — нетто-экспортёры разработки получают штраф
+    # (_score_market_penalty), потому что там ставки конкурируют вниз. Это не
+    # запрет: вакансия из такой страны просто должна быть лучше по существу.
+    #
+    # Отказ остаётся только там, где работодатель САМ говорит «нельзя»:
+    # exclusivity_markers выше, absolute_residency_phrases и hard_dealbreakers.
+    return False, {"verdict": "country_named", "value": loc_raw}
+
+
+_AVOIDED_MARKETS_CACHE = {}
+
+
+def _score_market_penalty(vacancy: dict, criteria: dict, profile: dict):
+    """Штраф за нетто-экспортёров разработки — единственное место, где
+    география вообще влияет на балл.
+
+    Владелец 2026-08-05: «есть понятие НЕцелевого региона — Индия, Пакистан,
+    Филиппины, им минус. Целевой регион — да пофиг».
+
+    Почему штраф, а не отсев: в такой стране тоже бывает подходящая вакансия,
+    просто большинство будет не в том стиле. Штраф ровно это и выражает —
+    вакансия оттуда должна быть лучше по существу, чтобы попасть наверх.
+
+    Список стран — общий (config/derivation/market_tiers.yaml, ярусы
+    exporter_avoid и excluded_practical): направление потока работы описывает
+    рынок, а не человека.
+    """
+    cfg = (criteria.get("remote_location_fit") or {}).get("net_exporter_penalty")
+    if not cfg:
+        return 0, {}
+
+    key = id(profile)
+    if key not in _AVOIDED_MARKETS_CACHE:
+        import markets as markets_mod
+
+        names = markets_mod.avoided_countries(profile)
+        _AVOIDED_MARKETS_CACHE[key] = {
+            common.normalize_for_matching(n): n for n in names
+        }
+    avoided = _AVOIDED_MARKETS_CACHE[key]
+    if not avoided:
+        return 0, {}
+
+    for tag in vacancy.get("tags") or []:
+        tag = str(tag)
+        if tag.startswith("market:"):
+            name = tag[7:]
+            if common.normalize_for_matching(name) in avoided:
+                return cfg.get("points", -10), {"country": name, "source": "тег площадки",
+                                                "points": cfg.get("points", -10)}
+
+    loc = common.normalize_for_matching(vacancy.get("location_raw") or "")
+    for needle, name in avoided.items():
+        if needle and needle in loc:
+            return cfg.get("points", -10), {"country": name, "source": "поле локации",
+                                            "points": cfg.get("points", -10)}
+    return 0, {}
 
 
 _TARGET_MARKETS_CACHE = {}
@@ -680,9 +726,27 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
             )
 
     points = 0
-    if worldwide_hits:
+    # Названная площадкой страна отменяет ПЛЮС за всемирную удалёнку из текста.
+    #
+    # Правило «структурное поле авторитетнее маркетинговой фразы» существовало
+    # с 2026-07-30, но работало как отсев: вакансия с location="London" просто
+    # отклонялась, и что там написано в блоке бенефитов, значения не имело.
+    # Когда 2026-08-05 страна перестала быть возражением, фраза "work from
+    # anywhere for a few weeks a year" из перечня плюшек начала приносить
+    # максимальный балл за международный найм. Регрессию поймал тест, который
+    # писался для прежней редакции правила, — поэтому он и сохранён.
+    #
+    # Смысл прежний: если площадка назвала город, работодатель не нанимает по
+    # всему миру, что бы ни было написано в разделе про печеньки.
+    structured_named_country = (structured_detail or {}).get("verdict") == "country_named"
+    if worldwide_hits and not structured_named_country:
         points = max(points, rl["worldwide_remote"]["points"])
         breakdown["worldwide_remote_hits"] = worldwide_hits
+    elif worldwide_hits:
+        breakdown["worldwide_remote_hits_ignored"] = {
+            "hits": worldwide_hits,
+            "why": "площадка назвала страну: %s" % (structured_detail or {}).get("value"),
+        }
     if eor_hits:
         points = max(points, rl["eor_or_contractor_international"]["points"])
         breakdown["eor_or_contractor_hits"] = eor_hits
@@ -1581,6 +1645,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     tech_points, tech_bd = _score_personal_tech_bonus(
         text, vacancy.get("title") or "", profile, criteria)
     title_penalty, title_penalty_bd = _score_title_role_penalty(vacancy.get("title") or "", criteria)
+    exporter_penalty, exporter_bd = _score_market_penalty(vacancy, criteria, profile)
 
     # Три ПОЛНЫХ ОТСЕВА (0% шанс попасть в выдачу), подтверждённых
     # человеком явно 2026-07-30 — не понижение приоритета, а dealbreaker:
@@ -1676,6 +1741,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         + market_points
         + tech_points
         + title_penalty
+        + exporter_penalty
     )
     total = max(0, min(100, round(raw_total)))
 
@@ -1733,6 +1799,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "contractor_friendliness": contractor_bd,
         "company_reputation_signal": reputation_bd,
         "company_age_signal": age_bd,
+        "net_exporter_penalty": exporter_bd,
         "personal_market_bonus": market_bd,
         "personal_tech_bonus": tech_bd,
         "title_role_penalty": title_penalty_bd,
