@@ -1,3 +1,4 @@
+import json
 import pytest
 import score
 
@@ -1949,3 +1950,34 @@ def test_an_override_cannot_rescue_a_vacancy_killed_by_a_gate():
     generous["personal_market_bonus"] = {"Anywhere": {"points": 100}}
     r = score.score_vacancy(v, CRITERIA, generous)
     assert r["classification"] == "rejected"
+
+
+def test_an_unfamiliar_compensation_shape_does_not_crash_the_run():
+    """Найдено эмуляцией онбординга в свежем клоне 2026-08-05.
+
+    Скоринг требовал ключ annual_parttime_usd и падал KeyError-ом посреди
+    прогона, если профиль описывал зарплату иначе. Агент, записывающий ответ
+    человека «5-8 тысяч в месяц», естественно пишет monthly_min/monthly_target
+    — и весь прогон валится, а причина видна только в трейсбеке.
+    """
+    profile = json.loads(json.dumps(PROFILE))
+    profile["goal"]["target_compensation"] = {"currency": "USD",
+                                              "monthly_min": 5000,
+                                              "monthly_target": 8000}
+    v = make_vacancy(title="Senior .NET Developer",
+                     description_text="C# and ASP.NET role. $120,000 - $150,000 per year.")
+    result = score.score_vacancy(v, CRITERIA, profile)
+    assert isinstance(result["score"], int)
+
+
+def test_a_filled_compensation_range_still_penalises_a_low_offer():
+    """Терпимость к форме не должна означать, что сравнение перестало работать."""
+    profile = json.loads(json.dumps(PROFILE))
+    profile["goal"]["target_compensation"] = {"annual_parttime_usd": [60000, 96000]}
+    low = make_vacancy(title="Senior .NET Developer",
+                       description_text="C# and ASP.NET. Salary $20,000 - $25,000 per year.")
+    fit = make_vacancy(title="Senior .NET Developer",
+                       description_text="C# and ASP.NET. Salary $70,000 - $90,000 per year.")
+    low_points = score.score_vacancy(low, CRITERIA, profile)["score_breakdown"]["compensation_signal"]["points"]
+    fit_points = score.score_vacancy(fit, CRITERIA, profile)["score_breakdown"]["compensation_signal"]["points"]
+    assert low_points < fit_points

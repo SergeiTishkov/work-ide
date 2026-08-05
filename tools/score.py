@@ -1163,21 +1163,39 @@ def _score_compensation(text: str, vacancy: dict, criteria: dict, profile: dict)
     hourlies = [h for a, h, mo in amounts if h is not None]
     monthlies = [mo for a, h, mo in amounts if mo is not None]
 
+    # Незаполненный диапазон просто не участвует в сравнении.
+    #
+    # Раньше здесь стояло target["annual_parttime_usd"] без оговорок, и профиль
+    # с зарплатой в другой форме ронял ВЕСЬ прогон KeyError-ом посреди скоринга.
+    # Найдено эмуляцией онбординга 2026-08-05: агент, записывающий ответ «5-8
+    # тысяч в месяц», естественно пишет monthly_min/monthly_target. Форма
+    # описана в шаблоне профиля; отсутствие ключа — не повод падать.
+    def _range(name):
+        value = target.get(name)
+        if isinstance(value, (list, tuple)) and len(value) == 2:
+            return value[0], value[1]
+        return None
+
     below = above = False
-    if annuals:
-        lo, hi = target["annual_parttime_usd"]
+    annual_range = _range("annual_parttime_usd")
+    if annuals and annual_range:
+        lo, hi = annual_range
         if max(annuals) < lo:
             below = True
         elif min(annuals) > hi:
             above = True
-    if hourlies:
-        lo, hi = target["hourly_contractor_usd"]
+    hourly_range = _range("hourly_contractor_usd")
+    if hourlies and hourly_range:
+        lo, hi = hourly_range
         if max(hourlies) < lo:
             below = True
         elif min(hourlies) > hi:
             above = True
-    if monthlies:
-        lo, hi = target.get("monthly_parttime_usd", [target["annual_parttime_usd"][0] / 12, target["annual_parttime_usd"][1] / 12])
+    monthly_range = _range("monthly_parttime_usd")
+    if monthly_range is None and annual_range:
+        monthly_range = (annual_range[0] / 12, annual_range[1] / 12)
+    if monthlies and monthly_range:
+        lo, hi = monthly_range
         if max(monthlies) < lo:
             below = True
         elif min(monthlies) > hi:
