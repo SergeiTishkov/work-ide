@@ -28,7 +28,7 @@ description: Прогнать обычный исследовательский 
 4. **Пройди `docs/VACANCY_CHECKLIST.md` по каждому кандидату уровня long_shot и
    выше — это обязательный шаг, а не рекомендация.** Читай полный
    `description_text` из базы, а не только score_breakdown.
-4. Отчёт: `reports/<p>_latest.md`.
+5. Отчёт: `reports/<p>_latest.md`.
 
 ## Почему шаг 4 нельзя пропускать
 
