@@ -1,142 +1,142 @@
 # =============================================================================
-#  ШАБЛОН ПРОФИЛЯ ИДЕНТИЧНОСТИ
+#  THE IDENTITY PROFILE TEMPLATE
 # =============================================================================
-#  Копируется как <префикс>_profile.yaml и заполняется по ответам вопросника.
-#  Человекочитаемая "истина" о том, кто ищет и что именно.
+#  Copied as <prefix>_profile.yaml and filled in from the questionnaire answers.
+#  The human-readable truth about who is searching, and for what.
 #
-#  Заполнять ВМЕСТЕ С ЧЕЛОВЕКОМ (docs/ONBOARDING.md), а не догадками.
+#  Fill it in TOGETHER WITH THE PERSON (docs/ONBOARDING.md), not by guesswork.
 # =============================================================================
 
 identity:
   kind: personal   # personal | shared_example | fixture
-  # Одной фразой: что означает высокий score именно в ЭТОМ поиске. Строка
-  # печатается в шапке каждого отчёта, поэтому пишется человеческим языком.
-  # У каждой идентичности она своя: то, что здесь плюс, для другого поиска
-  # может быть минусом.
+  # In one phrase: what a high score means in THIS search. The line is printed
+  # at the head of every report, so it is written in plain language.
+  # Every identity has its own: what is a plus here may be a minus for another
+  # search.
   scoring_philosophy: >
-    <например: чем выше score, тем больше вакансия похожа на спокойную
-    легаси-поддержку с низкой конкуренцией — то, что нужно.>
-  display_name: "<короткое название, видно в баннере инструментов>"
-  abbreviation: "<ПРЕФИКС> = <расшифровка>"
-  created_at: "<ГГГГ-ММ-ДД>"
+    <for example: the higher the score, the more the vacancy looks like calm
+    legacy maintenance with little competition — what is wanted.>
+  display_name: "<a short name, shown in the tools' banner>"
+  abbreviation: "<PREFIX> = <expansion>"
+  created_at: "<YYYY-MM-DD>"
 
 contact:
-  # Куда писать владельцу сайта, если он захочет связаться (честный
-  # User-Agent — инженерное обязательство проекта).
-  #   "local"        -> читать из local-constitution/personal/<p>/<p>_contact.yaml
-  #   "you@mail.com" -> прямо здесь (попадёт в общий репозиторий!)
-  #   null           -> без контакта (doctor выдаст предупреждение)
-  user_agent_contact: ""   # ваша почта; заполняется в локальной идентичности
+  # Where a site's owner can write if they want to get in touch (an honest
+  # User-Agent is an engineering commitment of the project).
+  #   "you@mail.com" -> right here (it will reach the shared repository!)
+  #   null           -> no contact (doctor will warn)
+  #
+  user_agent_contact: ""   # your address; filled in in the local identity
 
-# ==== ЛИЧНОЕ И ОБЩЕЕ ====
+# ==== PERSONAL AND SHARED ====
 #
-# Значение `local` означает: настоящее значение лежит в
-# local-constitution/personal/<префикс>/<префикс>_owner.yaml (вне гита) и
-# подставляется при активации идентичности.
+# Personal values live in your local identity, outside git; the template holds
+# only what describes the SEARCH.
 #
-# Проверочный вопрос, что куда: «изменится ли это, если тем же поиском
-# воспользуется другой человек?» Да -> local. Нет -> пишите значение здесь.
 #
-# Заготовку owner.yaml создаёт `python tools/identity.py init-local`.
+# The test question for what goes where: "would this change if another person
+# used the same search?" Yes -> your own file. No -> write the value here.
+#
+#
 owner:
-  name: "<ваше имя>"
-  linkedin: "<ссылка на ваш LinkedIn>"
-  years_experience: 0            # ваш стаж в годах        # стаж личный; уровень — в role ниже
-  role: "<должность: senior backend, lead QA…>"   # характеристика ПОИСКА
-  # CV лежит в Малой Конституции под своим исходным именем (правило префиксов
-  # на чужие документы не распространяется, см. docs/LOCAL_CONSTITUTION.md).
-  cv_files: []           # пути к файлам резюме в documents/
-  # Языки: в языковой фильтр попадут те, которых человек НЕ знает
-  # (см. config/derivation/languages.yaml).
-  languages: []           # языки, которыми владеете
-  # Резидентство обычно личное: другой человек с тем же поиском живёт в
-  # другом месте. НО если поиск привязан к стране по существу («ищу работу
-  # именно в Германии»), страна — определение идентичности, и тогда её пишут
-  # литерально вместо `local`:
+  name: "<your name>"
+  linkedin: "<a link to your LinkedIn>"
+  years_experience: 0            # your years of experience; the level is in role below
+  role: "<title: senior backend, lead QA…>"   # a property of the SEARCH
+  # The CV lives in documents/ under its original name (the prefix rule does
+  # not extend to somebody else's documents, see CLAUDE.md §5).
+  cv_files: []           # paths to CV files in documents/
+  # Languages: the filter gets the ones the person does NOT know
+  # (see config/derivation/languages.yaml).
+  languages: []           # the languages you speak
+  # Residency is usually personal: another person with the same search lives
+  # somewhere else. BUT if the search is tied to a country in substance ("I am
+  # looking for work in Germany specifically"), the country defines the
+  # identity and is written literally:
   #     location:
   #       country: "Germany"
   #       utc_offset: 1
-  # См. docs/IDENTITIES.md, «Граница: что личное, что характеристика поиска».
-  location: {}           # страна, часовой пояс: из них выводятся гео-правила
+  # See docs/IDENTITIES.md, "The boundary: what is personal, what describes the
+  location: {}           # country, time zone: the geography rules derive from them
   timezone_notes: ""
 
 target_regions:
-  # Различайте: "компания находится в X" ≠ "нужно резидентство в X".
-  dream:            # высокий потолок оплаты, меньше шансов
-    - "<регион>"
-  solid_realistic:  # где реально наймут
-    - "<регион>"
+  # Distinguish: "the company is in X" is not "residency in X is required".
+  dream:            # a high pay ceiling, lower chances
+    - "<region>"
+  solid_realistic:  # where you will realistically be hired
+    - "<region>"
 
 goal:
   purpose: >
-    <зачем этот поиск, одним абзацем>
+    <what this search is for, in one paragraph>
   hours_per_day_target: [0, 0]
   ai_assisted: true
-  # Зарплатные ожидания зависят от обстоятельств человека, а не от типа
-  # поиска — поэтому личные. Структуру заготовит `identity.py init-local`.
-  # Зарплатные ожидания. Суммы личные — здесь только ФОРМА, которую ждёт
-  # скоринг. Заполняется в локальной идентичности.
+  # Pay expectations depend on a person's circumstances rather than on the kind
+  # of search — hence personal.
+  # Pay expectations. The amounts are personal — only the SHAPE the scoring
+  # expects is here. Filled in in the local identity.
   #
-  # Три диапазона, потому что вакансии называют деньги по-разному, и сравнивать
-  # надо с сопоставимой величиной. Достаточно заполнить те, что вам осмысленны;
-  # незаполненный диапазон просто не участвует в сравнении.
+  # Three ranges, because vacancies quote money in different ways and the
+  # comparison has to be against a comparable figure. Fill in the ones that
+  # mean something to you; an empty range simply sits out the comparison.
   #
   #   target_compensation:
   #     monthly_parttime_usd:  [5000, 8000]    # "$5-8k/month"
   #     annual_parttime_usd:   [60000, 96000]  # "$60k-96k/year"
   #     hourly_contractor_usd: [55, 130]       # "$55-130/hour"
   #
-  # Единицы — доллары США: вакансии называют суммы в чём угодно, и приводить
-  # их к одной валюте проще один раз здесь, чем в каждом сравнении.
+  # The unit is US dollars: vacancies quote sums in anything at all, and
+  # converting once here is simpler than in every comparison.
   target_compensation: {}
 
 employment_type_priority:
   high: []
   medium: []
   low_but_possible: []
-  # Пункты, делающие вакансию невозможной. Если планируется совмещение с
-  # другой занятостью — оставьте здесь требования эксклюзивности.
+  # Things that make a vacancy impossible. If it is to be combined with other
+  # work, leave exclusivity requirements here.
   dealbreaker_signals:
     - "must relocate"
     - "on-site required"
 
-# Стек по ФАКТИЧЕСКОЙ частоте в резюме, а не по ощущениям.
-# Влияет на гейт релевантности: без совпадения по core/strong вакансия
-# отсеивается целиком.
+# The stack by ACTUAL frequency in the CV, not by impression.
+# It drives the relevance gate: without a core or strong match a vacancy is
+# rejected outright.
 tech_stack:
-  core: []       # было в большинстве последних ролей
-  strong: []     # регулярно, но не всегда
-  familiar: []   # одна-две роли за карьеру
-  # ОСТОРОЖНО с короткими и общими словами: ".NET" ловит "VB.NET",
-  # "LESS" ловит "no less than", "EOR" ловит "theoretical".
+  core: []       # was in most of your recent roles
+  strong: []     # regularly, but not always
+  familiar: []   # one or two roles across a career
+  # BEWARE short and generic words: ".NET" catches "VB.NET", "LESS" catches
+  # "no less than", "EOR" catches "theoretical".
 
 ideal_company_traits:
   high_priority: []
   low_priority_avoid: []
 
-# Упоминание такой платформы означает, что компания технически готова оформить
-# человека вне своей страны. Список общий, менять обычно не нужно.
+# A mention of such a platform means the company is technically able to engage
+# somebody outside its own country. The list is shared; rarely worth changing.
 eor_platforms_signal:
-  # Упоминание платформы найма — сильный сигнал, что компания реально готова
-  # оформить подрядчика вне своей страны (это +18, самый крупный плюс рубрики).
+  # A mention of an employment platform is a strong signal that a company is
+  # genuinely able to engage a contractor abroad (+18, the rubric's largest plus).
   #
-  # ОСТОРОЖНО С КОРОТКИМИ И ОБЩИМИ ФОРМАМИ. Замер 2026-08-05 на базе из 9527
-  # вакансий показал 345 ложных срабатываний:
-  #   * "Multiplier" (266) ловился в "productivity multiplier", "Talent
-  #     Multiplier", "operating as a multiplier" — обычное английское слово;
-  #   * "G-P" (79) ловился внутри немецкого "Mentorin-G-P-rogramm" и подобных.
-  # Тот же класс ошибки, что "LESS" внутри "no less than" и "eor" внутри
-  # "theoretical". Поэтому названия, совпадающие с обычными словами, пишутся
-  # доменом: домен в тексте вакансии однозначен.
-  - "Deel"                      # проверено: 17 срабатываний, все настоящие
+  # BEWARE SHORT AND GENERIC FORMS. Measured 2026-08-05 over a base of 9527
+  # vacancies: 345 false matches.
+  #   * "Multiplier" (266) was caught in "productivity multiplier", "Talent
+  #     Multiplier", "operating as a multiplier" — an ordinary English word;
+  #   * "G-P" (79) was caught inside German words like "Mentoring-Programm".
+  # The same class of mistake as "LESS" inside "no less than" and "eor" inside
+  # "theoretical". So names that coincide with ordinary words are written as a
+  # domain: a domain in vacancy text is unambiguous.
+  - "Deel"                      # verified: 17 matches, all genuine
   - "Remote.com"
   - "Oyster HR"
   - "Papaya Global"
-  - "multiplier.com"            # вместо голого "Multiplier"
+  - "multiplier.com"            # instead of a bare "Multiplier"
   - "Globalization Partners"
-  - "g-p.com"                   # вместо голого "G-P"
+  - "g-p.com"                   # instead of a bare "G-P"
   - "Velocity Global"
-  - "Employer of Record"        # общий термин, надёжнее любого бренда
+  - "Employer of Record"        # the generic term, safer than any brand
   - "EOR provider"
   - "Remofirst"
   - "Rippling EOR"

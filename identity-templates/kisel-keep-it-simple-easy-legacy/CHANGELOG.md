@@ -1,39 +1,39 @@
-# Журнал изменений шаблона KISEL
+# Change log for the KISEL template
 
-Новые версии добавляются СВЕРХУ. Номер раздела обязан совпадать с `version`
-в `template.yaml` — это проверяется тестом.
+New versions go on TOP. A section's number must match `version` in
+`template.yaml` — that is checked by a test.
 
-Записи пишутся так, чтобы по ним можно было понять, затрагивает ли изменение
-ваши локальные настройки: что изменилось, где и почему.
+Entries are written so that you can tell whether a change affects your local
+settings: what changed, where and why.
 
-## V1 — первая версия
+## V1 — the first version
 
-Шаблон спокойного легаси-поиска, собранный из рабочей идентичности после
-двух недель настройки на живых данных (более 11 000 вакансий).
+A template for a calm legacy search, assembled from a working identity after
+two weeks of tuning against live data (more than 11,000 vacancies).
 
-**Что определяет поиск**
+**What defines the search**
 
-- Цель — НАГРУЗКА, а не количество часов: ненапряжная полная ставка
-  подходит так же, как средненагруженный неполный день. Сокращённый график
-  и четырёхдневная неделя — формы низкой нагрузки, а не самоцель.
-- Стек: .NET/C# как ядро, JS/TS как сильная сторона; легаси-извод стека
-  (WebForms, EF6, jQuery, SOAP) — преимущество, а не недостаток.
-- Легаси и enterprise-признаки (`legacy`, `mainframe`, `cobol`, `bank`,
-  `government`) дают плюс; `greenfield`, `fast-paced`, `move fast` — минус.
+- The goal is INTENSITY rather than a number of hours: an undemanding
+  full-time role suits as well as a moderately loaded part-time one. Reduced
+  hours and a four-day week are forms of low intensity, not ends in themselves.
+- The stack: .NET/C# at the core, JS/TS as a strong suit; the legacy edition of
+  that stack (WebForms, EF6, jQuery, SOAP) is an advantage, not a drawback.
+- Legacy and enterprise signals (`legacy`, `mainframe`, `cobol`, `bank`,
+  `government`) are a plus; `greenfield`, `fast-paced`, `move fast` a minus.
 
-**Жёсткие отсевы**, каждый добавлен после реальной находки в выдаче
+**Hard rejections**, each added after a real finding in the shortlist
 
-- не роль разработчика (менеджмент, продажи, пресейл, DevRel, аналитика);
-- инфраструктурные роли и DevOps, в том числе за нейтральным заголовком;
-- QA и мобильная разработка;
-- краудворк по обучению ИИ, замаскированный под инженерную вакансию;
-- отрасли, в которые поиск не идёт;
-- вакансии не на английском языке.
+- not a developer role (management, sales, pre-sales, DevRel, analytics);
+- infrastructure roles and DevOps, including behind a neutral title;
+- QA and mobile development;
+- AI-training crowdwork disguised as an engineering vacancy;
+- industries the search does not go into;
+- vacancies not in English.
 
-**Механика, доставшаяся дорого**
+**Mechanics that came at a price**
 
-- названия технологий ищутся с учётом `docs/TECH_MATCHING.md`: короткие и
-  общие формы запрещены;
-- глубина совпадения по стеку важнее широты перечня;
-- поле локации от площадки авторитетнее маркетинговых фраз в тексте, но
-  слабее прямых слов работодателя.
+- technology names are matched per `docs/TECH_MATCHING.md`: short and generic
+  forms are forbidden;
+- the depth of a stack match matters more than the breadth of a list;
+- a board's location field carries more authority than marketing phrases in the
+  text, but less than the employer's own words.

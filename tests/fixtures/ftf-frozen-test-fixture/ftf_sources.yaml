@@ -1,12 +1,12 @@
-# Источники тестовой фикстуры.
+# Sources for the test fixture.
 #
-# ЗАМОРОЖЕНО: менять только вместе с осознанным обновлением тестов
-# (см. ftf_identity.md).
+# FROZEN: change only together with a deliberate update to the tests
+# (see ftf_identity.md).
 #
-# Что описывает этот файл: ТОЛЬКО предпочтения — какие источники включены и с
-# какими параметрами. Эндпоинты, тип источника и признак remote_only живут в
-# общем каталоге config/sources.catalog.yaml и идентичностью не переопределяются:
-# устаревший URL — это баг для всех сразу, а не чья-то настройка.
+# What this file describes: ONLY preferences — which sources are enabled and
+# with what parameters. Endpoints, source kind and the remote_only flag live in
+# the shared catalogue config/sources.catalog.yaml and are not overridable by an
+# identity: a stale URL is a bug for everybody at once.
 
 schema_version: 1
 
@@ -32,9 +32,9 @@ sources:
   - name: hn_whoishiring
     enabled: true
     params:
-      # В бою по умолчанию берётся из profile.tech_stack.core активной
-      # идентичности; здесь задано явно, чтобы фикстура не зависела от правок
-      # профиля.
+      # In production this defaults to the active identity's
+      # profile.tech_stack.core; here it is set explicitly so the fixture does
+      # not depend on edits to a profile.
       keywords: [".NET", "C#", "ASP.NET", "legacy", "SQL Server"]
       hits_per_keyword: 50
 

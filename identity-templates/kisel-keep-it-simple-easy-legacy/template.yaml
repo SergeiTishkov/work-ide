@@ -1,18 +1,18 @@
-# Манифест шаблона. Версия — ЧИСЛО, и именно по нему решается, есть ли
-# обновление: разбирать markdown ради решения о запуске нельзя.
+# The template manifest. The version is a NUMBER, and that is what decides
+# whether an update exists: parsing markdown to decide about a run will not do.
 #
-# При изменении любого файла шаблона версия увеличивается на единицу, и в
-# CHANGELOG.md добавляется раздел с этим номером. Проверяется тестом
-# test_template_version_matches_changelog — правило, которое держится на
-# памяти агента, в этом проекте уже ломалось.
+# When any template file changes, the version goes up by one and a section with
+# that number is added to CHANGELOG.md. Checked by the test
+# test_template_version_matches_changelog — a rule that rests on an agent's
+# memory has broken in this project before.
 
 name: kisel
 version: 1
 summary: >
-  Спокойная легаси-удалёнка с низкой нагрузкой для .NET/JS-разработчика.
-  Ищет скучную, предсказуемую, хорошо документированную работу с низкой
-  конкуренцией: legacy, enterprise, банки, госсектор — это плюсы, а
-  greenfield, стартапы и "move fast" — минусы.
+  Calm, low-intensity legacy remote work for a .NET/JS developer.
+  It looks for dull, predictable, well-documented work with little competition:
+  legacy, enterprise, banks and the public sector are pluses, while greenfield,
+  startups and "move fast" are minuses.
 suitable_for: >
-  Разработчик уровня senior на .NET/C# или JS/TS, которому важнее нагрузка и
-  предсказуемость, чем интересные задачи и карьерный рост.
+  A senior developer in .NET/C# or JS/TS to whom workload and predictability
+  matter more than interesting problems and career growth.

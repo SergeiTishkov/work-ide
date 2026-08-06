@@ -1,20 +1,20 @@
-# Источники идентичности KISEL.
+# Sources for the KISEL identity.
 #
-# Здесь ТОЛЬКО предпочтения: какие источники включены и с какими параметрами.
-# Эндпоинты, тип источника, признак remote_only и документация по каждому
-# источнику — в общем каталоге config/sources.catalog.yaml.
+# ONLY preferences here: which sources are enabled, and with what parameters.
+# Endpoints, source kind, the remote_only flag and the documentation for each
+# source live in the shared catalogue config/sources.catalog.yaml.
 #
-# Каталог доступных блоков с описанием сильных и слабых сторон каждого —
+# A catalogue of the available blocks, with each one's strengths and
 # docs/BUILDING_BLOCKS.md.
 
 schema_version: 1
 
 sources:
-  # --- Основные: только удалённые вакансии, англоязычные -------------------
+  # --- Primary: remote-only boards, English-language -----------------------
   - name: weworkremotely
     enabled: true
-    # Лучший источник по соотношению сигнал/шум: ~242 вакансии за прогон,
-    # структурное поле region, англоязычные.
+    # The best source by signal-to-noise: ~242 vacancies per run, a structured
+    # region field, in English.
 
   - name: remoteok
     enabled: true
@@ -28,53 +28,53 @@ sources:
   - name: himalayas
     enabled: true
 
-  # --- Вакансии напрямую от работодателей ---------------------------------
+  # --- Vacancies straight from employers -----------------------------------
   - name: ats
     enabled: true
-    # Список компаний — в kisel_ats_targets.yaml. Это главный рычаг качества:
-    # сам источник работает отлично, но его выход целиком определяется тем,
-    # какие компании в списке.
+    # The company list is in kisel_ats_targets.yaml. That is the main lever on
+    # quality: the source itself works well, but its yield is determined
+    # entirely by which companies are on the list.
 
-  # --- Нишевые ------------------------------------------------------------
+  # --- Niche ---------------------------------------------------------------
   - name: hn_whoishiring
     enabled: true
     params:
-      # Заданы явно, а не взяты из tech_stack.core: "legacy" и "SQL Server" —
-      # не языки, но для ЭТОЙ идентичности они ценнее половины стека, потому
-      # что ищется именно легаси-поддержка. Каждое слово = один HTTP-запрос.
+      # Set explicitly rather than taken from tech_stack.core: "legacy" and
+      # "SQL Server" are not languages, but for THIS identity they are worth
+      # more than half the stack, because legacy maintenance is what is being
       keywords: [".NET", "C#", "ASP.NET", "legacy", "SQL Server"]
       hits_per_keyword: 50
 
   - name: arbeitnow
     enabled: true
-    # Оставлен включённым осознанно, несмотря на низкий выход: по замеру
-    # 2026-07-30 давал 68% базы при ~6% полезного (немецкоязычный рынок,
-    # отсеивается языковым фильтром). Изредка приносит англоязычные
-    # remote-вакансии европейских компаний. Если начнёт мешать — поставить
-    # enabled: false, код трогать не нужно.
+    # Deliberately left enabled despite the low yield: measured 2026-07-30 it
+    # gave 68% of the base at about 6% useful (a German-language market, cut by
+    # the language filter). It occasionally brings English-language remote
+    # vacancies from European companies. If it starts getting in the way, set
+    # enabled: false; no code needs touching.
 
   - name: linkedin
     enabled: true
     params:
-      # Каждое слово умножается на каждую страну из ярусов рынков, поэтому
-      # список намеренно короткий: 3 слова × 26 стран × до 4 страниц — это уже
-      # сотни запросов. Начинаем с ядра стека.
-      # Основа — стек: по нему ищется то, что человек умеет делать.
-      # Плюс несколько запросов по ОСИ НАГРУЗКИ: замер 2026-08-05 показал, что
-      # спокойная неполная занятость почти не попадается, если искать только по
-      # стеку и фильтровать потом (8 вакансий с таким признаком на 10 215).
-      # Фильтр LinkedIn f_JT=P/C для этого не годится — проверено, гостевой
-      # эндпоинт его игнорирует, наборы результатов совпадают побайтово.
+      # Each word is multiplied by each country from the market tiers, so the
+      # list is deliberately short: 3 words x 26 countries x up to 4 pages is
+      # already hundreds of requests. Start from the core of the stack.
+      # The basis is the stack: it finds what the person can actually do.
+      # Plus a few queries along the INTENSITY AXIS: measured 2026-08-05, calm
+      # part-time work barely turns up if you search by stack alone and filter
+      # afterwards (8 vacancies with such a sign out of 10,215).
+      # LinkedIn's f_JT=P/C filter will not do for this — verified, the guest
+      # endpoint ignores it and the result sets match byte for byte.
       keywords: [".NET developer", "C# developer", "ASP.NET",
                  "part-time .NET developer", "contract C# developer",
                  "fractional software engineer"]
       max_pages: 2
-      # Догрузка описаний со страниц вакансий: в карточке поиска текста нет,
-      # и без него гейт стека отсекает три четверти найденного. Каждая
-      # догрузка — отдельный запрос, отсюда потолок.
+      # Fetching descriptions from vacancy pages: a search card has no text,
+      # and without it the stack gate rejects three quarters of what was found.
+      # Each fetch is a separate request, hence the cap.
       enrich_limit: 150
-    # Локации не заданы: берутся из profile.target_markets (ярусы рынков).
-    # Так список стран живёт в одном месте и не расходится между источниками.
+    # Locations are not set: they come from profile.target_markets (the market
+    # tiers). That way the country list lives in one place and does not drift.
 
   - name: devitjobs
     enabled: true
@@ -109,7 +109,7 @@ sources:
 
   - name: manual
     enabled: true
-    # Ручной канал: находки агента с LinkedIn/Indeed и карьерных страниц,
-    # заносимые через tools/ingest_manual.py. Для этой идентичности он важен
-    # особенно: публичные джоб-борды слабо покрывают комбинацию
-    # "легаси + worldwide remote + высокая ставка".
+    # The manual channel: the agent's finds from Indeed and careers pages,
+    # entered through tools/ingest_manual.py. It matters especially for this
+    # identity: the public boards cover the combination "legacy + worldwide
+    # remote + a high rate" poorly.

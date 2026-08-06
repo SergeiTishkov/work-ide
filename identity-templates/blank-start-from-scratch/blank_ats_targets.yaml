@@ -1,32 +1,32 @@
-# Карьерные страницы компаний через их ATS (системы найма).
+# Company careers pages, through their ATS (hiring systems).
 #
-# Читается tools/fetch_ats.py. Это вакансии "от первого лица", напрямую от
-# работодателя: без чужой воронки отклика (в отличие от WWR), без платных
-# подписок, без посредника. Все эндпоинты — официальные публичные JSON API
-# этих ATS, по которым работают виджеты вакансий на сайтах самих компаний:
-# обычный GET, без авторизации и без анти-бот защиты.
+# Read by tools/fetch_ats.py. These are first-hand vacancies, straight from the
+# employer: no third party's application funnel (unlike WWR), no paid
+# subscriptions, no intermediary. Every endpoint is an official public JSON API
+# of these ATS, the ones the vacancy widgets on the companies' own sites run
+# off: an ordinary GET, no authorisation and no anti-bot protection.
 #
 # provider: greenhouse | lever | ashby | recruitee
-# token:    идентификатор доски компании в этой ATS. Обычно виден прямо в
-#           URL карьерной страницы, например:
+# token:    the company's board identifier in that ATS. Usually visible right
+#           in the careers page URL, for example:
 #             boards.greenhouse.io/<token>
 #             jobs.lever.co/<token>
 #             jobs.ashbyhq.com/<token>
 #             <token>.recruitee.com
 #
-# КАК РАСШИРЯТЬ (это главный рычаг роста качества выдачи):
-# добавлять сюда зрелые enterprise-компании, которые реально нанимают на
-# .NET/C# и работают удалённо. Кандидатов брать из data/knowledge/
-# companies.json (у кого высокие legacy_enterprise_hits и возраст 10+ лет
-# по Wikidata) либо находить веб-поиском. Проверить токен можно одной
-# командой:
+# HOW TO EXTEND IT (the main lever on the quality of the shortlist):
+# add mature enterprise companies here that really do hire for .NET/C# and
+# work remotely. Take candidates from data/knowledge/companies.json (those
+# with high legacy_enterprise_hits and an age of 10+ years per Wikidata), or
+# find them by web search. A token can be checked with one command:
+#
 #   curl https://boards-api.greenhouse.io/v1/boards/<token>/jobs
 #
-# Начальный список ниже — это проверенные рабочие доски (замер
-# 2026-07-31). Он намеренно небольшой и составлен из технологических
-# компаний, которые точно нанимают удалённо; его нужно достраивать под
-# профиль владельца — банками, страховыми, healthcare и господрядчиками,
-# то есть теми, у кого водятся спокойные легаси-проекты.
+# The starting list below is of verified working boards (measured 2026-07-31).
+# It is deliberately small and made up of technology companies that certainly
+# hire remotely; it needs building out to suit the person — with banks,
+# the owner's profile — with banks, insurers, healthcare and government
+# where calm legacy projects live.
 
 targets:
   - company: "Stripe"
@@ -43,7 +43,7 @@ targets:
     provider: greenhouse
     token: gitlab
     enabled: true
-    notes: "Полностью удалённая компания (all-remote), нанимает по всему миру."
+    notes: "An all-remote company, hiring worldwide."
 
   - company: "Airtable"
     provider: greenhouse
@@ -69,4 +69,4 @@ targets:
     provider: recruitee
     token: tether
     enabled: true
-    notes: "Найдена через WWR: описание вело на tether.recruitee.com."
+    notes: "Found through WWR: the description led to tether.recruitee.com."

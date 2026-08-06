@@ -1,25 +1,25 @@
 # =============================================================================
-#  ШАБЛОН ИСТОЧНИКОВ ИДЕНТИЧНОСТИ
+#  THE IDENTITY SOURCES TEMPLATE
 # =============================================================================
-#  Копируется как <префикс>_sources.yaml.
+#  Copied as <prefix>_sources.yaml.
 #
-#  Здесь ТОЛЬКО предпочтения: что включено и с какими параметрами. Эндпоинты,
-#  тип источника и признак remote_only — в общем каталоге
-#  config/sources.catalog.yaml и идентичностью не переопределяются: устаревший
-#  URL это баг для всех сразу, а не чья-то настройка.
+#  ONLY preferences here: what is enabled, and with what parameters. Endpoints,
+#  source kind and the remote_only flag live in the shared catalogue
+#  config/sources.catalog.yaml and are not overridable by an identity: a stale
+#  URL is a bug for everybody at once rather than somebody's setting.
 #
-#  Описание каждого источника с его сильными и слабыми сторонами —
-#  docs/BUILDING_BLOCKS.md. Собирайте набор осознанно: источник с низким
-#  выходом для вашего профиля будет каждый прогон засорять базу мусором.
+#  Each source is described, with its strengths and weaknesses, in
+#  docs/BUILDING_BLOCKS.md. Assemble the set deliberately: a source with a low
+#  yield for your profile will litter the base with rubbish on every run.
 # =============================================================================
 
 schema_version: 1
 
 sources:
-  # --- Площадки, публикующие только удалённые вакансии ---------------------
+  # --- Boards that publish remote vacancies only ---------------------------
   - name: weworkremotely
     enabled: true
-    # Обычно лучший по соотношению сигнал/шум; даёт структурное поле region.
+    # Usually the best by signal-to-noise; it gives a structured region field.
 
   - name: remoteok
     enabled: true
@@ -33,28 +33,28 @@ sources:
   - name: himalayas
     enabled: true
 
-  # --- Вакансии напрямую от работодателей ----------------------------------
+  # --- Vacancies straight from employers -----------------------------------
   - name: ats
     enabled: true
-    # Список компаний — в <префикс>_ats_targets.yaml. Именно он определяет
-    # выход этого источника; сам по себе источник даёт много, но нерелевантного.
+    # The company list is in <prefix>_ats_targets.yaml. That list determines
+    # this source's yield; on its own it gives plenty, but of the wrong kind.
 
-  # --- Нишевые -------------------------------------------------------------
+  # --- Niche ---------------------------------------------------------------
   - name: hn_whoishiring
     enabled: true
     params:
-      # Без явного списка берутся первые 5 из tech_stack.core. Задавайте явно,
-      # если важны слова, которых нет в стеке (например "legacy").
-      # Каждое слово = один HTTP-запрос.
+      # With no explicit list, the first 5 of tech_stack.core are used. Set it
+      # explicitly if words outside the stack matter (e.g. "legacy").
+      # Each word is one HTTP request.
       keywords: []
       hits_per_keyword: 50
 
   - name: arbeitnow
     enabled: false
-    # По умолчанию ВЫКЛЮЧЕН: по замерам это преимущественно немецкоязычный
-    # рынок. Включайте, если читаете по-немецки либо готовы к низкому выходу.
+    # DISABLED by default: by measurement this is predominantly a
+    # German-language market. Enable it if you read German, or accept a low yield.
 
   - name: manual
     enabled: true
-    # Ручной канал: находки агента с площадок, которые нельзя читать
-    # программно (LinkedIn, Indeed). Часто именно здесь попадается лучшее.
+    # The manual channel: the agent's finds from sites that cannot be read
+    # programmatically (Indeed and the like). Often the best turns up here.

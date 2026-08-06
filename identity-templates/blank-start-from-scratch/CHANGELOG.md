@@ -1,9 +1,9 @@
-# Журнал изменений пустого шаблона
+# Change log for the blank template
 
-Новые версии добавляются СВЕРХУ.
+New versions go on TOP.
 
-## V1 — первая версия
+## V1 — the first version
 
-Полный набор файлов идентичности с плейсхолдерами и комментариями,
-объясняющими назначение каждого раздела. Ничего не решает за человека:
-все содержательные значения он задаёт при онбординге.
+A full set of identity files with placeholders and comments explaining what
+each section is for. It decides nothing on a person's behalf: they set every
+substantive value during onboarding.

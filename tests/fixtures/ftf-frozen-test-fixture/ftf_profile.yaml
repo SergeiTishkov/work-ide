@@ -1,30 +1,30 @@
 # =============================================================================
-#  FTF — ТЕСТОВАЯ ФИКСТУРА. НЕ РЕДАКТИРОВАТЬ ПРИ ТЮНИНГЕ ЧЬЕГО-ЛИБО ПОИСКА.
+#  FTF — A TEST FIXTURE. DO NOT EDIT WHILE TUNING ANYBODY'S SEARCH.
 # =============================================================================
-#  Это не идентичность живого человека, а замороженный слепок конфигурации, к
-#  которому откалиброваны ~111 тестов проекта. Она существует ровно затем, чтобы
-#  тесты не зависели от того, какую идентичность разработчик держит активной, и
-#  не краснели каждый раз, когда кто-то тюнит свои критерии.
+#  This is not a live person's identity but a frozen snapshot of the
+#  configuration the project's tests are calibrated against. It exists purely so
+#  that the tests do not depend on which identity a developer keeps active, and
+#  do not go red every time somebody tunes their own criteria.
 #
-#  ПРАВИЛО ЗАМОРОЗКИ: файлы ftf_* меняются ТОЛЬКО вместе с осознанным
-#  обновлением тестов. Если вы правите машинерию и ftf "отстал" — это не повод
-#  его синхронизировать молча: расхождение и есть тот самый сигнал, что
-#  изменение затрагивает поведение и требует пересмотра тестов.
+#  THE FREEZE RULE: ftf_* files change ONLY together with a deliberate update
+#  to the tests. If you are editing the machinery and ftf has "fallen behind",
+#  that is no reason to synchronise it silently: the divergence IS the signal
+#  that the change affects behaviour and the tests need revisiting.
 #
-#  Активация запрещена вне тестов (kind: fixture, см. common.activate_identity).
+#  Activation outside the tests is forbidden (kind: fixture).
 # =============================================================================
 
 identity:
   kind: fixture
-  display_name: "Тестовая фикстура (заморожена, калибрует тесты)"
+  display_name: "Test fixture (frozen, calibrates the tests)"
   abbreviation: "FTF = Frozen Test Fixture"
   scoring_philosophy: >
-    Шкала тестовой фикстуры — калибрует тесты, человеку не показывается.
+    The test fixture's scale — it calibrates the tests and is shown to nobody.
   frozen: true
 
 contact:
-  # У фикстуры нет живого человека, контакт не нужен: сетевые вызовы в тестах
-  # замоканы.
+  # A fixture has no live person and needs no contact: network calls in the
+  # tests are mocked.
   user_agent_contact: null
 
 owner:
@@ -35,96 +35,96 @@ owner:
   cv_files:
     - "CV Test Person Software Engineer.pdf"
     - "CV Test Person Software Engineer.docx"
-  # Подтверждено человеком явно (2026-07-30): только эти два языка. Любое
-  # явное требование другого языка в вакансии — dealbreaker, см.
-  # config/criteria.yaml → language_requirement_signal. (Не путать с более
-  # ранним, неподтверждённым и низкодостоверным упоминанием немецкого/
-  # китайского на "elementary"-уровне из публичного среза LinkedIn без
-  # логина — человек явно опроверг это в разговоре, доверяем словам
-  # человека, а не автоматической выжимке с чужого сайта.)
+  # Confirmed by the owner explicitly (2026-07-30): only these two languages.
+  # Any explicit requirement for another language in a vacancy is a dealbreaker,
+  # see criteria.yaml -> language_requirement_signal. (Not to be confused with
+  # an earlier, unconfirmed and low-reliability mention of German and Chinese at
+  # "elementary" level from the public LinkedIn view without a login — the
+  # person denied it outright in conversation, and we believe the person rather
+  # than an automatic extract from somebody else's site.)
   languages:
     - "English"
     - "Russian"
   location:
-    country: "Georgia"          # страна на Кавказе, НЕ штат США
+    country: "Georgia"          # the country in the Caucasus, NOT the US state
     not_in: ["EU", "Russia", "Belarus"]
     utc_offset: 4
     disambiguation_warning: >
-      В текстах вакансий "Georgia" почти всегда означает штат США (GA).
-      Никогда не путать. Если в адресе/описании встречается "Georgia" без
-      явного указания "country" или "Tbilisi"/"Batumi"/"Caucasus" —
-      помечать вакансию needs_manual_review=true и не делать автоматических
-      выводов о географическом соответствии.
+      In vacancy text "Georgia" almost always means the US state (GA). Never
+      confuse them. If "Georgia" appears in an address or description without
+      an explicit "country" or "Tbilisi"/"Batumi"/"Caucasus", mark the vacancy
+      needs_manual_review=true and draw no automatic conclusions about
+      geographic fit.
   timezone_notes: >
-    Грузия: UTC+4 круглый год. Удобное пересечение с US East Coast (UTC-4/-5)
-    — вечер по грузинскому времени. С Западным побережьем США пересечение
-    хуже, но всё ещё возможно вечером. Async-friendly роли предпочтительны.
+    Georgia: UTC+4 all year. A convenient overlap with the US East Coast
+    (UTC-4/-5) — evening local time. The overlap with the US West Coast is
+    worse but still possible in the evening. Async-friendly roles preferred.
 
 target_regions:
-  # Подтверждено человеком явно (2026-07-30). США/Канада — приоритет
-  # ("мечта"), но реальный, гарантированный вариант — контракт с компанией
-  # из Израиля/ОАЭ на ~$5k/мес: ниже потолок, зато выше вероятность
-  # реального найма. Оба варианта равноценно валидны для системы — это не
-  # "план Б хуже", а "то же самое качество, другая вероятность".
+  # Confirmed by the owner explicitly (2026-07-30). The US and Canada are the
+  # priority (the "dream"), but the real, dependable option is a contract with
+  # a company in Israel or the UAE at about $5k a month: a lower ceiling but a
+  # higher probability of actually being hired. Both are equally valid to the
+  # system — not "plan B is worse" but "the same quality, a different chance".
   dream:
     - "United States"
     - "Canada"
   solid_realistic:
-    - "Israel"        # реальный опыт работы с израильской компанией (реальный опыт сотрудничества) — не гипотеза
+    - "Israel"        # real experience of working with an Israeli company — not a hypothesis
     - "UAE"
-  # ИСПРАВЛЕНО 2026-07-30 (вечер): "Europe" здесь БЫЛО ошибочно — в реальной
-  # найденной вакансии "(EU Remote)" в заголовке означает требование
-  # резидентства В ЕС, что дисквалифицирует человека (Грузия не в ЕС)
-  # ровно так же, как "US Remote". Просто "компания из Европы" не
-  # отслеживается отдельным плюсом (слишком легко перепутать с
-  # резидентским требованием) — см. criteria.yaml →
-  # remote_location_fit.restrictive_region_signal, куда переехали "eu
-  # remote"/"remote europe" как dealbreaker.
+  # CORRECTED 2026-07-30 (evening): "Europe" here WAS a mistake — in a real
+  # vacancy found, "(EU Remote)" in the title means EU residency is required,
+  # EU residency, which disqualifies the person (Georgia is not in the EU)
+  # does. A plain "a European company" is not tracked as its own plus (too easy
+  # to confuse with a residency requirement) — see criteria.yaml ->
+  # remote_location_fit.restrictive_region_signal, where "eu remote" and
+  # "remote europe" moved as dealbreakers.
+  #
   note: >
-    Важно: "компания базируется в регионе X" ≠ "компания требует резидентство
-    в X". Israel/UAE ценны именно как ДОПОЛНИТЕЛЬНЫЕ реалистичные
-    регионы найма, а не как замена гео-фильтрации — жёсткое требование
-    резидентства/гражданства в ЛЮБОЙ стране (включая эти две и включая
-    США/Канаду) при отсутствии у человека такого резидентства — всегда
-    dealbreaker (полный отсев), см. criteria.yaml →
+    Note: "the company is based in region X" is not "the company requires
+    residency in X". Israel and the UAE are valuable as ADDITIONAL realistic
+    hiring regions rather than as a replacement for geography filtering — a
+    hard residency or citizenship requirement in ANY country (including these
+    two, and including the US and Canada) that the person does not hold is
+    always a dealbreaker (total rejection), see criteria.yaml ->
     remote_location_fit.restrictive_region_signal.
 
 goal:
   purpose: >
-    Спокойная неполная занятость: 2-4 часа в день.
-    Основная работа полностью закрывает потребность в интересных задачах —
-    здесь наоборот ценятся скука, предсказуемость, низкая когнитивная
-    нагрузка и низкая конкуренция за место.
+    Calm part-time work: 2-4 hours a day.
+    The main job fully satisfies the need for interesting problems — here, on
+    the contrary, what is valued is tedium, predictability, low cognitive load
+    and little competition for the position.
   hours_per_day_target: [2, 4]
   ai_assisted: true
   ai_tools_note: >
-    Планируется активно использовать AI (Claude/Cursor/Copilot) для
-    эффективности. Поэтому особенно хорошо подходят технологии, которые
-    современные LLM понимают отлично: ASP.NET (Framework и Core),
+    AI (Claude/Cursor/Copilot) is to be used actively for efficiency. So the
+    technologies that suit especially well are the ones modern LLMs understand
+    excellently: ASP.NET (Framework and Core), C#, classic REST/SOAP — that is,
     ASP.NET MVC/WebForms, EF6/EF Core, jQuery, Angular(JS), SQL Server,
-    C#, классический REST/SOAP — то есть ровно тот стек, который уже есть
-    в CV, только в "устаревшем", хорошо задокументированном изводе.
+    C#, classic REST/SOAP — that is, exactly the stack already in the CV, only
+    in its "ageing", well-documented edition.
   target_compensation:
     currency: USD
-    # Подтверждено человеком явно (2026-07-30): ориентир — $5000-8000/мес
-    # при 2-4ч/день. $7-8k предпочтительнее, но не в ущерб спокойствию:
-    # гарантированно скучная и лёгкая работа за $5k > стрессовая за $8k.
+    # Confirmed by the owner explicitly (2026-07-30): the guide is $5000-8000 a
+    # month at 2-4 hours a day. $7-8k is preferable but not at the cost of
+    # calm: guaranteed dull, easy work at $5k beats stressful work at $8k.
     monthly_parttime_usd: [5000, 8000]
-    annual_parttime_usd: [60000, 96000]  # = monthly_parttime_usd * 12, для сравнения с годовыми вилками в вакансиях
-    hourly_contractor_usd: [55, 130]  # $5-8k/мес при 44-88ч/мес (2-4ч х ~22 раб.дня)
+    annual_parttime_usd: [60000, 96000]  # = monthly_parttime_usd * 12, to compare with annual ranges
+    hourly_contractor_usd: [55, 130]  # $5-8k/month at 44-88 h/month (2-4 h x ~22 working days)
     priority_note: >
-      Приоритет строго: гарантированно низкая нагрузка/стресс важнее более
-      высокой оплаты. Если вакансия явно спокойная (низкий low_intensity
-      риск, легаси/энтерпрайз, без дедлайнов) — она должна оцениваться выше
-      вакансии с более высокой ставкой, но признаками стресса/спешки. Именно
-      поэтому в criteria.yaml вес low_intensity_signal (20) вдвое выше веса
-      compensation_signal (10) — это осознанное решение, а не оверсайт.
+      The priority is strict: guaranteed low intensity and stress matter more
+      than higher pay. If a vacancy is plainly calm (low low_intensity risk,
+      legacy or enterprise, no deadlines), it should score above a vacancy with
+      a higher rate but signs of stress and haste. That is precisely why
+      low_intensity_signal (20) weighs twice compensation_signal (10) in
+      criteria.yaml — a deliberate decision rather than an oversight.
     note: >
-      Чем выше ставка при явно низкой нагрузке — тем выше приоритет.
-      Отсутствие вилки в вакансии — не дисквалификация, но снижает
-      уверенность скоринга. Ниже нижней границы диапазона — вакансия не
-      исключается автоматически (мало ли, реально приятная и лёгкая), но
-      получает штраф в compensation_signal.
+      The higher the rate at plainly low intensity, the higher the priority.
+      A vacancy with no range is not disqualified, but scoring is less
+      confident about it. Below the bottom of the range a vacancy is not
+      excluded automatically (it may genuinely be pleasant and easy) but takes
+      a penalty in compensation_signal.
 
 employment_type_priority:
   high: ["contractor", "1099", "part-time", "fractional", "freelance", "hourly"]
@@ -141,19 +141,19 @@ employment_type_priority:
     - "on-site required"
     - "in-office"
 
-# Пересчитано по фактической частоте в CV (2026-07-30): 3 уровня отражают,
-# в скольких из 8 последних мест работы (2018-2026) реально встречалась
-# технология, а не субъективное "это тоже вроде подходит". Вакансия,
-# совпадающая только с familiar-технологиями, не должна оцениваться так же,
-# как вакансия, совпадающая с core — см. criteria.yaml → stack_fit.
+# Recomputed from actual frequency in the CV (2026-07-30): the 3 levels reflect
+# in how many of the last 8 jobs (2018-2026) a technology really appeared,
+# rather than a subjective "that fits too". A vacancy matching only familiar
+# technologies must not be scored the same as one matching core — see
+# criteria.yaml -> stack_fit.
 tech_stack:
-  # core: встречается в подавляющем большинстве ролей (6-8 из 8) — это
-  # буквально то, чем человек занимается почти без перерыва 7+ лет.
-  # ПРИМЕЧАНИЕ: голого ".NET" здесь намеренно нет. Он "поймал" бы .NET Core/
-  # .NET Framework и всё остальное как подстроку, но заодно и "VB.NET" —
-  # технологию, с которой человек не работал (см. CLAUDE.md §2a). Более
-  # специфичные ключи (.NET Core/.NET Framework/ASP.NET/C#) уже покрывают
-  # реальные случаи без этого побочного эффекта.
+  # core: appears in the overwhelming majority of roles (6-8 of 8) — literally
+  # what the person has been doing almost without a break for 7+ years.
+  # NOTE: a bare ".NET" is deliberately absent. It would catch .NET Core, .NET
+  # Framework and the rest as a substring, but also "VB.NET" — a technology the
+  # person has not worked with. More specific keys (.NET Core, .NET Framework,
+  # ASP.NET, C#) already cover the real cases without that side effect.
+  #
   core:
     - ".NET"
     - ".NET Core"
@@ -167,8 +167,8 @@ tech_stack:
     - "MS SQL"
     - "Angular"
     - "AngularJS"
-  # strong: регулярно, но не в каждой роли (2-4 из 8) — реальная, но не
-  # ежедневная экспертиза.
+  # strong: regularly, but not in every role (2-4 of 8) — real but not daily
+  # expertise.
   strong:
     - "Entity Framework"
     - "EF6"
@@ -184,19 +184,19 @@ tech_stack:
     - "Event Sourcing"
     - "HTML"
     - "CSS"
-  # familiar: было в 1-2 ролях за всю карьеру — реальный опыт, но узкий,
-  # не стоит считать наравне с core.
-  # ПРИМЕЧАНИЕ: "Express" здесь именно "Express.js" (без .js рискует ложно
-  # совпасть с обычным английским словом "express"); "LESS" убран совсем —
-  # реальный найденный баг (2026-07-30): CSS-препроцессор "LESS" ложно
-  # совпадал с обычным английским словом "less" в финансовой вакансии
-  # ("no less than...") и давал ей незаслуженный stack_fit. SCSS уже
-  # покрывает тот же класс задач и не имеет такого риска.
-  # "Java"/"Scala" — подтверждено человеком явно (2026-07-30): САМИ ПО СЕБЕ
-  # не считаются релевантными (Java web-разработка — не то, на что человек
-  # может рассчитывать), но Java/Scala ДЛЯ ДАТА-ПАЙПЛАЙНОВ (Spark/
-  # Databricks/ETL) — желанный вариант (реальный опыт, предыдущего места работы
-  # Engineering). Особая обработка — в criteria.yaml → stack_fit →
+  # familiar: was in 1-2 roles across a whole career — real experience, but
+  # narrow, and not to be counted level with core.
+  # NOTE: "Express" here is specifically "Express.js" (without the .js it risks
+  # falsely matching the ordinary English word "express"); "LESS" was removed
+  # entirely — a real bug found (2026-07-30): the CSS preprocessor "LESS"
+  # falsely matched the ordinary English word "less" in a finance vacancy
+  # ("no less than...") and gave it an undeserved stack_fit. SCSS already
+  # covers the same class of work without that risk.
+  # "Java"/"Scala" — confirmed by the owner explicitly (2026-07-30): ON THEIR
+  # OWN they do not count as relevant (Java web development is not something
+  # the person can expect), but Java/Scala FOR DATA PIPELINES
+  # (Spark/Databricks/ETL) is a wanted variant (real experience, from a
+  # previous job). The special handling is in criteria.yaml -> stack_fit ->
   # data_pipeline_language_keywords / data_pipeline_context_keywords.
   familiar:
     - "Node.js"
@@ -221,11 +221,11 @@ tech_stack:
     - "NgRx"
     - "Redux"
     - "MobX"
-  # ПРИМЕЧАНИЕ: "WebForms"/"VB.NET"/"Classic ASP" сознательно НЕ входят в
-  # tech_stack (нет подтверждения в CV, что человек с ними реально
-  # работал) — но остаются в criteria.yaml → legacy_enterprise_signal,
-  # потому что это сигнал о характере ВАКАНСИИ (легаси), а не о личном
-  # навыке. Не путать эти две разные оси при будущих правках.
+  # NOTE: "WebForms", "VB.NET" and "Classic ASP" are deliberately NOT in
+  # tech_stack (the CV does not confirm the person really worked with them) —
+  # but they remain in criteria.yaml -> legacy_enterprise_signal, because they
+  # signal the character of the VACANCY (legacy) rather than a personal skill.
+  # Do not confuse those two axes in future edits.
 
 ideal_company_traits:
   high_priority:
@@ -254,39 +254,39 @@ ideal_company_traits:
     - "wear many hats"
 
 eor_platforms_signal:
-  # Упоминание платформы найма — сильный сигнал, что компания реально готова
-  # оформить подрядчика вне своей страны (это +18, самый крупный плюс рубрики).
+  # A mention of an employment platform is a strong signal that a company is
+  # genuinely able to engage a contractor abroad (+18, the rubric's largest plus).
   #
-  # ОСТОРОЖНО С КОРОТКИМИ И ОБЩИМИ ФОРМАМИ. Замер 2026-08-05 на базе из 9527
-  # вакансий показал 345 ложных срабатываний:
-  #   * "Multiplier" (266) ловился в "productivity multiplier", "Talent
-  #     Multiplier", "operating as a multiplier" — обычное английское слово;
-  #   * "G-P" (79) ловился внутри немецкого "Mentorin-G-P-rogramm" и подобных.
-  # Тот же класс ошибки, что "LESS" внутри "no less than" и "eor" внутри
-  # "theoretical". Поэтому названия, совпадающие с обычными словами, пишутся
-  # доменом: домен в тексте вакансии однозначен.
-  - "Deel"                      # проверено: 17 срабатываний, все настоящие
+  # BEWARE SHORT AND GENERIC FORMS. Measured 2026-08-05 over a base of 9527
+  # vacancies: 345 false matches.
+  #   * "Multiplier" (266) was caught in "productivity multiplier", "Talent
+  #     Multiplier", "operating as a multiplier" — an ordinary English word;
+  #   * "G-P" (79) was caught inside German words like "Mentoring-Programm".
+  # The same class of mistake as "LESS" inside "no less than" and "eor" inside
+  # "theoretical". So names that coincide with ordinary words are written as a
+  # domain: a domain in vacancy text is unambiguous.
+  - "Deel"                      # verified: 17 matches, all genuine
   - "Remote.com"
   - "Oyster HR"
   - "Papaya Global"
-  - "multiplier.com"            # вместо голого "Multiplier"
+  - "multiplier.com"            # instead of a bare "Multiplier"
   - "Globalization Partners"
-  - "g-p.com"                   # вместо голого "G-P"
+  - "g-p.com"                   # instead of a bare "G-P"
   - "Velocity Global"
-  - "Employer of Record"        # общий термин, надёжнее любого бренда
+  - "Employer of Record"        # the generic term, safer than any brand
   - "EOR provider"
   - "Remofirst"
   - "Rippling EOR"
   - "Safeguard Global"
 
-# Переопределение весов красных флагов работодателя.
+# Overriding the weights of employer red flags.
 #
-# Общий каталог (config/derivation/company_red_flags.yaml) оценивает, насколько
-# плоха вещь САМА ПО СЕБЕ. Насколько она плоха для конкретного человека —
-# зависит от его обстоятельств, а обстоятельства не место хранить в общем
-# репозитории. Поэтому здесь сентинел `local`: веса приходят из
-# local-constitution/personal/<префикс>/<префикс>_owner.yaml.
+# The shared catalogue (config/derivation/company_red_flags.yaml) rates how bad
+# a thing is IN ITSELF. How bad it is for a particular person depends on their
+# circumstances, and circumstances have no place in a shared repository. So the
+# weights come from the local identity's own file.
 #
-# Переопределение работает в любую сторону, включая плюс. Границы механизма и
-# то, чего он НЕ может (снять жёсткий гейт), описаны в docs/OVERRIDES.md.
+#
+# The override works in either direction, including into a plus. The boundaries
+# of the mechanism, and what it CANNOT do (lift a hard gate), are in
 company_red_flag_severity: local

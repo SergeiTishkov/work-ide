@@ -1,26 +1,26 @@
-# Вопросник фикстуры — заполнен формально.
+# The fixture's questionnaire — filled in as a formality.
 #
-# У тестовой фикстуры нет живого человека, которого можно опросить. Файл
-# существует, чтобы структура папки была полной и `identity.py validate`
-# проверял фикстуру теми же правилами, что и настоящие идентичности.
+# A test fixture has no live person to interview. The file exists so that the
+# folder structure is complete and `identity.py validate` checks the fixture by
+# the same rules as a real identity.
 #
-# Шаблон с полным списком вопросов — identities/_template/tmpl_questionnaire.yaml;
-# как проводить опрос — docs/QUESTIONNAIRE.md. Пример заполненного вопросника
-# ищите в любой личной идентичности (`python tools/identity.py list`).
+# The template with the full list of questions is each template's
+# <prefix>_questionnaire.yaml; how to run the interview is in
+# docs/QUESTIONNAIRE.md.
 #
-# Намеренно без ссылок на конкретную живую идентичность: файлы одной
-# идентичности не должны упоминать префиксы другой — на это есть проверка в
-# identity.validate(), и она поймала именно эту строку, когда здесь стояла
-# прямая ссылка.
+# Deliberately without a reference to any live identity: one identity's files
+# must not mention another's prefix — identity.validate() checks that, and it
+# caught this very line when a direct reference stood here.
+#
 
 schema_version: 1
 identity_prefix: ftf
-filled_with_user_at: null   # никого не опрашивали: это фикстура
+filled_with_user_at: null   # nobody was interviewed: this is a fixture
 is_fixture: true
 
 note: >
-  Значения профиля и критериев этой идентичности — побайтовая копия конфигурации
-  проекта на 2026-07-31, к которой откалиброваны тесты. Они НЕ выведены из
-  ответов на вопросник и не должны регенерироваться через `identity.py build`.
+  This identity's profile and criteria values are a byte-for-byte copy of the
+  project's configuration as of 2026-07-31, which the tests are calibrated
+  against. They are NOT derived from questionnaire answers and must not be
 
 answers: []

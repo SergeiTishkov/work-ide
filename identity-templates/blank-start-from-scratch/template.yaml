@@ -1,14 +1,14 @@
-# Пустой шаблон: для тех, кому не подходит ни один готовый.
+# The blank template: for anyone none of the ready-made ones suits.
 #
-# Он ВАЛИДЕН (проходит identity.py validate), но НЕ ГОТОВ: пока плейсхолдеры
-# не заменены, поиск по нему запрещён проверкой готовности. Это намеренно —
-# реальный случай 2026-08-04: создание идентичности и запуск пайплайна на
-# плейсхолдерах отработали и выдали правдоподобный мусор на 1734 вакансии.
+# It is VALID (it passes identity.py validate) but NOT READY: until the
+# placeholders are replaced, the readiness check forbids searching with it.
+# That is deliberate — a real case, 2026-08-04: creating an identity and
+# running the pipeline on placeholders produced plausible rubbish over 1734
 
 name: blank
 version: 1
 summary: >
-  Пустая заготовка со всеми файлами и подробными комментариями, но без
-  готовых настроек. Заполняется по docs/ONBOARDING.md вместе с агентом.
+  Empty scaffolding with every file and detailed comments, but no ready-made
+  settings. Filled in per docs/ONBOARDING.md together with the agent.
 suitable_for: >
-  Любой поиск, для которого не подходит ни один готовый шаблон.
+  Any search that none of the ready-made templates suits.
