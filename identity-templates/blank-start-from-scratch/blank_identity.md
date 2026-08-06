@@ -20,9 +20,9 @@
 ## What this identity is
 
 <A paragraph comprehensible to an outsider: what work is being looked for, and
-why that kind. If the priorities are unusual, explain them. "Interesting
+why that kind. If the priorities are unusual, explain them — "interesting
 problems are not wanted here, predictable routine is" sounds strange until you
-say it is part-time work alongside another job.>
+say what the search is optimising for instead.>
 
 ## Who it is for
 

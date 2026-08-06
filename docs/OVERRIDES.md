@@ -212,8 +212,8 @@ and do not write presumed consumers into the header — only real ones.
 ## Checklist: a person asks for a change in behaviour
 
 1. **Is this about the search or about the person?** About the search — the
-   template. About the person (tax, family, a second job, plans to move) — their
-   own file in the local identity.
+   template. About the person (tax, family, other commitments, plans to move)
+   — their own file in the local identity.
 2. **Is it useful to everyone who clones the repository?** Then `config/` or
    `tools/`.
 3. **Is it about the score or about rejection?** Score — override a weight.

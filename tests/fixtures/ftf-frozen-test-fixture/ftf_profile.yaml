@@ -92,9 +92,9 @@ target_regions:
 goal:
   purpose: >
     Calm part-time work: 2-4 hours a day.
-    The main job fully satisfies the need for interesting problems — here, on
-    the contrary, what is valued is tedium, predictability, low cognitive load
-    and little competition for the position.
+    Interesting problems are not the goal here — on the contrary, what is
+    valued is tedium, predictability, low cognitive load and little
+    competition for the position.
   hours_per_day_target: [2, 4]
   ai_assisted: true
   ai_tools_note: >
