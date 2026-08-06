@@ -69,7 +69,6 @@ A board token can be checked with one request:
 | `link_check.py` | Checking that links are alive | Automatically inside the pipeline |
 | `report.py` | Rebuild the report without collecting again | After editing the criteria |
 | `textclean.py` | Strip email addresses and links out of text | Inside scoring; also useful by hand when debugging a match |
-| `migrate_to_identity.py` | Move the old layout into an identity | Once, historical |
 
 ## Manual enrichment of the base
 

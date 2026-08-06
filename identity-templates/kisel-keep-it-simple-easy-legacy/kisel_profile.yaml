@@ -32,15 +32,15 @@ contact:
 
 # ==== PERSONAL: the values live in the local identity, outside git ====
 #
-# The `local` sentinel means: the real value lives in the personal file and is
-# merged in when the identity is activated (common.resolve_local_fields). This
-# is the retired mechanism, kept for machines that have not migrated.
+# This folder is in the shared repository and describes a SEARCH, not a person.
+# A name, a LinkedIn profile, residency, a CV and pay expectations are no part
+# of describing a search; without the split, everyone who cloned the project
+# would get the author's personal file.
 #
-# Why: this folder is in the shared repository and describes a SEARCH, not a
-# person. A name, a LinkedIn profile, residency, a CV and pay expectations are
-# no part of describing a search; without the split, everyone who cloned the
-# project would get the author's personal file. Until the personal layer is
-# filled in, the identity counts as unfinished and no search runs.
+# Values set here are the search's; anything about the person goes in the file
+# beside the template/ copy inside their own identity, and is layered on top
+# (tools/settings.py). Until the required personal fields are filled in, the
+# identity counts as unfinished and no search runs.
 owner:
   # The role is part of the SEARCH profile: it explains which vacancies the
   # search aims at, and is the same for everybody using this template.

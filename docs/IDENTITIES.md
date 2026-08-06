@@ -28,14 +28,6 @@ So isolation here is not a convenience but a correctness requirement.
 
 Plus the data: `data/<prefix>/`, the accumulated base, outside git.
 
-An earlier architecture had a third layer, a "Local Constitution", holding a
-registry of active identities and a `local` sentinel in the shared configs. It
-was retired, and removed entirely on 2026-08-06: with identities outside git
-there is nobody left to hide personal fields from. If you have the folder from
-an earlier version, check that everything you need has moved into your local
-identity and delete it — nothing reads it. The reasoning is in
-`docs/ARCHITECTURE.md`.
-
 ## The template copy inside a local identity
 
 ```
