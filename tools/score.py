@@ -988,8 +988,9 @@ def _score_role_relevance(text: str, title: str, criteria: dict):
     wrong_profession_hits = [
         p for p in cfg["wrong_profession_title_patterns"] if re.search(p, search_area, re.IGNORECASE)
     ]
-    # Жёсткий уровень: менеджмент/продажи/GTM/пресейл — заведомо не роль
-    # рядового разработчика, даже если в заголовке есть "engineer"/"architect".
+    # The hard tier: management, sales, GTM and presales are certainly not an
+    # individual contributor role, even with "engineer" or "architect" in the
+    # title.
     hard_wrong_hits = [
         p for p in cfg.get("hard_wrong_profession_title_patterns", [])
         if re.search(p, search_area, re.IGNORECASE)
@@ -1213,24 +1214,25 @@ def _score_low_intensity(text: str, criteria: dict):
 
 
 def _extract_amounts(text: str):
-    """Best-effort извлечение денежных сумм из текста. Возвращает список
-    (значение_в_год_или_None, значение_в_час_или_None, значение_в_месяц_или_None).
+    """Best-effort extraction of money amounts. Returns a list of
+    (annual_or_None, hourly_or_None, monthly_or_None) tuples.
 
-    Отдельно распознаём "$X/month" / "$X per month" / "$X/mo" — без этого
-    типичное объявление вида "$5,000/month" трактовалось бы как ГОДОВАЯ
-    ставка (число >= 500) и несправедливо штрафовалось бы как заниженное
-    относительно annual_parttime_usd."""
+    Monthly forms ("$X/month", "$X per month", "$X/mo") are recognised
+    separately. Without that, an ordinary "$5,000/month" was read as an
+    ANNUAL figure — any number at or above 500 was — and unfairly penalised
+    as far below the target annual range."""
     results = []
     for m in _AMOUNT_RE.finditer(text):
-        # Контекст перед суммой. Реальный случай 2026-07-31: Sticker Mule
-        # пишет "Salary: $150,000–$250,000 USD" и следом "$20,000 signing
-        # bonus" — отчёт показывал вилку "$20,000-$250,000/год", то есть
-        # заметно занижал нижнюю границу. Бонусы, стипендии и оборот
-        # компании к ставке отношения не имеют.
-        # Назад смотрим шире, вперёд — узко: "signing bonus" стоит сразу за
-        # своей суммой, а вот заглядывать на 40 символов вперёд нельзя, иначе
-        # настоящая вилка "$150,000-$250,000 USD. $20,000 signing bonus"
-        # отбрасывалась бы целиком из-за соседнего бонуса.
+        # Context around the amount. Found 2026-07-31: Sticker Mule writes
+        # "Salary: $150,000–$250,000 USD" and then "$20,000 signing bonus",
+        # and the report showed a range of "$20,000-$250,000/year" — a badly
+        # understated lower bound. Bonuses, stipends and company revenue have
+        # nothing to do with the rate.
+        #
+        # The window looks further back than forward: "signing bonus" follows
+        # its own amount immediately, whereas looking 40 characters ahead
+        # would discard the real range in "$150,000-$250,000 USD. $20,000
+        # signing bonus" because of the bonus sitting next to it.
         window = text[max(0, m.start() - 40):m.end() + 15]
         if any(w in window for w in _NON_SALARY_CONTEXT_WORDS):
             continue
@@ -1240,7 +1242,7 @@ def _extract_amounts(text: str):
         except ValueError:
             continue
         if suffix in _MAGNITUDE_SUFFIXES:
-            continue  # оборот/инвестиции/суммарные выплаты, а не ставка
+            continue  # revenue, funding or total payouts, not a rate
         if suffix == "k":
             results.append((value * 1000, None, None))
         elif suffix and ("month" in suffix or suffix.lstrip("/per ").strip() == "mo"):
@@ -1257,11 +1259,11 @@ def _extract_amounts(text: str):
 
 def _score_external_salary_estimate(vacancy: dict, criteria: dict, profile: dict):
     """Scoring a manually found salary range (Glassdoor and similar) when the
-    вакансия зарплату не указывает. Подтверждено человеком явно
-    (2026-07-30): "если ЗП не указана, но из сторонних источников понятен
-    примерный рендж — маленький плюс". Заполняется через
-    `tools/kb.py set-salary-estimate` в vacancy.external_signals — это
-    top-level поле (не "manual"), поэтому оно участвует в rescoring."""
+    vacancy states none. Confirmed explicitly 2026-07-30: if no salary is
+    stated but third-party sources give a rough range, that is a SMALL plus.
+    Filled in via `tools/kb.py set-salary-estimate` into
+    vacancy.external_signals — a top-level field rather than "manual", so it
+    takes part in rescoring."""
     cfg = criteria["compensation_signal"]
     estimate = (vacancy.get("external_signals") or {}).get("salary_estimate")
     if not estimate:
@@ -1485,14 +1487,14 @@ def _score_company_reputation(vacancy: dict, criteria: dict, profile: dict = Non
     if red_flags:
         detail["red_flags"] = red_flags
         needs_review = True
-        # Красный флаг обязан стоить баллов, а не только пометки. Реальный
-        # случай 2026-08-05: платформа с отзывами "late payments" и
-        # "unpredictable work availability" получала +14 за рейтинг 3.5 и
-        # work-life balance 4.0 — и выходила на первое место в выдаче.
+        # A red flag has to cost points, not merely raise a marker. Found
+        # 2026-08-05: a platform whose reviews said "late payments" and
+        # "unpredictable work availability" was collecting +14 for a 3.5
+        # rating and 4.0 work-life balance — and leading the shortlist.
         #
-        # Вес зависит от того, ЧТО именно за флаг, и берётся из общего
-        # каталога, а идентичность или Малая Конституция могут перебить его
-        # в любую сторону, включая плюс (docs/OVERRIDES.md).
+        # The weight depends on WHICH flag it is and comes from the shared
+        # catalogue; an identity or the local layer may override it in either
+        # direction, positive included (docs/OVERRIDES.md).
         flag_points, flag_detail = _score_red_flags(red_flags, profile)
         points += flag_points
         detail["red_flag_penalty"] = flag_points
@@ -1503,10 +1505,12 @@ def _score_company_reputation(vacancy: dict, criteria: dict, profile: dict = Non
 
 
 def _score_company_age(vacancy: dict, criteria: dict):
-    """Зрелость компании из открытых данных (Wikidata, собирается
-    автоматически через tools/company_intel.py). profile.yaml →
-    ideal_company_traits просит "mature company (10+ years old)": у старой
-    компании обычно устоявшиеся процессы и легаси — то, что нужно."""
+    """Company maturity from open data (Wikidata, collected automatically by
+    tools/company_intel.py).
+
+    The profile asks for a mature company because an older one usually has
+    settled processes and legacy systems — which is the point of this
+    search."""
     cfg = (criteria.get("company_reputation_signal") or {}).get("company_age")
     intel = vacancy.get("_company_intel")
     if not cfg or not intel or not intel.get("found"):
@@ -1542,21 +1546,22 @@ def _score_contractor_friendliness(text: str, criteria: dict):
 
 
 def _score_personal_market_bonus(vacancy: dict, profile: dict):
-    """Личная надбавка за конкретный рынок.
+    """A personal bonus for a particular market.
 
-    ЗАЧЕМ ОТДЕЛЬНЫЙ СИГНАЛ И ПОЧЕМУ ЕГО ЗНАЧЕНИЯ ЖИВУТ ВНЕ РЕПОЗИТОРИЯ.
-    Бывают причины предпочесть страну, которых нет ни в рынке, ни в профиле
-    поиска: налоговое резидентство, пенсионный стаж, семья, планы на переезд.
-    Это обстоятельства КОНКРЕТНОГО человека — они не должны попадать ни в
-    общую машинерию (там им не место по определению), ни в идентичность
-    (её может переиспользовать кто угодно другой).
+    Why a separate signal, and why its values live outside the repository.
 
-    Поэтому в профиле идентичности стоит сентинел `local`, а сами страны и
-    веса лежат в Малой Конституции, вне гита. Идентичность лишь объявляет,
-    что такая надбавка может быть.
+    There are reasons to prefer a country that appear neither in the market
+    nor in the search profile: tax residency, pension contributions, family,
+    plans to move. Those are circumstances of ONE person. They belong neither
+    in the shared machinery, where they have no place by definition, nor in
+    the template, which anyone else may reuse.
 
-    Надбавка намеренно МЯГКАЯ: она двигает вакансию вверх в выдаче, но не
-    делает непроходную проходной — гейты отрабатывают раньше и независимо.
+    So the countries and their weights live in the local identity, outside
+    git, and the template does not declare them at all.
+
+    The bonus is deliberately SOFT: it moves a vacancy up the shortlist but
+    never makes an impossible one possible — the gates run first and
+    independently.
     """
     bonuses = (profile or {}).get("personal_market_bonus")
     if not isinstance(bonuses, dict) or not bonuses:
@@ -1572,8 +1577,8 @@ def _score_personal_market_bonus(vacancy: dict, profile: dict):
         if common.normalize_for_matching(country) not in haystack:
             continue
         points = cfg.get("points", 0) if isinstance(cfg, dict) else cfg
-        # Часть надбавок имеет смысл только для удалённой работы: «платить
-        # налоги дома» работает, если работать можно откуда угодно.
+        # Some bonuses only make sense for remote work: paying tax at home
+        # works if the work can be done from anywhere.
         if isinstance(cfg, dict) and cfg.get("remote_only") and not vacancy.get("remote"):
             continue
         hits[country] = points
@@ -1585,14 +1590,14 @@ def _score_personal_market_bonus(vacancy: dict, profile: dict):
 
 
 def _score_title_role_penalty(title: str, criteria: dict):
-    """Мягкий штраф за роли, которые человек закрыть может, но на которые его
-    возьмут с меньшей вероятностью.
+    """A soft penalty for roles the person can do but is less likely to be
+    hired for.
 
-    Не гейт: это вопрос шансов, а не возможности. Реальный случай 2026-08-05:
-    чистый Frontend Developer — работу человек сделает, но опыт у него в
-    основном фуллстек, и в конкуренции с профильными фронтендерами он
-    проигрывает. Выбрасывать такие вакансии неправильно, показывать наравне
-    с профильными — тоже.
+    Not a gate: this is about odds, not possibility. A pure Frontend Developer
+    role is work this profile can do, but the experience behind it is mostly
+    full-stack, and against specialist frontend candidates it loses. Throwing
+    such vacancies away would be wrong; showing them level with on-profile
+    ones would be wrong too.
     """
     cfg = criteria.get("title_role_penalty")
     if not cfg:
@@ -1605,7 +1610,7 @@ def _score_title_role_penalty(title: str, criteria: dict):
         pattern = rule.get("pattern")
         if not pattern or not re.search(pattern, title_norm, re.IGNORECASE):
             continue
-        # Исключения: «Fullstack (React)» не должен считаться чистым фронтендом.
+        # Exceptions: "Fullstack (React)" must not count as pure frontend.
         if any(re.search(x, title_norm, re.IGNORECASE) for x in rule.get("unless", [])):
             continue
         hits.append(rule.get("label") or pattern)
@@ -1615,25 +1620,27 @@ def _score_title_role_penalty(title: str, criteria: dict):
 
 
 def _score_personal_tech_bonus(text: str, title: str, profile: dict, criteria: dict = None):
-    """Личные надбавки и штрафы за конкретные технологии.
+    """Personal bonuses and penalties for particular technologies.
 
-    ЗАЧЕМ ОТДЕЛЬНО ОТ stack_fit. Тот отвечает на вопрос «умеет ли человек это
-    вообще» и одинаков для всех, кто пользуется идентичностью. А вот насколько
-    один знакомый стек предпочтительнее другого — вопрос личного опыта: два
-    разработчика с одинаковой строчкой ".NET/JS" в резюме могут быть сильны в
-    разном. Поэтому значения живут в Малой Конституции, вне гита.
+    Why separate from stack_fit. That answers "can this person do it at all"
+    and is the same for everyone using the template. How much one familiar
+    stack is preferred over another is a matter of personal experience: two
+    developers with the same ".NET/JS" line on a CV may be strong in quite
+    different parts of it. So the values live in the local identity, outside
+    git.
 
-    Вес считается ОДИН РАЗ на группу, а не за каждое совпадение: иначе
-    вакансия, перечислившая пять форм написания Node, получила бы пятикратный
-    штраф, а упомянувшая .NET один раз — одинарную надбавку.
+    The weight counts ONCE per group rather than per match: otherwise a
+    vacancy spelling Node five different ways would take a fivefold penalty,
+    while one mentioning .NET once would get a single bonus.
     """
     groups = (profile or {}).get("personal_tech_bonus")
     if not isinstance(groups, dict) or not groups:
         return 0, {}
 
-    # Срез "стекового спама" — тот же, что в оценке стека и в гейте отрасли.
-    # Без него аутстаф-компания с абзацем "NOT YOUR TECH STACK?" получает
-    # надбавку за .NET на любой своей вакансии, включая чистый React.
+    # The same stack-spam cut as in stack scoring and the industry gate.
+    # Without it an outstaffing company with a "NOT YOUR TECH STACK?"
+    # paragraph earns the .NET bonus on every vacancy it posts, pure React
+    # roles included.
     if criteria:
         text, _ = _strip_stack_noise_sections(text, criteria)
     haystack = f"{common.normalize_for_matching(title)} {text}"
@@ -1645,8 +1652,9 @@ def _score_personal_tech_bonus(text: str, title: str, profile: dict, criteria: d
         matched = _matches(haystack, cfg.get("keywords") or [])
         if not matched:
             continue
-        # Исключения нужны там, где технология упомянута как соседняя, а не
-        # как суть роли: "React + .NET" — это .NET-вакансия, а не Node.
+        # Exceptions matter where a technology is mentioned as adjacent rather
+        # than as the substance of the role: "React + .NET" is a .NET vacancy,
+        # not a Node one.
         if _matches(haystack, cfg.get("unless") or []):
             continue
         points = cfg.get("points", 0)
@@ -1682,8 +1690,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     title_penalty, title_penalty_bd = _score_title_role_penalty(vacancy.get("title") or "", criteria)
     exporter_penalty, exporter_bd = _score_market_penalty(vacancy, criteria, profile)
 
-    # Три ПОЛНЫХ ОТСЕВА (0% шанс попасть в выдачу), подтверждённых
-    # человеком явно 2026-07-30 — не понижение приоритета, а dealbreaker:
+    # Three FULL rejections (a zero-percent chance), confirmed explicitly on
+    # 2026-07-30 — not a lower priority but a dealbreaker:
     stack_relevant, stack_relevance_bd = _check_stack_relevance(
         text, stack_bd["core_hits"], stack_bd["strong_hits"], criteria
     )
@@ -1705,8 +1713,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     )
     if title_stack_bd:
         stack_bd["title_stack_gate"] = title_stack_bd
-    # Дата-пайплайны — задокументированное исключение: Scala/Java в заголовке
-    # при контексте Spark/Databricks/ETL остаются желанным вариантом.
+    # Data pipelines are a documented exception: Scala or Java in the title,
+    # in a Spark/Databricks/ETL context, remains a welcome variant.
     if title_mismatch and not stack_bd.get("data_pipeline_exception_applied"):
         dealbreakers.append(
             "stack: title names technology outside the core/strong stack "
@@ -1726,7 +1734,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         legacy_bd["industry_dealbreaker_gate"] = industry_bd
     if industry_blocked:
         dealbreakers.append(
-            "industry: отрасль, которую этот поиск избегает "
+            "industry: an industry this search avoids "
             f"({', '.join(industry_bd['hits'][:4])})"
         )
 
@@ -1782,21 +1790,21 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
 
     thresholds = criteria["classification_thresholds"]
 
-    # Вакансия, у которой ЕДИНСТВЕННОЕ возражение — страна в структурном поле
-    # локации, не отбрасывается молча, а выделяется в свой класс.
+    # A vacancy whose ONLY objection is a country in the structured location
+    # field is not dropped silently but placed in its own class.
     #
-    # Почему так, а не "отказ" (пересмотрено 2026-08-05 по прямому возражению
-    # владельца). Замер: 501 вакансия с .NET в заголовке отклонена ровно по
-    # этой причине и ни по какой другой, и ВСЕ 501 помечены источником как
-    # remote. Из тех 78, у кого есть описание, работодатель сам ограничивает
-    # право работать лишь в 16 случаях — в остальных 62 отказ выносится по
-    # догадке "вакансия в стране N значит для резидентов N".
+    # Why this rather than a rejection, revised 2026-08-05 after the owner
+    # objected. Measured: 501 vacancies with .NET in the title were rejected
+    # for exactly this reason and no other, and ALL 501 were marked remote by
+    # their source. Of the 78 that had a description, the employer restricts
+    # the right to work in only 16 — in the other 62 the rejection rests on
+    # the guess that a vacancy in country N is for residents of N.
     #
-    # Догадка чаще всего верна, и смешивать эти вакансии с основной выдачей
-    # нельзя: их сотни, они утопят десяток настоящих кандидатов. Но и решать
-    # за человека, что B2B-контракт с нидерландской компанией ему недоступен,
-    # система не вправе — это его решение, а не её. Поэтому отдельный класс и
-    # отдельный раздел отчёта.
+    # The guess is usually right, and these must not be mixed into the main
+    # shortlist: there are hundreds of them and they would drown a dozen real
+    # candidates. But deciding on someone's behalf that a B2B contract with a
+    # Dutch company is out of reach is not the system's call either. Hence a
+    # separate class and a separate section of the report.
     country_only = bool(dealbreakers) and all(
         d.startswith("location: source restricts hiring to") for d in dealbreakers
     )
@@ -1815,10 +1823,10 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     else:
         classification = "low_priority"
 
-    # Общая неопределённость локации (никакого явного "worldwide"/"US only"/
-    # EOR-сигнала) стоит перепроверять руками только для записей, которые и
-    # так попали в поле зрения (long_shot и выше) — иначе на реальных данных
-    # флаг срабатывает почти всегда и раздел отчёта становится бесполезным.
+    # General location uncertainty — no explicit "worldwide", no "US only", no
+    # EOR signal — is worth a human glance only for records already in view
+    # (long_shot and above). On real data the flag otherwise fires on almost
+    # everything, and the review section of the report becomes useless.
     if location_unknown and classification in ("hot_lead", "worth_a_look", "long_shot"):
         needs_review = True
 
