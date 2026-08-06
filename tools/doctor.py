@@ -1,13 +1,13 @@
 """
-Самопроверка окружения Work IDE. Запускать после клонирования репозитория
-на новой машине или если пайплайн ведёт себя странно.
+Environment self-check. Run it after cloning the repository on a new machine,
+or when the pipeline behaves strangely.
 
-python tools/doctor.py --identity <префикс>
+python tools/doctor.py --identity <prefix>
 
-Возвращает exit code 0, если все КРИТИЧНЫЕ проверки (идентичность, Python,
-зависимости, конфиги, запись в data/) прошли. Проверки доступности внешних
-источников — предупреждения, а не фатальные ошибки (сеть может быть недоступна
-прямо сейчас, это не повод считать окружение сломанным).
+Exit code 0 when every CRITICAL check passes: identity, Python version,
+dependencies, configuration, writability of data/. Reachability of external
+sources is a warning rather than a fatal error — the network may simply be
+down right now, which is no reason to call the environment broken.
 """
 from __future__ import annotations
 
@@ -31,45 +31,63 @@ def _report(label: str, ok: bool, detail: str = "", critical: bool = True) -> No
 
 def check_python() -> None:
     ok = sys.version_info >= (3, 8)
-    _report("Python >= 3.8", ok, f"текущая: {sys.version.split()[0]}")
+    _report("Python >= 3.8", ok, f"current: {sys.version.split()[0]}")
 
 
 def check_packages() -> None:
     for mod in ("requests", "yaml"):
         try:
             __import__(mod)
-            _report(f"пакет '{mod}'", True)
+            _report(f"package '{mod}'", True)
         except ImportError as exc:
-            _report(f"пакет '{mod}'", False, str(exc))
+            _report(f"package '{mod}'", False, str(exc))
 
 
 def check_identity() -> None:
-    """Первая и главная проверка: есть ли активная идентичность и цела ли она."""
+    """The first and most important check: is there an active identity, and is
+    it intact."""
     import identity as identity_mod
 
-    _report(f"активная идентичность: {identity_mod.describe(common.ACTIVE_IDENTITY)}", True)
+    _report(f"active identity: {identity_mod.describe(common.ACTIVE_IDENTITY)}", True)
     problems = identity_mod.validate(common.ACTIVE_IDENTITY)
     if problems:
         for p in problems:
-            _report("структура идентичности", False, p)
+            _report("identity structure", False, p)
     else:
-        _report("структура идентичности", True)
+        _report("identity structure", True)
 
 
 def check_configs() -> dict:
+    """Required keys must be present in the RESOLVED settings, not in one file.
+
+    This used to read a single file per document and report missing keys. Once
+    identities became a template copy plus a personal overlay, that check
+    started failing on a perfectly healthy setup: the personal file holds only
+    differences, so it has no tech_stack, and the template has no residency.
+    Found 2026-08-06 while translating this file — two red FAIL lines against a
+    configuration that was entirely correct, which is worse than no check at
+    all, because a person learns to ignore them.
+    """
+    import settings
+
     configs = {}
     for name, required_keys in (
         ("profile.yaml", ["owner", "goal", "tech_stack", "employment_type_priority"]),
-        ("criteria.yaml", ["weights", "remote_location_fit", "classification_thresholds"]),
+        # `weights` deliberately absent: the block was removed on 2026-08-05
+        # because no line of code ever read it. The real weights are the caps of
+        # each component (see the header of the criteria file).
+        ("criteria.yaml", ["remote_location_fit", "classification_thresholds"]),
         ("sources.yaml", ["sources"]),
     ):
-        path = common.identity_config(name)
-        label = f"identities/{common.ACTIVE_IDENTITY}/{path.name}"
+        document = name.rsplit(".", 1)[0]
+        label = f"{common.ACTIVE_IDENTITY}: {name}"
         try:
-            data = common.load_yaml(path) or {}
+            if document in ("profile", "criteria"):
+                data, _ = settings.resolve(document, common.ACTIVE_IDENTITY)
+            else:
+                data = common.load_yaml(common.identity_config(name)) or {}
             missing = [k for k in required_keys if k not in data]
-            ok = not missing
-            _report(label, ok, f"отсутствуют ключи: {missing}" if missing else "")
+            _report(label, not missing, f"missing keys: {missing}" if missing else "")
             configs[name] = data
         except Exception as exc:  # noqa: BLE001
             _report(label, False, str(exc))
@@ -83,9 +101,9 @@ def check_data_writable() -> None:
         probe = common.DATA_DIR / ".doctor_probe.tmp"
         probe.write_text("ok", encoding="utf-8")
         probe.unlink()
-        _report("data/ доступна для записи", True)
+        _report("data/ is writable", True)
     except Exception as exc:  # noqa: BLE001
-        _report("data/ доступна для записи", False, str(exc))
+        _report("data/ is writable", False, str(exc))
 
 
 def check_sources_reachable() -> None:
@@ -102,18 +120,18 @@ def check_sources_reachable() -> None:
                 url, headers={"User-Agent": common.USER_AGENT}, timeout=8, stream=True
             )
             ok = resp.status_code < 400
-            _report(f"источник '{src['name']}' доступен", ok, f"HTTP {resp.status_code}", critical=False)
+            _report(f"source '{src['name']}' reachable", ok, f"HTTP {resp.status_code}", critical=False)
         except Exception as exc:  # noqa: BLE001
-            _report(f"источник '{src['name']}' доступен", False, str(exc), critical=False)
+            _report(f"source '{src['name']}' reachable", False, str(exc), critical=False)
 
 
 def check_reputation_coverage() -> None:
-    """Сколько компаний головы выдачи не имеет результата проверки репутации.
+    """How many companies at the head of the shortlist have no reputation result.
 
-    Не критично для запуска — это про полноту накопленного знания, а не про
-    работоспособность окружения. Но видеть цифру полезно: 2026-08-06 в голове
-    выдачи было 55 компаний и ноль проверок, и заметить это можно было только
-    прочитав отчёт целиком.
+    Not critical for running: this is about the completeness of accumulated
+    knowledge rather than the health of the environment. But the number is
+    worth seeing — on 2026-08-06 the head of the shortlist held 55 companies
+    and zero checks, and the only way to notice was to read the whole report.
     """
     import kb
     import reputation
@@ -121,28 +139,29 @@ def check_reputation_coverage() -> None:
     try:
         vacancies = kb.load_vacancies()
         companies = kb.load_companies()
-    except Exception as exc:  # noqa: BLE001 — база может быть ещё не собрана
-        print(f"  [ SKIP ] репутация компаний: база не читается ({type(exc).__name__})")
+    except Exception as exc:  # noqa: BLE001 — the database may not exist yet
+        print(f"  [ SKIP ] company reputation: database unreadable "
+              f"({type(exc).__name__})")
         return
 
     stats = reputation.coverage(vacancies, companies)
     if not stats["companies"]:
-        print("  [ SKIP ] репутация компаний: в выдаче пока некого проверять")
+        print("  [ SKIP ] company reputation: nobody in the shortlist to check yet")
         return
     mark = "OK  " if not stats["unchecked"] else "WARN"
-    print(f"  [ {mark} ] репутация компаний головы выдачи: "
-          f"найдена {stats['found']}, источников мало {stats['insufficient']}, "
-          f"НЕ ПРОВЕРЕНО {stats['unchecked']} из {stats['companies']}")
+    print(f"  [ {mark} ] reputation of shortlist companies: "
+          f"found {stats['found']}, too few sources {stats['insufficient']}, "
+          f"NOT CHECKED {stats['unchecked']} of {stats['companies']}")
     if stats["unchecked"]:
-        print("           закрыть: python tools/reputation.py worklist "
+        print("           close it: python tools/reputation.py worklist "
               f"--identity {common.ACTIVE_IDENTITY}")
 
 
 def main() -> None:
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Самопроверка окружения Work IDE")
-    parser.add_argument("--identity", default=None, help="Префикс поисковой идентичности")
+    parser = argparse.ArgumentParser(description="Work IDE environment self-check")
+    parser.add_argument("--identity", default=None, help="Search identity prefix")
     args = parser.parse_args()
 
     try:
@@ -161,17 +180,17 @@ def main() -> None:
     check_data_writable()
     check_reputation_coverage()
     print()
-    print("--- Проверка доступности источников (не критично для работы) ---")
+    print("--- Source reachability (not critical for operation) ---")
     check_sources_reachable()
     print()
     if CRITICAL_OK:
         print(
-            "Итог: окружение в порядке, можно запускать "
+            "Result: the environment is sound; you can run "
             f"python tools/pipeline.py --identity {common.ACTIVE_IDENTITY}"
         )
         sys.exit(0)
     else:
-        print("Итог: есть критичные проблемы, см. FAIL выше.")
+        print("Result: there are critical problems; see the FAIL lines above.")
         sys.exit(1)
 
 
