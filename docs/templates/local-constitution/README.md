@@ -1,41 +1,49 @@
-# Малая Конституция
+# The Local Constitution (RETIRED LAYER)
 
-Эта папка — **локальная**. Её нет в гите и быть не должно: она описывает
-конкретного человека за конкретным компьютером, тогда как репозиторий общий.
+> **This layer is no longer used.** Identities now live in `local-identities/`,
+> which is outside git, so there is nowhere left to hide personal fields from.
+> The skeleton is kept for machines set up before the change — see
+> `docs/LOCAL_CONSTITUTION.md` for what to do with the folder if you have one.
+>
+> On a fresh clone you do not need this folder at all. Start with
+> `python tools/templates.py list`.
 
-Полная спецификация — `docs/LOCAL_CONSTITUTION.md` (она *в* гите, потому что
-без неё эту папку невозможно воссоздать на новой машине).
+This folder is **local**. It is not in git and must not be: it describes a
+particular person at a particular computer, while the repository is shared.
 
-## Что здесь лежит
+The full specification is `docs/LOCAL_CONSTITUTION.md` (which *is* in git,
+because without it the folder cannot be recreated on a new machine).
 
-| Файл / папка | Назначение |
+## What used to live here
+
+| File / folder | Purpose |
 |---|---|
-| `active.yaml` | Машиночитаемое: какие идентичности активны, какая по умолчанию. Читается инструментами |
-| `ACTIVE_IDENTITIES.md` | Человекочитаемое зеркало: почему выбраны именно эти идентичности |
-| `LOCAL_NOTES.md` | Личные наблюдения, которые не должны попасть ни в общую документацию, ни в идентичность |
-| `personal/<префикс>/` | Личные файлы конкретной идентичности: CV, контакты, приватные заметки |
+| `active.yaml` | Machine-readable: which identities are active, and which is the default. Read by the tools |
+| `ACTIVE_IDENTITIES.md` | A human-readable mirror: why these identities were chosen |
+| `LOCAL_NOTES.md` | Personal observations that should reach neither the shared documentation nor an identity |
+| `personal/<prefix>/` | A particular identity's personal files: CV, contacts, private notes |
 
-## Правило маршрутизации: что писать сюда, а что нет
+## The routing rule: what to write here and what not
 
-Три слоя, и путать их не стоит — от этого зависит, что увидят другие люди:
+The layers should not be confused — what other people see depends on it:
 
-- **Большая Конституция (`CLAUDE.md`) и `tools/`** — то, что улучшает проект для
-  всех пользователей: инженерные принципы, машинерия, новые источники.
-- **Идентичность (`identities/<префикс>/`)** — то, что делает конкретный поиск
-  лучше и осмысленно для любого, кто этой идентичностью воспользуется.
-- **Малая Конституция (эта папка)** — то, что касается только вас и этой машины:
-  какие идентичности активны, где лежит ваш CV, ваша почта, ваши личные выводы.
+- **The constitution (`CLAUDE.md`) and `tools/`** — what improves the project
+  for every user: engineering principles, machinery, new sources.
+- **An identity template (`identity-templates/<name>/`)** — what makes a
+  particular kind of search better and makes sense for anyone using it.
+- **Your local identity** — what concerns only you and this machine: where your
+  CV is, your email address, your own conclusions.
 
-Проверочный вопрос: *«будет ли это полезно другому человеку, если он склонирует
-репозиторий?»* Нет — значит сюда.
+The test question: *"would this be useful to another person who cloned the
+repository?"* No — then it goes in your own layer.
 
-## Как воссоздать на новой машине
+## How to set things up on a new machine
 
-1. Склонировать репозиторий.
-2. Скопировать скелет: `docs/templates/local-constitution/` → `local-constitution/`.
-3. Заполнить `active.yaml` (какие идентичности вам нужны).
-4. Положить свой CV в `personal/<префикс>/`.
-5. Проверить: `python tools/identity.py which`.
+1. Clone the repository.
+2. `python tools/templates.py clone <template> <prefix> "<expansion>"`.
+3. Put your CV in `local-identities/<folder>/documents/`.
+4. Fill in the personal fields in `local-identities/<folder>/<prefix>_profile.yaml`.
+5. Check: `python tools/identity.py which`.
 
-Если идентичности ещё нет — не копируйте чужую папку руками, пройдите онбординг:
-`docs/ONBOARDING.md`.
+If there is no identity yet, do not copy somebody else's folder by hand — go
+through onboarding: `docs/ONBOARDING.md`.

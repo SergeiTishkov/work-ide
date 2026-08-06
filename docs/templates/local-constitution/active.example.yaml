@@ -1,15 +1,16 @@
-# Скопируйте этот файл как active.yaml и заполните под себя.
-# Спецификация полей — docs/LOCAL_CONSTITUTION.md
+# RETIRED. Kept for machines set up before identities moved to local-identities/.
+# Copy this file as active.yaml and fill it in for yourself.
+# The field specification is in docs/LOCAL_CONSTITUTION.md
 
 schema_version: 1
 
-# Обязателен, если активных идентичностей больше одной. Без него инструменты
-# откажутся угадывать и потребуют явного --identity.
-default_identity: <префикс>
+# Mandatory once more than one identity is active. Without it the tools refuse
+# to guess and demand an explicit --identity.
+default_identity: <prefix>
 
 active_identities:
-  - prefix: <префикс>
-    activated_at: "<ГГГГ-ММ-ДД>"
+  - prefix: <prefix>
+    activated_at: "<YYYY-MM-DD>"
     relationship: owner          # owner | fork_of:<prefix> | using_shared
-    personal_dir: personal/<префикс>
-    note: "<зачем вам эта идентичность>"
+    personal_dir: personal/<prefix>
+    note: "<what you want this identity for>"

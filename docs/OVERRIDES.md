@@ -111,6 +111,25 @@ texts. Your own file holds only the differences.
 | How technologies are written | `config/tech_vocabulary.yaml` | — (global by design) | — |
 | Any scoring weight and any list | — | `<p>_criteria.yaml` in full | yes |
 
+### Template text that reaches the REPORT
+
+One row of the table above is easy to miss, and it was found by regenerating the
+report after the repository was translated: `identity.scoring_philosophy` is a
+template value, so it is written in English like everything else in git — and it
+is printed at the head of every report, which follows the person's language.
+
+So the line came out English in an otherwise Russian report.
+
+The fix is an override rather than an edit to the template: the identity's own
+file sets `identity.scoring_philosophy` in the person's language, and the layer
+order does the rest. The general rule follows:
+
+> Template text that reaches the REPORT is English in git, and is translated by
+> an override in the personal layer — never by editing the template.
+
+`tools/i18n.py` handles the report's own fixed strings; this is for the ones
+that come from configuration and are therefore different for every identity.
+
 ### Changing the sign is a legitimate case
 
 The least obvious property, and the whole point of the exercise. The shared
