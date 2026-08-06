@@ -1,10 +1,15 @@
 """
-Скоринг вакансий по рубрике config/criteria.yaml + config/profile.yaml.
+Vacancy scoring against the identity's criteria and profile.
 
-Философия (см. CLAUDE.md): обычный джоб-серч штрафует "legacy"/"boring"/
-"bureaucracy" — здесь наоборот, это плюс. Итоговый score — 0..100,
-раскладывается на прозрачные компоненты в score_breakdown, плюс отдельно
-список dealbreakers и флаг needs_manual_review.
+The score is 0..100 and always decomposes into named components in
+`score_breakdown`, alongside a separate list of dealbreakers and a
+`needs_manual_review` flag. Nothing here is a magic number: every point a
+vacancy gains or loses can be traced to a component and, through the
+comments, to the day something went wrong and why the rule exists.
+
+What counts as good is NOT decided here. A search for calm legacy work and
+a search for an ambitious startup role are opposite rubrics; both are
+expressed as data in the identity, and this module only applies them.
 """
 from __future__ import annotations
 
@@ -24,17 +29,18 @@ _AMOUNT_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Суффиксы порядка величины, после которых сумма заведомо НЕ является
-# зарплатой: миллионы и миллиарды в тексте вакансии — это оборот компании,
-# объём инвестиций или (реальный найденный случай) сумма выплат площадки
-# фрилансерам. Реальный баг 2026-07-31, замеченный на ручном чек-листе:
-# Lemon.io пишет "We've already paid out over $11M to our engineers", а
-# отчёт показывал владельцу "ЗП: $11/час" — прямая дезинформация в самом
-# важном для решения поле. Мы не просто игнорируем такую сумму: раньше
-# число 11 попадало в ветку "меньше 500 — значит почасовая ставка".
+# Magnitude suffixes after which an amount is certainly NOT a salary.
+# Millions and billions in a job ad are company revenue, funding raised, or
+# — a real case — how much a marketplace has paid out to its freelancers.
+#
+# Found 2026-07-31 by the manual checklist: Lemon.io writes "We've already
+# paid out over $11M to our engineers", and the report told the owner
+# "salary: $11/hour". Direct misinformation in the field that decides most.
+# Ignoring the suffix is not enough: the bare 11 then fell into the branch
+# "under 500, so it must be an hourly rate".
 _MAGNITUDE_SUFFIXES = {"m", "mm", "bn", "million", "billion"}
 
-# Суммы в таком контексте — не ставка кандидата.
+# An amount in this company is not the candidate's rate.
 _NON_SALARY_CONTEXT_WORDS = (
     "bonus",
     "signing",
@@ -51,20 +57,23 @@ _NON_SALARY_CONTEXT_WORDS = (
 )
 
 
-# Кэш ОБЯЗАН быть ключеван по идентичности. Раньше это был один глобальный
-# набор, заполняемый при первом вызове: после перехода на мультиидентичность
-# такой кэш стал бы межидентичностной утечкой — список remote-only источников
-# идентичности A управлял бы remote-гейтом идентичности B, а этот гейт решает
-# "дисквалифицировать вакансию или дать ей +4 балла". Отказ был бы тихим.
+# The cache MUST be keyed by identity. It used to be one global set filled on
+# first call; once the project became multi-identity that turned into a
+# cross-identity leak, where identity A's list of remote-only sources drove
+# identity B's remote gate — and that gate decides between "disqualify this
+# vacancy" and "give it four points". The failure would have been silent.
 #
-# Кэш нужен: функция вызывается на КАЖДУЮ вакансию внутри рескоринга, а база
-# — тысячи записей; чтение YAML каждый раз превратило бы прогон в парсинг.
+# The cache earns its place: this runs for EVERY vacancy during a rescore,
+# and the database holds thousands. Re-reading YAML each time would turn a
+# scoring pass into a parsing pass.
 _REMOTE_ONLY_SOURCES_CACHE: dict = {}
 
 
 def _reset_caches() -> None:
-    """Вызывается при активации идентичности (см. common.register_identity_hook).
-    Страховка на случай, если ключевание когда-нибудь сломают."""
+    """Runs on every identity activation (common.register_identity_hook).
+
+    Belt and braces: the caches are keyed by identity already, and this is
+    what keeps them correct if someone ever breaks that keying."""
     _REMOTE_ONLY_SOURCES_CACHE.clear()
 
 
@@ -72,9 +81,9 @@ common.register_identity_hook(_reset_caches)
 
 
 def _remote_only_sources() -> set:
-    """Имена источников, помеченных remote_only — площадки, публикующие
-    исключительно удалённые вакансии (их флаг достаточен как подтверждение
-    удалёнки, см. docs/SOURCES.md)."""
+    """Sources flagged remote_only — boards that publish nothing but remote
+    roles, so the board itself is sufficient proof of remoteness
+    (docs/SOURCES.md)."""
     common.require_identity()
     key = common.ACTIVE_IDENTITY
     if key not in _REMOTE_ONLY_SOURCES_CACHE:
@@ -87,12 +96,12 @@ def _remote_only_sources() -> set:
 
 
 def load_criteria() -> dict:
-    """Критерии со всеми слоями, наложенными в фиксированном порядке.
+    """Criteria with every layer applied in a fixed order.
 
-    До 2026-08-05 читался ровно один файл — файл идентичности. Из-за этого
-    Малая Конституция могла влиять только на профиль (через сентинел `local`)
-    и не могла тронуть ни одного порога или списка в критериях, хотя ровно
-    там живёт большая часть решений. Порядок и правила слияния — settings.py.
+    Until 2026-08-05 exactly one file was read — the identity's own. The
+    local layer could therefore reach the profile but not a single threshold
+    or list in the criteria, which is where most of the decisions actually
+    live. Layer order and merge rules: settings.py.
     """
     import settings
 
@@ -101,18 +110,18 @@ def load_criteria() -> dict:
 
 
 def load_profile() -> dict:
-    # Через common.load_profile, а не напрямую: личные поля профиля помечены
-    # сентинелом `local` и живут в Малой Конституции. Прямое чтение файла
-    # вернуло бы скорингу строку "local" вместо, например, списка языков.
+    # Through common.load_profile rather than reading a file: the profile is
+    # assembled from layers, and the identity's own file holds differences
+    # only. Reading it directly would hand scoring a profile with no stack.
     return common.load_profile()
 
 
 def _vacancy_text(vacancy: dict) -> str:
-    # Почта и ссылки вырезаются ДО поиска ключевых слов: домен внутри адреса
-    # неотличим от названия технологии (".net" в "harnly.net"), а внутри
-    # ссылки — от чего угодно ("react-native" в пути к вакансии).
-    # См. tools/textclean.py: там же объяснено, почему это не валидация
-    # адреса и почему библиотека-валидатор здесь не подходит.
+    # Emails and links are stripped BEFORE any keyword search: a domain inside
+    # an address is indistinguishable from a technology name (".net" inside
+    # "harnly.net"), and a URL path can contain anything at all
+    # ("react-native" in a job link). See tools/textclean.py, which also
+    # explains why this is shape recognition rather than address validation.
     parts = [
         vacancy.get("title") or "",
         vacancy.get("company") or "",
@@ -130,12 +139,12 @@ _TECH_PATTERNS_CACHE = {}
 
 
 def tech_matching_patterns() -> dict:
-    """Общий словарь "как найти технологию в тексте" (config/tech_vocabulary.yaml).
+    """The shared "how to find a technology in text" vocabulary.
 
-    Знание ГЛОБАЛЬНОЕ: как пишется ".NET", одинаково для всех пользователей
-    проекта, поэтому живёт в config/, а не в идентичности (CLAUDE.md §13).
-    Идентичность называет технологию каноническим именем в своём tech_stack —
-    и получает правильный поиск бесплатно.
+    How ".NET" is written is a fact about the world, identical for everyone
+    who clones this repository, so it lives in config/ rather than in an
+    identity (CLAUDE.md §13). An identity names the technology by its
+    canonical name in its tech_stack and gets correct matching for free.
     """
     if "data" not in _TECH_PATTERNS_CACHE:
         path = common.ROOT / "config" / "tech_vocabulary.yaml"
@@ -145,13 +154,13 @@ def tech_matching_patterns() -> dict:
 
 
 def _substring_unsafe_names() -> set:
-    """Технологии, которые НЕЛЬЗЯ искать подстрокой ни в каком списке."""
+    """Technologies that must never be matched as a substring, in any list."""
     return {name for name, spec in tech_matching_patterns().items()
             if spec.get("substring_unsafe")}
 
 
 def _pattern_specs_for(names: list) -> list:
-    """Записи глобального словаря для технологий, названных идентичностью."""
+    """Vocabulary entries for the technologies this identity names."""
     vocabulary = tech_matching_patterns()
     specs = []
     for name in names or []:
@@ -165,27 +174,28 @@ def _pattern_specs_for(names: list) -> list:
 
 
 def _matches_patterns(text: str, patterns: list, already_found: list = ()) -> list:
-    """Совпадение по регулярному выражению, а не по подстроке.
+    """Matching by regular expression rather than by substring.
 
-    Нужно там, где название технологии невозможно записать безопасной
-    подстрокой. Канонический случай — ".NET": подстрока ".net" есть в любом
-    почтовом домене ("(firstname)@harnly.net" — реальная запись с Hacker
-    News), поэтому её нельзя просто добавить в список ключей. А без неё
-    заголовок "Senior .NET Backend Developer" не совпадает НИ С ОДНИМ ключом
-    ядра, потому что все они длиннее (".NET Core", "ASP.NET", "C#").
+    Needed wherever a technology name cannot be written as a safe substring.
+    ".NET" is the canonical case: ".net" occurs inside every mail domain —
+    "(firstname)@harnly.net" is a real record that arrived as a job title —
+    so it cannot simply be added to the keyword list. Without it, though,
+    the title "Senior .NET Backend Developer" matches NOTHING in the core
+    stack, because every key there is longer (".NET Core", "ASP.NET", "C#").
 
-    Цена ошибки измерена 2026-08-05: 754 вакансии с .NET в заголовке,
-    отклонены все до единой, 325 из них — с формулировкой "не .NET/JS роль".
+    The cost was measured on 2026-08-05: 754 vacancies with .NET in the
+    title, every single one rejected, 325 of them with the reason "not a
+    .NET/JS developer role".
 
-    Формат записи — {name, pattern, redundant_if}: в отчёт попадает `name`
-    (человекочитаемое ".NET", а не сырая регулярка), а `redundant_if`
-    перечисляет ключи, при наличии которых совпадение не засчитывается.
-    Последнее обязательно: ".NET" совпадает и внутри "ASP.NET", и без этой
-    оговорки одна и та же технология считалась бы дважды.
+    An entry is {name, pattern, redundant_if}. The report shows `name` — a
+    readable ".NET" rather than a raw regex — and `redundant_if` lists keys
+    whose presence cancels the match. That last part is not optional:
+    ".NET" also matches inside "ASP.NET", and without it one platform would
+    be counted twice.
     """
     found = []
     for spec in patterns or []:
-        if isinstance(spec, str):  # краткая форма: сама регулярка и есть имя
+        if isinstance(spec, str):  # short form: the regex is its own name
             spec = {"name": spec, "pattern": spec}
         name, pattern = spec.get("name"), spec.get("pattern")
         if not pattern or name in found or name in already_found:
@@ -198,11 +208,11 @@ def _matches_patterns(text: str, patterns: list, already_found: list = ()) -> li
 
 
 def _matches(text: str, keywords: list) -> list:
-    """Поиск подстрокой. Технологии, помеченные в общем словаре как
-    `substring_unsafe`, пропускаются: их ищет только _matches_patterns.
+    """Substring matching. Technologies marked `substring_unsafe` in the shared
+    vocabulary are skipped here and matched only by _matches_patterns.
 
-    Без этой оговорки ".NET" в списке ключей снова начинает ловиться внутри
-    "asp.net" — то есть ровно та ошибка, ради которой словарь и заведён.
+    Without that skip, ".NET" in a keyword list starts matching inside
+    "asp.net" again — precisely the mistake the vocabulary exists to stop.
     """
     unsafe = _substring_unsafe_names()
     found = []
@@ -216,36 +226,40 @@ def _matches(text: str, keywords: list) -> list:
 
 
 def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = None):
-    """Проверяет СТРУКТУРНОЕ поле локации (location_raw), которое источники
-    отдают отдельно от текста описания. Возвращает (is_restricted, detail).
+    """Checks the STRUCTURED location field, which boards return separately
+    from the description text. Returns (is_restricted, detail).
 
-    Правило: непустое поле локации без явного маркера "весь мир" — это
-    гео-ограничение. Владелец в Грузии, поэтому "USA"/"Canada only"/
-    "Brazil"/"Europe" одинаково недоступны (реальный найденный баг
-    2026-07-30: ~20 из 32 кандидатов имели именно такое ограничение и
-    проходили фильтр, потому что проверялся только текст описания)."""
+    The field is authoritative where it says something explicit, and
+    deliberately powerless where it merely names a country — see the long
+    note further down about why geography stopped being an objection.
+
+    It exists at all because of a bug found 2026-07-30: boards deliver the
+    restriction as structured data (jobGeo="USA", locationRestrictions=
+    ["Canada"], candidate_required_location="Brazil") while only the
+    description text was being read, and about 20 of 32 candidates turned
+    out to be unreachable."""
     cfg = criteria["remote_location_fit"].get("structured_location_gate")
     if not cfg:
         return False, None
 
     loc_raw = (vacancy.get("location_raw") or "").strip()
     if not loc_raw:
-        return False, None  # поле не заполнено — судить не по чему, решает текстовая логика
+        return False, None  # empty field: nothing to judge, the text logic decides
 
     loc = common.normalize_for_matching(loc_raw)
 
     worldwide_marker_hits = [m for m in cfg["worldwide_markers"] if m in loc]
-    # "USA Only" содержит "only", но это НЕ маркер свободы; сначала явные маркеры.
+    # "USA Only" contains "only" but is not a marker of freedom, so explicit
+    # worldwide markers are checked first.
     if worldwide_marker_hits:
-        # Оговорка: "Europe only"/"US only" тоже могут содержать слово из
-        # списка континентов, но не маркер "весь мир" — сюда попадают только
-        # действительно свободные формулировки ("Anywhere in the World",
-        # "100% Remote (Global)").
+        # Note that "Europe only" / "US only" may contain a continent name
+        # without being a worldwide marker; only genuinely open phrasings
+        # reach this branch ("Anywhere in the World", "100% Remote (Global)").
         return False, {"verdict": "worldwide", "matched_markers": worldwide_marker_hits, "value": loc_raw}
 
-    # "Remote job" / "Distributed" / "Remote" — это указание формата работы,
-    # а не страны. Если после вычёркивания таких слов ничего не остаётся,
-    # значит источник просто не назвал страну — это не ограничение.
+    # "Remote job" / "Distributed" / "Remote" describe the work format, not a
+    # country. If nothing survives crossing those words out, the board simply
+    # did not name a place, which is not a restriction.
     residual = loc
     for token in cfg.get("remote_without_country_tokens", []):
         residual = residual.replace(token, " ")
@@ -253,16 +267,10 @@ def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = No
     if not residual:
         return False, {"verdict": "remote_without_country", "value": loc_raw}
 
-    # Регион, который идентичность САМА назвала приемлемым, не является
-    # ограничением. Реальная находка 2026-08-05: профиль kisel перечисляет
-    # Израиль и ОАЭ целевыми рынками, а структурный гейт отбрасывал ".NET
-    # Back End Developer @ Abu Dhabi" и "Backend Developer @ Israel" как
-    # "вакансия привязана к стране". Одна часть настроек противоречила
-    # другой, и побеждала та, что срабатывает раньше.
-    # Явная исключительность перебивает всё, что ниже. Реальная находка
-    # 2026-08-05: поле локации "United States only" содержит "United States",
-    # то есть целевой рынок, и вакансия проходила по правилу целевого рынка.
-    # Слово работодателя сильнее совпадения по названию страны.
+    # An explicit "and only here" overrides everything below it. Found
+    # 2026-08-05: the location field "United States only" contains "United
+    # States", so a rule keyed on country names let it through. What the
+    # employer states outranks what a country name happens to match.
     exclusivity_hits = [m for m in cfg.get("exclusivity_markers", []) if m in loc]
     if exclusivity_hits:
         return True, {"verdict": "restricted_explicitly", "matched": exclusivity_hits,
@@ -270,29 +278,31 @@ def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = No
 
     continent_hits = [c for c in cfg["continent_names"] if c in loc]
     if len(continent_hits) >= cfg["continent_threshold"]:
-        # Перечислены почти все континенты — фактически "весь мир"
+        # Nearly every continent listed is worldwide in practice
         # (Remotive: "Americas, Europe, Asia, Africa, Oceania").
         return False, {"verdict": "worldwide_by_continents", "continents": continent_hits, "value": loc_raw}
 
-    # СТРАНА САМА ПО СЕБЕ БОЛЬШЕ НЕ ЯВЛЯЕТСЯ ОГРАНИЧЕНИЕМ.
+    # A NAMED COUNTRY IS NO LONGER AN OBJECTION BY ITSELF.
     #
-    # Пересмотрено 2026-08-05 по прямому указанию владельца: «целевой регион —
-    # да пофиг, что мне даст регион? важна не география, а сама работа».
+    # Revised 2026-08-05 on the owner's direct instruction: forget target
+    # regions, what does a region give me, the work matters and not where.
     #
-    # История вопроса стоит того, чтобы её тут держать. Сначала любая страна в
-    # поле локации была полным отсевом — из 3281 европейской вакансии в выдачу
-    # попадала одна. Потом появилось исключение для «целевых рынков», и мир
-    # разделился на страны, дающие плюс, и страны, дающие отказ. Обе редакции
-    # решали за человека одно и то же: куда ему можно, а куда нельзя.
+    # The history is worth keeping here. First, any country in the location
+    # field was a full rejection — of 3281 European vacancies exactly one
+    # reached the report. Then an exception appeared for "target markets" and
+    # the world split into countries that earned points and countries that
+    # earned a refusal. Both editions decided the same thing on the person's
+    # behalf: where they are allowed to look.
     #
-    # Теперь география не даёт НИЧЕГО. Ранжируют признаки самой работы: стек,
-    # деньги, устаревшие технологии, отзывы про work-life balance. Страна
-    # влияет ровно в одном месте — нетто-экспортёры разработки получают штраф
-    # (_score_market_penalty), потому что там ставки конкурируют вниз. Это не
-    # запрет: вакансия из такой страны просто должна быть лучше по существу.
+    # Geography now contributes NOTHING. Ranking is done by properties of the
+    # work itself: stack, pay, ageing technologies, what former employees say
+    # about work-life balance. A country affects exactly one thing — net
+    # exporters of software work take a penalty (_score_market_penalty),
+    # because rates there compete downwards. That is not a ban: a vacancy
+    # from such a country simply has to be better on the merits.
     #
-    # Отказ остаётся только там, где работодатель САМ говорит «нельзя»:
-    # exclusivity_markers выше, absolute_residency_phrases и hard_dealbreakers.
+    # Refusal remains only where the EMPLOYER says no: exclusivity_markers
+    # above, absolute_residency_phrases, and hard_dealbreakers.
     return False, {"verdict": "country_named", "value": loc_raw}
 
 
@@ -300,19 +310,20 @@ _AVOIDED_MARKETS_CACHE = {}
 
 
 def _score_market_penalty(vacancy: dict, criteria: dict, profile: dict):
-    """Штраф за нетто-экспортёров разработки — единственное место, где
-    география вообще влияет на балл.
+    """Penalty for net exporters of software work — the only place geography
+    touches the score at all.
 
-    Владелец 2026-08-05: «есть понятие НЕцелевого региона — Индия, Пакистан,
-    Филиппины, им минус. Целевой регион — да пофиг».
+    The owner, 2026-08-05: there is such a thing as a NON-target region —
+    India, Pakistan, the Philippines — give them a minus; a target region is
+    worth nothing. Even in India something suitable could exist, it is just
+    that most of it will not be his kind of work.
 
-    Почему штраф, а не отсев: в такой стране тоже бывает подходящая вакансия,
-    просто большинство будет не в том стиле. Штраф ровно это и выражает —
-    вакансия оттуда должна быть лучше по существу, чтобы попасть наверх.
+    Hence a penalty rather than a gate: a vacancy from there has to be better
+    on the merits to rise, which is exactly what a penalty expresses.
 
-    Список стран — общий (config/derivation/market_tiers.yaml, ярусы
-    exporter_avoid и excluded_practical): направление потока работы описывает
-    рынок, а не человека.
+    The country list is shared (config/derivation/market_tiers.yaml, tiers
+    exporter_avoid and excluded_practical): the direction work flows in
+    describes the market, not the person.
     """
     cfg = (criteria.get("remote_location_fit") or {}).get("net_exporter_penalty")
     if not cfg:
@@ -335,13 +346,13 @@ def _score_market_penalty(vacancy: dict, criteria: dict, profile: dict):
         if tag.startswith("market:"):
             name = tag[7:]
             if common.normalize_for_matching(name) in avoided:
-                return cfg.get("points", -10), {"country": name, "source": "тег площадки",
+                return cfg.get("points", -10), {"country": name, "source": "board tag",
                                                 "points": cfg.get("points", -10)}
 
     loc = common.normalize_for_matching(vacancy.get("location_raw") or "")
     for needle, name in avoided.items():
         if needle and needle in loc:
-            return cfg.get("points", -10), {"country": name, "source": "поле локации",
+            return cfg.get("points", -10), {"country": name, "source": "location field",
                                             "points": cfg.get("points", -10)}
     return 0, {}
 
@@ -350,11 +361,11 @@ _TARGET_MARKETS_CACHE = {}
 
 
 def _target_market_of(vacancy: dict, profile: dict):
-    """Целевой рынок вакансии, если он есть, иначе None.
+    """The vacancy's target market, or None.
 
-    Сначала по тегу площадки (`market:United Kingdom` — фетчер LinkedIn
-    записывает страну, по которой делался запрос: это факт, а не догадка),
-    затем по названию страны в поле локации.
+    The board tag comes first (`market:United Kingdom` — the LinkedIn
+    fetcher records the country it queried, which is a fact rather than a
+    guess), then a country name in the location field.
     """
     if not profile:
         return None
@@ -384,26 +395,27 @@ def _target_market_of(vacancy: dict, profile: dict):
 
 
 def _check_header_hiring_scope(vacancy: dict, criteria: dict):
-    """Структурный заголовок ВНУТРИ описания (WWR добавляет в начало текста
-    блок "Headquarters: … / URL: …"). Возвращает (is_restricted, detail).
+    """A structured header INSIDE the description (WeWorkRemotely prepends a
+    "Headquarters: … / URL: …" block). Returns (is_restricted, detail).
 
-    Зачем отдельная проверка. Реальный найденный баг 2026-07-31 (ручной
-    чек-лист, два кандидата в топе выдачи):
-      * Stripe — поле region от площадки: "Anywhere in the World",
-        а первая строка описания: "Headquarters: US Remote";
-      * Airtable — то же поле "Anywhere in the World", заголовок:
-        "Headquarters: San Francisco, CA; New York, NY; Remote - US".
-    Обе — вакансии только для резидентов США, обе стояли в hot_lead.
+    Why a separate check. Found 2026-07-31 by the manual checklist, two
+    candidates sitting at the top of the shortlist:
+      * Stripe — the board's region field said "Anywhere in the World"
+        while the first line of the description said "Headquarters: US
+        Remote";
+      * Airtable — same field, header "Headquarters: San Francisco, CA;
+        New York, NY; Remote - US".
+    Both were US-residents-only roles, and both were hot leads.
 
-    Категорийный фид WWR ("Programming") не различает страну найма, поэтому
-    его region-поле заполняется размашисто; строка Headquarters приходит от
-    самого работодателя и потому точнее. Смотрим ТОЛЬКО заголовочные строки,
-    а не весь текст: "our US remote team" в теле описания — рассказ о
-    компании, а не требование к кандидату.
+    A category feed like WWR's "Programming" does not distinguish hiring
+    country, so its region field is filled in broadly; the Headquarters line
+    comes from the employer and is therefore more precise. Only header lines
+    are read, never the whole text: "our US remote team" in the body is a
+    description of the company, not a requirement of the candidate.
 
-    Обычный "Headquarters: Saudi Arabia" ограничением НЕ считается: это
-    адрес компании. Ограничение — только связка "remote + страна/регион",
-    то есть явное заявление о том, ГДЕ компания нанимает удалённо.
+    A plain "Headquarters: Saudi Arabia" is NOT a restriction — that is the
+    company's address. Only "remote + a country or region" counts, because
+    only that states WHERE the company hires remotely.
     """
     cfg = (criteria.get("remote_location_fit") or {}).get("header_scope_gate")
     if not cfg:
@@ -431,20 +443,18 @@ def _check_header_hiring_scope(vacancy: dict, criteria: dict):
 
 
 def _check_infrastructure_role(text: str, title: str, criteria: dict):
-    """DevOps/платформенная роль, замаскированная нейтральным заголовком.
+    """A DevOps or platform role hiding behind a neutral title.
 
-    Владелец исключил DevOps явно ("выкинь девопсов, это не моя вакансия"),
-    и в hard_wrong_profession_title_patterns есть devops/sre/platform
-    engineer — но это проверка ЗАГОЛОВКА. Реальный найденный случай
-    2026-07-31: "Software Engineer, Compute (8+ YOE)" @ Airtable — заголовок
-    абсолютно нейтральный, а тело целиком про Kubernetes-платформу (~70
-    кластеров, CNI-плагин, операторы, Terraform, ArgoCD, SLO). Score 45,
-    второе место в выдаче.
+    The title gate already lists devops/sre/platform engineer, but that is a
+    check of the TITLE. Found 2026-07-31: "Software Engineer, Compute (8+
+    YOE)" @ Airtable — a completely neutral title over a body that is
+    entirely a Kubernetes platform (~70 clusters, a CNI plugin, operators,
+    Terraform, ArgoCD, SLOs). It scored 45 and sat second in the shortlist.
 
-    Порог обязателен. Одно-два упоминания Kubernetes/Docker/CI-CD есть
-    почти в любой современной вакансии прикладного разработчика — по ним
-    судить нельзя. Отсекаем только плотную концентрацию инфраструктурных
-    признаков, которая означает, что роль ИМЕННО про эксплуатацию.
+    The threshold is not optional. One or two mentions of Kubernetes, Docker
+    or CI/CD appear in almost any modern application-developer posting and
+    prove nothing. Only a dense concentration of infrastructure signals means
+    the role itself is about running systems rather than building them.
     """
     cfg = (criteria.get("role_relevance_signal") or {}).get("infrastructure_role_gate")
     if not cfg:
@@ -468,10 +478,10 @@ _TZ_WINDOW_RE = re.compile(
     r"\(?\s*(?:\+/-|±|\+\s?/\s?-)\s*(?P<hours>\d{1,2})\s*(?:hours?|hrs?)?\s*\)?"
 )
 
-# Вторая форма того же требования, словами. Реальная находка 2026-07-31:
-# "We need a developer located within three hours of Pacific timezone"
-# (RedLine Solutions, HN) — единственная C#/.NET вакансия в выдаче, и она
-# для владельца (UTC+4) недостижима: Pacific ±3 = UTC-11..-5.
+# The same requirement in words. Found 2026-07-31: "We need a developer
+# located within three hours of Pacific timezone" (RedLine Solutions, HN) —
+# the only C#/.NET vacancy in the shortlist that day, and unreachable from
+# UTC+4: Pacific ±3 is UTC-11..-5.
 _TZ_WITHIN_RE = re.compile(
     r"within\s+(?P<hours>\d{1,2}|one|two|three|four|five|six)\s*(?:hours?|hrs?)"
     r"\s*(?:of|from)\s*(?:the\s+)?(?P<tz>[a-z]{2,9})"
@@ -479,10 +489,10 @@ _TZ_WITHIN_RE = re.compile(
 
 _NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
 
-# Третья форма требования к поясу: явный ДИАПАЗОН смещений.
-# Реальная находка 2026-08-04: SuperPlane пишет "We currently work across
-# GMT+2 to GMT-3 and welcome candidates in that range". Ни "±N часов", ни
-# "within N hours of X" — а кандидат в UTC+4 в этот диапазон не попадает.
+# A third form: an explicit RANGE of offsets. Found 2026-08-04: SuperPlane
+# writes "We currently work across GMT+2 to GMT-3 and welcome candidates in
+# that range". Neither "±N hours" nor "within N hours of X", and a candidate
+# at UTC+4 falls outside it.
 _TZ_RANGE_RE = re.compile(
     r"(?:gmt|utc)\s*(?P<a>[+-]\s*\d{1,2})\s*(?:to|through|\.\.|-)\s*"
     r"(?:gmt|utc)?\s*(?P<b>[+-]\s*\d{1,2})"
@@ -491,32 +501,34 @@ _TZ_RANGE_RE = re.compile(
 
 
 def _check_timezone_requirement(text: str, criteria: dict, profile: dict):
-    """Требование к часовому поясу кандидата.
+    """A requirement on the candidate's time zone.
 
-    Не покрывалось ничем: гео-гейты смотрят страну, а формулировка
+    Nothing covered this: the geography gates look at countries, while
     "Located in CET timezone (+/- 3 hours), we are unable to consider
-    applications from candidates in other time zones" (Proxify, 5 вакансий
-    в выдаче 2026-07-31) — это отдельная ось. Для владельца в UTC+4 такое
-    окно как раз проходит, но узнали мы это чтением глазами, а не проверкой.
+    applications from candidates in other time zones" (Proxify, five
+    vacancies in the shortlist on 2026-07-31) is a separate axis. That
+    particular window happens to fit, but we learned it by reading with our
+    eyes rather than by checking.
 
-    Возвращает (is_dealbreaker, needs_review, detail).
-    Осознанное ограничение: разбираем только явную форму "<TZ> +/- N часов".
-    Более вольные формулировки ("significant overlap with PST") дают
-    needs_review, а не отказ — скрыть настоящую вакансию хуже, чем показать
-    сомнительную (принцип из Большой Конституции).
+    Returns (is_dealbreaker, needs_review, detail).
+
+    A deliberate limit: only explicit forms are parsed. Looser phrasings
+    ("significant overlap with PST") produce needs_review rather than a
+    rejection — hiding a real vacancy is worse than showing a doubtful one
+    (a principle from the constitution).
     """
     cfg = (criteria.get("remote_location_fit") or {}).get("timezone_gate")
     if not cfg:
         return False, False, None
 
-    # Профиль хранит локацию внутри owner; верхний уровень поддержан на
-    # случай другой раскладки у чужой идентичности.
+    # The profile keeps location under owner; the top level is supported too,
+    # in case another identity lays its profile out differently.
     my_offset = ((profile.get("owner") or {}).get("location") or {}).get("utc_offset")
     if my_offset is None:
         my_offset = (profile.get("location") or {}).get("utc_offset")
     exclusive_hits = _matches(text, cfg.get("exclusive_phrases", []))
-    # Форма "within N hours of <TZ>" сама по себе является требованием —
-    # отдельной запретительной фразы рядом с ней не бывает.
+    # "within N hours of <TZ>" is a requirement in itself — no separate
+    # prohibitive sentence accompanies it.
     within_matches = list(_TZ_WITHIN_RE.finditer(text))
     range_matches = list(_TZ_RANGE_RE.finditer(text))
     if not exclusive_hits and not within_matches and not range_matches:
@@ -524,7 +536,8 @@ def _check_timezone_requirement(text: str, criteria: dict, profile: dict):
     if my_offset is None:
         return False, True, {"verdict": "no_utc_offset_in_profile", "phrases": exclusive_hits}
 
-    # Диапазон разбираем первым: он однозначнее любых окон вокруг названия.
+    # Ranges are parsed first: they are less ambiguous than any window around
+    # a zone name.
     for m in range_matches:
         lo, hi = sorted(int(m.group(g).replace(" ", "")) for g in ("a", "b"))
         detail = {
@@ -546,9 +559,9 @@ def _check_timezone_requirement(text: str, criteria: dict, profile: dict):
         if window is None:
             window = int(raw_hours)
         base = zones[tz]
-        # Летнее время сдвигает зону на час; принимаем кандидата, если он
-        # попадает в окно хотя бы при одном из двух вариантов — иначе
-        # отсекли бы по формальности того, кто фактически подходит полгода.
+        # Daylight saving shifts a zone by an hour. The candidate is accepted
+        # if either variant fits — otherwise someone who genuinely qualifies
+        # for half the year would be rejected on a technicality.
         fits = any(
             base + shift - window <= my_offset <= base + shift + window
             for shift in (0, 1)
@@ -567,18 +580,18 @@ def _check_timezone_requirement(text: str, criteria: dict, profile: dict):
 
 
 def _strip_stack_noise_sections(text: str, criteria: dict):
-    """Отрезает "стековый спам" — блоки, перечисляющие все технологии мира.
+    """Cuts away "stack spam" — blocks that list every technology on earth.
 
-    Реальный найденный случай 2026-07-31: у Lemon.io в конце каждого
-    объявления идёт абзац "NOT YOUR TECH STACK?" со списком ~60 технологий
-    (включая ".NET & C#", Angular, Scala). Из-за него ЛЮБАЯ их вакансия,
-    вплоть до "Senior Graphic Designer", получала core_hits ["C#",
-    "Angular"] и проходила гейт релевантности стека с максимальным баллом.
+    Found 2026-07-31: every Lemon.io posting ends with a "NOT YOUR TECH
+    STACK?" paragraph listing some 60 technologies, ".NET & C#", Angular and
+    Scala among them. Because of it EVERY vacancy of theirs — down to
+    "Senior Graphic Designer" — collected core hits ["C#", "Angular"] and
+    cleared the stack relevance gate with full marks.
 
-    Это не про одну площадку: тот же приём (перечислить все стеки, чтобы
-    попасть в любой поиск) используют агрегаторы и аутстаф-компании. Текст
-    отрезается ТОЛЬКО для оценки стека — гео и язык по-прежнему смотрят
-    описание целиком (там же перечень стран найма).
+    This is not about one board: agencies and outstaffing companies use the
+    same trick of listing every stack so as to appear in every search. The
+    text is cut ONLY for stack scoring — geography and language still read
+    the whole description, which is where the list of hiring countries is.
     """
     markers = (criteria.get("stack_fit") or {}).get("noise_section_markers") or []
     cut_at = len(text)
@@ -593,15 +606,16 @@ def _strip_stack_noise_sections(text: str, criteria: dict):
 
 
 def _score_ambiguous_places(text: str, criteria: dict):
-    """Неоднозначные топонимы: одно название, два разных места.
+    """Ambiguous place names: one name, two different places.
 
-    Обобщение прежней захардкоженной проверки на "georgia". Ловушка не уникальна
-    для одной идентичности: Cambridge (UK / Массачусетс), Washington (штат /
-    столица), Ontario (Канада / Калифорния), Odessa (Украина / Техас),
-    Birmingham (Англия / Алабама) — тот же класс ошибки для других людей.
+    A generalisation of what used to be a hardcoded check for "georgia". The
+    trap is not unique to one identity: Cambridge (UK / Massachusetts),
+    Washington (state / capital), Ontario (Canada / California), Odessa
+    (Ukraine / Texas), Birmingham (England / Alabama) — the same class of
+    error for other people.
 
-    Логика сохранена дословно: помечаем, только если сработал контекст ОБОИХ
-    значений или НИ ОДНОГО. Одно ясное значение — не повод дёргать человека.
+    A vacancy is flagged only when BOTH meanings have context, or NEITHER
+    does. One clear meaning is not a reason to interrupt anyone.
     """
     rules = (criteria.get("remote_location_fit") or {}).get("ambiguous_place_names") or []
     flagged = False
@@ -615,7 +629,7 @@ def _score_ambiguous_places(text: str, criteria: dict):
         a = _matches(text, (rule.get("meaning_a") or {}).get("context_keywords") or [])
         b = _matches(text, (rule.get("meaning_b") or {}).get("context_keywords") or [])
 
-        if bool(a) == bool(b):  # оба контекста или ни одного — непонятно
+        if bool(a) == bool(b):  # both contexts, or neither — undecidable
             flagged = True
             detail.append({
                 "name": rule.get("name"),
@@ -644,13 +658,12 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         dealbreakers.extend(f"location: {h}" for h in hard_hits)
 
     worldwide_hits = _matches(text, rl["worldwide_remote"]["keywords"])
-    # ПРИМЕЧАНИЕ: голого "eor" здесь намеренно нет. Реальный найденный баг
-    # (2026-07-30): "eor" - подстрока внутри обычных английских слов
-    # ("th-EOR-etical", "th-EOR-y") - ложно совпадало и обходило гейт
-    # "не подтверждено как remote" для вакансии, которая была Hybrid/Munich
-    # без единого слова "remote" в тексте. Тот же класс бага, что "LESS"/
-    # ".NET" внутри "VB.NET" - короткие акронимы слишком легко совпадают
-    # как подстрока.
+    # NOTE: a bare "eor" is deliberately absent. Found 2026-07-30: "eor" is a
+    # substring of ordinary English words ("th-EOR-etical", "th-EOR-y") and
+    # matched falsely, clearing the "not confirmed as remote" gate for a
+    # vacancy that was Hybrid/Munich without the word "remote" anywhere in
+    # it. The same class of bug as "LESS" or ".NET" inside "VB.NET": short
+    # acronyms match as substrings far too easily.
     eor_keywords = list(profile.get("eor_platforms_signal") or []) + [
         "contractor",
         "1099",
@@ -659,13 +672,14 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     eor_hits = _matches(text, eor_keywords)
     region_hits = _matches(text, rl["acceptable_region_signal"]["keywords"])
 
-    # Жёсткая привязка к конкретному региону (LATAM/APAC/UK-only/US-only/...)
-    # — dealbreaker, ЕСЛИ нет worldwide/EOR-сигнала, который бы это
-    # перевешивал (подтверждено человеком явно 2026-07-30: вакансия
-    # "remote LATAM" физически недоступна человеку из Грузии, убирать её
-    # надо, а не просто занижать приоритет).
-    # Прямое требование резидентства от работодателя не перебивается ничем —
-    # ни маркетинговым "worldwide" в тексте, ни размашистой подписью площадки.
+    # A hard tie to a specific region (LATAM/APAC/UK-only/US-only/…) is a
+    # dealbreaker UNLESS a worldwide or EOR signal outweighs it. Confirmed
+    # explicitly 2026-07-30: a "remote LATAM" role is physically unreachable
+    # from outside, so it should be removed rather than merely deprioritised.
+    #
+    # A direct residency requirement from the employer is overridden by
+    # nothing at all — not by a marketing "worldwide" in the text, and not by
+    # a board's broad-brush label.
     absolute_hits = _matches(text, rl["restrictive_region_signal"].get("absolute_residency_phrases", []))
     if absolute_hits:
         dealbreakers.extend(f"location: explicit residency requirement ('{h}')" for h in absolute_hits)
@@ -676,30 +690,30 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         dealbreakers.extend(f"location: restricted to '{h}'" for h in restrictive_hits)
         breakdown["restrictive_region_hits"] = restrictive_hits
 
-    # Структурное поле локации от источника (WWR region / Remotive
+    # The structured location field from the source (WWR region / Remotive
     # candidate_required_location / Jobicy jobGeo / Himalayas
-    # locationRestrictions) — более надёжный сигнал, чем фразы в тексте.
+    # locationRestrictions) is a more reliable signal than phrases in prose.
     structured_restricted, structured_detail = _check_structured_location(vacancy, criteria, profile)
     if structured_detail:
         breakdown["structured_location"] = structured_detail
-    # ВАЖНО: структурное ограничение НЕ снимается ничем из текста описания —
-    # ни упоминанием EOR/contractor, ни маркетинговыми worldwide-фразами.
-    # Поле локации от площадки — авторитетное утверждение о том, ГДЕ
-    # компания готова нанимать; фразы в описании таковыми не являются.
-    # Два реальных найденных бага (2026-07-30):
-    #  * LawnStarter: location = "Brazil"/"Uruguay"/"Mexico" + упоминание
-    #    Multiplier (EOR) — 11 латиноамериканских вакансий проходили.
-    #    EOR говорит, КАК оформляют сотрудника, а не ГДЕ его наймут.
-    #  * Prima: location = "London" + фраза "work from anywhere" в описании
-    #    бенефитов (типичное "работай откуда хочешь N недель в году") —
-    #    5 лондонских вакансий страховой компании проходили как worldwide.
+    # IMPORTANT: a structured restriction is lifted by nothing in the
+    # description — not by a mention of EOR or contracting, not by marketing
+    # "worldwide" phrasing. The board's location field is an authoritative
+    # statement about WHERE the company will hire; sentences in the body are
+    # not. Two bugs found on 2026-07-30:
+    #  * LawnStarter: location = "Brazil"/"Uruguay"/"Mexico" plus a mention
+    #    of Multiplier (an EOR) — eleven Latin American vacancies passed. An
+    #    EOR says HOW someone is employed, not WHERE they will be hired.
+    #  * Prima: location = "London" plus "work from anywhere" in the benefits
+    #    section (the usual "work from anywhere for N weeks a year") — five
+    #    London insurance vacancies passed as worldwide.
     if structured_restricted:
         dealbreakers.append(
             f"location: source restricts hiring to '{vacancy.get('location_raw', '').strip()}'"
         )
 
-    # Заголовочный блок самого работодателя внутри описания — точнее, чем
-    # размашистое region-поле категорийного фида. Тоже НЕ снимается текстом.
+    # The employer's own header block inside the description is more precise
+    # than a category feed's broad region field. Also not lifted by prose.
     header_restricted, header_detail = _check_header_hiring_scope(vacancy, criteria)
     if header_detail:
         breakdown["header_scope"] = header_detail
@@ -726,18 +740,19 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
             )
 
     points = 0
-    # Названная площадкой страна отменяет ПЛЮС за всемирную удалёнку из текста.
+    # A country named by the board cancels the worldwide BONUS from the text.
     #
-    # Правило «структурное поле авторитетнее маркетинговой фразы» существовало
-    # с 2026-07-30, но работало как отсев: вакансия с location="London" просто
-    # отклонялась, и что там написано в блоке бенефитов, значения не имело.
-    # Когда 2026-08-05 страна перестала быть возражением, фраза "work from
-    # anywhere for a few weeks a year" из перечня плюшек начала приносить
-    # максимальный балл за международный найм. Регрессию поймал тест, который
-    # писался для прежней редакции правила, — поэтому он и сохранён.
+    # The rule "the structured field outranks a marketing phrase" has existed
+    # since 2026-07-30, but it worked as a rejection: a vacancy with
+    # location="London" was simply dropped, and whatever the benefits section
+    # said did not matter. When a named country stopped being an objection on
+    # 2026-08-05, "work from anywhere for a few weeks a year" from the list of
+    # perks began earning full marks for international hiring. The regression
+    # was caught by a test written for the previous edition of the rule, which
+    # is exactly why that test was kept.
     #
-    # Смысл прежний: если площадка назвала город, работодатель не нанимает по
-    # всему миру, что бы ни было написано в разделе про печеньки.
+    # The meaning is unchanged: if the board named a city, the employer is not
+    # hiring worldwide, whatever the section about snacks claims.
     structured_named_country = (structured_detail or {}).get("verdict") == "country_named"
     if worldwide_hits and not structured_named_country:
         points = max(points, rl["worldwide_remote"]["points"])
@@ -745,7 +760,7 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     elif worldwide_hits:
         breakdown["worldwide_remote_hits_ignored"] = {
             "hits": worldwide_hits,
-            "why": "площадка назвала страну: %s" % (structured_detail or {}).get("value"),
+            "why": "the board named a country: %s" % (structured_detail or {}).get("value"),
         }
     if eor_hits:
         points = max(points, rl["eor_or_contractor_international"]["points"])
@@ -757,16 +772,16 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     location_unknown = False
     if not (worldwide_hits or eor_hits or region_hits or restrictive_hits):
         remote_word_hits = _matches(text, rl["remote_synonym_keywords"])
-        # Источник, публикующий ТОЛЬКО удалённые вакансии (WWR, RemoteOK,
-        # Remotive, Jobicy, Himalayas — см. sources.yaml remote_only), сам
-        # по себе является достаточным подтверждением удалёнки. Реальный
-        # найденный баг (2026-07-30): вакансии с таких площадок отклонялись
-        # как "не подтверждено как remote" только потому, что в тексте
-        # описания не встретилось английское слово "remote" — чистый
-        # ложноотрицательный результат, вырезавший десятки живых кандидатов.
+        # A board that publishes ONLY remote roles (WWR, RemoteOK, Remotive,
+        # Jobicy, Himalayas — see remote_only in the sources catalogue) is
+        # sufficient proof of remoteness by itself. Found 2026-07-30:
+        # vacancies from such boards were rejected as "not confirmed as
+        # remote" purely because the word "remote" did not appear in the
+        # description — a pure false negative that cut dozens of live
+        # candidates.
         from_remote_only_source = vacancy.get("source") in _remote_only_sources()
         if vacancy.get("remote") is True or remote_word_hits or from_remote_only_source:
-            points = 4  # известно что remote, но неясно про международный найм
+            points = 4  # known to be remote, unclear about hiring abroad
             location_unknown = True
         else:
             # Подтверждено человеком явно (2026-07-30): "мне нужны ТОЛЬКО
