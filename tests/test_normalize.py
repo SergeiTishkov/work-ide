@@ -42,7 +42,7 @@ def test_normalize_record_rejects_missing_required_fields():
 
 
 def test_normalize_record_rejects_blank_strings():
-    # поля есть, но состоят только из пробелов - тоже должны отбрасываться
+    # the fields exist but hold only whitespace — those must be discarded too
     raw = {
         "source": "x",
         "external_id": "1",
@@ -86,7 +86,7 @@ def test_normalize_record_id_is_stable_and_source_specific():
     raw2 = dict(raw1, source="remoteok")
     rec1 = normalize.normalize_record(raw1)
     rec2 = normalize.normalize_record(raw2)
-    assert rec1["id"] != rec2["id"], "одинаковый external_id с разных источников не должен схлопываться"
+    assert rec1["id"] != rec2["id"], "the same external_id from different sources must not collapse"
 
 
 def test_normalize_record_truncates_huge_description():
@@ -99,7 +99,7 @@ def test_normalize_record_truncates_huge_description():
         "description_text": "word " * 5000,
     }
     rec = normalize.normalize_record(raw)
-    assert len(rec["description_text"]) <= 6050  # с запасом на "…[truncated]"
+    assert len(rec["description_text"]) <= 6050  # with room for "…[truncated]"
 
 
 def test_normalize_record_handles_unicode_and_non_ascii():
@@ -109,7 +109,7 @@ def test_normalize_record_handles_unicode_and_non_ascii():
         "title": "Développeur .NET Sénior — 保守",
         "company": "Société Générale",
         "url": "https://x/1",
-        "description_html": "<p>Требуется поддержка legacy системы</p>",
+        "description_html": "<p>Support required for a legacy system</p>",
     }
     rec = normalize.normalize_record(raw)
     assert rec is not None

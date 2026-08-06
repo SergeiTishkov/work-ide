@@ -1,8 +1,8 @@
 """
-Тесты для tools/report.py - в первую очередь для отображения зарплаты с
-явным указанием источника (подтверждено владельцем явно, 2026-07-30):
-указано ли прямо в вакансии, найдено вручную на стороннем сайте, или
-данных нет вообще.
+Tests for tools/report.py — first of all for showing pay with its source named
+explicitly (confirmed by the owner, 2026-07-30): whether it is stated in the
+vacancy itself, was found by hand on an external site, or there is no data at
+all.
 """
 import common
 import report
@@ -71,15 +71,16 @@ def test_vacancy_line_always_includes_salary_sub_line():
 
 
 def test_scoring_philosophy_comes_from_the_identity_profile(monkeypatch):
-    """Раньше объяснение шкалы было зашито в общую машинерию и печаталось в
-    отчёт любой идентичности — включая ту, что ищет онсайт в стартапе."""
+    """The explanation of the scale used to be hard-coded into shared machinery
+    and printed into every identity's report — including one looking for onsite
+    work at a startup."""
     import report
 
     monkeypatch.setattr(
         common, "load_profile",
-        lambda *a, **k: {"identity": {"scoring_philosophy": "Своя философия этой идентичности."}},
+        lambda *a, **k: {"identity": {"scoring_philosophy": "This identity's own philosophy."}},
     )
-    assert report._scoring_philosophy() == "Своя философия этой идентичности."
+    assert report._scoring_philosophy() == "This identity's own philosophy."
 
 
 def test_scoring_philosophy_falls_back_to_a_neutral_line(monkeypatch):
@@ -94,10 +95,10 @@ def test_scoring_philosophy_falls_back_to_a_neutral_line(monkeypatch):
 
 
 def test_hiring_country_prefers_the_office_that_posted_over_company_hq():
-    """Просьба владельца 2026-08-05: у международной компании нужна страна
-    ОФИСА, разместившего вакансию, а не родина компании. Швейцарский офис
-    Google нанимает в Швейцарии — там договор, оттуда платят, тот часовой
-    пояс."""
+    """The owner's request, 2026-08-05: for an international company what is
+    wanted is the country of the OFFICE that posted the vacancy, not where the
+    company was founded. Google's Swiss office hires in Switzerland — that is
+    where the contract is, where the money comes from, which time zone applies."""
     swiss_office = {
         "title": "Software Engineer",
         "company": "Google",
@@ -109,15 +110,15 @@ def test_hiring_country_prefers_the_office_that_posted_over_company_hq():
 
 
 def test_hiring_country_trusts_the_market_tag_over_the_location_string():
-    """Тег `market:<страна>` записывает фетчер — это страна, по которой он
-    делал запрос, то есть факт, а не разбор строки."""
+    """The `market:<country>` tag is written by the fetcher — it is the country
+    the fetcher queried, that is, a fact rather than a parsed string."""
     v = {"tags": ["market:United Kingdom"], "location_raw": "Remote"}
     assert report.hiring_country(v) == ("United Kingdom", report.HIRING_OFFICE)
 
 
 def test_hiring_country_falls_back_to_headquarters_and_says_so():
-    """Когда офис неизвестен, штаб-квартира лучше пустоты — но человек должен
-    видеть, что это другое."""
+    """When the office is unknown, the head office beats nothing — but a person
+    must see that it is a different thing."""
     v = {
         "location_raw": "Anywhere in the World",
         "computed": {"score_breakdown": {"remote_location_fit": {
@@ -135,9 +136,9 @@ def test_hiring_country_handles_common_platform_spellings():
 
 
 def test_reputation_has_three_states_not_two():
-    """Просьба владельца 2026-08-06. «Не проверялась» читалось как «данных
-    нет», а означало «мы даже не пытались». Первое — свойство компании,
-    второе — дефект процесса, и человеку важно, какое из двух он видит."""
+    """The owner's request, 2026-08-06. «Not checked» read as «no data exists»
+    while it meant «we never even tried». The first is a property of the company,
+    the second a defect in the process, and which of the two a person sees matters."""
     found = report._fmt_reputation(
         {"has_data": True, "overall_rating": 4.2, "work_life_balance": 4.4,
          "source": "Glassdoor", "retrieval": "web_search"}, "hot_lead")
@@ -152,27 +153,27 @@ def test_reputation_has_three_states_not_two():
     assert "Glassdoor, Indeed" in checked_empty
 
     gap = report._fmt_reputation({"has_data": False}, "hot_lead")
-    assert "❗" in gap, "пробел в голове выдачи обязан быть заметен"
+    assert "❗" in gap, "a gap at the head of the shortlist has to be noticeable"
 
     tail = report._fmt_reputation({"has_data": False}, "long_shot")
-    assert "❗" not in tail, "в хвосте проверка не делается по замыслу — это не пробел"
+    assert "❗" not in tail, "the tail is deliberately left unchecked — that is not a gap"
 
 
 def test_reputation_coverage_block_names_what_is_left():
-    """Невыполненная работа обязана быть видна в отчёте, а не в чьей-то
-    памяти: замер 2026-08-06 показал 55 компаний в голове выдачи и ноль
-    проверок, и отчёт об этом молчал."""
+    """Work not done has to be visible in the report rather than in somebody's
+    memory: a measurement on 2026-08-06 found 55 companies at the head of the
+    shortlist and zero checks, and the report said nothing about it."""
     vacancies = {
-        "a": {"company": "Известная", "computed": {"classification": "hot_lead"}},
-        "b": {"company": "Незнакомая", "computed": {"classification": "worth_a_look"}},
+        "a": {"company": "Known Co", "computed": {"classification": "hot_lead"}},
+        "b": {"company": "Obscure Co", "computed": {"classification": "worth_a_look"}},
     }
     companies = {
-        "известная": {"name": "Известная",
+        "known-co": {"name": "Known Co",
                       "reputation": {"overall_rating": 4.0,
                                      "checked_at": "2026-08-06T10:00:00+00:00"}},
-        "незнакомая": {"name": "Незнакомая"},
+        "obscure-co": {"name": "Obscure Co"},
     }
     block = report._reputation_coverage_block(vacancies, companies)
     assert "not checked: 1" in block
-    assert "Незнакомая" in block
-    assert "Известная" not in block.split("Осталось проверить")[-1]
+    assert "Obscure Co" in block
+    assert "Known Co" not in block.split("Still to check")[-1]

@@ -1,7 +1,7 @@
 """
-Тесты для tools/link_check.py. Сеть не используется - requests.Session
-подменяется на фейковые head/get, чтобы тесты были быстрыми и
-детерминированными.
+Tests for tools/link_check.py. No network is used — requests.Session is
+replaced with fake head/get so the tests are fast and deterministic.
+
 """
 from datetime import datetime, timedelta, timezone
 
@@ -51,7 +51,7 @@ def test_check_links_classifies_dead_ok_and_unknown(monkeypatch):
         "https://x/dead": 404,
         "https://x/gone": 410,
         "https://x/ok": 200,
-        "https://x/blocked": 403,  # анти-бот, но НЕ мёртвая ссылка
+        "https://x/blocked": 403,  # anti-bot, but NOT a dead link
     }
 
     def fake_head(self, url, timeout=None, allow_redirects=None):
@@ -80,8 +80,8 @@ def test_check_links_classifies_dead_ok_and_unknown(monkeypatch):
     assert vacancies["1"]["link_check"]["status"] == "dead"
     assert vacancies["2"]["link_check"]["status"] == "dead"
     assert vacancies["3"]["link_check"]["status"] == "ok"
-    assert vacancies["4"]["link_check"]["status"] == "unknown"  # 403 не считается "мёртвым"
-    assert vacancies["5"]["link_check"]["status"] == "unknown"  # исключение не считается "мёртвым"
+    assert vacancies["4"]["link_check"]["status"] == "unknown"  # 403 does not count as "dead"
+    assert vacancies["5"]["link_check"]["status"] == "unknown"  # an exception does not count as "dead"
     assert stats["dead"] == 2
     assert stats["ok"] == 1
     assert stats["unknown"] == 2
@@ -93,7 +93,7 @@ def test_check_links_falls_back_to_get_when_head_not_allowed(monkeypatch):
 
     def fake_head(self, url, timeout=None, allow_redirects=None):
         call_log.append("head")
-        return FakeResponse(405)  # метод не разрешён
+        return FakeResponse(405)  # method not allowed
 
     def fake_get(self, url, timeout=None, allow_redirects=None, stream=None):
         call_log.append("get")
@@ -122,10 +122,10 @@ def test_check_links_skips_duplicates_and_recently_checked(monkeypatch):
     vacancies = {
         "1": {"id": "1", "url": "https://x/1", "duplicate_of": "2"},
         "2": {"id": "2", "url": "https://x/2", "link_check": {"status": "ok", "checked_at": now_iso}},
-        "3": {"id": "3", "url": "https://x/3"},  # единственная реально требующая проверки
+        "3": {"id": "3", "url": "https://x/3"},  # the only one genuinely due for a check
     }
     stats = link_check.check_links(vacancies, max_workers=2, timeout=1, recheck_after_hours=12)
 
-    assert call_count["n"] == 1  # только vac-3 реально дошла до сети
+    assert call_count["n"] == 1  # only vac-3 actually reached the network
     assert stats["skipped_recent_or_duplicate"] == 2
     assert stats["checked"] == 1

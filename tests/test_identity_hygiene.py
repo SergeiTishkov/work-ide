@@ -1,9 +1,9 @@
 """
-Гигиена идентичностей и шаблона.
+Hygiene of identities and of the template.
 
-Проверяет правила, которые легко нарушить вручную и трудно заметить глазами:
-единый префикс внутри папки, отсутствие ссылок на чужие идентичности,
-целостность шаблона и синхронизацию структуры конфигов с ним.
+Checks the rules that are easy to break by hand and hard to spot by eye: one
+prefix throughout a folder, no references to other identities, template
+integrity, and config structure kept in step with it.
 """
 import os
 
@@ -17,7 +17,7 @@ ALL_IDENTITIES = identity.list_identities(include_fixtures=True)
 
 
 def test_repo_has_at_least_one_identity():
-    assert ALL_IDENTITIES, "в репозитории должна быть хотя бы одна идентичность"
+    assert ALL_IDENTITIES, "there should be at least one identity present"
 
 
 @pytest.mark.parametrize("prefix", ALL_IDENTITIES)
@@ -33,8 +33,8 @@ def test_identity_prefix_matches_format(prefix):
 
 @pytest.mark.parametrize("prefix", ALL_IDENTITIES)
 def test_every_file_carries_its_own_prefix(prefix):
-    """Главное правило системы: перепутать kisel_notes.md и jvst_notes.md
-    практически невозможно, а два файла notes.md — вопрос времени."""
+    """The system's central rule: confusing kisel_notes.md with jvst_notes.md is
+    practically impossible, whereas two files called notes.md is a matter of time."""
     d = identity.identity_dir(prefix)
     offenders = [
         p.name for p in d.iterdir()
@@ -42,11 +42,11 @@ def test_every_file_carries_its_own_prefix(prefix):
         and p.name not in identity.KNOWN_FILES
         and not p.name.startswith(f"{prefix}_")
     ]
-    assert not offenders, f"файлы без префикса '{prefix}_': {offenders}"
+    assert not offenders, f"files without the prefix '{prefix}_': {offenders}"
 
-    # Внутри template/ действует то же правило: копия шаблона переименована
-    # под префикс идентичности при клонировании, и если там остались чужие
-    # имена — значит клонирование сделало не то.
+    # The same rule applies inside template/: the template copy is renamed to the
+    # identity's prefix at clone time, and if foreign names are left there, then
+    # cloning did the wrong thing.
     copy_dir = d / "template"
     if copy_dir.is_dir():
         stray = [
@@ -55,12 +55,12 @@ def test_every_file_carries_its_own_prefix(prefix):
             and p.name not in identity.KNOWN_FILES
             and not p.name.startswith(f"{prefix}_")
         ]
-        assert not stray, f"в копии шаблона файлы без префикса '{prefix}_': {stray}"
+        assert not stray, f"files in the template copy without '{prefix}_': {stray}"
 
 
 @pytest.mark.parametrize("prefix", ALL_IDENTITIES)
 def test_no_references_to_other_identities(prefix):
-    """Ловит копипасту из соседней папки с недоправленными путями."""
+    """Catches copy-paste from a neighbouring folder with paths half corrected."""
     problems = identity._check_foreign_prefix_leaks(prefix)
     assert not problems, "; ".join(problems)
 
@@ -72,21 +72,21 @@ def test_profile_declares_kind(prefix):
     profile, _ = settings.resolve("profile", prefix)
     kind = (profile.get("identity") or {}).get("kind")
     assert kind in ("personal", "shared_example", "fixture"), (
-        f"{prefix}: identity.kind должен быть personal | shared_example | fixture, а не {kind!r}"
+        f"{prefix}: identity.kind should be personal | shared_example | fixture, not {kind!r}"
     )
 
 
-# --- Шаблон ---------------------------------------------------------------
+# --- Template --------------------------------------------------------------
 
 def test_template_dir_exists_and_is_complete():
-    """Шаблон — точка входа для нового пользователя; неполный шаблон означает,
-    что онбординг упрётся в отсутствующий файл."""
+    """The template is a new user's entry point; an incomplete one means
+    onboarding runs into a missing file."""
     template_dir = common.TEMPLATES_DIR / identity.TEMPLATE_DIR_NAME
-    assert template_dir.is_dir(), "нет пустого шаблона в identity-templates/"
+    assert template_dir.is_dir(), "no blank template in identity-templates/"
 
     for name in identity.REQUIRED_FILES:
         path = template_dir / f"{identity.TEMPLATE_PREFIX}_{name}"
-        assert path.exists(), f"в шаблоне нет {path.name}"
+        assert path.exists(), f"the template has no {path.name}"
 
 
 def test_template_files_all_prefixed():
@@ -97,71 +97,72 @@ def test_template_files_all_prefixed():
         and p.name not in {"template.yaml", "CHANGELOG.md"}
         and not p.name.startswith(f"{identity.TEMPLATE_PREFIX}_")
     ]
-    assert not offenders, f"файлы шаблона без префикса: {offenders}"
+    assert not offenders, f"template files without a prefix: {offenders}"
 
 
 def test_template_is_not_listed_as_identity():
-    """Иначе агент однажды попробует искать работу по шаблону."""
+    """Otherwise the agent will one day try to search for work using the template."""
     assert identity.TEMPLATE_DIR_NAME not in ALL_IDENTITIES
 
 
 @pytest.mark.parametrize("prefix", ALL_IDENTITIES)
 def test_identity_is_not_behind_its_template(prefix):
-    """Локальная идентичность не должна молча отставать от своего шаблона.
+    """A local identity must not fall silently behind its template.
 
-    Раньше этот тест сравнивал структуру ключей: идентичности были полными
-    копиями, и «не доехавшее улучшение» выглядело как отсутствующий ключ.
-    Теперь структура приезжает из копии шаблона автоматически, и отставание
-    выражается ЧИСЛОМ ВЕРСИИ — сравнением, а не разбором.
+    This test used to compare key structure: identities were full copies, and an
+    "improvement that never arrived" looked like a missing key. The structure now
+    comes from the template copy automatically, and falling behind is expressed
+    as a VERSION NUMBER — a comparison rather than an analysis.
     """
     import templates
 
     update = templates.update_available(prefix)
     assert update is None, (
-        f"{prefix}: шаблон '{update['template']}' ушёл с v{update['from']} "
-        f"на v{update['to']}. Обновить: python tools/templates.py update "
+        f"{prefix}: template '{update['template']}' moved from v{update['from']} "
+        f"to v{update['to']}. Update it: python tools/templates.py update "
         f"--identity {prefix}"
     )
 
 
-# --- Derivation-таблицы ---------------------------------------------------
+# --- Derivation tables -----------------------------------------------------
 
 def test_derivation_tables_present_and_wellformed():
-    """Таблицы вывода — то, из чего собираются гео- и языковые правила новой
-    идентичности. Без них онбординг невозможен."""
+    """The derivation tables are what a new identity's geography and language
+    rules are assembled from. Without them onboarding is impossible."""
     for name, top_key in (
         ("regions.yaml", "regions"),
         ("languages.yaml", "languages"),
         ("ambiguous_places.yaml", "places"),
     ):
         path = common.shared_config("derivation") / name
-        assert path.exists(), f"нет config/derivation/{name}"
+        assert path.exists(), f"no config/derivation/{name}"
         data = common.load_yaml(path) or {}
-        assert data.get(top_key), f"{name}: пустой или отсутствует ключ '{top_key}'"
+        assert data.get(top_key), f"{name}: key '{top_key}' is empty or missing"
 
 
 def test_regions_table_separates_residency_from_company_location():
-    """Ключевое различие всей гео-логики: 'компания находится в X' и 'нужно
-    резидентство в X' — разные вещи. Проект уже ошибался на 'EU Remote'."""
+    """The key distinction of all the geography logic: 'the company is in X' and
+    'residency in X is required' are different things. The project has already
+    got 'EU Remote' wrong once."""
     data = common.load_yaml(common.shared_config("derivation") / "regions.yaml")
     for name, region in data["regions"].items():
-        assert "residency_required_phrases" in region, f"{name}: нет residency_required_phrases"
-        assert "company_located_phrases" in region, f"{name}: нет company_located_phrases"
+        assert "residency_required_phrases" in region, f"{name}: no residency_required_phrases"
+        assert "company_located_phrases" in region, f"{name}: no company_located_phrases"
         overlap = set(region["residency_required_phrases"]) & set(region["company_located_phrases"])
         assert not overlap, (
-            f"{name}: фразы {overlap} попали и в резидентство, и в местоположение компании — "
-            "это разные вещи, смешивать нельзя"
+            f"{name}: the phrases {overlap} landed in both residency and company "
+            "location — those are different things and must not be mixed"
         )
 
 
 def test_missing_dependency_gives_a_human_message_not_a_traceback(tmp_path):
-    """Первое, что видит человек на свежем клоне, если забыл поставить
-    зависимости. Раньше здесь был голый `ModuleNotFoundError: yaml`."""
+    """The first thing a person sees on a fresh clone if they forgot to install
+    the dependencies. It used to be a bare `ModuleNotFoundError: yaml`."""
     import subprocess
     import sys as _sys
 
     tools_dir = str(common.ROOT / "tools")
-    # Заглушка, из-за которой `import yaml` падает так же, как без установки.
+    # A stub that makes `import yaml` fail exactly as it would with nothing installed.
     (tmp_path / "yaml.py").write_text("raise ImportError('no yaml')", encoding="utf-8")
 
     result = subprocess.run(

@@ -1,9 +1,9 @@
 """
-Smoke-тест полного пайплайна БЕЗ сети: все фетчеры подменены на фейковые
-функции с заранее подготовленными данными. Проверяем, что весь цикл
+A smoke test of the full pipeline WITHOUT network: every fetcher is replaced by
+a fake function with data prepared in advance. What is checked is that the whole
 fetch -> normalize -> score -> merge -> rescore -> companies -> report
-отрабатывает от начала до конца, не падает на одном сломанном источнике и
-реально производит отчёт с осмысленным содержимым.
+cycle runs from end to end, does not fall over on one broken source, and really
+does produce a report with meaningful content.
 """
 import json
 
@@ -27,8 +27,8 @@ def fake_crashing_source():
 
 
 def _disable_real_link_check(monkeypatch):
-    """Смоук-тест пайплайна должен работать БЕЗ сети - link_check.py делает
-    настоящие HTTP-запросы, поэтому в тестах подменяем его на no-op."""
+    """The pipeline smoke test has to work WITHOUT network — link_check.py makes
+    real HTTP requests, so in tests it is replaced with a no-op."""
     import link_check
 
     def fake_check_links(vacancies, **kwargs):
@@ -73,7 +73,7 @@ def test_full_pipeline_smoke(isolated_data_dir, monkeypatch):
             "salary_raw": None,
         },
         {
-            # запись без обязательных полей - должна быть отброшена normalize'ом
+            # a record without required fields — normalize should discard it
             "source": "arbeitnow",
             "title": "",
             "company": "",
@@ -84,7 +84,7 @@ def test_full_pipeline_smoke(isolated_data_dir, monkeypatch):
     monkeypatch.setattr(pipeline, "FETCHERS", {
         "arbeitnow": fake_ok_source(good_records),
         "remoteok": fake_ok_source([]),
-        "weworkremotely": fake_crashing_source(),  # симулируем упавший источник
+        "weworkremotely": fake_crashing_source(),  # simulate a source that died
         "hn_whoishiring": fake_ok_source([]),
     })
 
@@ -111,16 +111,16 @@ def test_full_pipeline_smoke(isolated_data_dir, monkeypatch):
     assert report_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
 
-    # Датированная копия уходит в архив, чтобы корень reports/ не зарастал
-    # сотней файлов, среди которых глазами ищут latest.
-    # В архиве имя файла — просто дата: папка reports/archive/<префикс>/ уже
-    # принадлежит идентичности, повторять префикс в каждом имени незачем.
+    # The dated copy goes into the archive so that the root of reports/ does not
+    # grow into a hundred files to search by eye for the latest one.
+    # In the archive the file name is just a date: reports/archive/<prefix>/
+    # already belongs to the identity, so repeating the prefix buys nothing.
     archived = list(common.REPORTS_ARCHIVE_DIR.glob("*.md"))
-    assert len(archived) == 1, "датированный отчёт должен лежать в reports/archive/<префикс>/"
-    assert archived[0].name[:2] == "20", f"имя архивного отчёта — дата, а не {archived[0].name}"
+    assert len(archived) == 1, "the dated report should be in reports/archive/<prefix>/"
+    assert archived[0].name[:2] == "20", f"an archived report is named by date, not {archived[0].name}"
     assert common.REPORTS_ARCHIVE_DIR.name == common.ACTIVE_IDENTITY
     assert not list(common.REPORTS_DIR.glob("2*.md")), (
-        "в корне reports/ не должно быть датированных отчётов — только latest"
+        "there must be no dated reports at the root of reports/ — only latest"
     )
     assert legacy_title in report_text
     assert "Old Reliable Insurance Co" in report_text
@@ -158,8 +158,8 @@ def test_pipeline_is_idempotent_and_preserves_manual_status(isolated_data_dir, m
     vacancies[vid]["manual"]["notes"] = "Sent CV on 2026-07-30"
     kb.save_vacancies(vacancies)
 
-    # второй запуск с теми же данными не должен создавать дублей и не должен
-    # затирать manual.status/notes
+    # a second run with the same data must not create duplicates and must not
+    # overwrite manual.status/notes
     result2 = pipeline.run_pipeline()
     assert result2["new_vacancies"] == 0
     assert result2["updated_vacancies"] == 1
@@ -181,7 +181,7 @@ def test_ingest_manual_merges_into_same_kb_and_reruns_report(isolated_data_dir, 
         "weworkremotely": fake_ok_source([]),
         "hn_whoishiring": fake_ok_source([]),
     })
-    pipeline.run_pipeline()  # база пустая, но state/report создаются
+    pipeline.run_pipeline()  # the database is empty, but state and report are created
 
     manual_records = [{
         "title": "Legacy VB.NET Maintenance Engineer",
@@ -211,11 +211,11 @@ def test_ingest_manual_merges_into_same_kb_and_reruns_report(isolated_data_dir, 
 
 
 def test_company_enrichment_runs_for_the_shortlist(isolated_data_dir, monkeypatch):
-    """Ревизия 2026-08-04: company_intel был написан, задокументирован и
-    упомянут в отчёте — но не вызывался ниоткуда. Из 1083 компаний возраст
-    знали у 22, и все они попали туда ручными запусками. При этом признак
-    «зрелая компания 10+ лет» прямо записан в ideal_company_traits: система
-    просила то, чего не собирала."""
+    """Audit 2026-08-04: company_intel was written, documented and mentioned in
+    the report — and called from nowhere. Of 1083 companies, 22 had a known age,
+    and all of them got there through manual runs. Meanwhile the trait
+    "mature company, 10+ years" is written into ideal_company_traits outright:
+    the system was asking for what it did not collect."""
     import company_intel
     import pipeline
 
@@ -227,8 +227,8 @@ def test_company_enrichment_runs_for_the_shortlist(isolated_data_dir, monkeypatc
 
     monkeypatch.setattr(company_intel, "enrich_companies", fake_enrich)
     monkeypatch.setattr(pipeline.link_check, "check_links", lambda *_a, **_k: {})
-    # Скоринг здесь не проверяется: он перезаписал бы выставленные вручную
-    # классификации, а тест ровно про то, ЧЬИ компании попадают в обогащение.
+    # Scoring is not exercised here: it would overwrite the manually set
+    # classifications, and this test is precisely about WHOSE companies get enriched.
     monkeypatch.setattr(pipeline, "rescore_all", lambda *_a, **_k: None)
 
     vacancies = {
@@ -246,32 +246,32 @@ def test_company_enrichment_runs_for_the_shortlist(isolated_data_dir, monkeypatc
     pipeline.finalize_and_report(vacancies, {}, {})
 
     assert called["names"] == {"Shortlisted Co"}, (
-        "обогащаем только видимую часть выдачи: остальные компании всё равно "
-        "отсеяны, а внешний API не заслуживает сотен запросов впустую"
+        "only the visible part of the shortlist is enriched: the rest are filtered "
+        "out anyway, and an external API does not deserve hundreds of pointless requests"
     )
 
 
 def test_pipeline_records_the_reputation_gap_in_state(tmp_path, monkeypatch):
-    """Связь «выдача → проверка репутации» обязана быть в коде, а не в
-    инструкции. До 2026-08-06 обогащение вызывалось только при СБОРЕ вакансий,
-    а выдача меняется ещё и при каждой правке фильтров — и приходившие в неё
-    компании никто никогда не проверял."""
+    """The link «shortlist -> reputation check» has to live in code rather than in
+    an instruction. Until 2026-08-06 enrichment ran only when vacancies were
+    COLLECTED, whereas the shortlist also changes on every edit to the filters —
+    and companies arriving in it that way were never checked at all."""
     import reputation
 
     vacancies = {
-        "a": {"company": "Новая", "computed": {"classification": "hot_lead"}},
+        "a": {"company": "Newco", "computed": {"classification": "hot_lead"}},
     }
-    companies = {"новая": {"name": "Новая"}}
+    companies = {"newco": {"name": "Newco"}}
 
     todo = reputation.worklist(vacancies, companies)
-    assert [item["company"] for item in todo] == ["Новая"]
+    assert [item["company"] for item in todo] == ["Newco"]
 
     stats = reputation.coverage(vacancies, companies)
     assert stats == {"companies": 1, "found": 0, "insufficient": 0, "unchecked": 1}
 
-    assert reputation.mark_insufficient(companies, "Новая", "Glassdoor")
+    assert reputation.mark_insufficient(companies, "Newco", "Glassdoor")
     assert reputation.coverage(vacancies, companies)["insufficient"] == 1
     assert reputation.worklist(vacancies, companies) == [], (
-        "после записи результата компания обязана уйти из списка работ — "
-        "иначе каждый прогон заново ищет отзывы о конторе, которых нет"
+        "once the result is recorded the company has to leave the worklist — "
+        "otherwise every run searches again for reviews that do not exist"
     )

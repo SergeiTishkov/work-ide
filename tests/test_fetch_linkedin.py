@@ -1,15 +1,15 @@
 """
-Тесты парсера LinkedIn.
+Tests for the LinkedIn parser.
 
-Это единственный HTML-источник проекта: гостевая страница не документирована и
-может измениться в любой день. Поэтому проверяется не только «разбирает
-правильную вёрстку», но и — что важнее — «при изменившейся вёрстке возвращает
-НОЛЬ и ошибку, а не поток мусора». Молча отравленная база хуже пустой.
+This is the project's only HTML source: the guest page is undocumented and can
+change any day. So what is checked is not only "it parses correct markup" but
+— more importantly — "with changed markup it returns ZERO and an error rather
+than a stream of rubbish". A silently poisoned database is worse than an empty one.
 """
 import fetch_linkedin
 
 
-# Слепок реальной вёрстки, снятый 2026-08-04 (сокращён до двух карточек).
+# A snapshot of the real markup, taken 2026-08-04 (cut down to two cards).
 SNAPSHOT = """
 <li>
   <div class="base-card relative job-search-card">
@@ -46,7 +46,7 @@ SNAPSHOT = """
 </li>
 """
 
-# Что придёт, если LinkedIn поменяет вёрстку: карточки на месте, классы другие.
+# What arrives if LinkedIn changes its markup: cards in place, classes different.
 CHANGED_LAYOUT = """
 <li><div class="jobCard"><span class="jobCard__heading">Dotnet Developer</span>
 <span class="jobCard__org">RavenDB</span></div></li>
@@ -69,40 +69,40 @@ def test_snapshot_parses_into_complete_records():
     assert first["title"] == "Dotnet Developer"
     assert first["company"] == "RavenDB"
     assert first["url"].startswith("https://il.linkedin.com/jobs/view/")
-    assert "?" not in first["url"], "трекинговые параметры не должны попадать в id"
+    assert "?" not in first["url"], "tracking parameters must not reach the id"
     assert first["location_raw"] == "Hadera, Haifa District, Israel"
     assert first["posted_at"] == "2026-08-01"
-    assert first["remote"] is True, "запрос всегда идёт с фильтром remote"
+    assert first["remote"] is True, "the query always carries the remote filter"
 
 
 def test_html_entities_are_decoded():
-    """Иначе в отчёт поедут «Z&uuml;rich» и «&amp;» вместо нормального текста."""
+    """Otherwise «Z&uuml;rich» and «&amp;» would go into the report instead of text."""
     records = _parse(SNAPSHOT, location="Switzerland")
     assert records[1]["location_raw"] == "Zürich, Switzerland"
 
 
 def test_market_is_recorded_as_a_tag():
-    """Страна запроса надёжнее вольного текста в карточке и нужна отчёту,
-    чтобы показать, по какому рынку нашли вакансию."""
+    """The queried country is more dependable than free text on the card, and the
+    report needs it to show which market the vacancy was found in."""
     records = _parse(SNAPSHOT, location="Israel")
     assert "market:Israel" in records[0]["tags"]
 
 
 def test_changed_layout_yields_nothing_rather_than_garbage():
-    """Главная страховка источника: лучше ноль записей и явная ошибка, чем
-    мусор, который тихо отравит базу и всплывёт в отчёте как вакансия."""
+    """The source's main safety net: better zero records and an explicit error
+    than rubbish that quietly poisons the database and surfaces as a vacancy."""
     assert _parse(CHANGED_LAYOUT) == []
 
 
 def test_card_without_mandatory_fields_is_skipped():
-    """Реклама и блоки «похожие компании» приходят теми же <li>."""
-    promo = '<li><div class="base-card"><h3 class="base-search-card__title">Реклама</h3></div></li>'
+    """Ads and «similar companies» blocks arrive as the same <li>."""
+    promo = '<li><div class="base-card"><h3 class="base-search-card__title">Advert</h3></div></li>' 
     assert _parse(promo) == []
 
 
 def test_fetch_reports_format_change_as_an_error(monkeypatch):
-    """Когда карточки есть, а разобрать нельзя ни одной — это сбой формата,
-    и он обязан попасть в state.json, а не выглядеть как «на рынке пусто»."""
+    """When cards are present but not one can be parsed, that is a format failure,
+    and it has to reach state.json rather than look like «the market is empty»."""
     monkeypatch.setattr(fetch_linkedin, "_fetch_page",
                         lambda *a, **k: CHANGED_LAYOUT)
     monkeypatch.setattr(fetch_linkedin.time, "sleep", lambda *_: None)
@@ -113,8 +113,8 @@ def test_fetch_reports_format_change_as_an_error(monkeypatch):
 
 
 def test_fetch_deduplicates_across_keywords(monkeypatch):
-    """Одна вакансия находится по нескольким ключевым словам — в базу она
-    должна попасть один раз, иначе дубли размножатся по числу слов."""
+    """One vacancy is found by several keywords — it must enter the database once,
+    or duplicates multiply by the number of words."""
     monkeypatch.setattr(fetch_linkedin, "_fetch_page", lambda *a, **k: SNAPSHOT)
     monkeypatch.setattr(fetch_linkedin.time, "sleep", lambda *_: None)
 

@@ -1,163 +1,171 @@
-# RUNBOOK — что делать на каждом запуске
+# RUNBOOK — what to do on every run
 
-Этот файл — конкретная инструкция для агента, который открыл эту папку и получил
-задание "запусти обычный исследовательский цикл". Философия и приоритеты — в
-[CLAUDE.md](CLAUDE.md).
+This file is the concrete instruction for an agent that has opened this folder
+and been told "run the usual research cycle". The philosophy and the priorities
+are in [CLAUDE.md](CLAUDE.md).
 
-Во всех командах ниже `<p>` — префикс активной идентичности. Если активная
-идентичность одна, флаг `--identity` можно не писать: инструменты возьмут её из
-Малой Конституции.
+In every command below, `<p>` is the active identity's prefix. If there is only
+one identity, the `--identity` flag can be omitted: the tools will take the only
+one present.
 
-## Шаг −1 — определить идентичность (ОБЯЗАТЕЛЬНО, первым делом)
+## Step −1 — establish the identity (MANDATORY, before anything else)
 
 ```bash
-python tools\identity.py which
+python tools/identity.py which
 ```
 
-| Результат | Что делать |
+| Result | What to do |
 |---|---|
-| Показал идентичность | Работать с ней; дальше по шагам |
-| Идентичности нет | **Остановиться.** Поиск запрещён (CLAUDE.md, правило №0). Провести онбординг по [docs/ONBOARDING.md](docs/ONBOARDING.md) |
-| Активных несколько, дефолта нет | Спросить человека, какая нужна сейчас, либо понять из разговора. Не угадывать |
+| It named an identity | Work with that one; carry on with the steps |
+| There is no identity | **Stop.** Searching is forbidden (CLAUDE.md, rule zero). Run onboarding per [docs/ONBOARDING.md](docs/ONBOARDING.md) |
+| Several exist and none is chosen | Ask the person which one is wanted now, or work it out from the conversation. Do not guess |
 
-Смешение данных двух людей — тихий отказ: отчёт выглядит нормально, но он
-неправильный. Поэтому шаг не пропускается никогда.
+Mixing two people's data is a silent failure: the report looks fine but is
+wrong. So this step is never skipped.
 
-## Шаг 0 — самопроверка (если давно не запускали или что-то странно)
+## Step 0 — self-check (if it has been a while, or something looks odd)
 
 ```bash
-python tools\doctor.py --identity <p>
+python tools/doctor.py --identity <p>
 ```
 
-Если `.venv` отсутствует (новая машина или свежий клон):
+If `.venv` is missing (a new machine or a fresh clone):
 
 ```bash
 python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-Если нет `local-constitution/` — это тоже нормально для свежего клона: см.
-[docs/LOCAL_CONSTITUTION.md](docs/LOCAL_CONSTITUTION.md), там же скелет для
-копирования.
+If there is no `local-identities/` folder, that is also normal for a fresh
+clone: it is created when a template is cloned, see
+[docs/ONBOARDING.md](docs/ONBOARDING.md).
 
-## Шаг 1 — автоматический сбор и скоринг
+## Step 1 — automatic collection and scoring
 
 ```bash
-python tools\pipeline.py --identity <p>
+python tools/pipeline.py --identity <p>
 ```
 
-Это единственная команда, обязательная на каждом запуске. Она:
-- собирает вакансии из источников, включённых в `<p>_sources.yaml`;
-- никогда не падает целиком, даже если один источник недоступен —
-  смотрите на вывод и на секцию "Здоровье источников" в отчёте;
-- пересчитывает score **для всей базы**, а не только для новых записей —
-  если вы улучшили `<p>_criteria.yaml`, старые вакансии тоже получат
-  актуальную оценку;
-- проверяет ссылки (`tools/link_check.py`) и убирает из отчёта вакансии с
-  подтверждённо нерабочей ссылкой (404/410) — см. секцию "🔗 Проверка
-  ссылок" в отчёте;
-- обновляет `data/<p>/knowledge/*.json` и генерирует
-  `reports/<p>_latest.md`, а датированную копию кладёт в
-  `reports/archive/<p>/<дата>.md`. Папки создаются автоматически, если их нет.
+This is the one command mandatory on every run. It:
+- collects vacancies from the sources enabled in `<p>_sources.yaml`;
+- never fails wholesale, even when one source is unavailable — watch the output
+  and the "Source health" section of the report;
+- rescores **the whole database** rather than only the new records, so that if
+  you improved `<p>_criteria.yaml`, the old vacancies get the current verdict
+  too;
+- checks the links (`tools/link_check.py`) and removes from the report any
+  vacancy with a confirmed broken link (404/410) — see the "🔗 Link check"
+  section of the report;
+- updates `data/<p>/knowledge/*.json` and generates `reports/<p>_latest.md`,
+  filing a dated copy in `reports/archive/<p>/<date>.md`. The folders are
+  created automatically if absent.
 
-## Шаг 1.5 — ручной чек-лист по кандидатам (ОБЯЗАТЕЛЬНО, не пропускать)
+## Step 1.5 — the manual candidate checklist (MANDATORY, never skipped)
 
-Подтверждено пользователем явно (2026-07-30) после того, как вакансия с явным
-"ONSITE" и "ITAR: must be a U.S. person" в тексте прошла автоматику
-(score.py эти конкретные формулировки не знал). **Автоматический score —
-не финальное слово.** Для каждой вакансии в `long_shot` и выше (включая
-`needs_manual_review`) агент обязан:
+Confirmed explicitly by the user (2026-07-30) after a vacancy with an outright
+"ONSITE" and "ITAR: must be a U.S. person" in its text passed the automation
+(score.py did not know those particular wordings). **The automatic score is not
+the final word.** For every vacancy at `long_shot` and above (including
+`needs_manual_review`) the agent must:
 
-1. Прочитать её **полный** `description_text` из
-   `data/<p>/knowledge/<p>_vacancies.json` (локально, без сети) — не только `score_breakdown`/highlights из отчёта.
-2. Пройти по [docs/VACANCY_CHECKLIST.md](docs/VACANCY_CHECKLIST.md) пункт
-   за пунктом, явно зафиксировав результат (не "на глаз").
-3. Если найдена реальная нестыковка (что-то очевидное человеку, но не
-   пойманное keyword-скорингом) — это системная проблема: обновить
-   `<p>_criteria.yaml`/`tools/score.py`, добавить тест на конкретный
-   найденный случай, перезапустить `tools/pipeline.py`, повторить чек-лист
-   для оставшихся кандидатов. Это цикл, а не разовое действие — почти
-   каждый прогон чек-листа находит что-то новое (см.
-   `data/<p>/knowledge/<p>_insights.md`).
-4. Только вакансии, прошедшие чек-лист целиком, считаются подтверждёнными
-   находками.
+1. Read its **full** `description_text` from
+   `data/<p>/knowledge/<p>_vacancies.json` (locally, no network) — not only the
+   `score_breakdown` and highlights in the report.
+2. Work through [docs/VACANCY_CHECKLIST.md](docs/VACANCY_CHECKLIST.md) point by
+   point, recording each result explicitly rather than by eye.
+3. If a genuine inconsistency turns up — something obvious to a person but not
+   caught by keyword scoring — that is a systemic problem: update
+   `<p>_criteria.yaml` or `tools/score.py`, add a test for the specific case
+   found, re-run `tools/pipeline.py`, and repeat the checklist for the remaining
+   candidates. This is a loop rather than a one-off: almost every run of the
+   checklist finds something new (see `data/<p>/knowledge/<p>_insights.md`).
+4. Only vacancies that pass the checklist in full count as confirmed finds.
 
-## Шаг 2 — ручное расширение (то, что скрипты легально не могут)
+## Step 2 — manual extension (what the scripts cannot legitimately do)
 
-Автоматика сознательно не лезет в LinkedIn/Indeed/Dice/Glassdoor (см.
-[docs/SOURCES.md](docs/SOURCES.md) — там объяснено, почему). Здесь работает
-уже сам агент, своими инструментами (WebSearch/WebFetch), как это сделал бы
-человек:
+The automation deliberately stays out of Indeed, Dice and Glassdoor (see
+[docs/SOURCES.md](docs/SOURCES.md), which explains why). Here the agent works
+itself, with its own tools (WebSearch/WebFetch), as a person would:
 
-1. Прочитать `reports/<p>_latest.md` — секцию "🔎 Требуют ручной проверки".
-   Для каждой такой вакансии: проверить неоднозначность (например,
-   "Georgia" — это страна или штат США?), и обновить запись:
+1. Read `reports/<p>_latest.md` — the "🔎 Needs a manual check" section. For
+   each such vacancy: resolve the ambiguity (is "Georgia" the country or the US
+   state?) and update the record:
    ```bash
-   python tools\kb.py set-status --identity <p> --id <id> --status not_relevant --notes "почему не подходит"
+   python tools/kb.py set-status --identity <p> --id <id> --status not_relevant --notes "why it does not fit"
    ```
-   (или оставить как есть/поднять приоритет, если проверка оказалась
-   позитивной — тогда просто добавьте заметку через `--notes`).
+   (or leave it as it is and raise the priority if the check came out positive —
+   then just add a note through `--notes`).
 
-2. Сделать 2-4 точечных веб-поиска по паттерну вида:
-   `site:linkedin.com/jobs "<ключевые слова стека>" remote contractor` —
-   по всем целевым регионам идентичности (`<p>_profile.yaml` →
-   `target_regions`), а не только по самому желанному. Поискать и конкретные
-   компании из `ideal_company_traits`, которые могут нанимать через EOR
-   (Deel/Remote.com/Oyster/Papaya/Multiplier/G-P). Находки занести в
-   JSON-файл (формат — в docstring `tools/ingest_manual.py`) и запустить:
+2. Make two to four targeted web searches along the lines of:
+   `site:linkedin.com/jobs "<stack keywords>" remote contractor` — across all
+   the markets the identity is interested in, not only the most desirable one.
+   Search for specific companies from `ideal_company_traits` that may hire
+   through an EOR (Deel/Remote.com/Oyster/Papaya/Multiplier/G-P). Put the finds
+   into a JSON file (the format is in the docstring of
+   `tools/ingest_manual.py`) and run:
    ```bash
-   python tools\ingest_manual.py --identity <p> --file <path-to-file.json> --source-name linkedin
+   python tools/ingest_manual.py --identity <p> --file <path-to-file.json> --source-name linkedin
    ```
-   Это прогонит находки через тот же normalize+score+report, что и
-   автоматические источники, и перегенерирует отчёт.
+   That puts the finds through the same normalize + score + report path as the
+   automatic sources, and regenerates the report.
 
-3. **Проверить репутацию работодателя** для компаний из `hot_lead`/
-   `worth_a_look` (и по возможности `long_shot`) — это отдельный, важный
-   шаг: то, ради чего человек ищет работу (спокойствие, культура, темп), а
-   этого в тексте вакансии никогда не напишут, зато честно пишут бывшие
-   сотрудники. Искать обычным веб-поиском (Glassdoor/Indeed/Trustpilot
-   нельзя скрейпить автоматически — ToS) и заносить:
+3. **Check employer reputation** for the companies in `hot_lead` and
+   `worth_a_look` (and `long_shot` where possible). This is a separate,
+   important step: what a person is actually looking for — calm, culture, pace —
+   is never written in a job posting, whereas former employees write about it
+   honestly. Look it up with ordinary web search (Glassdoor, Indeed and
+   Trustpilot cannot be scraped automatically — they answer 403 behind bot
+   protection) and record it:
    ```bash
-   python tools\kb.py set-company-reputation --identity <p> --company "Acme Corp" --rating 4.2 --wlb 4.4 --source "Glassdoor" --retrieval web_search --reviews 257 --red-flags "layoffs,unpaid overtime" --notes "..."
+   python tools/kb.py set-company-reputation --identity <p> --company "Acme Corp" --rating 4.2 --wlb 4.4 --source "Glassdoor" --retrieval web_search --reviews 257 --red-flags "layoffs,unpaid overtime" --notes "..."
    ```
-   Репутация хранится на уровне компании и применяется сразу ко всем её
-   вакансиям; score пересчитывается немедленно. Особое внимание —
-   work-life balance (весит больше общего рейтинга) и красным флагам:
-   любой красный флаг ставит `needs_manual_review`, чтобы человек точно
-   прочитал причину перед откликом.
+   Reputation is stored per company and applies at once to all of its vacancies;
+   the score is recomputed immediately. Pay particular attention to work-life
+   balance (it weighs more than the overall rating) and to red flags: any red
+   flag sets `needs_manual_review`, so that a person definitely reads the reason
+   before applying.
 
-4. Если для конкретной перспективной вакансии без указанной ЗП удалось
-   найти примерную вилку из стороннего источника (Glassdoor и т.п.) —
-   занести её (даёт маленький, но честный плюс к score):
+   The list of companies still to check is compiled by the system itself:
    ```bash
-   python tools\kb.py set-salary-estimate --identity <p> --id <id> --low 60000 --high 80000 --period year --source "Glassdoor" --note "..."
+   python tools/reputation.py worklist --identity <p>
+   ```
+   If nothing credible was found about a company, record that too — it is a full
+   result, not the absence of one:
+   ```bash
+   python tools/reputation.py mark-insufficient --identity <p> --company "Acme Corp"
    ```
 
-5. Если по ходу проверки обнаружилась неочевидная закономерность о рынке
-   (например: "компании со словом X в описании почти всегда готовы нанять
-   контрактора вне США") — дописать её в
-   `data/<p>/knowledge/<p>_insights.md` **дополнением**, не переписывая файл целиком.
+4. If, for a particular promising vacancy that quotes no salary, an approximate
+   range was found on an external source (Glassdoor and the like), record it (it
+   gives a small but honest plus to the score):
+   ```bash
+   python tools/kb.py set-salary-estimate --identity <p> --id <id> --low 60000 --high 80000 --period year --source "Glassdoor" --note "..."
+   ```
 
-## Шаг 3 — самоанализ (см. CLAUDE.md, раздел 10)
+5. If a non-obvious pattern about the market turns up along the way (for
+   instance: "companies with word X in their description are nearly always
+   willing to hire a contractor outside the US"), append it to
+   `data/<p>/knowledge/<p>_insights.md` — appending, not rewriting the file.
 
-После шагов 1-2 задать себе вопрос: "какое следующее улучшение принесёт
-максимальную пользу проекту?" и сразу его реализовать. Ориентиры, на что
-смотреть:
-- `python tools/kb.py stats --identity <p>` — много ли `needs_manual_review`/дублей?
-  Если снова разрослось — доработать `score.py`/`kb.py` (это уже случалось,
-  см. `docs/ARCHITECTURE.md` → "Отклонённые подходы").
-- `data/<p>/<p>_state.json` → `sources` — не деградировал ли какой-то источник
-  (`consecutive_failures` растёт) — почитать, что изменилось в API/фиде.
-- Появился ли новый легальный публичный источник вакансий, которого здесь
-  ещё нет — добавить `tools/fetch_<name>.py` по образцу существующих.
-- Стала ли рубрика `<p>_criteria.yaml` менее точной на реальных данных — видно
-  по тому, что в `hot_lead`/`worth_a_look` попадает явно нерелевантное или,
-  наоборот, явно хорошее остаётся в `long_shot`.
+## Step 3 — self-examination (see CLAUDE.md, section 10)
 
-## Итог запуска
+After steps 1-2, ask yourself "which improvement would do the project the most
+good next?" and implement it straight away. Things worth looking at:
+- `python tools/kb.py stats --identity <p>` — are there many
+  `needs_manual_review` records or duplicates? If it has grown again, improve
+  `score.py` or `kb.py` (this has happened before, see `docs/ARCHITECTURE.md` →
+  "Rejected approaches").
+- `data/<p>/<p>_state.json` → `sources` — has a source degraded
+  (`consecutive_failures` climbing)? Find out what changed in its API or feed.
+- Has a new public source of vacancies appeared that is not here yet? Add
+  `tools/fetch_<name>.py` following the existing ones.
+- Has the `<p>_criteria.yaml` rubric become less accurate on real data? You can
+  see it when plainly irrelevant vacancies reach `hot_lead`/`worth_a_look`, or
+  when plainly good ones stay in `long_shot`.
 
-Каждый запуск обязан оставить репозиторий лучше, чем он был до запуска —
-даже если это просто более точная оценка или более чистый отчёт. Если после
-шагов 1-3 явных улучшений не нашлось — это тоже нормальный результат, но
-редкий; проверьте, не пропущено ли что-то из раздела "Дальнейшее развитие" в
-`docs/ARCHITECTURE.md`.
+## What a run must leave behind
+
+Every run must leave the repository better than it was — even if that is only a
+more accurate score or a cleaner report. If steps 1-3 turned up no obvious
+improvement, that is a legitimate outcome too, but a rare one; check whether
+something from "Further development" in `docs/ARCHITECTURE.md` has been missed.

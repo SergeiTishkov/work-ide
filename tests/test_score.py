@@ -12,10 +12,10 @@ def make_vacancy(**overrides):
         "title": "Senior C# Developer",
         "company": "Acme Corp",
         "location_raw": "",
-        # По умолчанию тестовая вакансия - подтверждённо remote (флаг от
-        # источника), чтобы тесты про другие оси (сложность роли, релевантность
-        # роли, стек и т.п.) не спотыкались об гейт "не подтверждено как
-        # remote". Тесты про сам location/remote гейт переопределяют явно.
+        # By default the test vacancy is confirmed remote (a flag from the
+        # source), so that tests about other axes (role difficulty, role
+        # relevance, stack and so on) do not trip over the "not confirmed as
+        # remote" gate. Tests about the location/remote gate itself say so.
         "remote": True,
         "tags": [],
         "description_text": "",
@@ -38,16 +38,16 @@ def test_worldwide_remote_scores_higher_than_restrictive_us_only():
     r_us = score.score_vacancy(v_us, CRITERIA, PROFILE)
     assert r_world["score"] > r_us["score"]
     assert r_world["classification"] != "rejected"
-    # Подтверждено владельцем явно (2026-07-30): жёсткое "US only" без
-    # worldwide/EOR-сигнала - dealbreaker, а не просто ниже приоритет,
-    # ровно как и любой другой региональный restrictive-сигнал.
+    # Confirmed explicitly by the owner (2026-07-30): a hard "US only" with no
+    # worldwide or EOR signal is a dealbreaker rather than merely lower
+    # priority, exactly like any other restrictive regional signal.
     assert r_us["classification"] == "rejected"
 
 
 def test_restrictive_region_latam_is_rejected():
-    # Реальный найденный баг (2026-07-30): HN-вакансия "remote LATAM"
-    # получила приличный score, хотя физически недоступна человеку из
-    # Грузии.
+    # A real bug found (2026-07-30): an HN vacancy saying "remote LATAM" got a
+    # decent score although it is physically unavailable to a person in
+    # Georgia.
     v = make_vacancy(
         title="Full-stack Developer",
         description_text="C# .NET SQL Server. This is a remote LATAM position, Latin America only.",
@@ -58,9 +58,9 @@ def test_restrictive_region_latam_is_rejected():
 
 
 def test_restrictive_region_overridden_by_worldwide_signal():
-    # Если ЕСТЬ явный worldwide/EOR сигнал - одиночное упоминание
-    # региональной фразы не должно рубить вакансию (возможно, это просто
-    # один из нескольких req'ов у гибкой компании).
+    # If an explicit worldwide/EOR signal IS present, a single mention of a
+    # regional phrase must not kill the vacancy (it may be just one of several
+    # requirements at a flexible company).
     v = make_vacancy(
         description_text="We hire remote worldwide via Deel. One of our teams is UK only, but most roles are open globally.",
     )
@@ -87,10 +87,10 @@ def test_acceptable_region_uae_recognized():
 
 
 def test_remote_europe_is_restrictive_not_acceptable():
-    # Исправленная ошибка первой версии (2026-07-30): "EU Remote"/"remote
-    # Europe" в реальной вакансии означает требование резидентства В ЕС -
-    # это dealbreaker (как "US Remote"), а не плюс, как ошибочно считалось
-    # раньше.
+    # A mistake in the first version, fixed 2026-07-30: "EU Remote"/"remote
+    # Europe" in a real vacancy means residency IN the EU is required — that is
+    # a dealbreaker (like "US Remote") rather than a plus, as was wrongly
+    # assumed before.
     v_eu = make_vacancy(description_text="C# .NET role, remote Europe, async-first team.")
     r_eu = score.score_vacancy(v_eu, CRITERIA, PROFILE)
     assert r_eu["classification"] == "rejected"
@@ -139,13 +139,13 @@ def test_startup_fast_paced_keywords_decrease_score():
 
 
 def _place_verdicts(result: dict) -> dict:
-    """{'georgia': 'ambiguous'|'meaning_a'|'meaning_b'} из score_breakdown."""
+    """{'georgia': 'ambiguous'|'meaning_a'|'meaning_b'} from score_breakdown."""
     hits = result["score_breakdown"]["remote_location_fit"].get("ambiguous_place_hits") or []
     return {h["name"]: h["verdict"] for h in hits}
 
 
 def test_ambiguous_place_flags_manual_review():
-    """Ни один контекст не сработал — непонятно, о каком месте речь."""
+    """No context fired — which place is meant is unclear."""
     v = make_vacancy(location_raw="Georgia", description_text="Remote position based in Georgia.")
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert r["needs_manual_review"] is True
@@ -171,10 +171,10 @@ def test_ambiguous_place_resolved_by_second_meaning_context():
 
 
 def test_ambiguous_place_mechanism_is_not_georgia_shaped():
-    """Механизм должен быть data-driven, а не заточен под одну ловушку.
+    """The mechanism must be data-driven rather than tailored to one trap.
 
-    Cambridge (Англия vs Массачусетс) — та же проблема для другого человека.
-    Правило описано в конфиге фикстуры, кода под него нет.
+    Cambridge (England vs Massachusetts) is the same problem for a different
+    person. The rule is described in the fixture's config; there is no code for it.
     """
     v_uk = make_vacancy(
         location_raw="Cambridge",
@@ -195,7 +195,7 @@ def test_ambiguous_place_mechanism_is_not_georgia_shaped():
 
 
 def test_stack_label_comes_from_criteria_not_hardcoded():
-    """Строка отказа по стеку раньше содержала захардкоженный '.NET/JS'."""
+    """The stack refusal line used to contain a hard-coded '.NET/JS'."""
     v = make_vacancy(
         title="Ruby Developer",
         location_raw="Anywhere in the World",
@@ -216,7 +216,7 @@ def test_stack_fit_rewards_known_technologies():
 
 
 def test_stack_fit_is_capped():
-    # Много совпадений не должно давать бесконечно растущий балл
+    # Many matches must not give an endlessly growing score
     all_keywords = " ".join(score.load_profile()["tech_stack"]["strong"])
     v = make_vacancy(description_text=all_keywords)
     r = score.score_vacancy(v, CRITERIA, PROFILE)
@@ -225,12 +225,12 @@ def test_stack_fit_is_capped():
 
 
 def test_stack_fit_core_technology_weighs_more_than_familiar():
-    # Подтверждено владельцем явно (2026-07-30): технологии, с которыми
-    # реально работал чаще (core, встречаются в 6-8 из 8 ролей за 7 лет),
-    # должны давать больше очков, чем те, с которыми пересекался мало
-    # (familiar, 1-2 роли).
-    v_core = make_vacancy(description_text="C# ASP.NET SQL Server")  # 3 core-слова
-    v_familiar = make_vacancy(description_text="MongoDB SOAP XSLT")  # 3 familiar-слова
+    # Confirmed explicitly by the owner (2026-07-30): technologies actually
+    # worked with more often (core, appearing in 6-8 of 8 roles over 7 years)
+    # should score more than ones only brushed against (familiar, 1-2 roles).
+    # (familiar, 1-2 roles).
+    v_core = make_vacancy(description_text="C# ASP.NET SQL Server")  # 3 core words
+    v_familiar = make_vacancy(description_text="MongoDB SOAP XSLT")  # 3 familiar words
     r_core = score.score_vacancy(v_core, CRITERIA, PROFILE)
     r_familiar = score.score_vacancy(v_familiar, CRITERIA, PROFILE)
     assert (
@@ -241,17 +241,17 @@ def test_stack_fit_core_technology_weighs_more_than_familiar():
 
 
 def test_webforms_not_claimed_as_personal_skill():
-    # WebForms/VB.NET убраны из tech_stack (нет подтверждения в CV) -
-    # упоминание одного только WebForms не должно засчитываться в stack_fit,
-    # хотя остаётся сигналом легаси в legacy_enterprise_signal.
-    # Пересмотрено 2026-08-05. Первая редакция требовала за такую вакансию
-    # РОВНО 0 за стек. Это было слишком: WebForms человек действительно не
-    # знает, но VB.NET — это .NET, тот же рантайм и та же экосистема, а .NET
-    # у него семь лет в ядре. Поддержка легаси на VB.NET — вообще образцовая
-    # вакансия для этого поиска: скучно, стабильно, мало конкурентов.
+    # WebForms/VB.NET were removed from tech_stack (no confirmation in the CV):
+    # a mention of WebForms alone must not count towards stack_fit, though it
+    # remains a legacy signal in legacy_enterprise_signal.
+    # Revised 2026-08-05. The first version demanded EXACTLY 0 for the stack on
+    # such a vacancy. That was too much: the person genuinely does not know
+    # WebForms, but VB.NET is .NET — the same runtime and the same ecosystem —
+    # and .NET has been in their core for seven years. Supporting legacy VB.NET
+    # is in fact a model vacancy for this search: dull, stable, few rivals.
     #
-    # Поэтому проверяется то, что и требовалось на самом деле: WebForms сам
-    # по себе навыком НЕ считается, а .NET-платформа засчитывается скромно.
+    # So what is checked is what was actually wanted: WebForms on its own does
+    # NOT count as a skill, while the .NET platform counts modestly.
     v = make_vacancy(title="Application Support", description_text="Maintaining a legacy WebForms VB.NET application.")
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     stack = r["score_breakdown"]["stack_fit"]
@@ -267,8 +267,8 @@ def test_webforms_not_claimed_as_personal_skill():
 
 
 def test_role_complexity_gate_triggers_on_title_principal_scientist():
-    # Реальный найденный случай (2026-07-30): "Principal Machine Learning
-    # Scientist" - явно не простая роль, даже если в описании легаси-слова.
+    # A real case found (2026-07-30): "Principal Machine Learning Scientist" is
+    # clearly not a simple role, even with legacy words in the description.
     v = make_vacancy(
         title="Principal Machine Learning Scientist (Experiences)",
         description_text="Enterprise banking insurance client, legacy systems, SQL Server, C#.",
@@ -280,9 +280,9 @@ def test_role_complexity_gate_triggers_on_title_principal_scientist():
 
 
 def test_role_complexity_gate_triggers_on_title_agentic():
-    # Реальный найденный случай: "Staff Software Engineer, Agentic Platform"
-    # в банке - легаси/enterprise слова в описании компании не делают
-    # AI-платформенную роль простой.
+    # A real case found: "Staff Software Engineer, Agentic Platform" at a bank —
+    # legacy and enterprise words in the company description do not make an
+    # AI-platform role simple.
     v = make_vacancy(
         title="Staff Software Engineer, Agentic Platform",
         description_text="We serve banking and insurance clients. C# .NET SQL Server Azure.",
@@ -293,10 +293,10 @@ def test_role_complexity_gate_triggers_on_title_agentic():
 
 
 def test_role_complexity_gate_triggers_on_title_llm_engineer():
-    # Реальный найденный случай (2026-07-30): "LLM Engineer Freelancer" -
-    # явно AI-роль ("design, build, and integrate practical AI features"),
-    # не поймана первой версией гейта (только "agentic"/"Principal
-    # Scientist"-паттерны).
+    # A real case found (2026-07-30): "LLM Engineer Freelancer" — plainly an AI
+    # role ("design, build, and integrate practical AI features"), not caught by
+    # the first version of the gate (which only had "agentic"/"Principal
+    # Scientist" patterns).
     v = make_vacancy(
         title="LLM Engineer Freelancer",
         description_text="Design, build, and integrate practical AI features. C# .NET JavaScript.",
@@ -307,13 +307,13 @@ def test_role_complexity_gate_triggers_on_title_llm_engineer():
 
 
 def test_role_complexity_gate_needs_multiple_description_hits_not_just_one():
-    # Одно случайное модное словечко в бойлерплейте не должно гейтить
-    # нормальную легаси-роль - нужен порог (threshold_hits) для description.
+    # One stray buzzword in boilerplate must not gate a perfectly normal legacy
+    # role — hence a threshold (threshold_hits) for the description.
     v = make_vacancy(
         title="Senior .NET Developer",
         description_text=(
             "Maintain legacy enterprise banking system, C# ASP.NET SQL Server. "
-            "We use cutting-edge monitoring tools for uptime."  # только 1 red-flag слово
+            "We use cutting-edge monitoring tools for uptime."  # only 1 red-flag word
         ),
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
@@ -348,7 +348,7 @@ def test_external_salary_estimate_gives_small_bonus_when_no_explicit_salary():
 
 
 def test_external_salary_estimate_ignored_when_explicit_salary_present():
-    # Явная ЗП в тексте вакансии всегда выигрывает у внешней оценки.
+    # An explicit salary in the vacancy text always beats an external estimate.
     v = make_vacancy(
         salary_raw="$70/hour",
         external_signals={
@@ -394,8 +394,8 @@ def test_compensation_below_target_is_penalized():
 
 
 def test_compensation_monthly_rate_within_target_not_misread_as_annual():
-    # Регрессия: "$6,000/month" не должен трактоваться как годовая ставка
-    # (что дало бы огромный штраф "below annual target").
+    # Regression: "$6,000/month" must not be read as an annual rate (which would
+    # give an enormous "below annual target" penalty).
     v = make_vacancy(description_text="Part-time contractor role, $6,000/month.")
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     bd = r["score_breakdown"]["compensation_signal"]
@@ -413,12 +413,12 @@ def test_compensation_monthly_rate_below_target_is_penalized():
 
 
 def test_low_intensity_weight_intentionally_dominates_compensation_weight():
-    # Явно подтверждённый владельцем приоритет (2026-07-30): гарантированно
-    # низкая нагрузка важнее более высокой оплаты. Защита от случайного
-    # "выравнивания" весов в будущем.
-    # Пересмотрено 2026-08-05: блок `weights` удалён — он не читался ни одной
-    # строкой кода и был декларацией, с которой реальность разошлась.
-    # Настоящий вес компонента — его ПОТОЛОК, по нему и сравниваем.
+    # A priority confirmed explicitly by the owner (2026-07-30): guaranteed low
+    # intensity matters more than higher pay. This guards against the weights
+    # being accidentally "levelled out" in future.
+    # Revised 2026-08-05: the `weights` block was deleted — no line of code read
+    # it, and it was a declaration reality had drifted away from.
+    # A component's real weight is its CAP, so that is what gets compared.
     intensity_swing = CRITERIA["low_intensity_signal"]["cap"] - CRITERIA["low_intensity_signal"]["floor"]
     comp_swing = CRITERIA["compensation_signal"]["has_explicit_range_points"] + max(
         CRITERIA["compensation_signal"]["above_target_bonus"],
@@ -443,13 +443,13 @@ def test_score_is_always_clamped_between_0_and_100():
 
 
 def test_a_named_country_is_not_an_objection_by_itself():
-    """Пересмотрено 2026-08-05 по прямому указанию владельца: «целевой регион
-    — да пофиг, что мне даст регион? важна не география, а сама работа».
+    """Revised 2026-08-05 on the owner's direct instruction: «the target region
+    — who cares, what does a region give me? What matters is not geography but
 
-    История: сначала любая страна в поле локации была полным отсевом — из 3281
-    европейской вакансии в выдачу попадала одна. Потом появился ярус «целевых
-    рынков», и мир разделился на страны с плюсом и страны с отказом. Обе
-    редакции решали за человека, куда ему можно. Теперь не решают.
+    The history: at first any country in the location field meant total
+    rejection — of 3281 European vacancies, one reached the shortlist. Then a
+    tier of "target markets" appeared, and the world split into countries with a
+    plus and countries with a refusal. Both editions decided for the person
     """
     for loc in ["USA", "Brazil", "Costa Rica", "Texas", "Virginia", "Dublin, Ireland"]:
         v = make_vacancy(
@@ -462,11 +462,11 @@ def test_a_named_country_is_not_an_objection_by_itself():
 
 
 def test_a_net_exporter_country_costs_points_but_is_not_excluded():
-    """«Есть понятие НЕцелевого региона — Индия, Пакистан, Филиппины, им
-    минус. Даже в Индии можно что-нибудь было бы найти, просто там большинство
-    вакансий будет не в моём стиле» (владелец, 2026-08-05).
+    """«There is such a thing as a NON-target region — India, Pakistan, the
+    Philippines, minus for them. Even in India you could find something, it is
+    just that most vacancies there will not be my style» (owner, 2026-08-05).
 
-    Поэтому штраф, а не отсев: вакансия оттуда должна быть лучше по существу.
+    Hence a penalty rather than rejection: a vacancy from there has to be better
     """
     neutral = make_vacancy(location_raw="Portugal",
                            description_text="C# ASP.NET SQL Server developer role.")
@@ -487,13 +487,13 @@ def test_structured_location_worldwide_markers_pass():
             description_text="C# ASP.NET SQL Server developer role.",
         )
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] != "rejected", f"{loc} НЕ должна отклоняться"
+        assert r["classification"] != "rejected", f"{loc} must NOT be rejected"
 
 
 def test_structured_location_remote_without_country_is_not_a_restriction():
-    # Реальный найденный баг (2026-07-31, после подключения ATS):
-    # Greenhouse/Ashby пишут "Remote job", GitLab — "Distributed"; это
-    # указание формата работы, а не страны, и резать по нему нельзя.
+    # A real bug found (2026-07-31, after the ATS sources were connected):
+    # Greenhouse/Ashby write "Remote job", GitLab writes "Distributed"; that
+    # states the working arrangement, not a country, and must not cut anything.
     for loc in ["Remote job", "Distributed", "Remote", "Work from home", "N/A"]:
         v = make_vacancy(
             location_raw=loc,
@@ -504,8 +504,8 @@ def test_structured_location_remote_without_country_is_not_a_restriction():
 
 
 def test_structured_location_continent_list_treated_as_worldwide():
-    # Remotive отдаёт "Americas, Europe, Asia, Africa, Oceania" — слова
-    # "worldwide" нет, но по смыслу это весь мир.
+    # Remotive returns "Americas, Europe, Asia, Africa, Oceania" — the word
+    # "worldwide" is absent, but in meaning that is the whole world.
     v = make_vacancy(
         location_raw="Americas, Europe, Asia, Africa, Oceania",
         description_text="C# ASP.NET SQL Server developer role.",
@@ -516,11 +516,11 @@ def test_structured_location_continent_list_treated_as_worldwide():
 
 
 def test_structured_location_not_overridden_by_marketing_worldwide_phrase():
-    # Реальный найденный баг (2026-07-30): Prima (страховая, London)
-    # публиковала 5 вакансий с location="London", а в описании бенефитов
-    # была фраза "work from anywhere" (типичное "работай откуда хочешь N
-    # недель в году") — это снимало гео-ограничение. Структурное поле
-    # площадки авторитетнее маркетинговой фразы в тексте.
+    # A real bug found (2026-07-30): Prima (an insurer, London) published 5
+    # vacancies with location="London", while the benefits section said "work
+    # from anywhere" (the usual "work where you like for N weeks a year") — and
+    # that lifted the geography restriction. The board's structured field
+    # carries more authority than a marketing phrase in the text.
     v = make_vacancy(
         location_raw="London",
         description_text=(
@@ -529,11 +529,11 @@ def test_structured_location_not_overridden_by_marketing_worldwide_phrase():
         ),
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    # Пересмотрено 2026-08-05: страна сама по себе больше не возражение, и
-    # проверять тут стало нечего кроме одного — что маркетинговая фраза в
-    # тексте не превратилась в ПЛЮС за всемирную удалёнку. Именно этим она
-    # была опасна: "work from anywhere for a few weeks a year" в блоке
-    # бенефитов читалось как готовность нанимать откуда угодно.
+    # Revised 2026-08-05: a country by itself is no longer an objection, so
+    # there is nothing left to check here except one thing — that the marketing
+    # phrase in the text did not turn into a PLUS for worldwide remote work.
+    # That was exactly its danger: "work from anywhere for a few weeks a year"
+    # in a benefits block read as willingness to hire from anywhere.
     assert not r["score_breakdown"]["remote_location_fit"].get("worldwide_remote_hits")
 
 
@@ -545,33 +545,33 @@ def test_ml_engineer_titles_are_gated_as_complex():
             description_text="C# TypeScript React SQL Server enterprise legacy.",
         )
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] == "low_priority", f"{title} должна гейтиться как сложная"
+        assert r["classification"] == "low_priority", f"{title} should be gated as complex"
         assert r["score_breakdown"]["role_complexity_signal"]["gate_triggered"] is True
 
 
 def test_structured_location_not_overridden_by_eor_mention():
-    # Реальный найденный баг (2026-07-30): LawnStarter публикует вакансии с
-    # location="Brazil" и упоминает Multiplier (EOR) — раньше упоминание EOR
-    # снимало гео-ограничение и 11 латиноамериканских вакансий попадали в
-    # кандидаты. EOR говорит КАК оформляют, а не ГДЕ нанимают.
+    # A real bug found (2026-07-30): LawnStarter publishes vacancies with
+    # location="Brazil" and mentions Multiplier (an EOR) — a mention of EOR used
+    # to lift the geography restriction, and 11 Latin American vacancies became
+    # candidates. An EOR says HOW people are engaged, not WHERE they are hired.
     v = make_vacancy(
         location_raw="Brazil",
         description_text="C# TypeScript React role. We hire via Multiplier as a contractor.",
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    # Пересмотрено 2026-08-05: страна сама по себе больше не возражение, и
-    # проверять тут стало нечего кроме одного — что маркетинговая фраза в
-    # тексте не превратилась в ПЛЮС за всемирную удалёнку. Именно этим она
-    # была опасна: "work from anywhere for a few weeks a year" в блоке
-    # бенефитов читалось как готовность нанимать откуда угодно.
+    # Revised 2026-08-05: a country by itself is no longer an objection, so
+    # there is nothing left to check here except one thing — that the marketing
+    # phrase in the text did not turn into a PLUS for worldwide remote work.
+    # That was exactly its danger: "work from anywhere for a few weeks a year"
+    # in a benefits block read as willingness to hire from anywhere.
     assert not r["score_breakdown"]["remote_location_fit"].get("worldwide_remote_hits")
 
 
 def test_remote_only_source_is_trusted_without_remote_word():
-    # Реальный найденный баг (2026-07-30): вакансии с remote-only площадок
-    # (WWR/RemoteOK/Remotive/Jobicy/Himalayas) отклонялись как "не
-    # подтверждено как remote" только потому, что в тексте не встретилось
-    # слово "remote" — чистый ложноотрицательный результат.
+    # A real bug found (2026-07-30): vacancies from remote-only boards
+    # (WWR/RemoteOK/Remotive/Jobicy/Himalayas) were rejected as "not confirmed
+    # as remote" purely because the word "remote" did not appear in the text —
+    # a pure false negative.
     v = make_vacancy(
         source="weworkremotely",
         remote=None,
@@ -596,10 +596,10 @@ def test_non_remote_only_source_still_needs_remote_signal():
 
 
 def test_infrastructure_only_stack_is_not_enough():
-    # Реальная находка (2026-07-30): вакансии Canonical (embedded/Linux
-    # systems) проходили гейт только по слову "Docker". Общие
-    # инфраструктурные слова не доказывают, что роль подходит .NET/JS
-    # разработчику - нужен настоящий язык/фреймворк.
+    # A real finding (2026-07-30): Canonical vacancies (embedded/Linux systems)
+    # passed the gate on the word "Docker" alone. Generic infrastructure words
+    # do not prove a role suits a .NET/JS developer — a real language or
+    # framework is needed.
     v = make_vacancy(
         title="Embedded Linux Systems Engineer",
         description_text="Embedded Linux, C, kernel optimisation, Docker containers, Azure cloud.",
@@ -617,11 +617,11 @@ def test_primary_language_match_passes_stack_gate():
 
 
 def test_hard_wrong_profession_not_lifted_by_engineer_in_title():
-    # Реальные находки (2026-07-30): "GTM Operations Process Architect" @
+    # Real findings (2026-07-30): "GTM Operations Process Architect" at
     # Stripe, "Partner Solutions Architect" @ Nebius, "Senior Manager,
-    # DevOps", "Senior Developer Advocate" @ Datadog - все содержат
-    # architect/engineer/developer в заголовке, из-за чего обычный
-    # developer-override снимал гейт.
+    # DevOps", "Senior Developer Advocate" at Datadog — all contain
+    # architect/engineer/developer in the title, which made the ordinary
+    # developer override lift the gate.
     for title in [
         "GTM Operations Process Architect",
         "Partner Solutions Architect",
@@ -635,15 +635,15 @@ def test_hard_wrong_profession_not_lifted_by_engineer_in_title():
             description_text="C# TypeScript React SQL Server enterprise legacy systems.",
         )
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] == "rejected", f"{title} должна отклоняться"
+        assert r["classification"] == "rejected", f"{title} should be rejected"
         assert any(d.startswith("role:") for d in r["dealbreakers"]), title
 
 
 def test_devops_and_infrastructure_roles_are_rejected():
-    # Подтверждено владельцем явно (2026-07-30): "выкинь девопсов, это не
-    # моя вакансия". Владелец - прикладной .NET/JS разработчик, а не
-    # инженер эксплуатации. Слово "engineer" в заголовке не должно
-    # снимать этот гейт.
+    # Confirmed explicitly by the owner (2026-07-30): "throw out the devops, it
+    # is not my kind of vacancy". The owner is an applied .NET/JS developer, not
+    # an operations engineer. The word "engineer" in a title must not lift this
+    # gate.
     for title in [
         "DevOps Engineer",
         "Senior DevOps Engineer",
@@ -660,13 +660,13 @@ def test_devops_and_infrastructure_roles_are_rejected():
             description_text="C# ASP.NET TypeScript React SQL Server legacy enterprise maintenance.",
         )
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] == "rejected", f"{title} должна отклоняться"
+        assert r["classification"] == "rejected", f"{title} should be rejected"
         assert any(d.startswith("role:") for d in r["dealbreakers"]), title
 
 
 def test_normal_developer_titles_still_pass():
-    # Защита от перекоса в другую сторону: обычные инженерные заголовки
-    # НЕ должны попадать под hard_wrong_profession.
+    # Guarding against the opposite skew: ordinary engineering titles must NOT
+    # fall under hard_wrong_profession.
     for title in [
         "Senior Software Engineer",
         "Full Stack Developer",
@@ -680,14 +680,14 @@ def test_normal_developer_titles_still_pass():
             description_text="C# ASP.NET TypeScript React SQL Server legacy enterprise maintenance.",
         )
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] != "rejected", f"{title} НЕ должна отклоняться"
+        assert r["classification"] != "rejected", f"{title} should NOT be rejected"
 
 
 def test_thresholds_let_plain_passing_vacancy_into_report():
-    # Ключевое изменение 2026-07-30: обычная нормальная remote-вакансия,
-    # прошедшая ВСЕ жёсткие гейты, но без слов "legacy"/"part-time"/вилки
-    # набирает всего ~15 баллов. При старом пороге long_shot=25 она вообще
-    # не показывалась владельцу - из 966 вакансий показывалась 1.
+    # The key change of 2026-07-30: an ordinary, perfectly normal remote vacancy
+    # that passed ALL the hard gates but says nothing about "legacy" or
+    # "part-time" and quotes no range scores only about 15 points. Under the old
+    # long_shot=25 threshold it was never shown to the owner — 1 of 966 was.
     v = make_vacancy(
         title="Senior Software Engineer",
         location_raw="Anywhere in the World",
@@ -695,8 +695,8 @@ def test_thresholds_let_plain_passing_vacancy_into_report():
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert r["classification"] in ("long_shot", "worth_a_look", "hot_lead"), (
-        "вакансия, прошедшая все гейты, обязана попадать в отчёт, "
-        f"а не в low_priority (score={r['score']})"
+        "a vacancy that passed every gate must reach the report rather than "
+        f"low_priority (score={r['score']})"
     )
 
 
@@ -706,7 +706,7 @@ def test_company_reputation_no_data_is_neutral():
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     bd = r["score_breakdown"]["company_reputation_signal"]
     assert bd["has_data"] is False
-    # Как и с зарплатой: "нет данных" != "плохо".
+    # As with pay: "no data" != "bad".
     baseline = r["score"]
 
     v2 = dict(v, _company_reputation={"overall_rating": 4.2, "work_life_balance": 4.4,
@@ -716,8 +716,8 @@ def test_company_reputation_no_data_is_neutral():
 
 
 def test_good_work_life_balance_outweighs_mediocre_overall_rating():
-    # Для этого проекта WLB важнее общего рейтинга: компания может быть
-    # "хорошей" за счёт зарплат и карьеры, но выжимать людей.
+    # For this project work-life balance matters more than the overall rating: a
+    # company can be "good" on pay and career while squeezing its people dry.
     good_wlb = make_vacancy(
         location_raw="Anywhere in the World",
         description_text="C# TypeScript React developer role.",
@@ -749,10 +749,10 @@ def test_alarming_rating_and_red_flags_force_manual_review():
 
 
 def test_eor_bare_keyword_does_not_false_match_inside_common_words():
-    # Реальный найденный баг (2026-07-30, найдено ручным чек-листом): голое
-    # "eor" ложно совпадало как подстрока внутри "theoretical"/"theory" и
-    # обходило гейт "не подтверждено как remote" для вакансии constellr
-    # (Hybrid, Munich, remote=False, ни слова "remote" в тексте).
+    # A real bug found (2026-07-30, via the manual checklist): a bare
+    # "eor" matched as a substring inside "theoretical"/"theory" and bypassed the
+    # "not confirmed as remote" gate for the constellr vacancy
+    # (Hybrid, Munich, remote=False, not one "remote" in the text).
     v = make_vacancy(
         remote=False,
         location_raw="Hybrid, Munich",
@@ -765,11 +765,11 @@ def test_eor_bare_keyword_does_not_false_match_inside_common_words():
 
 
 def test_role_complexity_gate_triggers_on_single_agentic_mention_in_description():
-    # Реальный найденный случай (2026-07-30, найдено ручным чек-листом):
-    # "Staff Software Engineer (AI CICD)" @ Chainguard упоминал "agentic AI
-    # foundation" один раз в описании - недостаточно для порога threshold_hits
-    # (нужно 2 расплывчатых слова), но "agentic" само по себе однозначно и
-    # должно гейтить с одного упоминания, даже если оно не в заголовке.
+    # A real case found (2026-07-30, via the manual checklist):
+    # "Staff Software Engineer (AI CICD)" at Chainguard mentioned "agentic AI
+    # foundation" once in the description — not enough for the threshold_hits
+    # bar (two vague words needed) — but "agentic" is unambiguous on its own and
+    # must gate on a single mention, even outside the title.
     v = make_vacancy(
         title="Staff Software Engineer (AI CICD)",
         description_text=(
@@ -785,12 +785,12 @@ def test_role_complexity_gate_triggers_on_single_agentic_mention_in_description(
 
 
 def test_vacancy_with_zero_remote_signal_is_rejected_not_just_flagged():
-    # Подтверждено владельцем явно (2026-07-30): "мне нужны ТОЛЬКО РЕМОУТ
-    # позиции" - реальный найденный случай, вакансия Rangeview (явно
-    # ONSITE, город "El Segundo, CA") не содержала слова "remote" вообще
-    # нигде и раньше получала мягкий needs_manual_review вместо отказа.
-    # Без ЛЮБОГО remote-сигнала (ни флага источника, ни слова в тексте) -
-    # dealbreaker, а не "неизвестно, но пусть будет".
+    # Confirmed explicitly by the owner (2026-07-30): "I need ONLY REMOTE
+    # positions". A real case found: the Rangeview vacancy (plainly ONSITE, city
+    # "El Segundo, CA") contained the word "remote" nowhere at all and used to
+    # get a soft needs_manual_review rather than a refusal. With no remote signal
+    # of ANY kind — neither a source flag nor a word in the text — that is a
+    # dealbreaker, not "unknown, but let it through".
     v = make_vacancy(
         remote=None,
         location_raw="El Segundo, CA",
@@ -804,10 +804,10 @@ def test_vacancy_with_zero_remote_signal_is_rejected_not_just_flagged():
 
 
 def test_needs_manual_review_when_promising_vacancy_mentions_remote_but_unclear_region():
-    # Стек-релевантная, легаси-энтерпрайзная вакансия, которая ГДЕ-ТО
-    # упоминает "remote" (так что это не dealbreaker "не подтверждено как
-    # remote"), но без явного worldwide/US-only/EOR/region сигнала - это
-    # ровно тот случай, где стоит попросить агента перепроверить руками.
+    # A stack-relevant, legacy-enterprise vacancy that mentions "remote"
+    # SOMEWHERE (so it is not a "not confirmed as remote" dealbreaker) but has no
+    # explicit worldwide/US-only/EOR/region signal is exactly the case worth
+    # asking the agent to re-check by hand.
     v = make_vacancy(
         remote=None,
         location_raw="",
@@ -821,8 +821,8 @@ def test_needs_manual_review_when_promising_vacancy_mentions_remote_but_unclear_
 
 
 def test_irrelevant_vacancy_with_no_stack_match_not_flagged_for_review():
-    # Полностью нерелевантная вакансия без единого технического слова - неважно,
-    # что локация тоже неясна, никто не должен тратить время на её перепроверку.
+    # A completely irrelevant vacancy without a single technical word — never
+    # mind that the location is unclear too, nobody should spend time re-checking it.
     v = make_vacancy(
         title="Groundman II",
         remote=None,
@@ -830,20 +830,20 @@ def test_irrelevant_vacancy_with_no_stack_match_not_flagged_for_review():
         description_text="Manual labor, utility line maintenance. Benefits include health insurance.",
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    # Подтверждено владельцем явно (2026-07-30): "0% шанс попасть в выдачу"
-    # для того, что не связано с реальными навыками - это dealbreaker
-    # (rejected), не просто низкий приоритет.
+    # Confirmed explicitly by the owner (2026-07-30): "0% chance of reaching the
+    # shortlist" for anything unrelated to real skills means a dealbreaker
+    # (rejected), not merely low priority.
     assert r["classification"] == "rejected"
     assert any(d.startswith("stack:") for d in r["dealbreakers"])
     assert r["needs_manual_review"] is False
 
 
 def test_stack_gate_rejects_irrelevant_boilerplate_job():
-    # Реальный кейс, найденный на живых данных: вакансия без единого совпадения
-    # по стеку (score_breakdown.stack_fit.points == 0), но с кучей generic
-    # enterprise/legacy-слов из бойлерплейта ("we serve banking, insurance,
-    # government and healthcare clients") набирала high-ish score и
-    # проваливалась в long_shot/needs_review, хотя не имеет отношения к .NET.
+    # A real case found on live data: a vacancy with not one stack match
+    # (score_breakdown.stack_fit.points == 0) but plenty of generic
+    # enterprise/legacy boilerplate words ("we serve banking, insurance,
+    # government and healthcare clients") scored high-ish and fell into
+    # long_shot/needs_review despite having nothing to do with .NET.
     v = make_vacancy(
         title="Transportation Analyst",
         description_text=(
@@ -859,10 +859,10 @@ def test_stack_gate_rejects_irrelevant_boilerplate_job():
 
 
 def test_role_relevance_gate_rejects_web_publisher():
-    # Реальный найденный случай (2026-07-30, найдено ручным чек-листом):
-    # "Web Publisher Half time US Timezone" - работа с CMS/Figma/контентом,
-    # не программирование, но прошла фильтр только за упоминание HTML/CSS
-    # (слишком общий сигнал стека сам по себе для web-adjacent ролей).
+    # A real case found (2026-07-30, via the manual checklist):
+    # "Web Publisher Half time US Timezone" — CMS/Figma/content work rather than
+    # programming, but it passed the filter purely for mentioning HTML/CSS
+    # (too generic a stack signal on its own for web-adjacent roles).
     v = make_vacancy(
         title="Web Publisher Half time US Timezone",
         description_text=(
@@ -876,17 +876,17 @@ def test_role_relevance_gate_rejects_web_publisher():
 
 
 def test_stack_gate_rejects_a_single_familiar_only_match():
-    # Реальный найденный баг (2026-07-30): "LESS" (CSS-препроцессор,
-    # familiar-уровень) ложно совпадал с обычным английским словом "less" в
-    # финансовой вакансии ("CFO Controller"), и одного familiar-совпадения
-    # хватало, чтобы пройти гейт. Теперь familiar-хита одного недостаточно -
-    # нужен core или strong.
+    # A real bug found (2026-07-30): "LESS" (the CSS preprocessor, at familiar
+    # level) falsely matched the ordinary English word "less" in a finance
+    # vacancy ("CFO Controller"), and one familiar match was enough to pass the
+    # gate. One familiar hit is no longer enough — a core or strong one is needed.
+    # a core or strong one is needed.
     v = make_vacancy(
         title="CFO Controller",
         description_text="Support ownership with financial modeling, no less than 5 years experience required.",
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    assert r["score_breakdown"]["stack_fit"]["familiar_hits"] == []  # "LESS" убран из списка
+    assert r["score_breakdown"]["stack_fit"]["familiar_hits"] == []  # "LESS" removed from the list
     assert r["classification"] == "rejected"
 
 
@@ -900,8 +900,8 @@ def test_tech_agnostic_override_bypasses_stack_gate():
 
 
 def test_role_relevance_gate_rejects_cfo_controller():
-    # Реальный найденный баг (2026-07-30): "CFO Controller" @ FractionalFinders
-    # получила score 60 и попала в worth_a_look.
+    # A real bug found (2026-07-30): "CFO Controller" at FractionalFinders scored
+    # 60 and reached worth_a_look.
     v = make_vacancy(
         title="CFO Controller",
         description_text="Support ownership as the primary financial partner. Contractor, part-time, 1099.",
@@ -922,11 +922,11 @@ def test_role_relevance_gate_rejects_product_manager():
 
 
 def test_developer_override_lifts_soft_wrong_profession_hit():
-    # "Developer"/"Engineer" в заголовке снимает МЯГКИЙ гейт профессии
-    # (в отличие от жёсткого списка - менеджмент/продажи/devops, см.
-    # test_devops_and_infrastructure_roles_are_rejected). Здесь: слово
-    # "Support" само по себе подозрительно, но "Engineer" рядом означает
-    # инженера поддержки продукта, а не саппорт-консультанта.
+    # "Developer"/"Engineer" in a title lifts the SOFT profession gate (unlike
+    # the hard list — management, sales, devops; see
+    # test_devops_and_infrastructure_roles_are_rejected). Here: the word
+    # "Support" is suspicious on its own, but "Engineer" beside it means a
+    # product support engineer rather than a support consultant.
     v = make_vacancy(
         title="Application Support Engineer",
         description_text="C# .NET Core ASP.NET SQL Server, maintaining legacy enterprise systems.",
@@ -937,9 +937,9 @@ def test_developer_override_lifts_soft_wrong_profession_hit():
 
 
 def test_language_requirement_german_explicit_is_dealbreaker():
-    # Реальный найденный баг (2026-07-30): "Web-Administration / Webmaster
-    # TYPO3" требовал "sehr gute Deutschkenntnisse" - владелец знает только
-    # русский и английский.
+    # A real bug found (2026-07-30): "Web-Administration / Webmaster TYPO3"
+    # required "sehr gute Deutschkenntnisse" — the owner speaks only Russian and
+    # English.
     v = make_vacancy(
         title="Web Developer",
         description_text="C# .NET ASP.NET role. Requires sehr gute Deutschkenntnisse for client calls.",
@@ -950,8 +950,8 @@ def test_language_requirement_german_explicit_is_dealbreaker():
 
 
 def test_language_requirement_german_market_heuristic_rejects_german_language_posting():
-    # Вакансия целиком на немецком, без явной англоязычной фразы про язык -
-    # эвристика по частым немецким словам/"m/w/d" должна поймать это тоже.
+    # A vacancy entirely in German, with no explicit English phrase about
+    # language — the heuristic over frequent German words and "m/w/d" must catch
     v = make_vacancy(
         title="Java Entwicklung (m/w/d)",
         description_text=(
@@ -971,9 +971,9 @@ def test_language_requirement_english_posting_not_flagged():
 
 
 def test_java_web_developer_role_is_rejected_not_a_fit():
-    # Подтверждено владельцем явно (2026-07-30): "Я ДОТНЕТЧИК, МЕНЯ НА ДЖАВА
-    # ПОЗИЦИЮ НЕ ВОЗЬМУТ" - чистая Java web-роль без .NET/JS не должна
-    # проходить гейт релевантности стека, даже с настоящим developer-заголовком.
+    # Confirmed explicitly by the owner (2026-07-30): "I AM A .NET DEVELOPER,
+    # THEY WILL NOT TAKE ME FOR A JAVA POSITION" — a pure Java web role with no
+    # .NET/JS must not pass the stack relevance gate, even with a real
     v = make_vacancy(
         title="Java Developer",
         description_text="Backend Java development, Spring Boot, REST APIs, enterprise banking client.",
@@ -984,10 +984,10 @@ def test_java_web_developer_role_is_rejected_not_a_fit():
 
 
 def test_java_scala_for_data_pipelines_is_accepted():
-    # Подтверждено владельцем явно (2026-07-30): "Scala для дата пайплайнов -
-    # оставь... Джава дата пайплайны тоже норм" - Java/Scala + контекст
-    # дата-инженерии (Spark/Databricks/ETL) - желанный вариант, в отличие от
-    # чистой Java web-роли.
+    # Confirmed explicitly by the owner (2026-07-30): "Scala for data pipelines —
+    # keep it... Java data pipelines are fine too". Java/Scala plus a data
+    # engineering context (Spark/Databricks/ETL) is a wanted variant, unlike a
+    # pure Java web role.
     v = make_vacancy(
         title="Data Engineer",
         description_text="Build ETL pipelines with Scala and Apache Spark on Databricks. Legacy data warehouse migration.",
@@ -999,34 +999,34 @@ def test_java_scala_for_data_pipelines_is_accepted():
 
 @pytest.mark.parametrize("classification_key", ["hot_lead", "worth_a_look", "long_shot", "low_priority", "rejected"])
 def test_all_classification_buckets_are_reachable(classification_key):
-    # Просто проверяем, что константа известна скорингу (защита от опечаток в criteria.yaml)
+    # Simply checks the constant is known to scoring (guards against typos in criteria.yaml)
     thresholds = CRITERIA["classification_thresholds"]
     valid_keys = set(thresholds.keys()) | {"low_priority", "rejected"}
     assert classification_key in valid_keys
 
 
 # ============================================================================
-# Баги, найденные ручным чек-листом 2026-07-31 на реальной выдаче.
-# Каждый тест назван по своему реальному источнику: если фильтр когда-нибудь
-# сломают обратно, из падения будет видно, какой именно случай он защищал.
+# Bugs found by the manual checklist, 2026-07-31, on a real shortlist.
+# Each test is named after its real source: if a filter is ever broken back
+# again, the failure shows which case it was protecting.
 # ============================================================================
 
 
 def test_millions_paid_out_are_not_read_as_an_hourly_rate():
-    # Lemon.io: "We've already paid out over $11M to our engineers". Отчёт
-    # показывал владельцу "ЗП: $11/час" — дезинформация в поле, по которому
-    # принимается решение откликаться.
+    # Lemon.io: "We've already paid out over $11M to our engineers". The report
+    # showed the owner "Pay: $11/hour" — misinformation in the field a decision
+    # to apply is made on.
     v = make_vacancy(
         description_text="We've already paid out over $11M to our engineers. Great C# projects.",
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     comp = r["score_breakdown"]["compensation_signal"]
-    assert comp["explicit"] is False, "сумма выплат площадки — не зарплата вакансии"
+    assert comp["explicit"] is False, "a board's total payout is not a vacancy's salary"
     assert not comp.get("hourly_amounts_found")
 
 
 def test_real_hourly_rate_is_still_recognised():
-    # Обратная сторона фикса выше: настоящая ставка обязана распознаваться.
+    # The flip side of the fix above: a real rate must still be recognised.
     v = make_vacancy(description_text="C# contract role, up to $60 per hour.")
     comp = score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]["compensation_signal"]
     assert comp["explicit"] is True
@@ -1034,8 +1034,8 @@ def test_real_hourly_rate_is_still_recognised():
 
 
 def test_employer_header_us_remote_beats_boards_worldwide_field():
-    # Stripe: region от WWR = "Anywhere in the World", а первая строка
-    # описания — "Headquarters: US Remote". Вакансия была в hot_lead.
+    # Stripe: region from WWR = "Anywhere in the World", while the first line of
+    # the description said "Headquarters: US Remote". The vacancy was in hot_lead.
     v = make_vacancy(
         title="Software Engineer",
         location_raw="Anywhere in the World",
@@ -1047,8 +1047,8 @@ def test_employer_header_us_remote_beats_boards_worldwide_field():
 
 
 def test_employer_header_with_plain_country_is_not_a_restriction():
-    # Mindrift: "Headquarters: Saudi Arabia" — это адрес компании, а не
-    # заявление о том, где она нанимает. Отсекать по нему нельзя.
+    # Mindrift: "Headquarters: Saudi Arabia" is the company's address, not a
+    # statement about where it hires. It must not be used to cut anything.
     v = make_vacancy(
         location_raw="Anywhere in the World",
         description_text="Headquarters: Saudi Arabia\nURL: http://example.ai\nFreelance C# work, worldwide.",
@@ -1058,8 +1058,8 @@ def test_employer_header_with_plain_country_is_not_a_restriction():
 
 
 def test_kubernetes_platform_role_with_neutral_title_is_rejected():
-    # Airtable "Software Engineer, Compute (8+ YOE)": заголовок нейтральный,
-    # тело — Kubernetes-платформа. Владелец исключил DevOps явно.
+    # Airtable "Software Engineer, Compute (8+ YOE)": a neutral title, with a
+    # Kubernetes platform in the body. The owner excluded DevOps explicitly.
     v = make_vacancy(
         title="Software Engineer, Compute (8+ YOE)",
         description_text=(
@@ -1075,8 +1075,8 @@ def test_kubernetes_platform_role_with_neutral_title_is_rejected():
 
 
 def test_app_developer_mentioning_docker_and_kubernetes_is_not_rejected():
-    # Порог обязан пропускать обычную прикладную вакансию: пара
-    # инфраструктурных слов есть почти в каждой.
+    # The threshold has to let an ordinary applied vacancy through: a couple of
+    # infrastructure words are in almost every one.
     v = make_vacancy(
         title="Senior .NET Developer",
         description_text=(
@@ -1089,8 +1089,8 @@ def test_app_developer_mentioning_docker_and_kubernetes_is_not_rejected():
 
 
 def test_keyword_stuffing_block_does_not_create_stack_hits():
-    # Lemon.io "Senior Graphic Designer" получал core_hits ["C#", "Angular"]
-    # из рекламного абзаца, перечисляющего ~60 технологий.
+    # Lemon.io "Senior Graphic Designer" got core_hits ["C#", "Angular"] out of a
+    # marketing paragraph listing some 60 technologies.
     v = make_vacancy(
         title="Senior Graphic Designer",
         description_text=(
@@ -1108,7 +1108,7 @@ def test_keyword_stuffing_block_does_not_create_stack_hits():
 
 
 def test_designer_title_is_a_hard_dealbreaker():
-    # Дизайн — не программирование, даже если стек в тексте настоящий.
+    # Design is not programming, even when the stack in the text is real.
     v = make_vacancy(
         title="Senior Graphic Designer",
         description_text="Work alongside our C# and Angular engineers on a legacy enterprise product.",
@@ -1121,7 +1121,7 @@ def test_designer_title_is_a_hard_dealbreaker():
 def test_timezone_window_that_includes_the_candidate_is_accepted():
     # Proxify: "Located in CET timezone (+/- 3 hours), we are unable to
     # consider applications from candidates in other time zones".
-    # Владелец в UTC+4, CET(UTC+1)+3 = UTC+4 — попадает.
+    # The owner is at UTC+4; CET(UTC+1)+3 = UTC+4 — within range.
     v = make_vacancy(
         title="Senior Frontend Developer",
         description_text=(
@@ -1136,7 +1136,7 @@ def test_timezone_window_that_includes_the_candidate_is_accepted():
 
 
 def test_timezone_window_that_excludes_the_candidate_is_rejected():
-    # То же правило с другим поясом: PST +/- 2 = UTC-10..-6, владелец в UTC+4.
+    # The same rule with another zone: PST +/- 2 = UTC-10..-6, owner at UTC+4.
     v = make_vacancy(
         title="Senior Frontend Developer",
         description_text=(
@@ -1150,7 +1150,7 @@ def test_timezone_window_that_excludes_the_candidate_is_rejected():
 
 
 def test_unparsed_timezone_requirement_flags_for_review_instead_of_rejecting():
-    # Скрыть настоящую вакансию хуже, чем показать сомнительную.
+    # Hiding a real vacancy is worse than showing a doubtful one.
     v = make_vacancy(
         title="Senior C# Developer",
         description_text=(
@@ -1164,9 +1164,9 @@ def test_unparsed_timezone_requirement_flags_for_review_instead_of_rejecting():
 
 
 def test_posting_written_in_spanish_is_rejected():
-    # Work and Study Travel: объявление целиком на испанском, оплата
-    # 16 000 MXN/мес. Прошло фильтр, потому что эвристика "объявление на
-    # чужом языке" существовала только для немецкого.
+    # Work and Study Travel: the posting was entirely in Spanish, paying
+    # 16,000 MXN/month. It passed the filter because the "posting in a foreign
+    # language" heuristic existed for German only.
     v = make_vacancy(
         title="Website Builder / WordPress Specialist",
         description_text=(
@@ -1193,7 +1193,7 @@ def test_posting_written_in_polish_is_rejected():
 
 
 def test_english_posting_is_not_flagged_as_foreign_language():
-    # Обратная страховка: маркеры не должны срабатывать на английском тексте.
+    # The reverse guard: the markers must not fire on English text.
     v = make_vacancy(
         description_text=(
             "We are looking for a C# developer with experience in legacy enterprise systems. "
@@ -1206,8 +1206,8 @@ def test_english_posting_is_not_flagged_as_foreign_language():
 
 def test_timezone_stated_in_words_is_understood():
     # RedLine Solutions (HN): "We need a developer located within three hours
-    # of Pacific timezone" — единственная C#/.NET вакансия в выдаче и
-    # физически недостижимая: Pacific ±3 = UTC-11..-5, владелец в UTC+4.
+    # of Pacific timezone" — the only C#/.NET vacancy in the shortlist, and
+    # physically unreachable: Pacific ±3 = UTC-11..-5, owner at UTC+4.
     v = make_vacancy(
         title="C#/.NET developer",
         description_text=(
@@ -1222,7 +1222,7 @@ def test_timezone_stated_in_words_is_understood():
 
 def test_signing_bonus_is_not_treated_as_the_bottom_of_the_salary_range():
     # Sticker Mule: "Salary: $150,000-$250,000 USD" + "$20,000 signing bonus".
-    # Отчёт показывал вилку "$20,000-$250,000/год".
+    # The report showed a range of "$20,000-$250,000/year".
     v = make_vacancy(
         description_text="Salary: $150,000-$250,000 USD. $20,000 signing bonus. C# and TypeScript.",
     )
@@ -1232,15 +1232,15 @@ def test_signing_bonus_is_not_treated_as_the_bottom_of_the_salary_range():
 
 
 # ============================================================================
-# Баги, найденные ручным чек-листом 2026-08-04.
+# Bugs found by the manual checklist, 2026-08-04.
 # ============================================================================
 
 
 def test_management_role_is_caught_when_the_title_is_garbage():
-    """Запись с Hacker News приехала с заголовком "YC 19" и компанией "Ashby":
-    парсер треда разобрал строку по разделителям и взял не тот кусок. Гейт
-    профессии смотрит заголовок — и в "YC 19" профессии нет, поэтому
-    менеджерская вакансия прошла как обычная."""
+    """A record from Hacker News arrived with the title "YC 19" and the company
+    "Ashby": the thread parser split the line on delimiters and took the wrong
+    piece. The profession gate looks at the title — and "YC 19" has no
+    profession in it, so a management vacancy passed as an ordinary one."""
     v = make_vacancy(
         title="YC 19",
         company="Ashby",
@@ -1256,8 +1256,8 @@ def test_management_role_is_caught_when_the_title_is_garbage():
 
 
 def test_informative_title_does_not_pull_words_from_the_description():
-    """Обратная страховка: у нормальной вакансии заголовок информативен, и
-    слово 'manager' из корпоративного блёрба не должно её выбрасывать."""
+    """The reverse guard: a normal vacancy has an informative title, and the word
+    'manager' in corporate blurb must not throw it away."""
     v = make_vacancy(
         title="Senior C# Developer",
         description_text=(
@@ -1270,9 +1270,9 @@ def test_informative_title_does_not_pull_words_from_the_description():
 
 
 def test_crypto_company_is_a_dealbreaker_not_a_penalty():
-    """Parity (Polkadot/Kusama) набрала 20 баллов и попала в выдачу, хотя
-    профиль прямо избегает crypto/web3: слова давали лишь -8 в
-    low_intensity_signal, и минус утонул в плюсах за remote и стек."""
+    """Parity (Polkadot/Kusama) scored 20 and reached the shortlist although the
+    profile avoids crypto/web3 outright: the words gave only -8 in
+    low_intensity_signal, and the minus drowned in pluses for remote and stack."""
     v = make_vacancy(
         title="Senior Experience Engineer",
         description_text=(
@@ -1286,8 +1286,8 @@ def test_crypto_company_is_a_dealbreaker_not_a_penalty():
 
 
 def test_single_crypto_mention_is_not_enough_to_reject():
-    """Обычная компания может упомянуть крипто среди клиентов — порог в два
-    совпадения существует именно для этого."""
+    """An ordinary company may mention crypto among its clients — the two-match
+    threshold exists precisely for that."""
     v = make_vacancy(
         title="Senior C# Developer",
         description_text=(
@@ -1301,7 +1301,7 @@ def test_single_crypto_mention_is_not_enough_to_reject():
 
 def test_timezone_stated_as_an_explicit_range():
     """SuperPlane: 'We currently work across GMT+2 to GMT-3 and welcome
-    candidates in that range' — ни '±N часов', ни 'within N hours of X'."""
+    candidates in that range' — neither '±N hours' nor 'within N hours of X'."""
     v = make_vacancy(
         title="Product Engineer",
         description_text=(
@@ -1329,10 +1329,10 @@ def test_timezone_range_that_includes_the_candidate_is_accepted():
 
 
 def test_keyword_stuffing_block_does_not_trigger_the_industry_gate():
-    """Гейт отрасли отсёк все вакансии Lemon.io: их рекламный абзац
-    "NOT YOUR TECH STACK?" перечисляет Blockchain, Ethereum и Solana.
-    Компания к крипте отношения не имеет — это список стеков, под которые
-    они подбирают проекты. Ложный отказ прячет живые вакансии."""
+    """The industry gate cut every Lemon.io vacancy: their marketing paragraph
+    "NOT YOUR TECH STACK?" lists Blockchain, Ethereum and Solana. The company has
+    nothing to do with crypto — that is a list of stacks they match projects to.
+    A false refusal hides live vacancies."""
     v = make_vacancy(
         title="Senior C# Developer",
         description_text=(
@@ -1348,9 +1348,9 @@ def test_keyword_stuffing_block_does_not_trigger_the_industry_gate():
 
 
 def test_title_naming_a_foreign_technology_is_rejected():
-    """Протечка, замеченная человеком прямо в выдаче 2026-08-04: гейт искал
-    знакомый язык по всему тексту, а в Rails-вакансии среди смежных навыков
-    перечислены HTML/CSS/JavaScript."""
+    """A leak a person spotted in the shortlist itself, 2026-08-04: the gate
+    looked for a familiar language across the whole text, and a Rails vacancy
+    lists HTML/CSS/JavaScript among adjacent skills."""
     for title in ("Senior Ruby on Rails Developer",
                   "Senior Fullstack Developer (Python)",
                   "Senior Vue Developer"):
@@ -1367,7 +1367,7 @@ def test_title_naming_a_foreign_technology_is_rejected():
 
 
 def test_title_naming_a_known_technology_still_passes():
-    """Обратная страховка: гейт не должен резать вакансии на своём стеке."""
+    """The reverse guard: the gate must not cut vacancies on the person's own stack."""
     for title in ("Senior C# Developer",
                   "Senior Fullstack Developer (React.js / Node.js)",
                   "Software engineer"):
@@ -1380,8 +1380,8 @@ def test_title_naming_a_known_technology_still_passes():
 
 
 def test_data_pipeline_exception_survives_the_title_gate():
-    """Scala/Java в заголовке при контексте Spark/Databricks — задокументированное
-    исключение, оно не должно погибнуть под новым гейтом."""
+    """Scala/Java in the title with a Spark/Databricks context is a documented
+    exception, and it must not die under the new gate."""
     v = make_vacancy(
         title="Scala Data Engineer",
         description_text=(
@@ -1393,12 +1393,12 @@ def test_data_pipeline_exception_survives_the_title_gate():
     assert r["classification"] != "rejected"
 
 
-# --- Личная надбавка за рынок и штраф за роль (2026-08-05) -------------------
+# --- Personal market bonus and role penalty (2026-08-05) ---------------------
 
 def test_personal_market_bonus_comes_from_the_local_constitution(monkeypatch):
-    """Причина надбавки — обстоятельства конкретного человека (налоги, пенсия,
-    семья), а не рынок и не профиль поиска. Поэтому значения живут вне гита, и
-    сам механизм обязан работать без них: у другого человека их просто нет."""
+    """The bonus exists because of one person's circumstances (tax, pension,
+    family) rather than the market or the search profile. So its values live
+    outside git, and the mechanism must work without them: another person has none."""
     profile = dict(PROFILE)
     profile["personal_market_bonus"] = {"Belarus": {"points": 12, "remote_only": True}}
 
@@ -1416,8 +1416,8 @@ def test_personal_market_bonus_comes_from_the_local_constitution(monkeypatch):
 
 
 def test_market_bonus_marked_remote_only_ignores_onsite_vacancies():
-    """Смысл надбавки — работать откуда угодно, оставаясь налоговым резидентом.
-    Для офисной вакансии он теряется."""
+    """The point of the bonus is working from anywhere while staying a tax
+    resident. For an office vacancy that point is lost."""
     profile = dict(PROFILE)
     profile["personal_market_bonus"] = {"Belarus": {"points": 12, "remote_only": True}}
     v = make_vacancy(title="Senior C# Developer", location_raw="Minsk, Belarus",
@@ -1426,8 +1426,8 @@ def test_market_bonus_marked_remote_only_ignores_onsite_vacancies():
 
 
 def test_market_bonus_does_not_rescue_a_disqualified_vacancy():
-    """Надбавка мягкая: она двигает вакансию вверх, но не делает непроходную
-    проходной. Гейты обязаны отрабатывать раньше и независимо."""
+    """The bonus is soft: it moves a vacancy up but does not make an unpassable
+    one passable. The gates must fire earlier and independently."""
     profile = dict(PROFILE)
     profile["personal_market_bonus"] = {"Belarus": {"points": 99}}
     v = make_vacancy(title="Senior Ruby on Rails Developer", location_raw="Minsk, Belarus",
@@ -1436,9 +1436,9 @@ def test_market_bonus_does_not_rescue_a_disqualified_vacancy():
 
 
 def test_pure_frontend_role_is_penalised_but_not_rejected():
-    """Подтверждено человеком (2026-08-05): «чистый Frontend Developer я
-    закрою, но опыт в основном фуллстек, там меня вряд ли наймут». Выбрасывать
-    неправильно — понижаем."""
+    """Confirmed by the owner (2026-08-05): «a pure Frontend Developer role I
+    could do, but my experience is mostly full-stack, and there they are unlikely
+    to hire me». Throwing it away would be wrong — it is downgraded instead."""
     front = make_vacancy(title="Frontend Developer",
                          description_text="React and TypeScript, worldwide remote.")
     full = make_vacancy(title="Fullstack Developer",
@@ -1446,24 +1446,24 @@ def test_pure_frontend_role_is_penalised_but_not_rejected():
     r_front = score.score_vacancy(front, CRITERIA, PROFILE)
     r_full = score.score_vacancy(full, CRITERIA, PROFILE)
 
-    assert r_front["classification"] != "rejected", "вакансию человек закрыть может"
+    assert r_front["classification"] != "rejected", "the person can do this job"
     assert r_front["score"] < r_full["score"]
     assert r_front["score_breakdown"]["title_role_penalty"]["points"] < 0
 
 
 def test_fullstack_title_mentioning_frontend_is_not_penalised():
-    """«Fullstack (Frontend focus)» — это фуллстек, а не чистый фронтенд."""
+    """«Fullstack (Frontend focus)» is full-stack, not pure frontend."""
     v = make_vacancy(title="Fullstack Developer (Frontend focus)",
                      description_text="React, C#, worldwide remote.")
     assert score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]["title_role_penalty"] == {}
 
 
 def test_eor_platform_names_do_not_match_ordinary_words():
-    """Замер 2026-08-05 на базе из 9527 вакансий: 345 ложных EOR-сигналов.
-    «Multiplier» ловился в «productivity multiplier» и «Talent Multiplier»
-    (266 раз), «G-P» — внутри немецкого «Mentoring-Programm» (79 раз). EOR —
-    самый крупный плюс рубрики (+18), поэтому ложное срабатывание тут дороже
-    всех прочих."""
+    """Measured 2026-08-05 over a base of 9527 vacancies: 345 false EOR signals.
+    «Multiplier» was caught inside «productivity multiplier» and «Talent
+    Multiplier» (266 times); «G-P» inside the German «Mentoring-Programm» (79
+    times). EOR is the rubric's largest plus (+18), so a false positive here
+    costs more than any other."""
     for text in (
         "We embrace AI as a core productivity multiplier across the team.",
         "Talent Multiplier: mentor and coach mid-level engineers.",
@@ -1472,11 +1472,11 @@ def test_eor_platform_names_do_not_match_ordinary_words():
         v = make_vacancy(title="Senior C# Developer", description_text=text)
         hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
                 ["remote_location_fit"].get("eor_or_contractor_hits") or [])
-        assert hits == [], f"ложное EOR-срабатывание на: {text[:40]}"
+        assert hits == [], f"false EOR match on: {text[:40]}"
 
 
 def test_real_eor_mentions_are_still_detected():
-    """Обратная страховка к фиксу выше: настоящие упоминания обязаны ловиться."""
+    """The reverse guard to the fix above: real mentions must still be caught."""
     for text in (
         "Payments are issued in partnership with Remote.com for contractors.",
         "We hire internationally through an Employer of Record.",
@@ -1485,13 +1485,13 @@ def test_real_eor_mentions_are_still_detected():
         v = make_vacancy(title="Senior C# Developer", description_text=text)
         hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
                 ["remote_location_fit"].get("eor_or_contractor_hits") or [])
-        assert hits, f"настоящий EOR-сигнал пропущен: {text[:40]}"
+        assert hits, f"a real EOR signal was missed: {text[:40]}"
 
 
 def test_worldwide_vocabulary_covers_common_phrasings():
-    """Замер 2026-08-05: прежний список ловил 75 вакансий из 9527 — не потому,
-    что таких мало, а потому что формулировок много, а в списке было десять.
-    После расширения — 389."""
+    """Measured 2026-08-05: the old list caught 75 vacancies of 9527 — not
+    because there are few such vacancies but because there are many wordings and
+    the list held ten. After extending it: 389."""
     for text in (
         "We are hiring anywhere in the world.",
         "Our globally distributed team works across time zones.",
@@ -1501,12 +1501,12 @@ def test_worldwide_vocabulary_covers_common_phrasings():
         v = make_vacancy(title="Senior C# Developer", description_text=text)
         hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
                 ["remote_location_fit"].get("worldwide_remote_hits") or [])
-        assert hits, f"формулировка не распознана: {text}"
+        assert hits, f"wording not recognised: {text}"
 
 
 def test_marketing_global_does_not_count_as_worldwide_hiring():
-    """«Global leader» и «global team» — маркетинг, а не готовность нанимать
-    откуда угодно. Поэтому все фразы в списке минимум из двух слов."""
+    """«Global leader» and «global team» are marketing rather than willingness to
+    hire from anywhere. Hence every phrase in the list is at least two words."""
     v = make_vacancy(
         title="Senior C# Developer",
         description_text="We are a global leader in payments with a global team of experts.",
@@ -1517,9 +1517,9 @@ def test_marketing_global_does_not_count_as_worldwide_hiring():
 
 
 def test_java_title_is_rejected_again():
-    """Регресс, который я сам и внёс: java, golang и c++ выпали из гейта
-    заголовка при обходе YAML-экранирования, и «Java Engineer» снова начал
-    проходить. Поймано ручным чек-listом 2026-08-05 на вакансии Azumo."""
+    """A regression I introduced myself: java, golang and c++ dropped out of the
+    title gate while working round YAML escaping, and «Java Engineer» started
+    passing again. Caught by the manual checklist 2026-08-05 on an Azumo vacancy."""
     v = make_vacancy(title="Java Engineer - Latin America",
                      description_text="Backend infrastructure, JavaScript on the frontend.")
     r = score.score_vacancy(v, CRITERIA, PROFILE)
@@ -1528,8 +1528,8 @@ def test_java_title_is_rejected_again():
 
 
 def test_project_manager_is_not_a_developer_role():
-    """«Product / Technical Project Manager (100% Remote, Worldwide)» прошла:
-    в списке профессий был только «product manager»."""
+    """«Product / Technical Project Manager (100% Remote, Worldwide)» passed: the
+    profession list held only «product manager»."""
     v = make_vacancy(title="Product / Technical Project Manager (100% Remote, Worldwide)",
                      description_text="We are redefining the internet architecture. C# and TypeScript.")
     r = score.score_vacancy(v, CRITERIA, PROFILE)
@@ -1538,10 +1538,10 @@ def test_project_manager_is_not_a_developer_role():
 
 
 def test_residency_stated_without_the_word_only():
-    """Требование резидентства формулируют по-разному. Реальный текст:
+    """A residency requirement is worded in many ways. Real text:
     «The position is fully remote based in Latin America. We will only be
-    considering candidates based in Latin America» — ни одной фразы из
-    прежнего списка там нет."""
+    considering candidates based in Latin America» — not one phrase from the old
+    list appears in it."""
     v = make_vacancy(
         title="Senior C# Developer",
         location_raw="Anywhere in the World",
@@ -1557,12 +1557,12 @@ def test_residency_stated_without_the_word_only():
 
 
 def test_short_legacy_acronyms_do_not_match_ordinary_words():
-    """Замер 2026-08-05: «ssis» дал 1057 ложных срабатываний — он подстрока в
-    «ai-assisted» и «assistance» — и поднял на первое место выдачи вакансию,
-    где никакого SSIS нет. «ssas» ловился в португальском «nossas».
+    """Measured 2026-08-05: «ssis» produced 1057 false matches — it is a substring
+    of «ai-assisted» and «assistance» — and pushed a vacancy with no SSIS in it to
+    the top of the shortlist. «ssas» was caught inside the Portuguese «nossas».
 
-    Ровно тот класс ошибки, что «LESS» внутри «no less than» и «Multiplier»
-    внутри «productivity multiplier». Короткий акроним пишется полностью."""
+    Exactly the class of mistake as «LESS» inside «no less than» and «Multiplier»
+    inside «productivity multiplier». A short acronym is written out in full."""
     for text in (
         "We use AI as an assisted tooling layer for the team.",
         "Providing assistance to customers and internal teams.",
@@ -1571,12 +1571,12 @@ def test_short_legacy_acronyms_do_not_match_ordinary_words():
         v = make_vacancy(title="Senior C# Developer", description_text=text)
         hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
                 ["legacy_enterprise_signal"].get("hits") or [])
-        assert "ssis" not in hits and "ssas" not in hits, f"ложный legacy-сигнал на: {text[:40]}"
+        assert "ssis" not in hits and "ssas" not in hits, f"false legacy signal on: {text[:40]}"
 
 
 def test_real_legacy_stack_is_detected():
-    """Обратная страховка: никто не пишет «у нас легаси», но старый стек в
-    требованиях виден — и говорит о характере работы точнее слов о культуре."""
+    """The reverse guard: nobody writes «we have legacy», but an old stack in the
+    requirements is visible — and says more about the work than words about culture."""
     v = make_vacancy(
         title="Senior C# Developer",
         description_text=(
@@ -1586,13 +1586,13 @@ def test_real_legacy_stack_is_detected():
     )
     hits = (score.score_vacancy(v, CRITERIA, PROFILE)["score_breakdown"]
             ["legacy_enterprise_signal"].get("hits") or [])
-    assert len(hits) >= 3, f"старый стек не распознан: {hits}"
+    assert len(hits) >= 3, f"the old stack was not recognised: {hits}"
 
 
 def test_engineering_support_role_counts_as_legacy_signal():
-    """Саппорт — плюс для этого поиска: поддержка работающей системы это ровно
-    тот характер работы, который ищется. Клиентский саппорт при этом остаётся
-    в дисквалификаторах профессий."""
+    """Support is a plus for this search: maintaining a working system is exactly
+    the character of work being looked for. Customer support meanwhile stays in
+    the profession disqualifiers."""
     v = make_vacancy(
         title="Application Support Engineer",
         description_text="Production support for our C# platform, incident resolution, bug fixing.",
@@ -1602,12 +1602,12 @@ def test_engineering_support_role_counts_as_legacy_signal():
     assert (r["score_breakdown"]["legacy_enterprise_signal"].get("hits") or [])
 
 
-# --- Личные веса технологий и список технологий в отчёте (2026-08-05) --------
+# --- Personal technology weights and the report's technology list (2026-08-05) --
 
 def test_personal_tech_bonus_prefers_one_known_stack_over_another():
-    """stack_fit отвечает «умеет ли человек это вообще» и одинаков для всех,
-    кто пользуется идентичностью. Насколько один знакомый стек предпочтительнее
-    другого — вопрос личного опыта, поэтому веса живут в Малой Конституции."""
+    """stack_fit answers «can the person do this at all» and is the same for
+    everyone using the identity. How much more one familiar stack is preferred
+    over another is personal experience, so the weights live in the Local Constitution."""
     profile = dict(PROFILE)
     profile["personal_tech_bonus"] = {
         "dotnet": {"points": 12, "keywords": ["c#", "asp.net"]},
@@ -1625,12 +1625,12 @@ def test_personal_tech_bonus_prefers_one_known_stack_over_another():
     assert r_dotnet["score"] > r_node["score"]
     assert r_dotnet["score_breakdown"]["personal_tech_bonus"]["points"] == 12
     assert r_node["score_breakdown"]["personal_tech_bonus"]["points"] == -10
-    assert r_node["classification"] != "rejected", "это штраф, а не дисквалификация"
+    assert r_node["classification"] != "rejected", "this is a penalty, not a disqualification"
 
 
 def test_node_mentioned_next_to_dotnet_is_not_penalised():
-    """«ASP.NET Core с React и Node в тулинге» — это .NET-вакансия с соседним
-    стеком, а не бэкенд на JS."""
+    """«ASP.NET Core with React and Node in the tooling» is a .NET vacancy with an
+    adjacent stack, not a JS backend."""
     profile = dict(PROFILE)
     profile["personal_tech_bonus"] = {
         "js_backend": {"points": -10, "keywords": ["node.js"], "unless": ["asp.net"]},
@@ -1641,8 +1641,8 @@ def test_node_mentioned_next_to_dotnet_is_not_penalised():
 
 
 def test_tech_group_is_counted_once_regardless_of_spellings():
-    """Вакансия, перечислившая пять форм написания Node, не должна получать
-    пятикратный штраф."""
+    """A vacancy listing five ways of writing Node must not collect a fivefold
+    penalty."""
     profile = dict(PROFILE)
     profile["personal_tech_bonus"] = {
         "js_backend": {"points": -10, "keywords": ["node.js", "nodejs", "node js", "nestjs"]},
@@ -1653,9 +1653,9 @@ def test_tech_group_is_counted_once_regardless_of_spellings():
 
 
 def test_report_lists_expected_technologies_including_unknown_ones():
-    """Требование глобальное, для всех идентичностей: увидеть в отчёте
-    незнакомую технологию не менее полезно, чем знакомую — по ней сразу видно,
-    подходит вакансия или нет, без открытия ссылки."""
+    """A global requirement, for every identity: seeing an unfamiliar technology
+    in the report is no less useful than a familiar one — it tells you at once
+    whether the vacancy fits, without opening the link."""
     import report
 
     v = make_vacancy(
@@ -1667,26 +1667,26 @@ def test_report_lists_expected_technologies_including_unknown_ones():
     )
     techs = report.expected_technologies(v)
     assert "C#" in techs and "SQL Server" in techs
-    assert "Delphi" in techs, "незнакомая технология тоже должна попасть в список"
+    assert "Delphi" in techs, "an unfamiliar technology should reach the list too"
     assert "Kafka" in techs and "Terraform" in techs
 
 
 def test_tech_vocabulary_avoids_short_ambiguous_forms():
-    """Правило, купленное опытом: короткие общие слова в словаре запрещены —
-    на них проект обжигался пять раз («LESS» в «no less than», «ssis» в
-    «ai-assisted», «java» в «javascript»)."""
+    """A rule bought with experience: short generic words are banned from the
+    vocabulary — the project has been burned on them five times («LESS» in «no
+    less than», «ssis» in «ai-assisted», «java» in «javascript»)."""
     import report
 
     v = make_vacancy(title="Support Agent",
                      description_text="We assist customers and handle assistance requests daily.")
     techs = report.expected_technologies(v)
-    assert techs == [], f"ложные технологии из обычных слов: {techs}"
+    assert techs == [], f"false technologies from ordinary words: {techs}"
 
 
 def test_keyword_stuffing_block_does_not_grant_a_personal_tech_bonus():
-    """Аутстаф-компания с абзацем «NOT YOUR TECH STACK?» перечисляет .NET & C#
-    в каждой вакансии — и получала надбавку за .NET даже на чистом React.
-    Тот же срез, что уже стоит на оценке стека и гейте отрасли."""
+    """An outstaffing company whose «NOT YOUR TECH STACK?» paragraph lists .NET &
+    C# in every vacancy was getting the .NET bonus even on pure React. The same
+    cut as already stands on stack scoring and on the industry gate."""
     profile = dict(PROFILE)
     profile["personal_tech_bonus"] = {"dotnet": {"points": 12, "keywords": ["c#", ".net"]}}
     v = make_vacancy(
@@ -1702,10 +1702,10 @@ def test_keyword_stuffing_block_does_not_grant_a_personal_tech_bonus():
 
 
 def test_non_developer_professions_are_rejected_on_merit_not_by_accident():
-    """Жалоба человека 2026-08-05: в отчёте лежали Sales Manager, Business
-    Partner Analyst, Patient Outreach Specialist, Data Entry. Проверка
-    показала, что все отклонены — но по location (офис, гео). Сделай такую
-    вакансию удалённой, и она бы прошла: суть роли гейт не видел."""
+    """A complaint from the owner, 2026-08-05: the report held Sales Manager,
+    Business Partner Analyst, Patient Outreach Specialist, Data Entry. Checking
+    showed all of them rejected — but on location (office, geography). Make such
+    a vacancy remote and it would pass: the gate never saw what the role was."""
     for title in ("Business Partner Analyst", "Senior Compliance Analyst",
                   "Client Onboarding Manager", "Patient Outreach Specialist",
                   "Video Data Entry Specialist", "Data-Video Generalist"):
@@ -1715,16 +1715,16 @@ def test_non_developer_professions_are_rejected_on_merit_not_by_accident():
             description_text="Worldwide remote role. We work with C# and TypeScript teams.",
         )
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] == "rejected", f"прошла: {title}"
+        assert r["classification"] == "rejected", f"passed: {title}"
         assert any(d.startswith("role:") for d in r["dealbreakers"]), (
-            f"'{title}' отклонена не за профессию, а случайно: {r['dealbreakers']}"
+            f"'{title}' was rejected by accident rather than for its profession: {r['dealbreakers']}"
         )
 
 
 def test_analytics_engineer_is_not_caught_by_the_analyst_patterns():
-    """«Analytics Engineer» — дата-инженерия, которую человек умеет (Spark и
-    Databricks в CV). Формулировки в списке профессий точные именно поэтому:
-    общее слово «analyst» выбросило бы подходящую роль."""
+    """«Analytics Engineer» is data engineering, which the person can do (Spark
+    and Databricks in the CV). The wordings in the profession list are precise
+    exactly for that reason: a generic «analyst» would throw away a suitable role."""
     v = make_vacancy(
         title="Analytics Engineer",
         description_text="Build ETL pipelines with Apache Spark on Databricks. Worldwide remote.",
@@ -1734,12 +1734,12 @@ def test_analytics_engineer_is_not_caught_by_the_analyst_patterns():
 
 
 def test_ai_training_crowdwork_is_rejected_however_engineering_the_title_looks():
-    """Замер 2026-08-05: четыре из девяти верхних позиций выдачи занимали
-    площадки, нанимающие разработчиков производить обучающие данные, а не
-    строить софт. Заголовки при этом обычные — «Senior Software Engineer»,
-    «Frontend Software Engineer». Они выигрывали закономерно: перечисляют
-    все языки сразу, пишут «no set schedules» (читается как низкая нагрузка)
-    и указывают почасовую ставку."""
+    """Measured 2026-08-05: four of the top nine positions in the shortlist were
+    platforms hiring developers to produce training data rather than to build
+    software. Their titles are ordinary — «Senior Software Engineer», «Frontend
+    Software Engineer». They won for good reason: they list every language at
+    once, write «no set schedules» (which reads as low intensity) and quote an
+    hourly rate."""
     cases = [
         ("Senior Software Engineer",
          "Open-ended contract with no minimum time or task commitments. "
@@ -1756,13 +1756,13 @@ def test_ai_training_crowdwork_is_rejected_however_engineering_the_title_looks()
         v = make_vacancy(title=title, location_raw="Anywhere in the World",
                          description_text=description + " Worldwide remote.")
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] == "rejected", f"прошла: {title}"
+        assert r["classification"] == "rejected", f"passed: {title}"
         assert any("crowdwork" in d for d in r["dealbreakers"]), r["dealbreakers"]
 
 
 def test_ordinary_company_building_an_ai_product_is_not_caught_as_crowdwork():
-    """Маркеры краудворка длинные именно поэтому: половина рынка сегодня
-    что-то делает с ИИ, и короткое слово выбросило бы нормальные вакансии."""
+    """The crowdwork markers are long precisely because half the market today
+    does something with AI, and a short word would throw away normal vacancies."""
     v = make_vacancy(
         title="Senior .NET Developer",
         description_text="We build an AI-powered analytics product in C# and ASP.NET. "
@@ -1773,10 +1773,10 @@ def test_ordinary_company_building_an_ai_product_is_not_caught_as_crowdwork():
 
 
 def test_qa_and_mobile_titles_survive_the_engineer_override():
-    """Жалоба человека 2026-08-05: «Senior QA Engineer — мусор». Слово
-    "engineer" в заголовке снимало мягкий гейт профессии, поэтому тестирование
-    и мобильная разработка лежат в ЖЁСТКОМ списке, который override не
-    снимает — там же, где devops с 2026-07-30."""
+    """A complaint from the owner, 2026-08-05: «Senior QA Engineer — rubbish». The
+    word "engineer" in the title lifted the soft profession gate, so testing and
+    mobile development sit in the HARD list, which no override lifts — the same
+    place devops has been since 2026-07-30."""
     for title in ("Senior QA Engineer", "QA Automation Engineer",
                   "Software Development Engineer in Test",
                   "Senior Mobile Engineer (React Native)",
@@ -1784,14 +1784,14 @@ def test_qa_and_mobile_titles_survive_the_engineer_override():
         v = make_vacancy(title=title, location_raw="Anywhere in the World",
                          description_text="Worldwide remote. We use C# and TypeScript.")
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] == "rejected", f"прошла: {title}"
+        assert r["classification"] == "rejected", f"passed: {title}"
         assert any(d.startswith("role:") for d in r["dealbreakers"]), r["dealbreakers"]
 
 
 def test_mobile_product_behind_a_neutral_title_is_rejected():
-    """Реальная находка 2026-08-05: «Lead Full-stack Developer» @ Khibraty —
-    по описанию существующее приложение на React Native, вся работа внутри
-    него. Тот же класс, что DevOps за нейтральным заголовком."""
+    """A real finding, 2026-08-05: «Lead Full-stack Developer» at Khibraty — by
+    its description an existing React Native application, with all the work
+    inside it. The same class as DevOps behind a neutral title."""
     v = make_vacancy(
         title="Lead Full-stack Developer",
         location_raw="Anywhere in the World",
@@ -1804,8 +1804,8 @@ def test_mobile_product_behind_a_neutral_title_is_rejected():
 
 
 def test_a_web_role_mentioning_a_mobile_app_once_is_not_rejected():
-    """Порог у гейта обязателен: у компании может быть мобильное приложение
-    среди продуктов, а вакансия — про веб."""
+    """The gate needs a threshold: a company may have a mobile app among its
+    products while the vacancy is about the web."""
     v = make_vacancy(
         title="Senior .NET Developer",
         description_text="Our platform serves web and a companion mobile app. "
@@ -1816,9 +1816,9 @@ def test_a_web_role_mentioning_a_mobile_app_once_is_not_rejected():
 
 
 def test_matching_the_core_stack_beats_listing_many_familiar_technologies():
-    """Замер 2026-08-05: вакансия на чистом C#/ASP.NET получала за стек 7
-    баллов, а перечень TypeScript/JavaScript/React/HTML/CSS — 14. Балл за
-    каждое совпадение вознаграждает длину списка, а не попадание в стек."""
+    """Measured 2026-08-05: a vacancy in pure C#/ASP.NET scored 7 for its stack,
+    while a list of TypeScript/JavaScript/React/HTML/CSS scored 14. A point per
+    match rewards the length of the list rather than the fit to the stack."""
     core = score._score_stack_fit(
         score.common.normalize_for_matching("Senior developer. C# and ASP.NET Core, Entity Framework."),
         CRITERIA, PROFILE)[0]
@@ -1826,14 +1826,14 @@ def test_matching_the_core_stack_beats_listing_many_familiar_technologies():
         score.common.normalize_for_matching(
             "TypeScript, JavaScript, React, HTML, CSS, Redux, GraphQL, Docker."),
         CRITERIA, PROFILE)[0]
-    assert core > breadth, f"ядро {core} не выиграло у перечня {breadth}"
+    assert core > breadth, f"the core {core} did not beat the list {breadth}"
 
 
 def test_reputation_red_flags_cost_points_not_only_a_review_flag():
-    """Реальный случай 2026-08-05: площадка с отзывами «late payments» и
-    «unpredictable work availability» получала +14 за рейтинг 3.5 и
-    work-life balance 4.0 и выходила на ПЕРВОЕ место выдачи. Для подрядчика
-    задержка оплаты — не нюанс, а суть сделки."""
+    """A real case, 2026-08-05: a platform whose reviews say «late payments» and
+    «unpredictable work availability» collected +14 for a 3.5 rating and 4.0
+    work-life balance and came FIRST in the shortlist. For a contractor, late
+    payment is not a nuance but the substance of the deal."""
     clean = make_vacancy(title="Senior .NET Developer")
     clean["_company_reputation"] = {"overall_rating": 3.5, "work_life_balance": 4.0}
     flagged = make_vacancy(title="Senior .NET Developer")
@@ -1843,27 +1843,27 @@ def test_reputation_red_flags_cost_points_not_only_a_review_flag():
     }
     clean_pts = score._score_company_reputation(clean, CRITERIA)[0]
     flagged_pts = score._score_company_reputation(flagged, CRITERIA)[0]
-    assert flagged_pts < clean_pts, f"{flagged_pts} не меньше {clean_pts}"
+    assert flagged_pts < clean_pts, f"{flagged_pts} is not less than {clean_pts}"
 
 
 def test_dotnet_in_the_title_is_recognised_as_the_core_stack():
-    """Замер 2026-08-05: 754 вакансии с .NET в заголовке, отклонены ВСЕ, из
-    них 325 — с формулировкой «не .NET/JS роль». Причина: голого ".NET" не
-    было ни в одном списке, все ключи длиннее (".NET Core", "ASP.NET", "C#"),
-    и заголовок «Senior .NET Backend Developer» не совпадал ни с одним."""
+    """Measured 2026-08-05: 754 vacancies with .NET in the title, ALL rejected,
+    325 of them with the wording «not a .NET/JS role». The cause: a bare ".NET"
+    was in no list at all — every key was longer (".NET Core", "ASP.NET", "C#") —
+    and the title «Senior .NET Backend Developer» matched none of them."""
     for title in ("Senior .NET Backend Developer", ".Net Backend Engineer",
                   "Dotnet Developer", "Senior .NET Engineer"):
         v = make_vacancy(title=title, location_raw="Anywhere in the World",
                          description_text="Worldwide remote contract position.")
         r = score.score_vacancy(v, CRITERIA, PROFILE)
         assert not any(d.startswith("stack:") for d in r["dealbreakers"]), \
-            f"'{title}' отклонена как не-дотнет: {r['dealbreakers']}"
+            f"'{title}' rejected as not-dotnet: {r['dealbreakers']}"
         assert r["score_breakdown"]["stack_fit"]["core_hits"], title
 
 
 def test_a_dot_net_email_domain_is_not_a_dotnet_vacancy():
-    """Почему регулярка, а не подстрока: ".net" есть в любом почтовом домене.
-    Реальная запись с Hacker News, приехавшая как заголовок вакансии:
+    """Why a regex rather than a substring: ".net" is in every mail domain.
+    A real record from Hacker News that arrived as a vacancy title:
     "Please email me ... (firstname)@harnly.net"."""
     v = make_vacancy(
         title="Please email me so I know which role (firstname)@harnly.net",
@@ -1871,32 +1871,32 @@ def test_a_dot_net_email_domain_is_not_a_dotnet_vacancy():
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert not r["score_breakdown"]["stack_fit"]["core_hits"], \
-        "почтовый домен засчитан как .NET"
+        "a mail domain was counted as .NET"
 
 
 def test_explicit_only_wording_is_still_a_hard_rejection():
-    """Различие, которое стоит держать явным (2026-08-05).
+    """A distinction worth keeping explicit (2026-08-05).
 
-    Поле локации "Canada" — это догадка площадки: вакансия может быть
-    открыта и контрактору снаружи. Формулировка "Canada only" — это слова
-    работодателя, и они однозначны. Первое попадает в national_market и
-    остаётся на глазах, второе отклоняется совсем."""
+    A location field of "Canada" is the board's guess: the vacancy may well be
+    open to a contractor outside it. The wording "Canada only" is the employer's
+    own words, and it is unambiguous. The first lands in national_market and
+    stays in view; the second is rejected outright."""
     guess = make_vacancy(location_raw="Canada",
                          description_text="C# ASP.NET SQL Server developer role.")
     stated = make_vacancy(location_raw="Canada only",
                           description_text="C# ASP.NET SQL Server developer role.")
-    # Пересмотрено 2026-08-05: догадка площадки («Canada») больше не значит
-    # ничего, а слово работодателя («Canada only») по-прежнему значит отказ.
-    # Разница между догадкой и утверждением — единственное, что здесь важно.
+    # Revised 2026-08-05: the board's guess («Canada») no longer means anything,
+    # while the employer's word («Canada only») still means refusal. The
+    # difference between a guess and a statement is all that matters here.
     assert score.score_vacancy(guess, CRITERIA, PROFILE)["classification"] != "rejected"
     assert score.score_vacancy(stated, CRITERIA, PROFILE)["classification"] == "rejected"
 
 
 def test_email_and_url_are_removed_before_technology_search():
-    """Реальная запись с Hacker News, приехавшая заголовком вакансии:
-    "Please email me ... (firstname)@harnly.net". Раньше её ".net" считался
-    упоминанием технологии. Убирается вычисткой контактов, а не запретом на
-    ".net" — иначе вместе с почтой отсекается и "asp.net"."""
+    """A real record from Hacker News that arrived as a vacancy title:
+    "Please email me ... (firstname)@harnly.net". Its ".net" used to count as a
+    mention of the technology. It is removed by stripping contacts rather than by
+    banning ".net" — otherwise "asp.net" would go along with the mail."""
     v = make_vacancy(
         title="Please email me so I know which role (firstname)@harnly.net",
         description_text="Reach out at jobs@example.net or https://careers.example.net",
@@ -1911,8 +1911,8 @@ def test_email_and_url_are_removed_before_technology_search():
 
 
 def test_dotnet_pattern_lives_in_the_global_vocabulary_not_in_identities():
-    """Как пишется технология — знание общее (CLAUDE.md §13). Идентичность
-    называет ".NET" каноническим именем, регулярку хранит config/."""
+    """How a technology is written is shared knowledge (CLAUDE.md §13). The
+    identity names ".NET" by its canonical name; config/ holds the regex."""
     import glob
     patterns = score.tech_matching_patterns()
     assert ".NET" in patterns and patterns[".NET"].get("substring_unsafe")
@@ -1923,23 +1923,23 @@ def test_dotnet_pattern_lives_in_the_global_vocabulary_not_in_identities():
 
 
 def test_red_flag_weight_comes_from_the_shared_catalogue():
-    """Свободнотекстовый флаг из отзывов относится к категории общего
-    каталога, и вес берётся оттуда, а не один на все флаги."""
+    """A free-text flag from reviews belongs to a category in the shared
+    catalogue, and its weight comes from there rather than one weight for all."""
     assert score.classify_red_flag("late payments") == "late_payment"
     assert score.classify_red_flag("unpredictable work availability") == "unstable_workload"
-    assert score.classify_red_flag("чтототакое") is None
+    assert score.classify_red_flag("somethingorother") is None
 
     points, detail = score._score_red_flags(["late payments"], {})
     assert points < 0 and detail[0]["source"] == "catalogue"
 
 
 def test_local_override_can_soften_a_red_flag_and_even_flip_its_sign():
-    """Вопрос владельца 2026-08-05: «глобально это красный флаг, а локально мы
-    переопределяем как нормальную вещь или даже как приоритет — сработает?»
+    """The owner's question, 2026-08-05: «globally this is a red flag, but locally
+    we override it as normal or even as a priority — will that work?»
 
-    Сработает, и смена знака — законный случай, а не ошибка ввода:
-    «непредсказуемая загрузка» для одного риск остаться без денег, для
-    другого именно то, что нужно, потому что грузить не будут."""
+    It will, and a change of sign is a legitimate case rather than a typo:
+    «unpredictable workload» is, for one person, the risk of being left without
+    money, and for another exactly what is wanted, because they will not be loaded."""
     flags = ["late payments", "unpredictable work availability"]
     plain = score._score_red_flags(flags, {})[0]
     softened = score._score_red_flags(
@@ -1951,23 +1951,23 @@ def test_local_override_can_soften_a_red_flag_and_even_flip_its_sign():
         flags, {"company_red_flag_severity": {"unstable_workload": 6}})[1]}
     assert per_flag["unstable_workload"]["points"] == 6
     assert per_flag["unstable_workload"]["source"] == "override"
-    # Категория, которую не переопределяли, остаётся на весе каталога.
+    # A category that was not overridden keeps the catalogue's weight.
     assert per_flag["late_payment"]["source"] == "catalogue"
 
 
 def test_unfilled_local_sentinel_does_not_break_scoring():
-    """Если Малая Конституция ничего не сказала, сентинел `local` доезжает до
-    скоринга строкой. Это не словарь весов, и падать на нём нельзя."""
+    """If the Local Constitution said nothing, the `local` sentinel reaches scoring
+    as a string. That is not a weights dict, and falling over on it is not allowed."""
     points, _ = score._score_red_flags(["late payments"],
                                        {"company_red_flag_severity": "local"})
     assert points < 0
 
 
 def test_an_override_cannot_rescue_a_vacancy_killed_by_a_gate():
-    """Граница механизма, которую важно держать явной: переопределения меняют
-    БАЛЛ, а гейты работают независимо от балла. Никакая личная надбавка не
-    делает непроходную вакансию проходной — иначе личные настройки начали бы
-    возвращать в выдачу то, что отсеяно по существу."""
+    """A boundary of the mechanism worth keeping explicit: overrides change the
+    SCORE, while gates work independently of the score. No personal bonus makes
+    an unpassable vacancy passable — otherwise personal settings would start
+    returning to the shortlist what was filtered out on the merits."""
     v = make_vacancy(title="Senior QA Engineer", location_raw="Anywhere in the World",
                      description_text="Worldwide remote. C# and TypeScript.")
     v["_company_reputation"] = {"overall_rating": 4.8, "work_life_balance": 5.0}
@@ -1978,12 +1978,13 @@ def test_an_override_cannot_rescue_a_vacancy_killed_by_a_gate():
 
 
 def test_an_unfamiliar_compensation_shape_does_not_crash_the_run():
-    """Найдено эмуляцией онбординга в свежем клоне 2026-08-05.
+    """Found by emulating onboarding in a fresh clone, 2026-08-05.
 
-    Скоринг требовал ключ annual_parttime_usd и падал KeyError-ом посреди
-    прогона, если профиль описывал зарплату иначе. Агент, записывающий ответ
-    человека «5-8 тысяч в месяц», естественно пишет monthly_min/monthly_target
-    — и весь прогон валится, а причина видна только в трейсбеке.
+    Scoring demanded the key annual_parttime_usd and died with a KeyError
+    mid-run if the profile described pay differently. An agent writing down a
+    person's answer «5-8 thousand a month» naturally writes monthly_min/
+    monthly_target — and the whole run collapses, with the cause visible only
+    in a traceback.
     """
     profile = json.loads(json.dumps(PROFILE))
     profile["goal"]["target_compensation"] = {"currency": "USD",
@@ -1996,7 +1997,7 @@ def test_an_unfamiliar_compensation_shape_does_not_crash_the_run():
 
 
 def test_a_filled_compensation_range_still_penalises_a_low_offer():
-    """Терпимость к форме не должна означать, что сравнение перестало работать."""
+    """Tolerating the shape must not mean the comparison stopped working."""
     profile = json.loads(json.dumps(PROFILE))
     profile["goal"]["target_compensation"] = {"annual_parttime_usd": [60000, 96000]}
     low = make_vacancy(title="Senior .NET Developer",
@@ -2009,9 +2010,9 @@ def test_a_filled_compensation_range_still_penalises_a_low_offer():
 
 
 def test_a_posting_in_an_unreadable_script_is_rejected():
-    """Найдено чтением выдачи 2026-08-05: вакансия на иврите стояла на 13-м
-    месте. Списки частых слов существовали для пяти европейских языков и
-    другую письменность поймать не могли в принципе — а алфавит виден сразу."""
+    """Found by reading the shortlist, 2026-08-05: a vacancy in Hebrew stood 13th.
+    The frequent-word lists existed for five European languages and could not
+    catch another script in principle — whereas an alphabet is visible at once."""
     v = make_vacancy(
         title="מפתח/ת C#/.NET",
         location_raw="Anywhere in the World",
@@ -2026,8 +2027,8 @@ def test_a_posting_in_an_unreadable_script_is_rejected():
 
 
 def test_a_few_foreign_words_do_not_disqualify_an_english_posting():
-    """Порог долевой: израильская компания может назвать себя на иврите в
-    англоязычном объявлении, и это не повод его выбрасывать."""
+    """The threshold is proportional: an Israeli company may name itself in Hebrew
+    inside an English posting, and that is no reason to throw the posting away."""
     v = make_vacancy(
         title="Senior .NET Developer",
         description_text=(
@@ -2042,9 +2043,9 @@ def test_a_few_foreign_words_do_not_disqualify_an_english_posting():
 
 
 def test_hybrid_and_office_wording_is_a_dealbreaker():
-    """Найдено 2026-08-05: восемь вакансий с «Hybrid Position», «hybrid working
-    model» и «(WFO)» стояли в выдаче. Список содержал «hybrid required» — так
-    почти никто не пишет."""
+    """Found 2026-08-05: eight vacancies saying «Hybrid Position», «hybrid working
+    model» and «(WFO)» stood in the shortlist. The list contained «hybrid
+    required» — which almost nobody writes."""
     for wording in ("Category: Full time, Hybrid Position",
                     "We follow a hybrid working model",
                     "Location - Dubai (WFO)",
@@ -2055,12 +2056,12 @@ def test_hybrid_and_office_wording_is_a_dealbreaker():
             description_text=f"C# and ASP.NET Core role. {wording}.",
         )
         r = score.score_vacancy(v, CRITERIA, PROFILE)
-        assert r["classification"] == "rejected", f"прошла: {wording}"
+        assert r["classification"] == "rejected", f"passed: {wording}"
 
 
 def test_the_crowdwork_gate_catches_a_reworded_version_of_the_same_platform():
-    """Та же площадка вернулась под другим названием и с переписанным текстом.
-    Гейт, ловящий одну редакцию, ловит редакцию, а не жанр."""
+    """The same platform came back under a different name and with rewritten text.
+    A gate that catches one edition catches an edition, not a genre."""
     v = make_vacancy(
         title="Freelance Agent Evaluation Engineer",
         location_raw="Anywhere in the World",

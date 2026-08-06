@@ -1,10 +1,10 @@
 """
-Тесты слияния каталога источников с настройками идентичности.
+Tests for merging the source catalogue with an identity's settings.
 
-Разделение проведено по границе «факт о мире» / «предпочтение человека»:
-эндпоинт и признак remote_only — свойства площадки, одинаковые для всех;
-enabled и params — выбор конкретного человека. Идентичность не может
-переопределить эндпоинт: устаревший URL это баг для всех сразу.
+The split follows the boundary between «a fact about the world» and «a person's
+preference»: the endpoint and the remote_only flag are properties of the board,
+identical for everyone; enabled and params are one person's choice. An identity
+cannot override an endpoint: a stale URL is a bug for everybody at once.
 """
 import pytest
 
@@ -47,17 +47,17 @@ sources:
 
     merged = {s["name"]: s for s in common.load_sources()}
 
-    # факты о площадке пришли из каталога
+    # facts about the board came from the catalogue
     assert merged["alpha"]["url"] == "https://example.com/alpha"
     assert merged["alpha"]["remote_only"] is True
-    # предпочтения — из идентичности
+    # preferences came from the identity
     assert merged["alpha"]["params"]["hits_per_keyword"] == 25
     assert merged["beta"]["enabled"] is False
 
 
 def test_unknown_source_name_fails_loudly(tmp_path, monkeypatch):
-    """Опечатка в имени источника должна ловиться сразу, а не приводить к тому,
-    что источник молча не опрашивается."""
+    """A typo in a source name must be caught at once rather than leading to the
+    source silently never being queried."""
     _write_catalog(tmp_path, monkeypatch, """
 schema_version: 1
 sources:
@@ -75,12 +75,12 @@ sources:
     with pytest.raises(ValueError) as exc:
         common.load_sources()
     assert "alfa" in str(exc.value)
-    assert "alpha" in str(exc.value), "сообщение должно подсказывать известные имена"
+    assert "alpha" in str(exc.value), "the message should suggest the known names"
 
 
 def test_identity_cannot_override_endpoint(tmp_path, monkeypatch):
-    """Идентичность может задать params, но URL остаётся за каталогом —
-    иначе устаревший эндпоинт чинился бы у каждого отдельно."""
+    """An identity may set params, but the URL stays with the catalogue —
+    otherwise a stale endpoint would have to be fixed by everyone separately."""
     _write_catalog(tmp_path, monkeypatch, """
 schema_version: 1
 sources:
@@ -104,8 +104,8 @@ sources:
 
 
 def test_fetch_params_passes_url_and_identity_params():
-    """Раньше поле url в конфиге было мёртвым: фетчеры хардкодили свой API_URL,
-    а пайплайн звал fetch_fn() вообще без аргументов."""
+    """The url field in the config used to be dead: fetchers hard-coded their own
+    API_URL, and the pipeline called fetch_fn() with no arguments at all."""
     src = {
         "name": "alpha",
         "url": "https://example.com/alpha",
@@ -126,8 +126,8 @@ def test_fetch_params_identity_value_wins_over_catalog_default():
 
 
 def test_fetcher_not_accepting_param_does_not_crash_pipeline(capsys):
-    """Конфиг может уйти вперёд кода (или наоборот). Лишний параметр —
-    не повод терять весь источник."""
+    """A config can move ahead of the code, or the other way round. One extra
+    parameter is no reason to lose a whole source."""
     def picky_fetch():
         return [{"ok": True}], None
 
@@ -140,10 +140,10 @@ def test_fetcher_not_accepting_param_does_not_crash_pipeline(capsys):
 
 
 def test_himalayas_company_survives_a_renamed_api_field():
-    """Площадка меняла форму поля: `companyName`, потом `company` строкой,
-    когда-то — вложенным объектом. Реальный случай 2026-08-04: парсер читал
-    только `companyName`, поле стало пустым, и все 60 записей источника молча
-    отбрасывались — при HTTP 200 и «здоровом» источнике."""
+    """The board changed the shape of the field: `companyName`, then `company` as
+    a string, and once a nested object. A real case, 2026-08-04: the parser read
+    only `companyName`, the field went empty, and all 60 records from the source
+    were silently discarded — at HTTP 200, from a «healthy» source."""
     import fetch_himalayas
 
     for payload in (
@@ -158,10 +158,10 @@ def test_himalayas_company_survives_a_renamed_api_field():
 
 
 def test_himalayas_placeholder_company_falls_back_to_the_slug():
-    """Замер 2026-08-04: площадка отдаёт companyName: "name" и
-    companyLogo: "thumbnail_url" — буквально названия полей вместо значений.
-    В базе завелись вакансии от компании «name», и человек увидел их в отчёте.
-    Плейсхолдер выглядит валидной строкой и молча проходит проверку на пустоту.
+    """Measured 2026-08-04: the board returns companyName: "name" and
+    companyLogo: "thumbnail_url" — literally the field names instead of the values.
+    Vacancies from a company called «name» got into the database, and a person saw
+    them in the report. A placeholder looks like a valid string and passes an
     """
     import fetch_himalayas
 
@@ -175,10 +175,10 @@ def test_himalayas_placeholder_company_falls_back_to_the_slug():
 
 
 def test_workable_and_smartrecruiters_parsers():
-    """Две ATS, добавленные 2026-08-04. SmartRecruiters проверен на живом
-    аккаунте (Visa, 2 вакансии); у Workable все проверенные аккаунты вернули
-    пустой список, поэтому парсер зафиксирован тестом на образце ответа —
-    иначе его корректность осталась бы непроверенной."""
+    """Two ATS providers added 2026-08-04. SmartRecruiters was verified against a
+    live account (Visa, 2 vacancies); every Workable account checked returned an
+    empty list, so its parser is pinned by a test against a sample response —
+    otherwise its correctness would have stayed unverified."""
     import fetch_ats
 
     workable = {
@@ -197,7 +197,7 @@ def test_workable_and_smartrecruiters_parsers():
     records = fetch_ats._parse_workable(workable, "fallback", "acme")
     assert len(records) == 1
     rec = records[0]
-    assert rec["company"] == "Acme Ltd", "имя из ответа важнее имени из конфига"
+    assert rec["company"] == "Acme Ltd", "the name from the response beats the one from the config"
     assert rec["location_raw"] == "Tel Aviv, Israel"
     assert rec["remote"] is True
     assert rec["external_id"] == "workable:acme:ABC123"
@@ -218,7 +218,7 @@ def test_workable_and_smartrecruiters_parsers():
 
 
 def test_ats_parsers_skip_records_without_mandatory_fields():
-    """Общее для всех ATS: запись без заголовка или ссылки бесполезна."""
+    """Common to every ATS: a record without a title or a link is useless."""
     import fetch_ats
 
     assert fetch_ats._parse_workable({"jobs": [{"title": "", "url": "x"}]}, "c", "t") == []

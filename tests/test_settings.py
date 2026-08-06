@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Слоистые настройки: порядок, правила слияния, происхождение, заморозка.
+"""Layered settings: order, merge rules, provenance, freezing.
 
-Вопрос владельца 2026-08-05: как сделать переопределения максимально
-детерминированными. Детерминизм проверяется здесь — каждое правило слияния
-имеет тест, потому что «наверное, побеждает нижний слой» и есть та неявность,
-ради устранения которой всё затевалось.
+The owner's question, 2026-08-05: how to make overrides as deterministic as
+possible. The determinism is checked here — every merge rule has a test,
+because "the lower layer probably wins" is exactly the implicitness this was
+all started to remove.
 """
 import sys
 from pathlib import Path
@@ -22,19 +22,19 @@ def _write(path, text):
 
 @pytest.fixture()
 def layered(tmp_path, monkeypatch):
-    """Три слоя на диске, подменённые под настоящие пути."""
+    """Three layers on disk, patched over the real paths."""
     defaults = tmp_path / "config" / "defaults" / "criteria.yaml"
     identity = tmp_path / "identities" / "aaa" / "aaa_criteria.yaml"
     local = tmp_path / "local" / "aaa" / "aaa_criteria.yaml"
     policy = tmp_path / "config" / "settings_policy.yaml"
-    _write(policy, "frozen:\n  identity.kind: нельзя менять вид идентичности\n")
+    _write(policy, "frozen:\n  identity.kind: the kind of identity must not change\n")
 
     def fake_paths(document, prefix):
         return [("defaults", defaults), ("template", identity), ("local", local)]
 
     monkeypatch.setattr(settings, "layer_paths", fake_paths)
     monkeypatch.setattr(settings, "frozen_keys",
-                        lambda: {"identity.kind": "нельзя менять вид идентичности"})
+                        lambda: {"identity.kind": "the kind of identity must not change"})
     return defaults, identity, local
 
 
@@ -49,7 +49,7 @@ def test_later_layer_wins_and_provenance_says_which(layered):
 
 
 def test_local_layer_beats_identity(layered):
-    """Малая Конституция сильнее идентичности — она про конкретного человека."""
+    """The Local Constitution beats the identity — it is about a specific person."""
     defaults, identity, local = layered
     _write(defaults, "thresholds:\n  hot: 60\n")
     _write(identity, "thresholds:\n  hot: 45\n")
@@ -60,8 +60,8 @@ def test_local_layer_beats_identity(layered):
 
 
 def test_lists_are_replaced_not_appended(layered):
-    """Правило 2. Дополнение выглядит удобным ровно до первого случая, когда
-    из унаследованного списка нужно что-то УБРАТЬ."""
+    """Rule 2. Appending looks convenient right up to the first time something
+    must be REMOVED from an inherited list."""
     defaults, identity, _ = layered
     _write(defaults, "keywords: ['a', 'b', 'c']\n")
     _write(identity, "keywords: ['b']\n")
@@ -69,7 +69,7 @@ def test_lists_are_replaced_not_appended(layered):
 
 
 def test_explicit_null_deletes_an_inherited_key(layered):
-    """Правило 3: единственный способ сказать «у меня этого нет»."""
+    """Rule 3: the only way to say «I do not have this»."""
     defaults, identity, _ = layered
     _write(defaults, "gate:\n  enabled: true\n  threshold: 2\n")
     _write(identity, "gate:\n  threshold: null\n")
@@ -79,21 +79,21 @@ def test_explicit_null_deletes_an_inherited_key(layered):
 
 
 def test_frozen_key_cannot_be_overridden_and_fails_loudly(layered):
-    """Заморозка — не предпочтение, а граница. Молчаливое игнорирование было
-    бы хуже отказа: человек думал бы, что настройка работает."""
+    """Freezing is a boundary, not a preference. Ignoring it silently would be
+    worse than refusing: the person would think their setting was working."""
     defaults, identity, local = layered
     _write(defaults, "identity:\n  kind: fixture\n")
     _write(local, "identity:\n  kind: personal\n")
     with pytest.raises(settings.FrozenSettingError) as err:
         settings.resolve("criteria", "aaa")
     assert "identity.kind" in str(err.value)
-    assert "нельзя менять вид идентичности" in str(err.value)
+    assert "the kind of identity must not change" in str(err.value)
 
 
 def test_conflicts_lists_every_key_set_by_more_than_one_layer(layered):
-    """Переопределение — это норма, но каждое должно быть намеренным.
-    Молчаливое переопределение и есть способ, которым две части конфигурации
-    начинают противоречить друг другу."""
+    """Overriding is normal, but every override should be deliberate.
+    A silent override is exactly how two parts of a configuration start
+    contradicting each other."""
     defaults, identity, local = layered
     _write(defaults, "a: 1\nb: 2\n")
     _write(identity, "a: 10\n")

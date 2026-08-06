@@ -1,446 +1,464 @@
-# CLAUDE.md — Большая Конституция проекта "Work IDE"
+# CLAUDE.md — the constitution of the Work IDE project
 
-> Кодовое имя проекта: **Work IDE** — work identity: рабочая среда, в которой
-> «кто и что ищет» является явным, изолированным объектом, а не разлитой по
-> конфигам россыпью настроек.
+> Project codename: **Work IDE** — *work identity*: a working environment in
+> which "who is searching, and for what" is an explicit, isolated object rather
+> than settings scattered across a dozen config files.
 >
-> Этот файл — **Большая Конституция**: главный документ проекта, общий для ВСЕХ
-> пользователей. Он стоит выше любой отдельной задачи, любого тикета, любой идеи
-> "как было бы удобнее". Если инструкция конкретной задачи противоречит этому файлу
-> — **побеждает этот файл**. Улучшать его можно всегда, ухудшать — никогда.
+> This file is the **constitution**: the project's principal document, shared by
+> EVERY user. It outranks any individual task, any ticket, any idea of "what
+> would be more convenient". If the instructions for a particular task
+> contradict this file, **this file wins**. It may always be improved, never
+> weakened.
 >
-> Он сознательно **user-agnostic**: здесь нет ничего про конкретного человека, его
-> стек, страну или зарплатные ожидания. Всё это живёт в поисковых идентичностях
-> (`identities/<префикс>-<расшифровка>/`) и в Малой Конституции (`local-constitution/`, не в гите).
+> It is deliberately **user-agnostic**: there is nothing here about any
+> particular person, their stack, their country or their pay expectations. All
+> of that lives in search identities (`local-identities/<prefix>-<expansion>/`),
+> outside git.
 
 ---
 
-## 0. Правило нулевое: без активной идентичности поиска нет
+## 0. Rule zero: without an active identity there is no search
 
-**Это правило важнее всех остальных разделов и проверяется первым.**
+**This rule outranks every other section and is checked first.**
 
-Система обслуживает разных людей с разными профилями поиска. Смешение их данных —
-худший из возможных отказов: он тихий, его не видно в отчёте, и он систематически
-портит результат. Поэтому:
+The system serves different people with different search profiles. Mixing their
+data is the worst failure available to it: it is silent, it is invisible in the
+report, and it systematically spoils the result. Therefore:
 
-- **Никакой поисковой работы без активной поисковой идентичности.** Ни сбора
-  вакансий, ни скоринга, ни отчётов, ни исследования компаний, ни занесения
-  находок вручную.
-- Если активной идентичности нет — агент обязан сначала провести онбординг (см.
-  `docs/ONBOARDING.md`): спросить у человека CV / ссылку на LinkedIn / описание
-  себя, вместе с ним заполнить вопросник, создать идентичность и зарегистрировать
-  её в Малой Конституции. И только потом начинать искать.
-- Если активных идентичностей несколько и из разговора не ясно, о какой речь —
-  спросить. Не угадывать.
-- **Идентичностей может быть несколько, и агент обязан об этом сказать.** Один
-  человек может искать два разных типа работы (спокойную неполную занятость и полную
-  ставку — критерии у них противоположные), пробовать другой стек, не ломая
-  настроенный поиск, или делить репозиторий с коллегой. Человек сам об этом не
-  спросит: он просил «настроить поиск работы». Один раз назвать возможность —
-  часть онбординга (`docs/ONBOARDING.md`, шаг 6a).
-- Запрос «а можно ещё один фильтр / ещё один поиск?» — это запрос на новую
-  идентичность, а **не** правка существующей. Подмешивать вторую цель в уже
-  настроенные критерии нельзя: обе выдачи станут хуже, и по отчёту это не
-  видно. Процедура — `docs/ONBOARDING.md`, раздел «Вторая и последующие
-  идентичности».
-- **Единственное исключение**: доработка самих инструментов (код, тесты,
-  документация, машинерия) разрешена всегда — она не привязана к идентичности.
-  Именно поэтому "переписать фильтр" можно без идентичности, а "запусти поиск" —
-  нельзя.
+- **No search work without an active search identity.** No collecting
+  vacancies, no scoring, no reports, no company research, no entering findings
+  by hand.
+- If there is no active identity, the agent must run onboarding first (see
+  `docs/ONBOARDING.md`): ask the person for a CV, a LinkedIn link or a
+  description of themselves, fill in the questionnaire together with them, and
+  create the identity from a template. Only then start searching.
+- If several identities exist and the conversation does not make clear which
+  one is meant — ask. Do not guess.
+- **There may be more than one identity, and the agent is obliged to say so.**
+  One person may be looking for two different kinds of work (calm part-time and
+  a full-time role — their criteria are opposites), may want to try another
+  stack without breaking a search that is already tuned, or may share the
+  repository with a colleague. The person will not ask about this themselves:
+  they asked to "set up a job search". Naming the possibility once is part of
+  onboarding (`docs/ONBOARDING.md`, step 6a).
+- A request for "one more filter, one more search" is a request for a NEW
+  IDENTITY, not an edit to the existing one. A second goal must not be blended
+  into criteria that are already tuned: both shortlists get worse, and the
+  report does not show it. The procedure is in `docs/ONBOARDING.md`, under
+  "Second and subsequent identities".
+- **The one exception**: work on the tools themselves (code, tests,
+  documentation, machinery) is always allowed — it is not tied to an identity.
+  That is exactly why "rewrite this filter" is fine without an identity while
+  "run a search" is not.
 
-Запрет продублирован в коде: `common.require_identity()` роняет любую попытку
-чтения или записи данных без активации. Документация и код здесь обязаны
-совпадать — если однажды разойдутся, прав код, а документацию чинить немедленно.
-
----
-
-## 1. Миссия
-
-Построить автономную исследовательскую систему, которая **систематически и
-постоянно** ищет работу под конкретный профиль поиска — и делает это одинаково
-хорошо для разных людей с разными профилями.
-
-Профиль задаётся **поисковой идентичностью** (`identities/<префикс>-<расшифровка>/`), а не
-этим файлом. Один человек ищет спокойную легаси-удалёнку на неполный день, другой —
-онсайт в стартапе: система обязана обслуживать обоих, не смешивая их данные.
-
-Система должна не просто выдавать список ссылок. Она должна **накапливать
-понимание рынка**: какие компании реально нанимают в интересующих регионах,
-какие формулировки в вакансиях являются надёжным сигналом (а какие —
-маркетинговым шумом), кто пользуется EOR-платформами и потому технически готов
-оформить человека вне своей страны, а кто пишет "remote", подразумевая "remote
-в пределах одной страны, с релокацией".
-
-**Каждый запуск обязан оставить репозиторий умнее и полезнее, чем он был
-до запуска.** Это не пожелание, это критерий приёмки любой работы над
-проектом.
+The prohibition is duplicated in code: `common.require_identity()` fails any
+attempt to read or write data without activation. Documentation and code are
+obliged to agree here — if they ever diverge, the code is right and the
+documentation must be fixed at once.
 
 ---
 
-## 2. Где живёт знание о конкретном человеке
+## 1. The mission
 
-Этот файл — user-agnostic. Ничего про конкретного человека, его стек, страну
-или зарплатные ожидания здесь быть не должно. Всё это распределено по трём
-слоям:
+Build an autonomous research system that **systematically and continuously**
+looks for work matching a particular search profile — and does it equally well
+for different people with different profiles.
 
-| Слой | Где | В гите | Что содержит |
+The profile is defined by a **search identity**
+(`local-identities/<prefix>-<expansion>/`), not by this file. One person is
+looking for calm legacy remote work part-time, another for onsite work at a
+startup: the system is obliged to serve both without mixing their data.
+
+The system should not merely produce a list of links. It should **accumulate an
+understanding of the market**: which companies really do hire in the regions of
+interest, which phrasings in a vacancy are a dependable signal (and which are
+marketing noise), who uses EOR platforms and is therefore technically able to
+engage somebody outside their own country, and who writes "remote" meaning
+"remote within one country, after relocating".
+
+**Every run must leave the repository smarter and more useful than it was
+before.** That is not a wish; it is the acceptance criterion for any work on
+the project.
+
+---
+
+## 2. Where knowledge about a particular person lives
+
+This file is user-agnostic. Nothing about a particular person, their stack,
+their country or their pay expectations belongs here. All of that is
+distributed across two layers, split along the git boundary:
+
+| Layer | Where | In git | What it holds |
 |---|---|---|---|
-| **Большая Конституция** | этот файл | да | Принципы, инженерные правила, границы — для всех |
-| **Идентичность** | `identities/<префикс>-<расшифровка>/` | да | Профиль поиска: кто ищет, что, где, на каких условиях |
-| **Малая Конституция** | `local-constitution/` | **нет** | Какие идентичности активны на этой машине, личные файлы |
+| **The constitution** | this file | yes | Principles, engineering rules, boundaries — for everyone |
+| **Identity template** | `identity-templates/<name>/` | yes | The KIND of search: stack, criteria, sources. Not one personal fact |
+| **Local identity** | `local-identities/<prefix>-<expansion>/` | **no** | MY search: who I am, where I live, what I expect to be paid |
 
-Накопленные данные — `data/<префикс>/`, готовые подборки — `reports/`. Обе
-папки вне гита и обе создаются инструментами автоматически: в свежем клоне их
-нет, и это нормальное состояние, а не поломка.
+Accumulated data lives in `data/<prefix>/`, finished shortlists in `reports/`.
+Both folders are outside git and both are created by the tools automatically: a
+fresh clone does not have them, and that is a normal state rather than breakage.
 
-Полное описание архитектуры — `docs/IDENTITIES.md`. Самое важное свойство,
-которое обязан сохранять любой рефакторинг:
+A local identity holds a **verbatim copy of the template** in `template/`, and
+personal settings sit beside it as separate files layered on top. Three
+consequences follow, and any refactor must preserve them:
 
-> **Радиус поражения изменения равен префиксу изменённого файла.** Правка
-> `<префикс>_criteria.yaml` физически не может повлиять на другую идентичность.
+1. **`git pull` cannot move the shortlist.** The template in the repository
+   moved on; the copy inside the identity did not. Silent configuration drift is
+   impossible by construction rather than by discipline.
+2. **A template update is a folder replacement, not a text merge.** Personal
+   edits take no part in the operation, so there is nowhere for an agent to
+   quietly lose somebody's setting.
+3. **The blast radius of a change equals the prefix of the file changed.** An
+   edit to `<prefix>_criteria.yaml` physically cannot affect another identity.
 
-Из этого следуют два правила, которые легко нарушить по невнимательности:
+Two rules follow from that, and both are easy to break through inattention:
 
-1. **Гео-правила и языковые фильтры выводятся, а не копируются.** Они —
-   следствие резидентства и языков конкретного человека. Фраза «us only» для
-   резидента Бразилии дисквалификация, для резидента США — плюс. Таблицы вывода:
-   `config/derivation/`.
-2. **Файлы одной идентичности не ссылаются на другую.** Проверяется
-   автоматически (`identity.py validate`), потому что копипаста из соседней
-   папки — самая вероятная ошибка при создании новой идентичности.
+1. **Geography rules and language filters are DERIVED, not copied.** They follow
+   from a particular person's residency and languages. The phrase "us only" is a
+   disqualification for a resident of Brazil and a plus for a resident of the
+   US. The derivation tables are in `config/derivation/`.
+2. **One identity's files never reference another.** Checked automatically
+   (`identity.py validate`), because copy-paste from a neighbouring folder is
+   the likeliest mistake when creating a new identity.
 
+The full description of the architecture is in `docs/IDENTITIES.md`. Settings
+are assembled from layers by one deterministic resolver — order, merge rules and
+provenance are in `tools/settings.py` and `docs/OVERRIDES.md`.
 
-## 3. Цели проекта
+## 3. Goals
 
-1. Автоматически находить вакансии/компании, соответствующие профилю выше,
-   из максимально широкого набора легальных, не требующих авторизации
-   источников.
-2. Оценивать каждую находку по прозрачной, воспроизводимой рубрике
-   (`identities/<префикс>/<префикс>_criteria.yaml`) и объяснять оценку человеку.
-3. Копить структурированные знания о компаниях, вакансиях, рекрутерах и
-   паттернах рынка труда — так, чтобы каждый следующий запуск был точнее
-   предыдущего.
-4. Производить на каждый запуск понятный человеку отчёт-дайджест
-   (`reports/<префикс>_latest.md`) с top-кандидатами и объяснением "почему".
-5. Быть по-настоящему автономной: владелец должен иметь возможность просто
-   попросить агента "запусти обычный цикл" вечером и ничего больше не
-   объяснять.
+1. Automatically find vacancies and companies matching the profile above, from
+   the widest possible set of sources that are open to an ordinary request and
+   need no authorisation.
+2. Score every finding against a transparent, reproducible rubric
+   (`<prefix>_criteria.yaml`) and explain the score to a person.
+3. Accumulate structured knowledge about companies, vacancies, recruiters and
+   market patterns — so that each run is more accurate than the last.
+4. Produce, on every run, a digest a person can actually read
+   (`reports/<prefix>_latest.md`) with the top candidates and an explanation of
+   "why".
+5. Be genuinely autonomous: the owner should be able to ask the agent to "run
+   the usual cycle" in the evening and explain nothing further.
 
-## 4. Критерии успеха
+## 4. What success looks like
 
-Проект считается успешным, если:
+The project is succeeding if:
 
-- Любой новый разработчик (человек или ИИ-агент), открыв репозиторий,
-  за 5 минут понимает, что это, зачем и как запускать.
-- `python tools/pipeline.py` выполняется от начала до конца без
-  ручного вмешательства и либо успешно обновляет базу знаний и отчёт,
-  либо явно и понятно объясняет, что пошло не так — никогда не падает
-  молча и никогда не портит существующие данные при ошибке одного из
-  источников.
-- Отчёт за последний запуск даёт человеку возможность за 10 минут
-  утреннего кофе просмотреть 5–15 лучших вакансий, понять, почему они
-  хорошие, и решить, куда откликаться.
-- `insights.md` реально растёт содержательными, неочевидными выводами
-  о рынке, а не пересказом того, что и так есть в коде.
-- Тесты (`pytest`) проходят и реально проверяют пограничные случаи, а не
-  только happy path.
-- Данные читаемы человеком напрямую в текстовом редакторе (Markdown/JSON/
-  YAML), без необходимости поднимать БД или UI.
-
----
-
-## 5. Инженерные принципы
-
-- **Файловая система — это база данных.** Никаких SQL/NoSQL серверов.
-  Human-readable форматы: JSON для машиночитаемых структур, Markdown —
-  для отчётов и для накопленных выводов, YAML — для конфигурации.
-- **Идемпотентность и безопасность повторного запуска.** Пайплайн можно
-  запускать сколько угодно раз подряд; он не создаёт дублей, не теряет
-  историю, не падает, если какой-то из внешних источников недоступен —
-  просто логирует проблему и продолжает с тем, что есть.
-- **Разделение "жёстких данных" и "суждений агента".** Скрипты на Python
-  делают детерминированную, воспроизводимую часть работы: сбор, парсинг,
-  дедупликация, скоринг по формуле, генерация отчёта. Агент (сам Claude
-  Code в интерактивной сессии) добавляет качественную часть, которую
-  скрипты сделать не могут: чтение отзывов о компании, проверку реальной
-  визовой/EOR-политики компании, разрешение неоднозначных топонимов
-  (см. `ambiguous_place_names`), ручной просмотр LinkedIn/Glassdoor через свои
-  инструменты (WebSearch/WebFetch), и запись выводов обратно в базу
-  знаний через `tools/kb.py` / `tools/ingest_manual.py`.
-- **Парсеры — да. Обход защиты — нет.** Граница проходит здесь, и она
-  уточнена по прямому вопросу пользователя (2026-07-31), поэтому
-  зафиксирована явно, чтобы не выяснять заново:
-  - **Делаем свободно**: парсеры любых источников, которые отдают данные
-    обычному GET-запросу — JSON API, RSS, HTML. В проекте таких уже
-    больше десятка (`fetch_*.py`, `company_intel.py`, `link_check.py`),
-    включая выковыривание регуляркой сайта компании из HTML-описания в
-    `fetch_wwr.py`. Наличие или отсутствие ToS само по себе решающим не
-    является: ToS — договорное право, а не уголовное, и практика по
-    публичным данным (hiQ v. LinkedIn, Van Buren, Meta v. Bright Data)
-    скорее на стороне парсинга. Конкретные юридические обстоятельства
-    пользователя проекту неизвестны и в нём не фиксируются.
-  - **Не делаем никогда**: обход активной технической защиты, явно
-    сообщающей "ботам нельзя" — подделка отпечатка браузера, ротация
-    фингерпринтов/прокси ради обхода блокировки, решение CAPTCHA,
-    headless-браузер, запущенный именно для обмана детектора ботов.
-    Замер 2026-07-31: Glassdoor/Trustpilot/Indeed/levels.fyi/Reddit-JSON
-    отвечают 403 обычному запросу, официальный Glassdoor API — 410 Gone.
-    Пройти туда скриптом можно ТОЛЬКО маскировкой — значит, не идём.
-    Это ограничение агента, не зависящее от юрисдикции пользователя.
-  - **Что делаем вместо этого**: данные с закрытых площадок собирает сам
-    агент обычным веб-поиском (поисковик индексирует их публичные
-    страницы — так получены рейтинги Glassdoor для Proxify, Lemon.io,
-    Mindrift) и заносит через `kb.py set-company-reputation` /
-    `ingest_manual.py`. Работает, легально, уже в проекте.
-  - **Вежливость по умолчанию** (не мораль, а нормальная инженерия):
-    честный User-Agent с контактом, паузы между запросами, кэширование
-    (`link_check` не перепроверяет ссылку чаще раза в 12 часов,
-    `company_intel` — раза в 30 дней), никаких персональных данных.
-- **Тестовая фикстура не оставляет следов в реальных папках.** Тесты работают
-  от имени замороженной фикстуры, и если тест забыл изолировать пути, он пишет
-  в настоящие `reports/` и `data/` — единственные места, куда человек реально
-  смотрит. Такой мусор недопустим, даже безвредный: он выглядит как результат
-  работы и заставляет разбираться, откуда взялся.
-  Обеспечено кодом, а не памятью: страховка в `tests/conftest.py` роняет
-  прогон при любой записи в реальные папки И убирает следы фикстуры
-  (`tools/clean_fixture_artifacts.py`). Одного обнаружения недостаточно —
-  проверено практикой: 2026-08-04 страховка сработала, причину устранили, а
-  файл остался лежать и был найден человеком через сутки.
-- **Никогда не удалять и не переименовывать чужие файлы.** Проект работает
-  строго внутри своей папки. Личные документы пользователя
-  (`local-constitution/personal/`) — только для чтения: не редактируются, не
-  удаляются и **не переименовываются**, даже ради единообразия. Соглашения
-  об именах (префиксы идентичностей) действуют только на файлы, которые
-  создаёт сам проект. Человек узнаёт своё CV по имени, ищет его по имени и
-  отправляет работодателю по имени — приведение к «правильному» виду ничего
-  не даёт проекту и ломает то, что было у человека. Реальная ошибка
-  2026-07-31, замеченная владельцем сразу.
-- **Ложный пропуск дороже ложного срабатывания.** Лишняя вакансия в отчёте
-  видна: человек её читает и ругается. Пропущенная не видна никому — она
-  просто не приходит. Поэтому пропуски ищутся замерами, а не ожиданием
-  жалобы, и никакой фильтр не считается верным, пока не измерено, что
-  именно он выбрасывает.
-  Реальная цена, измеренная 2026-08-05: 754 вакансии с ".NET" в заголовке
-  не проходили ни одна, причём 325 из них — с формулировкой "не .NET-роль".
-  Голого ".NET" не было ни в одном списке ключей, а добавить его подстрокой
-  нельзя: ".net" есть в каждом почтовом домене. Механика поиска названий
-  технологий и чек-лист на этот класс ошибок — `docs/TECH_MATCHING.md`.
-- **Отказ по догадке — не отказ.** Когда система отбрасывает вакансию не по
-  словам работодателя, а по косвенному признаку (страна в поле площадки,
-  отсутствие слова в описании), она принимает решение за человека, не имея
-  оснований. Такие вакансии не выбрасываются молча: они попадают в
-  отдельный класс и отдельный раздел отчёта, где человек решает сам.
-  Прямые слова работодателя ("Canada only", "must be based in") — другое
-  дело, это настоящий отказ.
-- **Прозрачность скоринга.** Каждая оценка вакансии должна раскладываться
-  на компоненты (`score_breakdown`), а не быть "магическим числом".
-- **Устойчивость к мусору во входных данных.** Внешние API нестабильны,
-  меняют формат, отдают спам (это уже наблюдалось на практике — RemoteOK
-  отдаёт вперемешку с вакансиями нерелевантный мусор). Парсеры обязаны
-  быть defensive: проверять обязательные поля, отбрасывать некорректные
-  записи с логированием, никогда не ронять весь пайплайн из-за одной
-  плохой записи.
-- **Маленькие, единообразные CLI-скрипты.** Каждый скрипт в `tools/`
-  запускается независимо через `python tools/<script>.py --help` и решает
-  одну задачу. Это тот же принцип, что в агентских средах, которые
-  запускают переиспользуемые CLI-инструменты вместо монолита.
-- **Мёртвые ссылки не показываются человеку.** Подтверждено явно
-  (2026-07-30): каждая ссылка на вакансию в отчёте должна быть проверена;
-  вакансии с однозначно нерабочей ссылкой (404/410) убираются из выдачи, а
-  не просто понижаются в приоритете (см. `tools/link_check.py`). При этом
-  неоднозначные случаи (сайт блокирует автоматические запросы, таймаут) —
-  это НЕ повод считать ссылку мёртвой: лучше по ошибке показать
-  сомнительную ссылку, чем по ошибке скрыть настоящую вакансию.
-- **Три уровня доверия к зарплате.** Подтверждено явно (2026-07-30): явно
-  указанная в самой вакансии ЗП — полный плюс; примерная вилка, найденная
-  агентом из стороннего источника (Glassdoor и т.п.) — маленький плюс;
-  отсутствие ЗП вообще — нейтрально (ни плюса, ни минуса). Не путать
-  "нет данных" с "плохая зарплата".
+- Any new developer — human or AI agent — opening the repository understands
+  within five minutes what this is, what it is for and how to run it.
+- `python tools/pipeline.py` runs from end to end with no manual intervention
+  and either updates the knowledge base and the report successfully, or
+  explains clearly and explicitly what went wrong. It never fails silently and
+  never damages existing data when one source breaks.
+- The latest report lets a person spend ten minutes over morning coffee looking
+  through 5-15 of the best vacancies, understand why they are good, and decide
+  where to apply.
+- `insights.md` really does grow with substantive, non-obvious conclusions about
+  the market, rather than restating what the code already says.
+- The tests (`pytest`) pass and genuinely exercise edge cases, not only the
+  happy path.
+- The data is readable by a person directly in a text editor (Markdown, JSON,
+  YAML), with no database or UI to start up.
 
 ---
 
-## 6. Правила принятия решений
+## 5. Engineering principles
 
-Когда неочевидно, как поступить — руководствоваться в таком порядке:
-
-1. Что безопаснее для данных пользователя и его компьютера?
-2. Что оставит систему более прозрачной и объяснимой для человека?
-3. Что легче исправить в будущем, если решение окажется неудачным?
-4. Что ближе к профилю поиска АКТИВНОЙ идентичности (её `criteria.yaml` и
-   `identity.md`) — а не к тому, что кажется хорошей вакансией вообще?
-5. Что проще для не-разработчика, который просто хочет открыть отчёт и
-   прочитать его?
-
-Архитектурные решения принимаются самостоятельно и фиксируются в
-`docs/ARCHITECTURE.md` вместе с кратким "почему". Если решение оказалось
-плохим — переписывается без сожалений, старое решение документируется в
-том же файле в разделе "Отклонённые подходы", чтобы не наступать на те же
-грабли повторно.
+- **The file system is the database.** No SQL or NoSQL servers. Human-readable
+  formats: JSON for machine-readable structures, Markdown for reports and for
+  accumulated conclusions, YAML for configuration.
+- **Idempotence, and safety on re-run.** The pipeline can be run as many times
+  in a row as you like; it creates no duplicates, loses no history, and does not
+  fail when an external source is unavailable — it logs the problem and carries
+  on with what it has.
+- **"Hard data" is kept separate from "the agent's judgement".** The Python
+  scripts do the deterministic, reproducible part: collection, parsing,
+  deduplication, formula scoring, report generation. The agent — Claude Code in
+  an interactive session — adds the qualitative part the scripts cannot do:
+  reading reviews about a company, checking its real visa or EOR policy,
+  resolving ambiguous place names (see `ambiguous_place_names`), looking through
+  LinkedIn or Glassdoor with its own tools (WebSearch/WebFetch), and writing the
+  conclusions back into the knowledge base through `tools/kb.py` and
+  `tools/ingest_manual.py`.
+- **Parsers, yes. Circumventing protection, no.** The boundary runs here, and it
+  was clarified by a direct question from the user (2026-07-31), so it is
+  recorded explicitly to avoid working it out again:
+  - **Done freely**: parsers of any source that serves its data to an ordinary
+    GET request — JSON API, RSS, HTML. The project already has more than a dozen
+    (`fetch_*.py`, `company_intel.py`, `link_check.py`), including pulling a
+    company's site out of an HTML description with a regex in `fetch_wwr.py`.
+    The presence or absence of terms of service is not decisive in itself: ToS
+    is contract law rather than criminal law, and the case law on public data
+    (hiQ v. LinkedIn, Van Buren, Meta v. Bright Data) leans towards parsing. The
+    user's specific legal circumstances are unknown to the project and are not
+    recorded in it.
+  - **Never done**: circumventing active technical protection that explicitly
+    says "no bots" — faking a browser fingerprint, rotating
+    fingerprints or proxies to get past a block, solving CAPTCHAs, or running a
+    headless browser specifically to fool a bot detector. Measured 2026-07-31:
+    Glassdoor, Trustpilot, Indeed, levels.fyi and Reddit's JSON all answer 403
+    to an ordinary request, and the official Glassdoor API is 410 Gone. Getting
+    in by script would take ONLY impersonation — so we do not go. This is a
+    limit on the agent, independent of the user's jurisdiction.
+  - **What is done instead**: the agent gathers data from closed sites through
+    ordinary web search — search engines index their public pages, which is how
+    the Glassdoor ratings for Proxify, Lemon.io and Mindrift were obtained — and
+    enters it through `kb.py set-company-reputation` or `ingest_manual.py`. It
+    works, it is legitimate, and it is already in the project.
+  - **Politeness by default** (not morality, just ordinary engineering): an
+    honest User-Agent carrying a contact, pauses between requests, caching
+    (`link_check` does not re-check a link more than once in 12 hours,
+    `company_intel` more than once in 30 days), no personal data.
+- **A test fixture leaves no trace in the real folders.** The tests run under a
+  frozen fixture, and a test that forgets to isolate its paths writes into the
+  real `reports/` and `data/` — the only places a person actually looks. Such
+  litter is unacceptable even when harmless: it looks like a result and forces
+  somebody to work out where it came from.
+  Guaranteed by code rather than by memory: the safety net in `tests/conftest.py`
+  fails the run on any write into the real folders AND clears the fixture's
+  traces (`tools/clean_fixture_artifacts.py`). Detection alone is not enough —
+  proven in practice: on 2026-08-04 the net fired, the cause was fixed, and the
+  file stayed where it was until a person found it a day later.
+- **Never delete or rename somebody else's files.** The project works strictly
+  inside its own folder. The user's personal documents
+  (`local-identities/<prefix>/documents/`) are read-only: never edited, never
+  deleted and **never renamed**, not even for consistency. Naming conventions
+  (identity prefixes) apply only to files the project creates itself. A person
+  recognises their CV by its name, looks for it by its name and sends it to
+  employers under that name — tidying it into the "right" shape buys the project
+  nothing and breaks what the person had. A real mistake made 2026-07-31, and
+  spotted by the owner immediately.
+- **A false negative costs more than a false positive.** A spurious vacancy in
+  the report is visible: a person reads it and complains. A missed one is
+  visible to nobody — it simply never arrives. So misses are hunted with
+  measurements rather than waited for as complaints, and no filter counts as
+  correct until what it throws away has been measured.
+  The real cost, measured 2026-08-05: 754 vacancies with ".NET" in the title,
+  not one of which passed, 325 of them with the wording "not a .NET role". A
+  bare ".NET" was in no key list at all, and it cannot be added as a substring:
+  ".net" is in every mail domain. The mechanics of matching technology names,
+  and a checklist for this class of mistake, are in `docs/TECH_MATCHING.md`.
+- **A refusal by guesswork is not a refusal.** When the system discards a
+  vacancy not on the employer's words but on an indirect sign — a country in the
+  board's field, the absence of a word in the description — it is deciding for
+  the person without grounds. Such vacancies are not thrown away silently: they
+  go into their own class and their own section of the report, where the person
+  decides. The employer's own words ("Canada only", "must be based in") are a
+  different matter — that is a genuine refusal.
+- **Scoring is transparent.** Every vacancy's score must decompose into
+  components (`score_breakdown`) rather than being a magic number.
+- **Robustness against rubbish in the input.** External APIs are unstable,
+  change format and serve spam — already observed in practice: RemoteOK returns
+  irrelevant rubbish mixed in with vacancies. Parsers must be defensive: check
+  required fields, discard malformed records with a log line, and never bring
+  the whole pipeline down over one bad record.
+- **Small, uniform CLI scripts.** Every script in `tools/` runs independently
+  via `python tools/<script>.py --help` and solves one problem. It is the same
+  principle as in agent environments that run reusable CLI tools rather than a
+  monolith.
+- **Dead links are not shown to a person.** Confirmed explicitly (2026-07-30):
+  every vacancy link in the report must be checked, and a vacancy with an
+  unambiguously broken link (404/410) is removed from the shortlist rather than
+  merely demoted (see `tools/link_check.py`). Ambiguous cases — a site blocking
+  automated requests, a timeout — are NOT grounds for calling a link dead:
+  better to show a doubtful link by mistake than to hide a real vacancy by
+  mistake.
+- **Three levels of trust in a salary.** Confirmed explicitly (2026-07-30): a
+  salary stated in the vacancy itself is a full plus; an approximate range found
+  by the agent on an external source (Glassdoor and the like) is a small plus;
+  no salary at all is neutral — neither plus nor minus. Do not confuse "no data"
+  with "bad pay".
 
 ---
 
-## 7. Требования к качеству
+## 6. How decisions get made
 
-- Код — как у прагматичного senior-инженера: простой, читаемый, без
-  избыточной абстракции ради абстракции, но с чёткими границами
-  ответственности между модулями.
-- Один модуль — одна причина для изменения (fetch ≠ normalize ≠ score ≠
-  report ≠ хранение).
-- Ошибки не проглатываются молча: минимум — запись в лог/`state.json`,
-  видимая в отчёте ("источник X недоступен, N дней подряд").
-- Никаких секретов/токенов в репозитории. Все используемые источники в
-  MVP — публичные, не требующие ключей API. Если в будущем понадобится
-  платный API — ключ хранится вне репозитория (переменная окружения),
-  никогда в git.
+When it is not obvious how to proceed, use this order:
 
-## 8. Философия тестирования
+1. What is safer for the user's data and their computer?
+2. What leaves the system more transparent and more explicable to a person?
+3. What is easier to correct later if the decision turns out badly?
+4. What is closer to the ACTIVE identity's search profile (its `criteria.yaml`
+   and `identity.md`) — rather than to what looks like a good vacancy in
+   general?
+5. What is simpler for a non-developer who just wants to open the report and
+   read it?
 
-Тестировать как опытный корпоративный QA, который получает премию за
-найденные баги, а не как автор, который хочет побыстрее закрыть тикет:
+Architectural decisions are taken independently and recorded in
+`docs/ARCHITECTURE.md` together with a short "why". If a decision turns out
+badly it is rewritten without regret, and the old one is documented in the same
+file under "Rejected approaches", so the same ground is not covered twice.
 
-- Обязательно проверять не только happy path, но и: пустые/битые входные
-  данные, дубликаты вакансий с разных источников, вакансии без зарплаты,
-  без описания, с неоднозначным топонимом в адресе, с HTML-мусором, с очень
-  длинными описаниями, с не-ASCII текстом (например, вакансии на других
-  языках), с отсутствующими обязательными полями.
-- Тесты на дедупликацию и скоринг обязаны включать граничные случаи
-  (одинаковая вакансия с чуть разным названием на двух бордах; вакансия
-  на грани порога скоринга).
-- Пайплайн в целом должен иметь "smoke test": полный прогон на
-  зафиксированных тестовых данных без сети, подтверждающий, что отчёт и
-  база знаний действительно генерируются.
-- После каждого цикла разработки: разработка → тестирование → починка →
-  повторное тестирование, пока не останется очевидных проблем. Это не
-  разовое действие, а постоянный цикл на протяжении всей жизни проекта.
+---
 
-## 9. Требования к автономности
+## 7. Quality requirements
 
-- Никогда не останавливаться и не спрашивать разрешения из-за
-  неоднозначности. Если есть несколько разумных вариантов — выбрать
-  лучший, зафиксировать выбор (в коде/конфиге/`ARCHITECTURE.md`) и
-  продолжать.
-- При обнаружении, что более раннее архитектурное решение было плохим —
-  переписать, не спрашивая одобрения.
-- Предположения фиксировать явно (комментарий, запись в `insights.md`
-  или `ARCHITECTURE.md`), чтобы будущий запуск/агент мог их пересмотреть.
-- Разрешено и приветствуется агенту в интерактивной сессии дополнительно
-  вручную "погулять" по вебу (WebSearch/WebFetch) в дополнение к
-  автоматическим источникам — особенно чтобы точечно проверить
-  неоднозначные случаи (например, находится ли конкретная вакансия в
-  том месте, которое имел в виду парсер; действительно ли компания
-  нанимает контракторов вне США).
+- Code as a pragmatic senior engineer would write it: simple, readable, without
+  abstraction for its own sake, but with clear boundaries of responsibility
+  between modules.
+- One module, one reason to change (fetch ≠ normalize ≠ score ≠ report ≠
+  storage).
+- Errors are not swallowed silently: at minimum a line in the log or
+  `state.json`, visible in the report ("source X unavailable, N days running").
+- No secrets or tokens in the repository. Every source used is public and needs
+  no API key. If a paid API is ever needed, the key lives outside the repository
+  (an environment variable), never in git.
 
-## 10. Требования к самоанализу
+## 8. The philosophy of testing
 
-После каждой значимой задачи система (агент) должна спросить себя:
-**"Какое следующее улучшение принесёт максимальную пользу проекту?"** —
-и сразу приступить к его реализации. Примеры того, что может быть таким
-улучшением: новый источник вакансий, более точная дедупликация, более
-информативный отчёт, найденный и исправленный баг в скоринге, более
-глубокое понимание паттерна рынка, записанное в `insights.md`.
+Test like an experienced corporate QA who is paid for the bugs they find, not
+like an author who wants to close the ticket quickly:
 
-Раз в несколько запусков стоит явно смотреть на `data/state.json` —
-здоровье источников, скорость роста базы знаний, долю вакансий с
-`needs_manual_review=true` — и на основе этого решать, что чинить в
-первую очередь.
+- Always exercise more than the happy path: empty and malformed input,
+  duplicate vacancies from different sources, vacancies with no salary, no
+  description, an ambiguous place name in the address, HTML rubbish, very long
+  descriptions, non-ASCII text (postings in other languages), missing required
+  fields.
+- Deduplication and scoring tests must include edge cases: the same vacancy with
+  a slightly different title on two boards; a vacancy right on a scoring
+  threshold.
+- The pipeline as a whole needs a smoke test: a full run over frozen test data
+  with no network, confirming that the report and the knowledge base really are
+  generated.
+- After every development cycle: build → test → fix → test again, until no
+  obvious problems remain. That is not a one-off action but a continuous loop
+  over the project's whole life.
 
-## 11. Требования к постоянному улучшению и критерий "стоп"
+## 9. Autonomy requirements
 
-Не останавливаться на первоначальном списке задач. Продолжать улучшать,
-пока одновременно не выполнены все условия:
+- Never stop and ask permission because of ambiguity. If there are several
+  reasonable options, pick the best, record the choice (in code, in config, or
+  in `ARCHITECTURE.md`) and carry on.
+- On discovering that an earlier architectural decision was bad, rewrite it
+  without asking for approval.
+- Record assumptions explicitly (a comment, an entry in `insights.md` or
+  `ARCHITECTURE.md`), so that a future run or agent can revisit them.
+- The agent in an interactive session is allowed and encouraged to walk the web
+  by hand (WebSearch/WebFetch) in addition to the automatic sources —
+  particularly to check ambiguous cases: whether a given vacancy really is in
+  the place the parser assumed; whether a company really does hire contractors
+  outside the US.
 
-- архитектура выглядит зрелой (нет очевидных "заплаток");
-- документация полная и не расходится с кодом;
-- тесты проходят и покрывают пограничные случаи;
-- очевидные проблемы устранены;
-- проект легко расширяется (добавить новый источник вакансий — работа на
-  один файл, а не рефакторинг всей системы);
-- репозиторий понятен новому разработчику/агенту без дополнительных
-  объяснений;
-- дальнейшие улучшения дают лишь незначительный прирост качества.
+## 10. Self-examination requirements
 
-До этого момента после завершения любой задачи всегда должна оставаться
-хотя бы одна следующая задача в очереди.
+After every significant task, the system (the agent) should ask itself: **"which
+improvement would do the project the most good next?"** — and start on it
+straight away. Examples of what that might be: a new source of vacancies, more
+accurate deduplication, a more informative report, a scoring bug found and
+fixed, a deeper understanding of a market pattern written into `insights.md`.
 
-## 12. Документация
+Every few runs it is worth looking explicitly at `data/state.json` — the health
+of the sources, how fast the knowledge base is growing, the share of vacancies
+with `needs_manual_review=true` — and deciding from that what to fix first.
 
-Агент — одновременно разработчик и среда исполнения этого проекта. Значит,
-документация пишется в первую очередь для агента: она должна позволять начать
-работу с нуля, без потери качества и без раскопок в истории чата.
+## 11. Continuous improvement, and the stopping criterion
 
-**Общие документы (для всех пользователей):**
+Do not stop at the initial list of tasks. Keep improving until all of these hold
+at once:
 
-- `README.md` — что это и как запустить.
-- `RUNBOOK.md` — что выполнять в рамках одного исследовательского цикла.
-- `docs/IDENTITIES.md` — архитектура идентичностей. Читать сразу после этого
-  файла, если предстоит что-то менять.
-- `docs/ONBOARDING.md` — как создать идентичность с нуля.
-- `docs/QUESTIONNAIRE.md` — как вести опрос человека.
-- `docs/LOCAL_CONSTITUTION.md` — спецификация локальной папки (её самой нет в
-  гите, поэтому спецификация обязана быть).
-- `docs/BUILDING_BLOCKS.md` — каталог источников и инструментов с их
-  сильными и слабыми сторонами.
-- `docs/ARCHITECTURE.md` — архитектурные решения и **отклонённые
-  альтернативы**, чтобы не наступать на те же грабли.
-- `docs/SOURCES.md` — источники и граница дозволенного при сборе данных.
-- `docs/OVERRIDES.md` — что чем перебивается между тремя слоями, что
-  переопределению неподвластно (жёсткие гейты) и как не завести две части
-  конфигурации, которые не знают друг о друге. Последнее — самая дорогая
-  ошибка проекта: она не ломает тесты и потому живёт долго.
-- `docs/TECH_MATCHING.md` — как искать названия технологий в тексте.
-  Читать перед тем, как добавлять технологию в стек или чинить «фильтр
-  что-то не находит»: там разобран класс ошибок, который в этом проекте
-  повторялся чаще любого другого.
-- `docs/VACANCY_CHECKLIST.md` — обязательный ручной чек-лист по кандидатам.
+- the architecture looks mature (no obvious patches);
+- the documentation is complete and does not diverge from the code;
+- the tests pass and cover edge cases;
+- the obvious problems are gone;
+- the project is easy to extend (adding a new source of vacancies is one file's
+  work, not a refactor of the whole system);
+- the repository is comprehensible to a new developer or agent with no further
+  explanation;
+- further improvements would give only a marginal gain in quality.
 
-**Документы уровня идентичности** (в её папке, с её префиксом):
+Until then, after finishing any task there should always be at least one more
+task in the queue.
 
-- `<префикс>_identity.md` — что это за поиск, для кого, какие инструменты
-  использует, журнал решений.
-- `<префикс>_questionnaire.yaml` — почему настройки именно такие.
-- `data/<префикс>/knowledge/<префикс>_insights.md` — растущий журнал выводов
-  о рынке для этого профиля.
+## 12. Documentation
 
-## 13. Куда класть изменения
+The agent is both the developer and the runtime of this project. So the
+documentation is written for the agent first: it must make it possible to start
+work from nothing, without loss of quality and without digging through chat
+history.
 
-Проект развивается по запросам пользователей. Каждое изменение нужно осознанно
-положить в правильный слой — иначе личные предпочтения одного человека тихо
-станут правилами для всех, а полезные общие улучшения останутся у одного.
+**Shared documents (for every user):**
 
-| Изменение | Куда | Проверочный вопрос |
+- `README.md` — what this is and how to run it.
+- `RUNBOOK.md` — what to do within one research cycle.
+- `docs/IDENTITIES.md` — the identity architecture. Read straight after this
+  file if anything is about to change.
+- `docs/ONBOARDING.md` — how to create an identity from nothing.
+- `docs/QUESTIONNAIRE.md` — how to run the interview with a person.
+- `docs/LOCAL_CONSTITUTION.md` — the specification of the retired local folder,
+  kept for machines set up before the split into templates and local identities.
+- `docs/BUILDING_BLOCKS.md` — a catalogue of sources and tools with their
+  strengths and weaknesses.
+- `docs/ARCHITECTURE.md` — architectural decisions and **rejected
+  alternatives**, so the same ground is not covered twice.
+- `docs/SOURCES.md` — the sources, and the boundary of what is allowed when
+  collecting data.
+- `docs/OVERRIDES.md` — what overrides what between the layers, what is beyond
+  overriding (the hard gates), and how not to end up with two parts of the
+  configuration that do not know about each other. That last one is the
+  project's most expensive mistake: it does not break the tests, so it lives a
+  long time.
+- `docs/TECH_MATCHING.md` — how to look for technology names in text. Read
+  before adding a technology to a stack or fixing "the filter is not finding
+  something": it dissects the class of mistake that has recurred here more often
+  than any other.
+- `docs/VACANCY_CHECKLIST.md` — the mandatory manual checklist for candidates.
+
+**Identity-level documents** (in its folder, with its prefix):
+
+- `<prefix>_identity.md` — what this search is, for whom, which tools it uses, a
+  log of decisions.
+- `<prefix>_questionnaire.yaml` — why the settings are what they are.
+- `data/<prefix>/knowledge/<prefix>_insights.md` — a growing log of conclusions
+  about the market for this profile.
+
+**Language.** The repository is written in English — code, comments,
+documentation, templates. The REPORT is written in the language the person
+speaks to the agent in: it is taken from `preferences.language` in the identity
+(see `tools/i18n.py`), and the person can ask for another language at any time.
+The split is deliberate: the repository is shared and may one day be public,
+whereas a report is read by one person.
+
+## 13. Where to put a change
+
+The project grows in response to users' requests. Every change has to be placed
+in the right layer deliberately — otherwise one person's preferences quietly
+become rules for everybody, and useful general improvements stay with one
+person.
+
+| The change | Where it goes | The test question |
 |---|---|---|
-| Улучшает работу **для всех пользователей** | Большая Конституция, `tools/`, `docs/`, `config/` | «Стало бы лучше любому, кто склонирует репозиторий?» |
-| Улучшает **конкретный профиль поиска** и осмысленно для каждого, кто им пользуется | `identities/<префикс>/` | «Полезно ли это всем, кто ищет работу с таким профилем?» |
-| Касается **только этого человека и этой машины** | `local-constitution/` | «Нужно ли это кому-то, кроме меня?» |
+| Improves things **for every user** | this file, `tools/`, `docs/`, `config/` | "Would anyone who cloned the repository be better off?" |
+| Improves a **kind of search**, and makes sense for everyone using it | `identity-templates/<name>/` | "Is this useful to everyone searching with this profile?" |
+| Concerns **only this person and this machine** | `local-identities/<prefix>/` | "Does anyone but me need this?" |
 
-Признаки, что слой выбран неверно:
+Signs the layer is wrong:
 
-- в Большой Конституции появилось название конкретной технологии, страны или
-  компании — это уровень идентичности;
-- в идентичности появилась правка машинерии скоринга — это уровень `tools/`;
-- в общий репозиторий попал CV, почта или личная заметка — это Малая
-  Конституция.
+- the name of a specific technology, country or company appeared in this file —
+  that belongs at identity level;
+- an edit to the scoring machinery appeared in an identity — that belongs in
+  `tools/`;
+- a CV, an email address or a private note reached the shared repository — that
+  belongs in the local identity.
 
-Сомневаетесь между слоями — выбирайте более узкий. Поднять изменение из
-идентичности в общий слой легко; вычистить чужие личные настройки из общего
-слоя, когда ими уже пользуются, — тяжело.
+When in doubt between layers, choose the narrower one. Promoting a change from
+an identity up into the shared layer is easy; cleaning somebody else's personal
+settings out of the shared layer once people depend on them is hard.
 
-## 14. Данные и приватность
+## 14. Data and privacy
 
-- CV и личные данные пользователя не публикуются никуда и не отправляются во
-  внешние сервисы, кроме как по прямому запросу самого пользователя (например,
-  он сам решает, когда откликаться на вакансию).
-- Личные документы живут в `local-constitution/personal/`, вне гита, **под
-  своими исходными именами** — проект их не переименовывает (см. §5).
-  Репозиторий общий — в нём не должно быть ничего, что человек не готов
-  показать всем, у кого есть доступ.
-- В `data/` не хранится ничего, что нельзя было бы прочитать в обычном
-  текстовом редакторе.
-- Данные одного пользователя недоступны инструментам, работающим от имени
-  другой идентичности. Это обеспечено кодом, а не дисциплиной.
+- The user's CV and personal data are published nowhere and sent to no external
+  service, except at the user's own direct request (they decide for themselves
+  when to apply for a vacancy).
+- Personal documents live in `local-identities/<prefix>/documents/`, outside
+  git, **under their own original names** — the project does not rename them
+  (see §5). The repository is shared: nothing should be in it that a person is
+  not prepared to show everyone who has access.
+- Nothing is stored in `data/` that could not be read in an ordinary text
+  editor.
+- One user's data is unreachable by tools running under another identity. That
+  is guaranteed by code, not by discipline.
 
 ---
 
-Эта Конституция может расширяться по мере того, как проект учится на
-собственном опыте. Любое расширение должно **добавлять** строгость и
-ясность, а не снимать её.
+This constitution may grow as the project learns from its own experience. Any
+extension must **add** rigour and clarity, never remove it.
