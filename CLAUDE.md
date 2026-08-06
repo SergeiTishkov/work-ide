@@ -219,6 +219,31 @@ The project is succeeding if:
   traces (`tools/clean_fixture_artifacts.py`). Detection alone is not enough —
   proven in practice: on 2026-08-04 the net fired, the cause was fixed, and the
   file stayed where it was until a person found it a day later.
+- **The repository is in English.** Code, comments, docstrings,
+  documentation, templates, commit messages, test names — all of it. Not for
+  style: the repository is shared, and an agent or a person who does not read
+  the author's language must be able to work with it without translating first.
+  A comment nobody can read is a comment that stops being maintained.
+
+  **The one exception is data about language itself.** This project reads
+  vacancies written in any language, so it necessarily holds fragments of them:
+  the German words that identify a German-language posting, the Ukrainian phrase
+  that disambiguates Odesa, a Hebrew vacancy text in a test that proves the
+  unreadable-script gate fires. Those are not comments in another language, they
+  are the subject matter — translating them would break the thing they check.
+  The test of whether an exception is legitimate: *would translating this
+  fragment into English break what it does?* Yes — it is data. No — it is an
+  untranslated comment.
+
+  The REPORT is not part of this rule. It is written in the language the person
+  speaks to the agent in, taken from `preferences.language` in their identity
+  (see `tools/i18n.py`), and they can ask for another at any time. The split is
+  deliberate: the repository is shared, a report is read by one person.
+
+  Enforced by `tests/test_language_policy.py`, which scans every tracked file
+  for non-Latin script and requires each surviving fragment to be listed with a
+  reason. A rule that rests on an agent's memory has broken here before.
+
 - **Never delete or rename somebody else's files.** The project works strictly
   inside its own folder. The user's personal documents
   (`local-identities/<prefix>/documents/`) are read-only: never edited, never
@@ -409,12 +434,9 @@ history.
 - `data/<prefix>/knowledge/<prefix>_insights.md` — a growing log of conclusions
   about the market for this profile.
 
-**Language.** The repository is written in English — code, comments,
-documentation, templates. The REPORT is written in the language the person
-speaks to the agent in: it is taken from `preferences.language` in the identity
-(see `tools/i18n.py`), and the person can ask for another language at any time.
-The split is deliberate: the repository is shared and may one day be public,
-whereas a report is read by one person.
+**Language.** The documentation is in English, like the rest of the
+repository; the report is in the person's own language. The rule and its one
+exception are §5, "The repository is in English".
 
 ## 13. Where to put a change
 
