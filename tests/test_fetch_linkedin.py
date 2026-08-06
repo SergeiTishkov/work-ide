@@ -109,7 +109,7 @@ def test_fetch_reports_format_change_as_an_error(monkeypatch):
 
     records, note = fetch_linkedin.fetch(keywords=["C#"], locations=["Israel"], max_pages=1)
     assert records == []
-    assert "формат страницы изменился" in note
+    assert "the page format changed" in note
 
 
 def test_fetch_deduplicates_across_keywords(monkeypatch):

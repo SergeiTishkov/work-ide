@@ -1,23 +1,22 @@
 """
-Фетчер вакансий напрямую с карьерных страниц компаний через их ATS.
+Fetches vacancies straight from company careers pages via their ATS.
 
-Greenhouse / Lever / Ashby / Recruitee — это системы управления наймом, в
-которых компании ведут собственные карьерные страницы. У всех есть
-ОФИЦИАЛЬНЫЕ публичные JSON-эндпоинты, предназначенные именно для того,
-чтобы их читали (по ним работают виджеты вакансий на сайтах компаний).
-Никакой авторизации, никакой анти-бот защиты, никакого обхода — обычный
-GET, HTTP 200 (замер 2026-07-31: Greenhouse Stripe 546 вакансий,
-Cloudflare 284, GitLab 185; Ashby Notion 111, Ramp 126).
+Greenhouse / Lever / Ashby / Recruitee are hiring-management systems in which
+companies run their own careers pages. All of them have OFFICIAL public JSON
+endpoints meant precisely to be read — the vacancy widgets on company sites
+run off them. No authorisation, no anti-bot protection, nothing to circumvent:
+an ordinary GET, HTTP 200 (measured 2026-07-31: Greenhouse Stripe 546
+vacancies, Cloudflare 284, GitLab 185; Ashby Notion 111, Ramp 126).
 
-Ценность для проекта: это вакансии ОТ ПЕРВОГО ЛИЦА, минуя джоб-борды.
-Здесь нет чужой воронки отклика (в отличие от WWR), нет платных подписок и
-нет посредника, который может протухнуть. Плюс сюда попадают вакансии
-зрелых enterprise-компаний, которые часто вообще не публикуются на
-remote-бордах.
+Value to the project: these are vacancies FIRST-HAND, bypassing the job
+boards. There is no third party's application funnel (unlike WWR), no paid
+subscription and no intermediary that can go stale. On top of that, mature
+enterprise companies turn up here that often never post on remote boards at
+all.
 
-Список компаний — в config/ats_targets.yaml. Расширять его стоит теми
-компаниями, что уже показали себя в базе знаний (legacy/enterprise
-сигналы, зрелость по Wikidata), либо найденными агентом вручную.
+The company list lives in config/ats_targets.yaml. It is worth extending with
+companies that have already shown themselves in the knowledge base (legacy or
+enterprise signals, maturity per Wikidata), or ones the agent found by hand.
 """
 from __future__ import annotations
 
@@ -31,8 +30,8 @@ import common  # noqa: E402
 
 SOURCE_NAME = "ats"
 
-# Пауза между запросами к одному провайдеру — обычная вежливость к чужому
-# серверу, а не требование площадки.
+# The pause between requests to one provider is ordinary politeness towards
+# somebody else's server rather than a requirement of the board.
 POLITE_DELAY_SEC = 0.3
 
 
@@ -47,9 +46,9 @@ def _endpoint(provider: str, token: str) -> Optional[str]:
     if provider == "recruitee":
         return f"https://{token}.recruitee.com/api/offers/"
     if provider == "workable":
-        # Виджет карьерной страницы. Именно этой ATS пользуется большинство
-        # израильских технологических компаний — отсюда её ценность для
-        # проекта: собственные израильские борды (Drushim) отвечают 403.
+        # The careers-page widget. This is the ATS most Israeli technology
+        # companies use — hence its value to the project: Israel's own boards
+        # (Drushim) answer 403.
         return f"https://apply.workable.com/api/v1/widget/accounts/{token}?details=true"
     if provider == "smartrecruiters":
         return f"https://api.smartrecruiters.com/v1/companies/{token}/postings?limit=100"
@@ -223,15 +222,15 @@ _PARSERS = {
 def load_targets() -> list:
     path = common.identity_config("ats_targets.yaml")
     if not path.exists():
-        return []  # список целевых компаний необязателен для идентичности
+        return []  # a target-company list is optional for an identity
     cfg = common.load_yaml(path) or {}
     return [t for t in (cfg.get("targets") or []) if t.get("enabled", True)]
 
 
 def fetch(targets: Optional[list] = None, timeout: int = common.DEFAULT_TIMEOUT):
-    """Обходит все настроенные ATS-доски. Падение одной компании не должно
-    ронять остальные — это обычное дело, компания могла сменить ATS или
-    закрыть доску."""
+    """Walks every configured ATS board. One company failing must not bring the
+    rest down — it is routine, the company may have switched ATS or closed its
+    board."""
     import requests
 
     if targets is None:

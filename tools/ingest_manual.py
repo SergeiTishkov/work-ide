@@ -1,15 +1,15 @@
 """
-Ручной ввод находок в базу знаний Work IDE.
+Manual entry of findings into the Work IDE knowledge base.
 
-Зачем это нужно: часть лучших источников (LinkedIn Jobs, Indeed, Dice,
-карьерные страницы конкретных компаний) НЕЛЬЗЯ надёжно и легально парсить
-скриптом без авторизации и без риска нарушить условия использования (см.
-CLAUDE.md, docs/SOURCES.md). Вместо этого агент в интерактивной сессии сам
-использует свои инструменты (WebSearch/WebFetch) как это сделал бы человек,
-и заносит найденные вакансии сюда — они проходят через тот же normalize +
-score + report, что и автоматические источники.
+Why this is needed: some of the best sources (LinkedIn Jobs, Indeed, Dice,
+particular companies' careers pages) CANNOT be parsed by script dependably and
+within the project's bounds without authorisation (see CLAUDE.md,
+docs/SOURCES.md). Instead, the agent in an interactive session uses its own
+tools (WebSearch/WebFetch) the way a person would, and enters what it finds
+here — where it goes through the same normalize + score + report path as the
+automatic sources.
 
-Формат входного JSON-файла — список объектов:
+The input JSON file is a list of objects:
 [
   {
     "title": "Senior .NET Developer (Legacy Systems)",
@@ -17,16 +17,16 @@ score + report, что и автоматические источники.
     "url": "https://www.linkedin.com/jobs/view/1234567890",
     "location_raw": "Remote - United States",
     "remote": true,
-    "description_text": "... (можно с HTML, будет очищено) ...",
+    "description_text": "... (HTML is fine, it will be cleaned) ...",
     "tags": ["linkedin", ".NET", "insurance"],
     "salary_raw": "$60-70/hr contractor",
-    "posted_at": "2026-07-20T00:00:00+00:00",   // опционально
-    "external_id": "li-1234567890"               // опционально, иначе = url
+    "posted_at": "2026-07-20T00:00:00+00:00",   // optional
+    "external_id": "li-1234567890"              // optional; defaults to url
   },
   ...
 ]
 
-Использование:
+Usage:
   python tools/ingest_manual.py --file path/to/found.json
   python tools/ingest_manual.py --file path/to/found.json --source-name linkedin
 """
@@ -49,7 +49,7 @@ def load_manual_file(path: Path) -> list:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
-        raise ValueError("Ожидался JSON-список объектов-вакансий")
+        raise ValueError("Expected a JSON list of vacancy objects")
     return data
 
 
@@ -96,21 +96,21 @@ def ingest(records: list, source_name: str = "manual") -> dict:
 def main() -> None:
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Заносит вручную найденные вакансии в базу знаний")
-    parser.add_argument("--file", required=True, help="Путь к JSON-файлу со списком вакансий")
-    parser.add_argument("--source-name", default="manual", help="Метка источника, например 'linkedin'")
+    parser = argparse.ArgumentParser(description="Enter manually found vacancies into the knowledge base")
+    parser.add_argument("--file", required=True, help="Path to the JSON file with the vacancy list")
+    parser.add_argument("--source-name", default="manual", help="Source label, e.g. 'linkedin'")
     identity_mod.add_identity_arg(parser)
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
 
     path = Path(args.file)
     if not path.exists():
-        print(f"Файл не найден: {path}")
+        print(f"File not found: {path}")
         sys.exit(1)
 
     records = load_manual_file(path)
     result = ingest(records, source_name=args.source_name)
-    print("Ручной импорт завершён:")
+    print("Manual import finished:")
     for k, v in result.items():
         print(f"  {k}: {v}")
 

@@ -1,13 +1,13 @@
 """
-Фетчер источника Jobicy (https://jobicy.com/api/v2/remote-jobs).
+Fetcher for the Jobicy source (https://jobicy.com/api/v2/remote-jobs).
 
-Публичный JSON API, без ключа, только удалённые вакансии (remote_only).
-Фильтр industry=dev даёт максимальную долю разработки (замер 2026-07-30:
-100 вакансий против 100 общих с заметно меньшей долей IT). Параметр tag=
-на практике возвращает пустой результат — не использовать.
+A public JSON API, no key, remote vacancies only (remote_only). The
+industry=dev filter gives the highest share of development work (measured
+2026-07-30: 100 vacancies against 100 general ones with a markedly lower IT
+share). The tag= parameter returns nothing in practice — do not use it.
 
-Ценность источника: структурированная зарплата (salaryMin/Max/Currency/
-Period) и структурное гео-ограничение (jobGeo) — надёжнее парсинга текста.
+The source's value: structured salary (salaryMin/Max/Currency/Period) and a
+structured geography restriction (jobGeo) — more dependable than parsing text.
 """
 from __future__ import annotations
 
@@ -84,8 +84,8 @@ def _to_common_schema(item: dict) -> Optional[dict]:
     if item.get("jobLevel"):
         tags.append(str(item["jobLevel"]))
 
-    # jobDescription — полный HTML; jobExcerpt — короткая выжимка. Берём
-    # полное описание, оно нужно и для скоринга, и для ручного чек-листа.
+    # jobDescription is the full HTML; jobExcerpt a short summary. The full
+    # description is taken: it is needed both for scoring and for the checklist.
     description = item.get("jobDescription") or item.get("jobExcerpt") or ""
 
     return {
@@ -95,7 +95,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "company": company,
         "url": url,
         "location_raw": (item.get("jobGeo") or "").strip(),
-        "remote": True,  # Jobicy — remote-only площадка по определению
+        "remote": True,  # Jobicy is a remote-only board by definition
         "tags": tags,
         "description_html": description,
         "posted_at": item.get("pubDate"),

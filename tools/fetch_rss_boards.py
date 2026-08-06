@@ -1,14 +1,14 @@
 """
-Фетчер job-бордов, отдающих стандартный RSS.
+Fetcher for job boards that serve standard RSS.
 
-Один модуль на несколько площадок вместо файла на каждую: Jobspresso и Berlin
-Startup Jobs отличаются ровно одним — адресом фида. Формат job-RSS
-стандартизован (WordPress WP Job Manager и его клоны), и заводить под каждый
-почти одинаковый файл значит гарантированно получить расхождение при первой же
-правке.
+One module for several boards rather than a file each: Jobspresso and Berlin
+Startup Jobs differ in exactly one thing — the feed address. The job-RSS format
+is standardised (WordPress WP Job Manager and its clones), and giving each
+nearly identical board its own file guarantees they drift apart at the first
+edit.
 
-Добавить площадку = добавить строку в BOARDS. Если её фид окажется устроен
-иначе — вот тогда и появится отдельный модуль, а не заранее.
+Adding a board = adding a line to BOARDS. If its feed turns out to be built
+differently — that is when a separate module appears, not in advance.
 """
 from __future__ import annotations
 
@@ -24,13 +24,13 @@ import common  # noqa: E402
 SOURCE_NAME = "rss_boards"
 
 BOARDS = {
-    # name: (url, remote_only, локация по умолчанию)
+    # name: (url, remote_only, default location)
     "jobspresso": ("https://jobspresso.co/?feed=job_feed", True, "Worldwide"),
     "berlinstartupjobs": ("https://berlinstartupjobs.com/feed/", False, "Berlin, Germany"),
 }
 
-# В job-RSS компания и локация лежат в отдельных namespace-полях, но далеко не
-# всегда: у части площадок они внутри заголовка через дефис или в описании.
+# In job-RSS the company and location sit in separate namespaced fields, but by
+# no means always: on some boards they are inside the title after a dash, or in
 _NS = {"job": "http://www.w3.org/2005/Atom"}
 _COMPANY_IN_TITLE = re.compile(r"^(?P<title>.+?)\s+(?:at|@|-)\s+(?P<company>[^-]+)$")
 
@@ -41,8 +41,8 @@ def _text(node, tag: str) -> str:
 
 
 def _split_title_and_company(raw_title: str, explicit_company: str):
-    """Компанию берём из отдельного поля, если оно есть; иначе разбираем
-    заголовок вида «Senior Developer at Acme»."""
+    """The company comes from its own field when there is one; otherwise the
+    title is parsed, in the form «Senior Developer at Acme»."""
     if explicit_company:
         return raw_title.strip(), explicit_company.strip()
     m = _COMPANY_IN_TITLE.match(raw_title.strip())
@@ -57,7 +57,7 @@ def _item_to_common_schema(item, board: str, remote_only: bool, default_location
     if not raw_title or not url:
         return None
 
-    # Разные площадки кладут компанию в разные теги; проверяем известные.
+    # Different boards put the company in different tags; the known ones are tried.
     explicit_company = ""
     for tag in ("{http://www.w3.org/2005/Atom}company", "company", "dc:creator",
                 "{http://purl.org/dc/elements/1.1/}creator"):
@@ -67,7 +67,7 @@ def _item_to_common_schema(item, board: str, remote_only: bool, default_location
 
     title, company = _split_title_and_company(raw_title, explicit_company)
     if not company:
-        return None  # без компании запись бесполезна для дедупликации и отчёта
+        return None  # without a company the record is useless for dedup and report
 
     categories = [c.text.strip() for c in item.findall("category") if c is not None and c.text]
 
@@ -97,7 +97,7 @@ def fetch(boards: Optional[List[str]] = None, timeout: int = common.DEFAULT_TIME
     for board in boards:
         cfg = BOARDS.get(board)
         if not cfg:
-            errors.append(f"неизвестная площадка '{board}'")
+            errors.append(f"unknown board '{board}'")
             continue
         url, remote_only, default_location = cfg
 
@@ -111,7 +111,7 @@ def fetch(boards: Optional[List[str]] = None, timeout: int = common.DEFAULT_TIME
 
         items = root.findall(".//item")
         if not items:
-            errors.append(f"{board}: в фиде нет элементов item")
+            errors.append(f"{board}: the feed has no item elements")
             continue
 
         for item in items:
@@ -123,7 +123,7 @@ def fetch(boards: Optional[List[str]] = None, timeout: int = common.DEFAULT_TIME
 
     note = []
     if skipped:
-        note.append(f"пропущено {skipped} записей без компании")
+        note.append(f"skipped {skipped} records with no company")
     if errors:
         note.append("; ".join(errors[:3]))
     return records, ("; ".join(note) or None)
@@ -133,13 +133,13 @@ def main() -> None:
     import argparse
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Сбор вакансий с RSS-бордов")
+    parser = argparse.ArgumentParser(description="Collect vacancies from RSS boards")
     identity_mod.add_identity_arg(parser)
     parser.add_argument("--board", action="append", choices=sorted(BOARDS))
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
     records, note = fetch(args.board)
-    print(f"{SOURCE_NAME}: {len(records)} записей ({note or 'без замечаний'})")
+    print(f"{SOURCE_NAME}: {len(records)} records ({note or 'no remarks'})")
 
 
 if __name__ == "__main__":

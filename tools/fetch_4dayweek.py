@@ -1,26 +1,27 @@
 """
-Фетчер 4dayweek.io — площадка про сокращённую занятость.
+Fetcher for 4dayweek.io — a board about reduced working hours.
 
-ПОЧЕМУ ЭТОТ ИСТОЧНИК ОСОБЕННЫЙ
+WHY THIS SOURCE IS DIFFERENT
 ------------------------------
-Все остальные источники проекта ищут по СТЕКУ, а спокойствие вычисляется потом,
-из текста описания. Замер 2026-08-05 показал, чем это плохо: из 10 215 вакансий
-в базе все гейты проходили 27, и лишь у 8 нашёлся хоть какой-то признак низкой
-нагрузки. Слово "part-time" встретилось во всей базе один раз.
+Every other source in the project searches by STACK, and calmness is computed
+afterwards from the description text. A measurement on 2026-08-05 showed what
+is wrong with that: of 10,215 vacancies in the database, 27 passed all the
+gates, and only 8 had any sign of low intensity at all. The word "part-time"
+appeared in the entire database once.
 
-Спокойная неполная занятость — не подмножество обычных вакансий, а отдельный
-рынок. Здесь он представлен целиком, причём СТРУКТУРНЫМ полем `schedule_type`:
+Calm part-time work is not a subset of ordinary vacancies but a separate
+market. Here it is present in full, and via a STRUCTURED `schedule_type` field:
 4_day_week, 4_day_week_pro_rata, 9_day_fortnight, compressed_week,
-half_day_fridays, flexible_hours. Это надёжнее любого угадывания по тексту —
-площадка сама сортирует работодателей по режиму работы.
+half_day_fridays, flexible_hours. That is more dependable than any guess from
+text — the board itself sorts employers by working pattern.
 
-Замер: 23 182 вакансии всего, в выборке из 100 около 21% — engineering.
+Measured: 23,182 vacancies in total; in a sample of 100, about 21% engineering.
 
-ЧТО ЭТО ЗНАЧИТ ДЛЯ СКОРИНГА
+WHAT THIS MEANS FOR SCORING
 --------------------------
-Режим работы кладётся в теги (`schedule:4_day_week`), и его подхватывает
-low_intensity_signal идентичности. То есть источник не просто приносит
-вакансии, а приносит их с уже доказанным признаком низкой нагрузки.
+The working pattern goes into the tags (`schedule:4_day_week`), where the
+identity's low_intensity_signal picks it up. So the source does not merely
+bring vacancies — it brings them with a proven mark of low intensity.
 """
 from __future__ import annotations
 
@@ -41,8 +42,8 @@ PAGE_SIZE = 100
 MAX_PAGES = 6
 PAUSE_SECONDS = 0.5
 
-# Значения schedule_type, которые площадка отдаёт в чистом виде. Переводим в
-# человеческий текст, чтобы они читались и в теге, и в отчёте.
+# schedule_type values the board returns verbatim. Translated into readable
+# text so they read well both in the tag and in the report.
 SCHEDULE_LABELS = {
     "4_day_week": "4-day week",
     "4_day_week_pro_rata": "4-day week (pro rata)",
@@ -56,11 +57,11 @@ SCHEDULE_LABELS = {
 
 
 def _format_salary(item: dict) -> Optional[str]:
-    """Готовая строка от площадки надёжнее пересчёта.
+    """A ready-made string from the board beats recomputing it.
 
-    Числовые поля salary_lower/upper приходят в сотых долях единицы
-    ($162k выглядит как 16250866), и восстанавливать из них сумму — лишний
-    риск ошибиться на два порядка в самом важном для решения поле.
+    The numeric salary_lower/upper fields arrive in hundredths of a unit
+    ($162k looks like 16250866), and reconstructing the sum from them is an
+    extra chance to be wrong by two orders of magnitude in the field that
     """
     text = str(item.get("salary") or "").strip()
     if not text:
@@ -98,8 +99,8 @@ def _to_common_schema(item: dict) -> Optional[dict]:
     schedule = str(item.get("schedule_type") or "").strip()
     tags: List[str] = []
     if schedule:
-        # И машиночитаемый вид, и человеческий: первый переживёт смену
-        # словаря на стороне площадки, второй читается в отчёте.
+        # Both machine-readable and human-readable: the first survives a change
+        # of vocabulary on the board's side, the second reads well in the report.
         tags.append(f"schedule:{schedule}")
         label = SCHEDULE_LABELS.get(schedule)
         if label:
@@ -118,8 +119,8 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "location_raw": _format_location(item),
         "remote": item.get("work_arrangement") == "remote",
         "tags": tags,
-        # Описания в списочном ответе нет. Режим работы — главное, что нужно
-        # от этого источника, и он приходит структурным полем.
+        # The list response carries no description. The working pattern is the
+        # main thing wanted here, and it arrives as a structured field.
         "description_text": "",
         "posted_at": item.get("posted"),
         "salary_raw": _format_salary(item),
@@ -145,12 +146,12 @@ def fetch(categories: Optional[List[str]] = None,
                 resp.raise_for_status()
                 payload = resp.json()
             except Exception as exc:  # noqa: BLE001
-                errors.append(f"{category} стр.{page}: {type(exc).__name__}")
+                errors.append(f"{category} page {page}: {type(exc).__name__}")
                 break
 
             items = payload.get("jobs") if isinstance(payload, dict) else None
             if not isinstance(items, list):
-                errors.append(f"{category}: в ответе нет списка jobs")
+                errors.append(f"{category}: no jobs list in the response")
                 break
             if not items:
                 break
@@ -171,7 +172,7 @@ def fetch(categories: Optional[List[str]] = None,
 
     note = []
     if skipped:
-        note.append(f"пропущено {skipped} (истёкшие или неполные)")
+        note.append(f"skipped {skipped} (expired or incomplete)")
     if errors:
         note.append("; ".join(errors[:3]))
     return records, ("; ".join(note) or None)
@@ -181,7 +182,7 @@ def main() -> None:
     import argparse
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Сбор вакансий с 4dayweek.io")
+    parser = argparse.ArgumentParser(description="Collect vacancies from 4dayweek.io")
     identity_mod.add_identity_arg(parser)
     parser.add_argument("--category", action="append")
     parser.add_argument("--pages", type=int, default=MAX_PAGES)
@@ -189,7 +190,7 @@ def main() -> None:
     identity_mod.activate_or_exit(args.identity)
 
     records, note = fetch(args.category, args.pages)
-    print(f"{SOURCE_NAME}: {len(records)} записей ({note or 'без замечаний'})")
+    print(f"{SOURCE_NAME}: {len(records)} records ({note or 'no remarks'})")
     for r in records[:8]:
         line = f"  - {r['title']} @ {r['company']} [{', '.join(r['tags'][:2])}] {r['salary_raw'] or ''}"
         print(line.encode(sys.stdout.encoding or "utf-8", "replace")

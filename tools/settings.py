@@ -70,7 +70,7 @@ class FrozenSettingError(Exception):
 
 
 # --------------------------------------------------------------------------
-#  Где лежат слои
+#  Where the layers live
 # --------------------------------------------------------------------------
 
 def layer_paths(document: str, prefix: str) -> List[Tuple[str, Path]]:
@@ -108,7 +108,7 @@ def frozen_keys() -> Dict[str, str]:
 
 
 # --------------------------------------------------------------------------
-#  Слияние
+#  Merging
 # --------------------------------------------------------------------------
 
 def _flatten(node, path: str = "") -> Dict[str, object]:
@@ -173,10 +173,10 @@ def resolve(document: str, prefix: str) -> Tuple[dict, Dict[str, str]]:
                         continue
                     if key in already and already[key] != value:
                         raise FrozenSettingError(
-                            f"Слой '{layer}' ({path}) меняет '{key}' "
-                            f"с {already[key]!r} на {value!r}, а этот ключ "
-                            f"заморожен.\n  Причина: {reason}\n"
-                            "  Замороженные ключи перечислены в "
+                            f"Layer '{layer}' ({path}) changes '{key}' "
+                            f"from {already[key]!r} to {value!r}, and that key "
+                            f"is frozen.\n  Reason: {reason}\n"
+                            "  Frozen keys are listed in "
                             "config/settings_policy.yaml."
                         )
 
@@ -286,7 +286,7 @@ def main() -> None:
     for layer in LAYER_ORDER:
         print(f"  from layer {layer:<9} {counts.get(layer, 0)}")
     print("\nWhere a particular value came from:")
-    print(f"  python tools/settings.py {args.document} <точечный.ключ>")
+    print(f"  python tools/settings.py {args.document} <dotted.key>")
 
 
 if __name__ == "__main__":

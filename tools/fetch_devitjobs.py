@@ -1,19 +1,19 @@
 """
-Фетчер Devitjobs — IT-вакансии Великобритании и США.
+Fetcher for Devitjobs — IT vacancies in the UK and the US.
 
-Один модуль на две площадки: devitjobs.uk и devitjobs.com отличаются только
-доменом, формат ответа у них общий. Заводить два почти одинаковых файла ради
-разного хоста — лишний повод для расхождения.
+One module for two boards: devitjobs.uk and devitjobs.com differ only in
+domain, and share a response format. Two nearly identical files for the sake
+of a different host is just an invitation to let them drift apart.
 
-Замер 2026-08-04: UK отдаёт 2449 записей одним вызовом, US — 1590. Это
-крупнейший по объёму источник проекта. Формат «lightweight»: без текста
-описания, зато со структурными полями — вилка зарплаты (annualSalaryFrom/To),
-уровень (expLevel), тип компании и признак удалёнки.
+Measured 2026-08-04: the UK board returns 2449 records in one call, the US one
+1590. This is the project's largest source by volume. The format is
+"lightweight": no description text, but with structured fields — pay range
+(annualSalaryFrom/To), level (expLevel), company type and a remote flag.
 
-ВАЖНОЕ ОГРАНИЧЕНИЕ: описания в ответе нет. Гейты, читающие текст вакансии
-(язык, отрасль, инфраструктурная роль), по этим записям работают вслепую и
-опираются только на заголовок и теги. Поэтому ручной чек-лист по кандидатам
-отсюда особенно важен.
+AN IMPORTANT LIMITATION: the response carries no description. Gates that read
+the vacancy text (language, industry, infrastructure role) work blind on these
+records and rely on the title and tags alone. The manual candidate checklist
+therefore matters especially for anything from here.
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def _to_common_schema(item: dict, board: str) -> Optional[dict]:
     if not isinstance(item, dict):
         return None
 
-    # Площадка называет заголовок `name`, а не `title`.
+    # The board calls the title `name` rather than `title`.
     title = str(item.get("name") or item.get("title") or "").strip()
     company = str(item.get("company") or "").strip()
     slug = str(item.get("url") or item.get("_id") or "").strip()
@@ -66,7 +66,7 @@ def _to_common_schema(item: dict, board: str) -> Optional[dict]:
             tags.append(str(value))
 
     location = str(item.get("actualCity") or item.get("address") or "").strip()
-    # Площадка помечает удалёнку категорией города, а не отдельным флагом.
+    # The board marks remote work with a city category, not a separate flag.
     is_remote = "remote" in " ".join(tags).lower() or "remote" in location.lower()
 
     return {
@@ -95,7 +95,7 @@ def fetch(boards: Optional[List[str]] = None, timeout: int = common.DEFAULT_TIME
     for board in boards:
         url = BOARDS.get(board)
         if not url:
-            errors.append(f"неизвестная доска '{board}'")
+            errors.append(f"unknown board '{board}'")
             continue
         try:
             resp = requests.get(url, headers={"User-Agent": common.USER_AGENT}, timeout=timeout)
@@ -106,7 +106,7 @@ def fetch(boards: Optional[List[str]] = None, timeout: int = common.DEFAULT_TIME
             continue
 
         if not isinstance(payload, list):
-            errors.append(f"{board}: ожидался список, пришло {type(payload).__name__}")
+            errors.append(f"{board}: expected a list, got {type(payload).__name__}")
             continue
 
         for item in payload:
@@ -118,7 +118,7 @@ def fetch(boards: Optional[List[str]] = None, timeout: int = common.DEFAULT_TIME
 
     note_parts = []
     if skipped:
-        note_parts.append(f"пропущено {skipped} некорректных записей")
+        note_parts.append(f"skipped {skipped} malformed records")
     if errors:
         note_parts.append("; ".join(errors))
     return records, ("; ".join(note_parts) or None)
@@ -128,14 +128,14 @@ def main() -> None:
     import argparse
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Сбор вакансий с Devitjobs (UK/US)")
+    parser = argparse.ArgumentParser(description="Collect vacancies from Devitjobs (UK/US)")
     identity_mod.add_identity_arg(parser)
     parser.add_argument("--board", action="append", choices=sorted(BOARDS), default=None)
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
 
     records, note = fetch(args.board)
-    print(f"{SOURCE_NAME}: {len(records)} записей ({note or 'без замечаний'})")
+    print(f"{SOURCE_NAME}: {len(records)} records ({note or 'no remarks'})")
 
 
 if __name__ == "__main__":

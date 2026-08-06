@@ -1,35 +1,34 @@
 """
-Фетчер LinkedIn через гостевой эндпоинт поиска вакансий.
+Fetches LinkedIn through its guest job-search endpoint.
 
-ПОЧЕМУ ЭТО ЗАКОННО ДЛЯ ПРОЕКТА
-------------------------------
-Замер 2026-08-04: `linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search`
-отвечает HTTP 200 на обычный GET с честным User-Agent проекта — без
-авторизации, без CAPTCHA, без анти-бот блокировки. Это тот же эндпоинт,
-которым пользуется гостевой интерфейс самого LinkedIn, когда страницу
-открывает незалогиненный человек.
+WHY THIS IS WITHIN THE PROJECT'S BOUNDS
+---------------------------------------
+Measured 2026-08-04: `linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search`
+answers HTTP 200 to an ordinary GET carrying the project's honest User-Agent —
+no authorisation, no CAPTCHA, no anti-bot block. It is the same endpoint
+LinkedIn's own guest interface uses when a logged-out person opens the page.
 
-Граница проекта (CLAUDE.md §5): «парсеры того, что отдаётся обычным
-GET-запросом — да; обход активной защиты — нет». Здесь первое. Для контраста,
-тем же запросом в тот же день: Indeed — 403, Glassdoor — 403. Вот они закрыты
-по-настоящему, и туда проект не идёт.
+The project's boundary (CLAUDE.md §5): "parsers of anything served to an
+ordinary GET — yes; circumventing active protection — no". This is the former.
+For contrast, the same request on the same day: Indeed 403, Glassdoor 403.
+Those are genuinely closed, and the project does not go there.
 
-ПОЧЕМУ ЭТО ГЛАВНЫЙ ИСТОЧНИК ПРОЕКТА
------------------------------------
-Один фетчер закрывает все интересующие рынки разом: проверено по Израилю,
-ОАЭ, Саудовской Аравии, Сингапуру, Швейцарии, Германии и Нидерландам — везде
-200 и реальные вакансии. Страновые борды тех же рынков (Bayt, GulfTalent,
-Drushim, NodeFlair) отвечают 403/404, то есть альтернативы им нет.
+WHY THIS IS THE PROJECT'S MAIN SOURCE
+-------------------------------------
+One fetcher covers every market of interest at once: verified for Israel, the
+UAE, Saudi Arabia, Singapore, Switzerland, Germany and the Netherlands — 200
+and real vacancies everywhere. The national boards of those same markets
+(Bayt, GulfTalent, Drushim, NodeFlair) answer 403/404, so there is no
 
-ЦЕНА РЕШЕНИЯ
+
 ------------
-Это HTML недокументированной страницы. Вёрстка может измениться в любой день,
-и тогда парсер обязан вернуть НОЛЬ записей и ошибку — а не поток мусора,
-который тихо отравит базу. Поэтому здесь:
-  * каждая запись проходит проверку обязательных полей;
-  * если карточки в ответе есть, а разобрать не удалось ни одной — это
-    считается сбоем формата и попадает в state.json как ошибка источника;
-  * тест на зафиксированном слепке HTML проверяет оба поведения.
+THE PRICE OF THE DECISION
+
+This is the HTML of an undocumented page. The markup can change any day, and
+then the parser must return ZERO records and an error rather than a stream of
+rubbish that quietly poisons the database. Hence, here:
+  * every record passes a required-field check;
+  * if the response contains cards but not one could be parsed, that counts as
 """
 from __future__ import annotations
 
@@ -47,18 +46,18 @@ import common  # noqa: E402
 SOURCE_NAME = "linkedin"
 API_URL = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 
-# f_WT=2 — фильтр «Remote» в терминах LinkedIn.
+# f_WT=2 is LinkedIn's "Remote" filter.
 REMOTE_WORKPLACE_TYPE = "2"
 
-PAGE_SIZE = 25          # столько LinkedIn отдаёт на один запрос
-# Сколько карточек за прогон догружать полным описанием. В карточке описания
-# нет — только заголовок, компания и локация. Без описания гейт стека отсекает
-# три четверти найденного (замер: 447 из 621), потому что не видит ни одного
-# знакомого языка. Страница вакансии открывается тем же обычным GET и отдаёт
-# полный текст, но это отдельный запрос на каждую вакансию — отсюда потолок.
+PAGE_SIZE = 25          # what LinkedIn returns per request
+# How many cards per run to enrich with a full description. A card carries no
+# description — only title, company and location. Without one, the stack gate
+# rejects three quarters of what was found (measured: 447 of 621), because it
+# sees no familiar language. The vacancy page opens to the same ordinary GET
+# and returns the full text, but that is one request per vacancy — hence a cap.
 ENRICH_LIMIT = 120
-MAX_PAGES = 4           # 100 вакансий на пару (запрос × страна) — разумный потолок
-PAUSE_SECONDS = 1.5     # вежливость: не долбим чужой сервер
+MAX_PAGES = 4           # 100 vacancies per (query × country) pair is a sane cap
+PAUSE_SECONDS = 1.5     # politeness: do not hammer somebody else's server
 
 _CARD_RE = re.compile(r"<li>(.*?)</li>", re.S)
 _TITLE_RE = re.compile(r'base-search-card__title[^>]*>(.*?)</h3>', re.S)
@@ -88,9 +87,9 @@ def _card_to_common_schema(card_html: str, location_query: str) -> Optional[dict
     url_match = _URL_RE.search(card_html)
     url = url_match.group(1) if url_match else ""
 
-    # Обязательные поля. Их отсутствие означает либо чужую карточку (реклама,
-    # блок «похожие компании»), либо изменившуюся вёрстку — в обоих случаях
-    # запись брать нельзя.
+    # Required fields. Their absence means either somebody else's card (an ad,
+    # a "similar companies" block) or changed markup — in both cases the record
+    # must not be taken.
     if not title or not company or not url:
         return None
 
@@ -101,12 +100,12 @@ def _card_to_common_schema(card_html: str, location_query: str) -> Optional[dict
         "title": title,
         "company": company,
         "url": url,
-        # Страна запроса сохраняется отдельно: она надёжнее вольного текста
-        # в карточке и нужна отчёту, чтобы показать, по какому рынку нашли.
+        # The queried country is stored separately: it is more dependable than
+        # free text on the card, and the report needs it to show which market
         "location_raw": location or location_query,
-        "remote": True,          # запрос всегда идёт с фильтром f_WT=2
+        "remote": True,          # the query always carries the f_WT=2 filter
         "tags": [f"market:{location_query}"],
-        "description_text": "",  # в карточке описания нет, только на странице вакансии
+        "description_text": "",  # a card has none; only the vacancy page does
         "posted_at": _first(_DATE_RE, card_html) or None,
         "salary_raw": None,
     }
@@ -136,11 +135,11 @@ def _looks_like_dev_role(title: str) -> bool:
 
 
 def _fetch_description(url: str, timeout: int) -> str:
-    """Полный текст вакансии со страницы объявления.
+    """The full vacancy text from its posting page.
 
-    Страница отдаётся анониму обычным GET — так же, как страница поиска.
-    Пустая строка означает «не получилось»: это не ошибка прогона, вакансия
-    просто останется с оценкой по заголовку.
+    The page is served to an anonymous ordinary GET, just like the search page.
+    An empty string means "it did not work": not a failure of the run, the
+    vacancy simply keeps its title-only score.
     """
     import requests
 
@@ -161,11 +160,11 @@ def fetch(keywords: Optional[List[str]] = None,
           max_pages: int = MAX_PAGES,
           enrich_limit: int = ENRICH_LIMIT,
           timeout: int = common.DEFAULT_TIMEOUT):
-    """Обходит пары (ключевое слово × страна) и возвращает (записи, заметка).
+    """Walks (keyword × country) pairs and returns (records, note).
 
-    keywords/locations приходят из <префикс>_sources.yaml -> params. Локации
-    по умолчанию берутся из ярусов рынков активной идентичности, чтобы список
-    стран жил в одном месте (см. tools/markets.py).
+    keywords/locations come from <prefix>_sources.yaml -> params. Locations
+    default to the active identity's market tiers, so that the country list
+    lives in one place (see tools/markets.py).
     """
     import markets
 
@@ -174,7 +173,7 @@ def fetch(keywords: Optional[List[str]] = None,
     locations = locations or markets.target_locations(profile)
 
     if not keywords or not locations:
-        return [], "нечего запрашивать: пустой список ключевых слов или стран"
+        return [], "nothing to query: the keyword or country list is empty"
 
     records: List[dict] = []
     seen_urls = set()
@@ -208,18 +207,18 @@ def fetch(keywords: Optional[List[str]] = None,
                 if len(cards) < PAGE_SIZE:
                     break
 
-    # Ключевая защита от смены вёрстки: карточки пришли, но ни одна не
-    # разобралась. Молча вернуть пусто нельзя — это выглядело бы как «на рынке
-    # ничего нет», хотя на деле сломался парсер.
+    # The key defence against changed markup: cards arrived, but not one parsed.
+    # Returning empty silently will not do — it would look like "the market has
+    # nothing", when in fact the parser broke.
     if cards_seen and not records:
         return [], (
-            f"формат страницы изменился: получено {cards_seen} карточек, "
-            "не удалось разобрать ни одной"
+            f"the page format changed: {cards_seen} cards received, "
+            "none could be parsed"
         )
 
-    # Догрузка описаний. Порядок важен: сначала те, чей заголовок вообще
-    # похож на разработку — если лимит закончится, он закончится на менее
-    # интересных записях, а не на первой попавшейся.
+    # Description enrichment. The order matters: those whose title looks like
+    # development at all come first — if the budget runs out, it runs out on the
+    # less interesting records rather than on whatever came first.
     enriched = 0
     if enrich_limit:
         records.sort(key=lambda r: 0 if _looks_like_dev_role(r["title"]) else 1)
@@ -230,9 +229,9 @@ def fetch(keywords: Optional[List[str]] = None,
                 enriched += 1
             time.sleep(PAUSE_SECONDS)
 
-    note_parts = [f"карточек {cards_seen}, записей {len(records)}, с описанием {enriched}"]
+    note_parts = [f"cards {cards_seen}, records {len(records)}, with description {enriched}"]
     if errors:
-        note_parts.append("ошибки: " + "; ".join(errors[:3]))
+        note_parts.append("errors: " + "; ".join(errors[:3]))
     return records, "; ".join(note_parts)
 
 
@@ -240,20 +239,20 @@ def main() -> None:
     import argparse
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Сбор вакансий с LinkedIn (гостевой поиск)")
+    parser = argparse.ArgumentParser(description="Collect vacancies from LinkedIn (guest search)")
     identity_mod.add_identity_arg(parser)
-    parser.add_argument("--keyword", action="append", help="Ключевое слово (можно несколько)")
-    parser.add_argument("--location", action="append", help="Страна (можно несколько)")
+    parser.add_argument("--keyword", action="append", help="Keyword (repeatable)")
+    parser.add_argument("--location", action="append", help="Country (repeatable)")
     parser.add_argument("--max-pages", type=int, default=MAX_PAGES)
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
 
     records, note = fetch(args.keyword, args.location, args.max_pages)
-    print(f"{SOURCE_NAME}: {len(records)} записей ({note})")
+    print(f"{SOURCE_NAME}: {len(records)} records ({note})")
     for r in records[:10]:
-        # Названия компаний бывают с символами, которых нет в кодировке
-        # консоли Windows. Падать на печати из-за этого — глупо: данные
-        # собраны, ломается только вывод.
+        # Company names sometimes carry characters the Windows console encoding
+        # has no room for. Dying on a print because of that is silly: the data
+        # is collected, only the output breaks.
         line = f"  - {r['title']} @ {r['company']} [{r['location_raw']}]"
         print(line.encode(sys.stdout.encoding or "utf-8", "replace")
                   .decode(sys.stdout.encoding or "utf-8", "replace"))

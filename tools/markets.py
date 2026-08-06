@@ -1,16 +1,16 @@
 """
-Ярусы рынков труда: какие страны обходить при поиске.
+Labour-market tiers: which countries to search.
 
-ЗАЧЕМ ОТДЕЛЬНЫЙ МОДУЛЬ
+WHY THIS IS ITS OWN MODULE
 ----------------------
-Список локаций нужен фетчерам, которые умеют искать по стране (в первую
-очередь LinkedIn). Собирать его в каждом фетчере заново — гарантированное
-расхождение: один обновят, другой забудут.
+The location list is needed by fetchers that can search by country (LinkedIn
+above all). Assembling it afresh in each fetcher guarantees they diverge: one
+gets updated, another is forgotten.
 
-Таблица стран (`config/derivation/market_tiers.yaml`) общая для всех
-идентичностей — она описывает объективное положение дел на рынке. Выбор
-ярусов принадлежит идентичности (`profile.target_markets`), потому что это
-уже предпочтение конкретного поиска.
+The country table (`config/derivation/market_tiers.yaml`) is shared by every
+identity — it describes the objective state of the market. Which tiers to use
+belongs to the identity (`profile.target_markets`), because that is already a
+preference of one particular search.
 """
 from __future__ import annotations
 
@@ -35,11 +35,11 @@ def tier_countries(tier_name: str) -> List[str]:
 
 
 def target_locations(profile: dict) -> List[str]:
-    """Страны для поиска по профилю идентичности.
+    """The countries to search, per the identity's profile.
 
-    Пустой результат — это не ошибка конфигурации, а осознанный выбор: если
-    идентичность не назвала ни одного яруса, фетчеры по странам просто
-    ничего не делают, и их выход виден в state.json как ноль.
+    An empty result is not a configuration error but a deliberate choice: if
+    the identity named no tier, the country fetchers simply do nothing, and
+    their yield shows up in state.json as zero.
     """
     cfg = (profile or {}).get("target_markets") or {}
     names: List[str] = []
@@ -57,11 +57,11 @@ def target_locations(profile: dict) -> List[str]:
 
 
 def avoided_countries(profile: dict) -> List[str]:
-    """Страны, которые поиск обходит: нетто-экспортёры разработки плюс
-    исключённые по практическим причинам.
+    """Countries the search steers around: net exporters of development work,
+    plus ones excluded for practical reasons.
 
-    Нужны не фетчерам, а скорингу и отчёту — чтобы объяснить человеку, почему
-    вакансия из такой страны не попала в выдачу.
+    Needed not by the fetchers but by scoring and the report — to explain to a
+    person why a vacancy from such a country did not make the shortlist.
     """
-    del profile  # список одинаков для всех: он про рынок, а не про человека
+    del profile  # the list is the same for everyone: it is about the market
     return tier_countries("exporter_avoid") + tier_countries("excluded_practical")

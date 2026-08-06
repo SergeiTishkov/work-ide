@@ -1,11 +1,11 @@
 """
-Фетчер источника We Work Remotely — категория "Remote Programming Jobs" RSS.
+Fetcher for We Work Remotely — the "Remote Programming Jobs" RSS category.
 
-RSS без ключа, парсится стандартной библиотекой xml.etree.ElementTree (без
-feedparser, чтобы не тянуть лишнюю зависимость). WWR отдаёт полезное поле
-"region" (например, "Anywhere in the World" / "USA Only") — это прямой,
-надёжный сигнал для remote_location_fit, гораздо точнее, чем keyword-угадывание
-по описанию, поэтому сохраняем его отдельно.
+RSS, no key, parsed with the standard library's xml.etree.ElementTree (rather
+than feedparser, to avoid an extra dependency). WWR returns a useful `region`
+field ("Anywhere in the World" / "USA Only" and so on) — a direct, dependable
+signal for remote_location_fit, far more accurate than guessing keywords from
+the description, so it is stored separately.
 """
 from __future__ import annotations
 
@@ -21,10 +21,10 @@ import common  # noqa: E402
 
 SOURCE_NAME = "weworkremotely"
 
-# Замер 2026-07-30: одна только категория remote-programming-jobs даёт 25
-# вакансий, тогда как все пять вместе — ~277 (и в 10 раз больше
-# .NET-релевантных). Раньше использовалась только первая — это была главная
-# причина скудного выхода пайплайна.
+# Measured 2026-07-30: the remote-programming-jobs category alone gives 25
+# vacancies, whereas all five together give about 277 (and ten times as many
+# .NET-relevant ones). Only the first used to be used — that was the main
+# reason the pipeline's yield was so thin.
 FEED_URLS = [
     "https://weworkremotely.com/categories/remote-programming-jobs.rss",
     "https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss",
@@ -32,16 +32,16 @@ FEED_URLS = [
     "https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss",
     "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss",
 ]
-FEED_URL = FEED_URLS[0]  # обратная совместимость для существующих вызовов
+FEED_URL = FEED_URLS[0]  # backwards compatibility for existing callers
 
-# Namespace, который WWR подмешивает в некоторые элементы (content:encoded и т.п.)
+# The namespace WWR mixes into some elements (content:encoded and the like)
 _NS = {"content": "http://purl.org/rss/1.0/modules/content/"}
 
 
 def fetch(urls=None, timeout: int = common.DEFAULT_TIMEOUT):
-    """Обходит ВСЕ категорийные фиды WWR и объединяет результат, дедуплицируя
-    по ссылке (одна вакансия часто публикуется сразу в нескольких
-    категориях — например, и в full-stack, и в back-end)."""
+    """Walks ALL of WWR's category feeds and merges the result, deduplicating by
+    link (one vacancy is often published in several categories at once — in
+    full-stack and back-end, for instance)."""
     import requests
 
     if urls is None:
@@ -62,7 +62,7 @@ def fetch(urls=None, timeout: int = common.DEFAULT_TIMEOUT):
             )
             resp.raise_for_status()
             root = ET.fromstring(resp.content)
-        except Exception as exc:  # noqa: BLE001 - один упавший фид не должен ронять остальные
+        except Exception as exc:  # noqa: BLE001 - one dead feed must not kill the rest
             errors.append(f"{url.rsplit('/', 1)[-1]}: {type(exc).__name__}")
             continue
 
@@ -74,7 +74,7 @@ def fetch(urls=None, timeout: int = common.DEFAULT_TIMEOUT):
                 skipped += 1
                 continue
             if rec["external_id"] in seen_ids:
-                continue  # та же вакансия из другой категории
+                continue  # the same vacancy from another category
             seen_ids.add(rec["external_id"])
             records.append(rec)
 
@@ -96,18 +96,18 @@ _COMPANY_URL_RE = re.compile(r"URL:\s*(https?://[^\s<>\"')]+)", re.IGNORECASE)
 
 
 def _extract_company_url(description_html: str) -> Optional[str]:
-    """Достаёт официальный сайт компании из структурного блока WWR
+    """Extracts the company's official site from WWR's structured block
     ("Headquarters: ... / URL: ...").
 
-    Зачем: WWR держит воронку отклика у себя — поле "To apply:" в
-    большинстве вакансий ведёт обратно на weworkremotely.com, а не на
-    работодателя (проверено 2026-07-30: 71% вакансий именно так). Сайт
-    компании позволяет найти ту же вакансию на её карьерной странице и
-    откликнуться напрямую, без аккаунта на WWR."""
+    Why: WWR keeps the application funnel to itself — the "To apply:" field in
+    most vacancies leads back to weworkremotely.com rather than to the
+    employer (verified 2026-07-30: 71% of vacancies do exactly that). The
+    company site makes it possible to find the same vacancy on their careers
+    page and apply directly, with no WWR account."""
     if not description_html:
         return None
-    # Ищем в ОЧИЩЕННОМ тексте: в сыром HTML ссылка обёрнута в <a href=...>,
-    # и "URL:" отделено от неё разметкой.
+    # Searched in the CLEANED text: in raw HTML the link is wrapped in
+    # <a href=...>, and "URL:" is separated from it by markup.
     m = _COMPANY_URL_RE.search(common.strip_html(description_html))
     if not m:
         return None
@@ -123,7 +123,7 @@ def _to_common_schema(item) -> Optional[dict]:
     if not title_raw or not link:
         return None
 
-    # WWR обычно кодирует заголовок как "Company: Job Title"
+    # WWR usually encodes the title as "Company: Job Title"
     company, sep, title = title_raw.partition(":")
     if not sep:
         company, title = "", title_raw
@@ -137,7 +137,7 @@ def _to_common_schema(item) -> Optional[dict]:
     if pub_date_raw:
         try:
             posted_at_epoch = int(parsedate_to_datetime(pub_date_raw).timestamp())
-        except Exception:  # noqa: BLE001 - дата не критична для работы пайплайна
+        except Exception:  # noqa: BLE001 - a date is not critical to the pipeline
             posted_at_epoch = None
 
     remote = None

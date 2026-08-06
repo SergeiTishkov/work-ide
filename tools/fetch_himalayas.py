@@ -1,14 +1,14 @@
 """
-Фетчер источника Himalayas (https://himalayas.app/jobs/api).
+Fetcher for the Himalayas source (https://himalayas.app/jobs/api).
 
-Публичный JSON API, без ключа, только удалённые вакансии (remote_only).
-Отдаёт ~20 вакансий за вызов независимо от параметра limit — мало, но
-бесплатно и без ключа.
+A public JSON API, no key, remote vacancies only (remote_only). It returns
+about 20 vacancies per call regardless of the limit parameter — not many, but
+free and keyless.
 
-Ценность источника: `locationRestrictions` — явный, структурный список
-разрешённых стран (пустой = worldwide), плюс структурированная зарплата.
-Это самый надёжный гео-сигнал среди всех источников проекта: не нужно
-угадывать по фразам в тексте.
+The source's value: `locationRestrictions` — an explicit, structured list of
+permitted countries (empty = worldwide), plus structured salary. This is the
+most dependable geography signal among all the project's sources: no guessing
+from phrases in the text.
 """
 from __future__ import annotations
 
@@ -67,11 +67,11 @@ def _format_salary(item: dict) -> Optional[str]:
 
 
 def _format_location(item: dict) -> str:
-    """locationRestrictions — список разрешённых стран. Пустой список
-    означает "без ограничений" (worldwide). Приводим к фразам, которые
-    понимает score.py: явное "only" для ограниченных, "Worldwide" для
-    свободных — так структурный сигнал площадки корректно превращается в
-    dealbreaker там, где нужно."""
+    """locationRestrictions is a list of permitted countries. An empty list
+    means "no restriction" (worldwide). It is turned into the phrases score.py
+    understands: an explicit "only" for restricted ones, "Worldwide" for free
+    ones — so the board's structured signal correctly becomes a dealbreaker
+    where it should."""
     restrictions = item.get("locationRestrictions")
     if not restrictions:
         return "Worldwide"
@@ -83,31 +83,33 @@ def _format_location(item: dict) -> str:
     return ", ".join(names) + " only"
 
 
-# Значения, которые площадка отдаёт вместо настоящих данных.
+# Values the board returns in place of real data.
 #
-# Замер 2026-08-04: Himalayas возвращает `companyName: "name"` и
-# `companyLogo: "thumbnail_url"` — буквально НАЗВАНИЯ ПОЛЕЙ вместо значений,
-# то есть у них сломана сериализация ответа. В базе из-за этого завелись
-# вакансии от компании с именем «name», и человек увидел их в отчёте.
+# Measured 2026-08-04: Himalayas returns `companyName: "name"` and
+# `companyLogo: "thumbnail_url"` — literally THE FIELD NAMES instead of the
+# values, meaning their response serialisation is broken. That is how vacancies
+# from a company called "name" got into the database, and a person saw them in
+# the report.
 #
-# Настоящее имя при этом доступно в `companySlug`. Отсюда общее правило для
-# любых внешних API: пустое значение — не единственная форма отсутствия
-# данных, плейсхолдер выглядит как валидная строка и молча проходит проверки.
+# The real name is available in `companySlug` all the while. Hence a general
+# rule for any external API: an empty value is not the only form absence takes;
+# a placeholder looks like a valid string and passes checks silently.
 _PLACEHOLDER_VALUES = {"name", "title", "company", "companyname", "null", "none",
                        "undefined", "string", "thumbnail_url", "n/a"}
 
 
 def _extract_company(item: dict) -> str:
-    """Имя компании из записи Himalayas, в каком бы виде оно ни пришло.
+    """The company name from a Himalayas record, in whatever form it arrives.
 
-    Площадка меняла форму этого поля: раньше `companyName`, сейчас `company`
-    строкой, а когда-то — вложенным объектом `{"name": ...}`. Реальный случай
-    2026-08-04: парсер читал только `companyName`, поле стало приходить пустым,
-    и ВСЕ 60 записей источника молча отбрасывались как «без компании». Отказ
-    был совершенно тихим: источник числился рабочим и отдавал HTTP 200.
+    The board has changed this field's shape: it used to be `companyName`, it is
+    now `company` as a string, and at one point it was a nested object
+    `{"name": ...}`. A real case, 2026-08-04: the parser read only `companyName`,
+    the field started arriving empty, and ALL 60 records from the source were
+    silently discarded as "no company". The failure was completely quiet: the
+    source counted as working and returned HTTP 200.
 
-    Отсюда правило: у внешнего API не бывает «того самого» имени поля.
-    Перебираем известные формы и берём первую непустую.
+    Hence the rule: an external API has no such thing as "the" field name. Walk
+    the known forms and take the first non-empty one.
     """
     for key in ("companyName", "company", "organization"):
         value = item.get(key)
@@ -117,7 +119,7 @@ def _extract_company(item: dict) -> str:
         if value and value.lower() not in _PLACEHOLDER_VALUES:
             return value
 
-    # Запасной путь: слаг компании. Он же используется в URL вакансии.
+    # The fallback: the company slug. It is also used in the vacancy URL.
     slug = str(item.get("companySlug") or "").strip()
     return slug
 
@@ -148,7 +150,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "company": company,
         "url": url,
         "location_raw": _format_location(item),
-        "remote": True,  # Himalayas — remote-only площадка по определению
+        "remote": True,  # Himalayas is a remote-only board by definition
         "tags": tags,
         "description_html": item.get("description") or item.get("excerpt") or "",
         "posted_at_epoch": item.get("pubDate"),

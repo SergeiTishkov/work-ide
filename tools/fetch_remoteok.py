@@ -1,13 +1,13 @@
 """
-Фетчер источника RemoteOK (https://remoteok.com/api).
+Fetcher for the RemoteOK source (https://remoteok.com/api).
 
-Публичный JSON, без ключа. На практике фид бывает зашумлён нерелевантным
-контентом (наблюдалось на практике при разработке: вперемешку с вакансиями
-приходят обычные новостные заметки без должности/компании). Поэтому парсер
-максимально строг к обязательным полям и никогда не доверяет фиду вслепую.
+Public JSON, no key. In practice the feed carries irrelevant content mixed in
+— observed during development: ordinary news items with no job title or
+company arrive alongside vacancies. So the parser is as strict as it can be
+about required fields and never trusts the feed blindly.
 
-Первый элемент ответа RemoteOK — служебная legal-запись (не вакансия),
-поэтому пропускается по контракту API.
+The first element of a RemoteOK response is a housekeeping legal record rather
+than a vacancy, so it is skipped per the API contract.
 """
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "company": company,
         "url": apply_url,
         "location_raw": item.get("location") or "",
-        "remote": True,  # RemoteOK — только remote-вакансии по определению площадки
+        "remote": True,  # RemoteOK carries remote vacancies only, by definition
         "tags": list(item.get("tags") or []),
         "description_html": item.get("description") or "",
         "posted_at_epoch": item.get("epoch"),

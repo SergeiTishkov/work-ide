@@ -1,16 +1,16 @@
 """
-База знаний (Knowledge Base): вакансии, компании, рекрутеры.
+The knowledge base: vacancies, companies, recruiters.
 
-Хранится как человекочитаемый JSON в data/knowledge/*.json. Здесь же —
-CLI для ручного управления записями (agent/owner отмечает статус вакансии,
-добавляет заметку, смотрит статистику), которым можно пользоваться из
-интерактивной сессии без необходимости лезть в JSON руками.
+Stored as human-readable JSON under data/knowledge/*.json. This file also
+holds the CLI for managing records by hand — marking a vacancy's status,
+adding a note, looking at statistics — usable from an interactive session
+without having to open the JSON.
 
-Важный инвариант: повторный запуск пайплайна НИКОГДА не должен затирать
-поле "manual" (status/notes), которое мог отредактировать человек/агент.
-Оно создаётся один раз при первом обнаружении вакансии со значением по
-умолчанию и дальше трогается только через merge_vacancy(..., manual_patch=)
-или CLI-команды этого файла.
+An important invariant: re-running the pipeline must NEVER overwrite the
+"manual" field (status/notes), which a person or agent may have edited. It is
+created once, with a default value, when a vacancy is first seen, and after
+that only merge_vacancy(..., manual_patch=) or this file's CLI commands
+touch it.
 """
 from __future__ import annotations
 
@@ -40,14 +40,14 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-# --- Загрузка / сохранение ------------------------------------------------
+# --- Loading and saving ----------------------------------------------------
 #
-# Каждая функция начинается с require_identity(). Это code-level реализация
-# правила №0: без активной идентичности любое касание данных должно падать с
-# понятным объяснением, а не с "NoneType has no attribute 'exists'". Формально
-# activate_identity() и так вызывается раньше — но именно эти шесть функций
-# являются входной дверью к данным, и дешевле проверить здесь, чем однажды
-# записать вакансии одного человека в базу другого.
+# Every function starts with require_identity(). That is rule zero implemented
+# in code: without an active identity, any touch of the data must fail with a
+# comprehensible explanation rather than "NoneType has no attribute 'exists'".
+# Formally activate_identity() runs earlier anyway — but these six functions are
+# the front door to the data, and checking here is cheaper than one day writing
+# one person's vacancies into another person's database.
 
 def load_vacancies() -> dict:
     common.require_identity()
@@ -79,15 +79,15 @@ def save_recruiters(recruiters: list) -> None:
     common.save_json_atomic(common.RECRUITERS_PATH, recruiters)
 
 
-# --- Слияние вакансий -----------------------------------------------------
+# --- Merging vacancies -----------------------------------------------------
 
 def merge_vacancy(kb: dict, normalized: dict, computed: dict) -> str:
-    """Вставляет/обновляет вакансию в kb (dict, ключ = id). Возвращает
-    "new" или "updated". Поля "manual" и "external_signals" создаются один
-    раз и больше не трогаются автоматикой — это данные, которые заносит
-    человек/агент (статус отклика, вручную найденная вилка ЗП с Glassdoor и
-    т.п. через `tools/kb.py set-salary-estimate`), и следующий прогон
-    пайплайна не имеет права их стереть, пересобирая запись с нуля."""
+    """Inserts or updates a vacancy in the kb (a dict keyed by id). Returns
+    "new" or "updated". The "manual" and "external_signals" fields are created
+    once and never touched by automation again — they hold what a person or
+    agent entered (application status, a pay range found by hand on Glassdoor
+    via `tools/kb.py set-salary-estimate`), and the next pipeline run has no
+    right to erase that while rebuilding the record from scratch."""
     vid = normalized["id"]
     ts = now_iso()
     existing = kb.get(vid)
@@ -119,25 +119,25 @@ def merge_vacancy(kb: dict, normalized: dict, computed: dict) -> str:
 
 
 def mark_duplicates(vacancies: dict) -> int:
-    """Помечает почти-дубли (одна и та же вакансия, опубликованная дважды —
-    например, замечено на практике: We Work Remotely иногда отдаёт один и тот
-    же пост под двумя разными URL). Дублями считаются записи с ТОЧНЫМ
-    совпадением нормализованной пары (компания, заголовок). Каноническая
-    запись — с лучшим score (при равенстве — самая ранняя по first_seen);
-    остальные получают top-level поле "duplicate_of" и исключаются из отчёта.
+    """Marks near-duplicates — the same vacancy posted twice. Observed in
+    practice: We Work Remotely sometimes returns one post under two different
+    URLs. Records count as duplicates only on an EXACT match of the normalised
+    (company, title) pair. The canonical record is the one with the best score
+    (ties broken by earliest first_seen); the rest get a top-level
+    "duplicate_of" field and drop out of the report.
 
-    Важно: сознательно НЕ используется fuzzy-сравнение заголовков. На
-    реальных данных это давало серьёзные false positives — например,
-    "Software Engineer - Manchester" и "Software Engineer - Newcastle" (одна
-    компания массово нанимает на одну роль в разных городах) или
+    Note: fuzzy title comparison is deliberately NOT used. On real data it
+    produced serious false positives — "Software Engineer - Manchester" and
+    "Software Engineer - Newcastle" (one company hiring for one role across
+    several cities), or
     "(Native Danish) Support Consultant" / "(Native Finnish) Support
-    Consultant" (разные вакансии под разные языки) fuzzy-совпадали на >90% и
-    ошибочно схлопывались в одну, пряча от владельца реально разные открытые
-    позиции. Спрятать настоящую вакансию — куда хуже, чем изредка показать
-    безобидный точный повтор, поэтому порог сознательно строгий (exact match).
+    Consultant" (separate vacancies for separate languages) matched at >90% and
+    were wrongly collapsed into one, hiding genuinely different open positions
+    from the owner. Hiding a real vacancy is far worse than occasionally
+    showing a harmless exact repeat, so the threshold is deliberately strict.
 
-    Пересчитывается с нуля на каждом запуске (иначе при исчезновении дубля
-    из выдачи источника пометка осталась бы навсегда)."""
+    Recomputed from scratch on every run: otherwise, once a duplicate stopped
+    appearing in a source's results, the mark would stay forever."""
     for v in vacancies.values():
         v.pop("duplicate_of", None)
 
@@ -167,11 +167,11 @@ def mark_duplicates(vacancies: dict) -> int:
 
 
 def build_companies_from_vacancies(vacancies: dict, previous_companies: Optional[dict] = None) -> dict:
-    """companies.json — производное представление от vacancies.json (плюс
-    ручные заметки per-company). Пересобирается целиком на каждом запуске,
-    чтобы счётчики (vacancy_ids, signals) никогда не расходились с реальным
-    состоянием базы вакансий. first_seen и notes переносятся из предыдущей
-    версии, чтобы не терять историю."""
+    """companies.json is a view derived from vacancies.json, plus per-company
+    notes entered by hand. It is rebuilt whole on every run so that the
+    counters (vacancy_ids, signals) can never drift away from the real state of
+    the vacancy database. first_seen and notes are carried over from the
+    previous version so that history is not lost."""
     companies: dict = {}
     for slug, old in (previous_companies or {}).items():
         carried = {
@@ -186,9 +186,9 @@ def build_companies_from_vacancies(vacancies: dict, previous_companies: Optional
             },
             "notes": old.get("notes", ""),
         }
-        # Репутация собрана вручную агентом (дорогая, требует веб-поиска) —
-        # переносим, как notes и first_seen, иначе она терялась бы при
-        # каждой пересборке companies.json.
+        # Reputation is gathered by the agent by hand — expensive, requiring web
+        # search — so it is carried over like notes and first_seen. Otherwise it
+        # would be lost on every rebuild of companies.json.
         if old.get("reputation"):
             carried["reputation"] = old["reputation"]
         if old.get("intel"):
@@ -244,21 +244,21 @@ def upsert_company(companies: dict, company_name: str, vacancy: dict) -> None:
 def cmd_stats(_args) -> None:
     vacancies = load_vacancies()
     if not vacancies:
-        print("База знаний пуста. Запустите tools/pipeline.py.")
+        print("The knowledge base is empty. Run tools/pipeline.py.")
         return
     by_class = {}
     for v in vacancies.values():
         cls = v.get("computed", {}).get("classification", "unknown")
         by_class[cls] = by_class.get(cls, 0) + 1
-    print(f"Всего вакансий в базе: {len(vacancies)}")
+    print(f"Vacancies in the database: {len(vacancies)}")
     for cls, n in sorted(by_class.items(), key=lambda kv: -kv[1]):
         print(f"  {cls}: {n}")
     review = sum(1 for v in vacancies.values() if v.get("computed", {}).get("needs_manual_review"))
-    print(f"  требуют ручной проверки: {review}")
+    print(f"  needing manual review: {review}")
     dupes = sum(1 for v in vacancies.values() if v.get("duplicate_of"))
-    print(f"  почти-дублей (скрыты в отчёте): {dupes}")
+    print(f"  near-duplicates (hidden from the report): {dupes}")
     dead = sum(1 for v in vacancies.values() if v.get("link_check", {}).get("status") == "dead")
-    print(f"  мёртвых ссылок (скрыты в отчёте): {dead}")
+    print(f"  dead links (hidden from the report): {dead}")
 
 
 def cmd_list(args) -> None:
@@ -277,7 +277,7 @@ def cmd_show(args) -> None:
     vacancies = load_vacancies()
     v = vacancies.get(args.id)
     if not v:
-        print(f"Вакансия с id={args.id} не найдена.")
+        print(f"No vacancy with id={args.id}.")
         sys.exit(1)
     import json
 
@@ -286,12 +286,12 @@ def cmd_show(args) -> None:
 
 def cmd_set_status(args) -> None:
     if args.status not in VALID_STATUSES:
-        print(f"Недопустимый статус. Допустимые: {', '.join(VALID_STATUSES)}")
+        print(f"Invalid status. Valid ones: {', '.join(VALID_STATUSES)}")
         sys.exit(1)
     vacancies = load_vacancies()
     v = vacancies.get(args.id)
     if not v:
-        print(f"Вакансия с id={args.id} не найдена.")
+        print(f"No vacancy with id={args.id}.")
         sys.exit(1)
     v.setdefault("manual", {"status": "new", "notes": ""})
     v["manual"]["status"] = args.status
@@ -302,16 +302,16 @@ def cmd_set_status(args) -> None:
 
 
 def cmd_set_salary_estimate(args) -> None:
-    """Заносит вручную найденную (например, через Glassdoor) вилку ЗП для
-    вакансии, которая сама зарплату не указывает. Подтверждено владельцем
-    явно (2026-07-30): такая оценка даёт маленький плюс — меньше, чем явно
-    указанная в вакансии ставка, но больше, чем полное отсутствие данных.
-    Хранится в vacancy.external_signals (не в manual!) — именно поэтому
-    участвует в скоринге, а не только в отображении."""
+    """Records a pay range found by hand (on Glassdoor, say) for a vacancy that
+    states no salary itself. Confirmed explicitly by the owner (2026-07-30):
+    such an estimate earns a small plus — less than a rate stated in the
+    vacancy itself, more than no data at all. Stored in
+    vacancy.external_signals rather than in manual, which is precisely why it
+    takes part in scoring instead of only being displayed."""
     vacancies = load_vacancies()
     v = vacancies.get(args.id)
     if not v:
-        print(f"Вакансия с id={args.id} не найдена.")
+        print(f"No vacancy with id={args.id}.")
         sys.exit(1)
 
     v.setdefault("external_signals", {})
@@ -323,8 +323,8 @@ def cmd_set_salary_estimate(args) -> None:
         "note": args.note or "",
     }
 
-    # Пересчитываем score сразу, чтобы изменение было видно немедленно, не
-    # дожидаясь следующего запуска tools/pipeline.py.
+    # Rescore immediately, so the change is visible at once rather than after
+    # the next tools/pipeline.py run.
     criteria = score.load_criteria()
     profile = score.load_profile()
     vacancy_view = {k: val for k, val in v.items() if k not in ("computed", "manual")}
@@ -332,42 +332,42 @@ def cmd_set_salary_estimate(args) -> None:
     save_vacancies(vacancies)
     print(
         f"OK: {args.id} -> external salary estimate "
-        f"{args.low}-{args.high}/{args.period} (источник: {args.source}). "
-        f"Новый score: {v['computed']['score']} ({v['computed']['classification']})"
+        f"{args.low}-{args.high}/{args.period} (source: {args.source}). "
+        f"New score: {v['computed']['score']} ({v['computed']['classification']})"
     )
 
 
 def cmd_set_company_reputation(args) -> None:
-    """Заносит репутацию работодателя, найденную агентом во внешних
-    источниках (Glassdoor/Indeed/Trustpilot). Хранится на уровне КОМПАНИИ,
-    поэтому применяется сразу ко всем её вакансиям.
+    """Records employer reputation found by the agent on external sites
+    (Glassdoor, Indeed, Trustpilot). Stored at COMPANY level, so it applies to
+    all of that company's vacancies at once.
 
-    Автоматически скрейпить эти площадки нельзя (ToS), поэтому данные
-    собирает агент обычным веб-поиском и заносит сюда — тот же принцип, что
-    и с `set-salary-estimate`."""
+    Those sites cannot be scraped by script — they answer 403 behind bot
+    protection — so the agent finds the data by ordinary web search and enters
+    it here, on the same principle as `set-salary-estimate`."""
     companies = load_companies()
     slug = common.normalize_company_name(args.company)
     entry = companies.get(slug)
     if entry is None:
         matches = [s for s in companies if args.company.lower().replace(" ", "-") in s]
-        hint = f" Похожие: {', '.join(matches[:5])}" if matches else ""
-        print(f"Компания '{args.company}' (slug={slug}) не найдена в базе.{hint}")
+        hint = f" Similar: {', '.join(matches[:5])}" if matches else ""
+        print(f"Company '{args.company}' (slug={slug}) is not in the database.{hint}")
         sys.exit(1)
 
     reputation = {
         "overall_rating": args.rating,
         "work_life_balance": args.wlb,
         "source": args.source,
-        # КАК именно получены цифры. Важное различие, всплывшее по вопросу
-        # владельца (2026-07-31): "источник: Glassdoor" читается как "агент
-        # открыл страницу Glassdoor и посмотрел", тогда как на деле сам
-        # Glassdoor отдаёт 403 любому скрипту, и цифры взяты из СНИППЕТОВ
-        # поисковой выдачи. Это второисточник: если сниппет устарел или
-        # поисковик выдернул число из другого контекста, агент этого не
-        # заметит. Данные обязаны честно показывать свою достоверность.
-        #   web_search  - из поисковой выдачи, первоисточник НЕ открывался
-        #   direct      - страница первоисточника реально прочитана
-        #   owner       - владелец сообщил лично
+        # HOW the numbers were obtained. An important distinction that surfaced
+        # from the owner's question (2026-07-31): "source: Glassdoor" reads as
+        # "the agent opened the Glassdoor page and looked", whereas in fact
+        # Glassdoor answers 403 to any script and the numbers come from SEARCH
+        # RESULT SNIPPETS. That is second-hand: if a snippet is stale, or the
+        # search engine pulled the number out of a different context, the agent
+        # will not notice. Data must be honest about its own reliability.
+        #   web_search  - from search results; the primary source was NOT opened
+        #   direct      - the primary source page was actually read
+        #   owner       - the owner said so personally
         "retrieval": args.retrieval,
         "review_count": args.reviews,
         "red_flags": [f.strip() for f in (args.red_flags or "").split(",") if f.strip()],
@@ -377,8 +377,8 @@ def cmd_set_company_reputation(args) -> None:
     entry["reputation"] = reputation
     save_companies(companies)
 
-    # Пересчитываем score всех вакансий этой компании сразу, чтобы эффект
-    # был виден немедленно, не дожидаясь следующего pipeline.py.
+    # Rescore every vacancy of this company at once, so the effect is visible
+    # immediately rather than after the next pipeline.py run.
     vacancies = load_vacancies()
     criteria = score.load_criteria()
     profile = score.load_profile()
@@ -395,14 +395,14 @@ def cmd_set_company_reputation(args) -> None:
 
     print(
         f"OK: {entry['name']} -> rating={args.rating} wlb={args.wlb} "
-        f"(источник: {args.source}). Пересчитано вакансий: {updated}"
+        f"(source: {args.source}). Vacancies rescored: {updated}"
     )
 
 
 def attach_company_reputation(vacancies: dict, companies: dict) -> None:
-    """Прокидывает репутацию компании в каждую её вакансию перед скорингом.
-    Вызывается пайплайном: репутация живёт на уровне компании, а score
-    считается на уровне вакансии."""
+    """Pushes company reputation into each of its vacancies before scoring.
+    Called by the pipeline: reputation lives at company level, while score is
+    computed per vacancy."""
     by_slug = {}
     for slug, entry in companies.items():
         payload = {}
@@ -425,24 +425,27 @@ def attach_company_reputation(vacancies: dict, companies: dict) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Управление базой знаний Work IDE")
+    p = argparse.ArgumentParser(description="Manage the Work IDE knowledge base")
     sub = p.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("stats", help="Сводная статистика по базе знаний").set_defaults(func=cmd_stats)
+    sub.add_parser("stats", help="Summary statistics for the knowledge base"
+                   ).set_defaults(func=cmd_stats)
 
-    p_list = sub.add_parser("list", help="Список вакансий, отсортированный по score")
+    p_list = sub.add_parser("list", help="List vacancies, sorted by score")
     p_list.add_argument("--classification", default=None, choices=[
         "hot_lead", "worth_a_look", "long_shot", "low_priority", "rejected"
     ])
     p_list.add_argument("--limit", type=int, default=20)
-    p_list.add_argument("--include-duplicates", action="store_true", help="Не скрывать помеченные дубли")
+    p_list.add_argument("--include-duplicates", action="store_true",
+                        help="Do not hide records marked as duplicates")
     p_list.set_defaults(func=cmd_list)
 
-    p_show = sub.add_parser("show", help="Полная запись вакансии по id")
+    p_show = sub.add_parser("show", help="The full vacancy record, by id")
     p_show.add_argument("--id", required=True)
     p_show.set_defaults(func=cmd_show)
 
-    p_status = sub.add_parser("set-status", help="Изменить manual.status/notes вакансии")
+    p_status = sub.add_parser("set-status",
+                              help="Change a vacancy's manual.status/notes")
     p_status.add_argument("--id", required=True)
     p_status.add_argument("--status", required=True)
     p_status.add_argument("--notes", default=None)
@@ -450,34 +453,40 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_salary = sub.add_parser(
         "set-salary-estimate",
-        help="Указать вручную найденную (напр. Glassdoor) вилку ЗП для вакансии без явной ставки",
+        help="Record a pay range found by hand (e.g. on Glassdoor) for a vacancy "
+             "that states no rate",
     )
     p_salary.add_argument("--id", required=True)
     p_salary.add_argument("--low", type=float, required=True)
     p_salary.add_argument("--high", type=float, required=True)
     p_salary.add_argument("--period", choices=["year", "month", "hour"], default="year")
-    p_salary.add_argument("--source", required=True, help="Например: Glassdoor")
+    p_salary.add_argument("--source", required=True, help="For example: Glassdoor")
     p_salary.add_argument("--note", default=None)
     p_salary.set_defaults(func=cmd_set_salary_estimate)
 
     p_rep = sub.add_parser(
         "set-company-reputation",
-        help="Занести репутацию компании из внешних источников (Glassdoor и т.п.)",
+        help="Record company reputation from external sources (Glassdoor etc.)",
     )
-    p_rep.add_argument("--company", required=True, help="Название компании как в базе")
-    p_rep.add_argument("--rating", type=float, default=None, help="Общий рейтинг 1..5")
+    p_rep.add_argument("--company", required=True,
+                       help="Company name as it appears in the database")
+    p_rep.add_argument("--rating", type=float, default=None,
+                       help="Overall rating, 1..5")
     p_rep.add_argument("--wlb", type=float, default=None, help="Work-life balance 1..5")
-    p_rep.add_argument("--source", required=True, help="Первоисточник данных, например: Glassdoor")
+    p_rep.add_argument("--source", required=True,
+                       help="Primary source of the data, for example: Glassdoor")
     p_rep.add_argument(
         "--retrieval",
         choices=["web_search", "direct", "owner"],
         default="web_search",
-        help="КАК получены цифры: web_search — из поисковой выдачи (первоисточник не "
-             "открывался, данные второй руки); direct — страница реально прочитана; "
-             "owner — со слов владельца",
+        help="HOW the numbers were obtained: web_search — from search results "
+             "(the primary source was not opened, so the data is second-hand); "
+             "direct — the page was actually read; owner — the owner said so",
     )
-    p_rep.add_argument("--reviews", type=int, default=None, help="Количество отзывов")
-    p_rep.add_argument("--red-flags", default=None, help="Через запятую: layoffs,toxic,...")
+    p_rep.add_argument("--reviews", type=int, default=None,
+                       help="Number of reviews")
+    p_rep.add_argument("--red-flags", default=None,
+                       help="Comma-separated: layoffs,toxic,...")
     p_rep.add_argument("--notes", default=None)
     p_rep.set_defaults(func=cmd_set_company_reputation)
 

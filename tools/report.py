@@ -1,8 +1,9 @@
 """
-Генератор человекочитаемого Markdown-отчёта по текущей базе знаний.
+Generates the human-readable Markdown report from the current knowledge base.
 
-Отчёт — главный интерфейс для владельца: он должен суметь за 10 минут
-утреннего кофе просмотреть top-вакансии и понять, куда стоит откликнуться.
+The report is the owner's main interface: over ten minutes of morning coffee
+they should be able to look through the top vacancies and decide where to
+apply.
 """
 from __future__ import annotations
 
@@ -17,8 +18,8 @@ import common  # noqa: E402
 import i18n  # noqa: E402
 import kb  # noqa: E402
 
-# Английский текст — исходник, перевод берётся из словаря. Подробности и
-# обоснование выбора «ключ = английская фраза» — в tools/i18n.py.
+# The English text is the source; a translation is looked up in the catalogue.
+# The reasoning behind "the key IS the English phrase" is in tools/i18n.py.
 t = i18n.translate
 
 TOP_N_PER_SECTION = 15
@@ -31,11 +32,11 @@ def _fmt_amount(value: float) -> str:
 
 
 def _fmt_salary_info(vacancy: dict, comp_bd: dict) -> str:
-    """Всегда возвращает строку про ЗП с явным указанием источника —
-    подтверждено владельцем явно (2026-07-30): указана ли зарплата прямо в
-    вакансии, найдена агентом на стороннем сайте (Glassdoor и т.п.), или
-    данных нет вообще — это должно быть видно прямо в отчёте, а не только
-    влиять на score."""
+    """Always returns a pay line that names its source. Confirmed explicitly by
+    the owner (2026-07-30): whether the salary is stated in the vacancy itself,
+    was found by the agent on an external site (Glassdoor and the like), or is
+    absent altogether has to be visible in the report rather than only
+    affecting the score."""
     if comp_bd.get("explicit"):
         raw = vacancy.get("salary_raw")
         if raw:
@@ -71,13 +72,13 @@ def _fmt_salary_info(vacancy: dict, comp_bd: dict) -> str:
 
 
 def _fmt_reputation(rep_bd: dict, classification: str = "") -> str:
-    """Строка про репутацию работодателя. Как и с зарплатой, всегда явно
-    показываем источник и отличаем "нет данных" от "плохо"."""
-    # Три состояния, а не два. Различие введено по прямой просьбе владельца
-    # 2026-08-06 и закрывает настоящую двусмысленность: «не проверялась»
-    # читалось как «данных нет», а означало «мы даже не пытались». Первое —
-    # свойство компании, второе — дефект процесса, и человеку важно, какое
-    # из двух он видит.
+    """The employer-reputation line. As with pay, the source is always named,
+    and "no data" is kept distinct from "bad"."""
+    # Three states rather than two. The distinction was added at the owner's
+    # direct request on 2026-08-06 and closes a genuine ambiguity: "not
+    # checked" read as "no data exists" while it actually meant "we never even
+    # tried". The first is a property of the company, the second a defect in
+    # the process, and which of the two a person is looking at matters.
     if rep_bd.get("verdict") == "insufficient_sources":
         when = (rep_bd.get("checked_at") or "")[:10]
         where = rep_bd.get("searched") or "Glassdoor, Indeed, Trustpilot, web search"
@@ -95,7 +96,8 @@ def _fmt_reputation(rep_bd: dict, classification: str = "") -> str:
                 + t("this is a gap in the process, not a property of the company")
                 + ": `python tools/reputation.py worklist`)_"
             )
-        # В хвосте выдачи проверка не делается сознательно — см. reputation.py.
+        # The tail of the shortlist is deliberately left unchecked — see
+        # reputation.py.
         return (t("not checked") + " _("
                 + t("tail of the shortlist: companies at worth_a_look and above are checked")
                 + ")_")
@@ -106,9 +108,9 @@ def _fmt_reputation(rep_bd: dict, classification: str = "") -> str:
         parts.append(f"{t('work-life balance')} {rep_bd['work_life_balance']}/5")
     text = ", ".join(parts) if parts else t("rating without numbers")
     source = rep_bd.get("source", "?")
-    # Показываем не только ЧТО за источник, но и КАК данные получены:
-    # цифры из поисковой выдачи — это вторая рука, сам первоисточник
-    # (Glassdoor и т.п.) отдаёт 403 скриптам и агентом не открывался.
+    # Show not only WHAT the source was but HOW the data was obtained: numbers
+    # taken from search results are second-hand — the primary source (Glassdoor
+    # and the like) answers 403 to scripts and was never opened by the agent.
     retrieval_note = {
         "web_search": ", " + t("data from search results — the primary source was not opened"),
         "direct": ", " + t("the primary source page was read"),
@@ -124,10 +126,10 @@ _TECH_VOCABULARY_CACHE = {}
 
 
 def _tech_vocabulary() -> dict:
-    """Словарь технологий: каноническое имя -> формы написания.
+    """The technology vocabulary: canonical name -> ways of writing it.
 
-    Общий для всех идентичностей: список того, что бывает в вакансиях, не
-    зависит от того, кто ищет. Лежит в config/tech_vocabulary.yaml.
+    Shared by every identity: the list of what appears in vacancies does not
+    depend on who is searching. It lives in config/tech_vocabulary.yaml.
     """
     if not _TECH_VOCABULARY_CACHE:
         path = common.SHARED_CONFIG_DIR / "tech_vocabulary.yaml"
@@ -137,12 +139,14 @@ def _tech_vocabulary() -> dict:
 
 
 def expected_technologies(vacancy: dict, limit: int = 24) -> list:
-    """Технологии, которых ждут на проекте — включая незнакомые человеку.
+    """The technologies a project expects — including ones the person does not
+    know.
 
-    Отдельно от stack_fit: тот показывает совпадения со стеком конкретного
-    человека, а здесь нужен состав проекта как он есть. Увидеть в отчёте
-    незнакомую технологию не менее полезно, чем знакомую: по ней сразу видно,
-    подходит вакансия или нет, без открытия ссылки.
+    Separate from stack_fit: that shows overlaps with a particular person's
+    stack, whereas what is wanted here is the project's composition as it is.
+    Seeing an unfamiliar technology in the report is no less useful than a
+    familiar one: it tells you straight away whether the vacancy fits, without
+    opening the link.
     """
     haystack = common.normalize_for_matching(chr(10).join([
         vacancy.get("title") or "",
@@ -163,7 +167,7 @@ def expected_technologies(vacancy: dict, limit: int = 24) -> list:
     return found
 
 
-# Страны в тех написаниях, которыми их называют площадки.
+# Countries, spelled the way the job boards spell them.
 _COUNTRY_ALIASES = {
     "usa": "United States", "us": "United States", "u.s.": "United States",
     "united states of america": "United States", "america": "United States",
@@ -178,8 +182,9 @@ _COUNTRY_ALIASES = {
     "czechia": "Czech Republic", "czech republic": "Czech Republic",
 }
 
-# Откуда узнали страну. Константы, а не строки на месте: их СРАВНИВАЮТ, и
-# перевод сравниваемого значения — классический способ тихо сломать логику.
+# How the country was learned. Constants rather than inline strings: these are
+# COMPARED, and translating a compared value is a classic way to break logic
+# silently.
 HIRING_OFFICE = "hiring office"
 COMPANY_HOME = "company home country"
 
@@ -187,10 +192,11 @@ _COUNTRY_INDEX_CACHE = {}
 
 
 def _country_index() -> dict:
-    """Нормализованное название страны -> каноническое.
+    """Normalised country name -> canonical name.
 
-    Список стран берётся из общей таблицы рынков: она и так перечисляет всё,
-    что проекту интересно, и поддерживать второй список незачем.
+    The country list comes from the shared markets table: it already enumerates
+    everything the project cares about, and maintaining a second list would buy
+    nothing.
     """
     if "data" not in _COUNTRY_INDEX_CACHE:
         import markets
@@ -208,20 +214,22 @@ def _country_index() -> dict:
 
 
 def hiring_country(vacancy: dict):
-    """(страна, откуда узнали) — или (None, None).
+    """(country, how it was learned) — or (None, None).
 
-    Нужна СТРАНА НАЙМА, а не родина компании. У международной компании это
-    разные вещи: швейцарский офис Google нанимает в Швейцарии, и человеку
-    важна именно Швейцария — там оформляют договор, оттуда платят, тот
-    часовой пояс. Поэтому порядок источников такой:
+    What is wanted is the HIRING COUNTRY, not where the company was founded.
+    For an international company those differ: Google's Swiss office hires in
+    Switzerland, and Switzerland is what matters to a person — that is where
+    the contract is signed, where the money comes from, which time zone
+    applies. Hence this order of sources:
 
-      1. тег площадки `market:<страна>` — страна, по которой фетчер делал
-         запрос, то есть офис, разместивший вакансию. Это факт, а не догадка;
-      2. последний элемент поля локации ("Barendrecht, South Holland,
+      1. the board tag `market:<country>` — the country the fetcher queried,
+         that is, the office that posted the vacancy. A fact, not a guess;
+      2. the last element of the location field ("Barendrecht, South Holland,
          Netherlands");
-      3. любое упоминание страны в поле локации ("Remote, Israel");
-      4. заголовок "Headquarters:" из описания — уже штаб-квартира, а не
-         офис найма, поэтому идёт последним и помечается явно.
+      3. any mention of a country in the location field ("Remote, Israel");
+      4. a "Headquarters:" heading in the description — that is the head
+         office rather than the hiring one, so it comes last and is labelled
+         explicitly.
     """
     index = _country_index()
 
@@ -293,9 +301,9 @@ def _fmt_vacancy_line(v: dict) -> str:
         f"{t('status')}: `{status}`{highlight_str}",
         f"  - 💰 {t('salary')}: {salary_line}",
     ]
-    # Прямой сайт работодателя, если известен — чтобы можно было найти ту же
-    # вакансию на карьерной странице и откликнуться без аккаунта на
-    # джоб-борде (WWR держит воронку отклика у себя, см. docs/SOURCES.md).
+    # The employer's own site, when known — so the same vacancy can be found on
+    # their careers page and applied to without an account on the job board
+    # (WWR keeps the application funnel to itself, see docs/SOURCES.md).
     company_url = v.get("company_url")
     if company_url:
         lines.append(f"  - 🏢 {t('company site (apply directly)')}: {company_url}")
@@ -309,8 +317,9 @@ def _fmt_vacancy_line(v: dict) -> str:
         suffix = "" if country_source == HIRING_OFFICE else f" _({t(country_source)})_"
         lines.append(f"  - 🌍 {t('hiring country')}: {country}{suffix}")
     else:
-        # Отсутствие страны бывает двух разных видов, и путать их не стоит:
-        # либо вакансия сознательно без географии, либо площадка не сказала.
+        # A missing country comes in two different kinds, worth keeping apart:
+        # either the vacancy is deliberately geography-free, or the board did
+        # not say.
         verdict = (bd.get("remote_location_fit", {})
                    .get("structured_location", {}).get("verdict"))
         location = (v.get("location_raw") or "").strip()
@@ -331,8 +340,9 @@ def _fmt_vacancy_line(v: dict) -> str:
     return "\n".join(lines)
 
 
-# Сколько вакансий национальных рынков показывать. Их сотни; смысл раздела —
-# дать человеку увидеть, что рынок есть, а не пролистать его целиком.
+# How many national-market vacancies to show. There are hundreds; the point of
+# the section is to let a person see that the market exists, not to page
+# through all of it.
 NATIONAL_MARKET_LIMIT = 25
 
 
@@ -347,7 +357,7 @@ def _section(title: str, items: list) -> str:
 
 
 def _rel(path: Optional[Path]) -> str:
-    """Путь относительно корня репозитория — так его удобнее копировать."""
+    """A path relative to the repository root — easier to copy that way."""
     if path is None:
         return "?"
     try:
@@ -363,18 +373,19 @@ _DEFAULT_PHILOSOPHY = (
 
 
 def _scoring_philosophy() -> str:
-    """Объяснение шкалы score — своё у каждой идентичности.
+    """The explanation of the score scale — different for every identity.
 
-    Раньше здесь стояла зашитая строка про «скучную, легаси, хорошо
-    оплачиваемую» вакансию. Она печаталась в отчёт ЛЮБОЙ идентичности, включая
-    ту, что ищет онсайт в стартапе, — то есть общая машинерия навязывала всем
-    философию одного профиля поиска. Артефакт времён, когда профиль был один.
+    This used to be a hard-coded line about a "boring, legacy, well-paid"
+    vacancy. It was printed in the report of EVERY identity, including one
+    looking for onsite work at a startup — that is, shared machinery imposing
+    one search profile's philosophy on everybody. An artefact of the days when
+    there was only one profile.
     """
     try:
         philosophy = ((common.load_profile().get("identity") or {})
                       .get("scoring_philosophy") or "").strip()
         return philosophy or _DEFAULT_PHILOSOPHY
-    except Exception:  # noqa: BLE001 — подпись не должна ронять отчёт
+    except Exception:  # noqa: BLE001 — a caption must not bring the report down
         return _DEFAULT_PHILOSOPHY
 
 
@@ -383,14 +394,15 @@ def _identity_display_name() -> str:
         import identity as identity_mod
 
         return identity_mod.describe(common.ACTIVE_IDENTITY)
-    except Exception:  # noqa: BLE001 - подпись не должна ронять отчёт
+    except Exception:  # noqa: BLE001 - a caption must not bring the report down
         return common.ACTIVE_IDENTITY or t("not determined")
 
 
 def _ambiguous_places_hint(criteria: Optional[dict]) -> str:
-    """Подсказка про неоднозначные топонимы — из настроек активной идентичности,
-    а не захардкоженная. У каждого человека своя ловушка: для одного это
-    Georgia (страна vs штат), для другого Cambridge (UK vs Массачусетс)."""
+    """The hint about ambiguous place names — taken from the active identity's
+    settings rather than hard-coded. Everyone has their own trap: for one
+    person it is Georgia (the country vs the state), for another Cambridge
+    (UK vs Massachusetts)."""
     rules = ((criteria or {}).get("remote_location_fit") or {}).get("ambiguous_place_names") or []
     names = [r.get("name") for r in rules if r.get("name")]
     if not names:
@@ -414,18 +426,17 @@ def _format_link_check_stats(stats: Optional[dict]) -> str:
 
 
 def _source_usefulness(vacancies: dict) -> str:
-    """Сколько вакансий источник принёс и сколько из них дошло до выдачи.
+    """How many records a source brought in, and how many reached the shortlist.
 
-    ЗАЧЕМ. Реестр источников хранит ОБЪЁМ, и по нему источники выглядят
-    совершенно иначе, чем они есть. Замер 2026-08-05: devitjobs дал 4033
-    записи и НОЛЬ в выдаче, а weworkremotely с его 251 записью дал больше
-    половины всех кандидатов. Объём без пользы — это только время прогона и
-    раздутая база.
+    WHY. The source registry stores VOLUME, and by volume the sources look
+    nothing like what they are. Measured 2026-08-05: devitjobs produced 4033
+    records and ZERO in the shortlist, while weworkremotely, with its 251,
+    produced more than half of all candidates. Volume with no yield is only run
+    time and a bloated database.
 
-    Поэтому считаем «выход на 100 записей». Источник с нулём в выдаче не
-    отключается автоматически: у редких источников выдача появляется рывками,
-    и одно решение по одному прогону было бы поспешным. Но цифра должна быть
-    перед глазами.
+    So what is counted is "yield per 100 records". A source with zero yield is
+    not disabled automatically: rare sources deliver in bursts, and deciding on
+    one run would be hasty. But the number has to be in front of you.
     """
     stats = {}
     for v in vacancies.values():
@@ -451,12 +462,14 @@ def _source_usefulness(vacancies: dict) -> str:
 
 
 def _reputation_coverage_block(vacancies: dict, companies: dict) -> str:
-    """Сколько компаний головы выдачи проверено — и кто остался.
+    """How many companies at the head of the shortlist were checked, and who is
+    left.
 
-    Раздел существует потому, что невыполненная работа обязана быть видна.
-    Замер 2026-08-06: в hot_lead и worth_a_look было 55 компаний, репутация
-    была известна у нуля, и отчёт про это молчал — писал у каждой «не
-    проверялась», что читается как свойство компании, а не как пробел.
+    The section exists because work not done has to be visible. Measured
+    2026-08-06: hot_lead and worth_a_look held 55 companies, reputation was
+    known for zero of them, and the report said nothing about it — writing "not
+    checked" against each, which reads as a property of the company rather than
+    as a gap.
     """
     import reputation
 
@@ -490,10 +503,10 @@ def _reputation_coverage_block(vacancies: dict, companies: dict) -> str:
         lines += [
             "",
             "```bash",
-            "python tools/reputation.py worklist          # полный список",
+            "python tools/reputation.py worklist          # the full list",
             "python tools/kb.py set-company-reputation \\",
-            "    --company \"<имя>\" --rating 4.2 --wlb 4.4 --source Glassdoor",
-            "python tools/reputation.py mark-insufficient --company \"<имя>\"",
+            "    --company \"<name>\" --rating 4.2 --wlb 4.4 --source Glassdoor",
+            "python tools/reputation.py mark-insufficient --company \"<name>\"",
             "```",
         ]
     else:
@@ -506,12 +519,12 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     import score
 
     now = datetime.now(timezone.utc)
-    # Тексты отчёта, зависящие от настроек (например подсказка про
-    # неоднозначные топонимы), берутся из активной идентичности.
+    # Report text that depends on settings (the ambiguous-place-names hint, for
+    # one) comes from the active identity.
     if criteria is None:
         try:
             criteria = score.load_criteria()
-        except Exception:  # noqa: BLE001 - отчёт не должен падать из-за подсказки
+        except Exception:  # noqa: BLE001 - a hint must not break the report
             criteria = {}
     live = [v for v in vacancies.values() if not v.get("duplicate_of")]
     dead_link_count = sum(1 for v in live if v.get("link_check", {}).get("status") == "dead")
@@ -526,20 +539,22 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     hot = by_class("hot_lead")
     worth = by_class("worth_a_look")
     long_shot = by_class("long_shot")
-    # Вакансии, у которых единственное возражение — страна в поле локации.
-    # Не в основной выдаче (их сотни, они утопят десяток живых кандидатов),
-    # но и не выброшены: догадка "вакансия в стране N значит для резидентов
-    # N" верна не всегда, а решение писать или не писать — человека, не
-    # системы. Показываем верхушку по score, сгруппированную по стране.
+    # Vacancies whose only objection is the country in the location field. Not
+    # in the main shortlist — there are hundreds and they would drown a dozen
+    # live candidates — but not thrown away either: the guess "a vacancy in
+    # country N is for residents of N" is not always right, and whether to
+    # apply is the person's decision rather than the system's. The top of them
+    # by score is shown, grouped by country.
     national = by_class("national_market")[:NATIONAL_MARKET_LIMIT]
-    # Ручной проверки требуют только те вакансии, судьба которых ещё не решена.
+    # Only vacancies whose fate is still undecided need manual review.
     #
-    # Реальная жалоба человека 2026-08-05: в этой секции лежали Sales Manager,
-    # Business Partner Analyst, Patient Outreach Specialist и Data Entry — все
-    # ОТКЛОНЁННЫЕ. Флаг «нужна проверка» ставится независимо от классификации,
-    # и секция собирала отсеянное вместе с сомнительным. Проверять в
-    # отклонённой вакансии нечего: гейт уже принял решение, а человек тратит
-    # внимание на мусор в единственном месте, куда смотрит.
+    # An actual complaint from the owner, 2026-08-05: this section contained
+    # Sales Manager, Business Partner Analyst, Patient Outreach Specialist and
+    # Data Entry — all of them REJECTED. The "needs review" flag is set
+    # independently of classification, so the section gathered the discarded
+    # along with the doubtful. There is nothing to review in a rejected
+    # vacancy: the gate has already decided, and the person spends attention on
+    # rubbish in the one place they actually look.
     visible = {"hot_lead", "worth_a_look", "long_shot"}
     review_items = [v for v in items
                     if v.get("computed", {}).get("needs_manual_review")
@@ -564,8 +579,8 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     run_stats = state.get("last_run_stats", {})
 
     parts = [
-        # Идентичность в заголовке: отчёт часто открывают отдельной вкладкой или
-        # пересылают, и он обязан себя опознавать без контекста.
+        # The identity goes in the title: a report is often opened in its own
+        # tab or forwarded, and it has to identify itself without context.
         f"# Work IDE [{common.ACTIVE_IDENTITY or '?'}] — {t('report of')} "
         f"{now.strftime('%Y-%m-%d %H:%M UTC')}",
         "",
@@ -625,7 +640,7 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         "",
         f"## 📡 {t('Source health')}",
         "",
-        "\n".join(source_lines) or "_нет данных_",
+        "\n".join(source_lines) or f"_{t('no data')}_",
         "",
         f"## 📈 {t('Source usefulness')}",
         "",
@@ -642,7 +657,7 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         "",
         f"- {t('Accumulated market findings')}: `{_rel(common.INSIGHTS_PATH)}`",
         f"- {t('Full vacancy database')}: `{_rel(common.VACANCIES_PATH)}` "
-        f"(или `python tools/kb.py list --identity {common.ACTIVE_IDENTITY}`)",
+        f"(or `python tools/kb.py list --identity {common.ACTIVE_IDENTITY}`)",
         f"- {t('Archive of past reports')}: `{_rel(common.REPORTS_ARCHIVE_DIR)}`",
         f"- {t('Mark status after applying')}: `python tools/kb.py set-status "
         f"--identity {common.ACTIVE_IDENTITY} --id <id> --status applied --notes \"...\"`",
@@ -652,18 +667,19 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
 
 
 def write_report(markdown_text: str, run_date: Optional[str] = None) -> Path:
-    """Пишет свежий отчёт и кладёт датированную копию в архив.
+    """Writes the latest report and files a dated copy in the archive.
 
-    Раскладка (по прямой просьбе владельца, улучшение для всех пользователей):
-        reports/<prefix>_latest.md        — свежие подборки всех идентичностей
-        reports/archive/<prefix>/<дата>.md — история, разложенная по идентичностям
+    The layout (at the owner's direct request; an improvement for everyone):
+        reports/<prefix>_latest.md          — the latest shortlist of each identity
+        reports/archive/<prefix>/<date>.md  — history, split per identity
 
-    Два отдельных решения, у каждого своя причина:
-      * `reports/` лежит в КОРНЕ репозитория, а не внутри `data/<префикс>/`.
-        Отчёт — единственный файл, который человек открывает руками; искать его
-        в дереве накопленных данных неудобно.
-      * latest отделён от датированных копий. Иначе через пару месяцев работы
-        папка превращается в сотню файлов, среди которых глазами ищут свежий.
+    Two separate decisions, each with its own reason:
+      * `reports/` sits at the repository ROOT rather than inside
+        `data/<prefix>/`. The report is the one file a person opens by hand,
+        and hunting for it in a tree of accumulated data is a nuisance.
+      * latest is kept apart from the dated copies. Otherwise, after a couple
+        of months, the folder becomes a hundred files to search by eye for the
+        newest.
     """
     common.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     common.REPORTS_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
@@ -672,7 +688,8 @@ def write_report(markdown_text: str, run_date: Optional[str] = None) -> Path:
     prefix = common.FILE_PREFIX or ""
 
     latest_path = common.REPORTS_DIR / f"{prefix}latest.md"
-    # В архиве префикс в имени не нужен: папка уже принадлежит идентичности.
+    # No prefix is needed in the archive: the folder already belongs to the
+    # identity.
     archived_path = common.REPORTS_ARCHIVE_DIR / f"{run_date}.md"
 
     latest_path.write_text(markdown_text, encoding="utf-8")

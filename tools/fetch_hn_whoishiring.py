@@ -1,20 +1,20 @@
 """
-Фетчер источника Hacker News "Who is hiring?" — через официальный Algolia HN
-Search API (http://hn.algolia.com/api/v1/), без ключа, без скрейпинга HTML.
+Fetcher for the Hacker News "Who is hiring?" thread, through the official
+Algolia HN Search API (http://hn.algolia.com/api/v1/) — no key, no HTML scraping.
 
-Легаси/enterprise вакансии часто попадают именно в этот тред, а не на обычные
-джоб-борды — стоит внимания, несмотря на шумный формат.
+Legacy and enterprise vacancies often land in this thread rather than on the
+ordinary job boards, so it is worth attention despite the noisy format.
 
-Алгоритм:
-  1. search_by_date с тегами story,author_whoishiring находит самый свежий
-     тред "Ask HN: Who is hiring?" (whoishiring публикует и "who wants to be
-     hired" в тот же день — отфильтровываем по заголовку).
-  2. Для набора ключевых слов стека ищем комментарии внутри этого треда
-     (tags=comment,story_<id>) — это гораздо эффективнее, чем скачивать все
-     сотни комментариев через Firebase API и грепать их по одному.
-  3. Комментарии, как правило, начинают с "Company | Role | Location | ..." —
-     разбираем эту конвенцию best-effort; если не парсится, используем первую
-     строку как заголовок с компанией "Unknown (HN thread)".
+How it works:
+  1. search_by_date with the tags story,author_whoishiring finds the most
+     recent "Ask HN: Who is hiring?" thread (whoishiring also posts "who wants
+     to be hired" the same day — filtered out by title).
+  2. For a set of stack keywords, comments are searched inside that thread
+     (tags=comment,story_<id>) — far more efficient than downloading all its
+     hundreds of comments through the Firebase API and grepping them one by one.
+  3. Comments usually begin "Company | Role | Location | ..." — that convention
+     is parsed best-effort; if it does not parse, the first line becomes the
+     title, with the company "Unknown (HN thread)".
 """
 from __future__ import annotations
 
@@ -29,20 +29,20 @@ SOURCE_NAME = "hn_whoishiring"
 THREAD_SEARCH_URL = "http://hn.algolia.com/api/v1/search_by_date"
 COMMENT_SEARCH_URL = "http://hn.algolia.com/api/v1/search"
 
-# Сколько ключевых слов брать по умолчанию. Это БЮДЖЕТ СТОИМОСТИ, а не
-# ограничение качества: каждое слово — отдельный HTTP-запрос к Algolia (см. цикл
-# ниже). Пять слов = пять запросов на каждый прогон пайплайна.
+# How many keywords to take by default. This is a COST BUDGET rather than a
+# quality limit: every word is a separate HTTP request to Algolia (see the loop
+# below). Five words = five requests per pipeline run.
 DEFAULT_KEYWORD_LIMIT = 5
 DEFAULT_HITS_PER_KEYWORD = 50
 
 
 def _default_keywords() -> list:
-    """Ключевые слова из стека активной идентичности.
+    """Keywords from the active identity's stack.
 
-    Раньше здесь был захардкоженный список стека владельца — единственный
-    фетчер, куда личные данные протекли в слой сбора. Теперь слова берутся из
-    profile.tech_stack.core активной идентичности, а идентичность может задать
-    их явно через params в своём <префикс>_sources.yaml.
+    This used to be a hard-coded list of the owner's stack — the one fetcher
+    into which personal data had leaked down to the collection layer. The words
+    now come from the active identity's profile.tech_stack.core, and an identity
+    can set them explicitly through params in its <prefix>_sources.yaml.
     """
     import score
 
@@ -59,7 +59,7 @@ def fetch(keywords: Optional[list] = None,
 
     keywords = keywords or _default_keywords()
     if not keywords:
-        return [], "нет ключевых слов: у идентичности пуст tech_stack.core"
+        return [], "no keywords: the identity's tech_stack.core is empty"
 
     session = requests.Session()
     session.headers.update({"User-Agent": common.USER_AGENT})

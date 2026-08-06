@@ -1,17 +1,17 @@
 """
-Фетчер jobs.ch — главный швейцарский джоб-борд.
+Fetcher for jobs.ch — Switzerland's main job board.
 
-Почему именно Швейцария заслуживает отдельного источника: для контрактора из
-третьей страны она реалистичнее США. Ставки одни из самых высоких в мире, а
-практика найма зарубежных подрядчиков распространена шире, чем в Штатах, где
-большинство удалённых вакансий требуют резидентства.
+Why Switzerland in particular deserves its own source: for a contractor from a
+third country it is more realistic than the US. The rates are among the
+highest in the world, and hiring foreign contractors is more widespread there
+than in the States, where most remote vacancies demand residency.
 
-Публичный поисковый API их сайта: обычный GET, без ключа и авторизации
-(замер 2026-08-04 — HTTP 200).
+Their site's public search API: an ordinary GET, no key and no authorisation
+(measured 2026-08-04 — HTTP 200).
 
-Оговорка: борд национальный, и подавляющее большинство вакансий там локальные
-и на немецком. Языковой фильтр и гейт удалёнки отсекут почти всё — но
-оставшееся ценно, потому что других источников по Швейцарии у проекта нет.
+A caveat: the board is national, and the overwhelming majority of vacancies on
+it are local and in German. The language filter and the remote gate will cut
+away nearly all of it — but what remains is valuable, because the project has
 """
 from __future__ import annotations
 
@@ -26,8 +26,8 @@ import common  # noqa: E402
 SOURCE_NAME = "jobs_ch"
 API_URL = "https://www.jobs.ch/api/v1/public/search"
 DEFAULT_QUERIES = ["software engineer", "backend developer", ".NET"]
-# Площадка отдаёт ровно 20 записей на страницу и игнорирует параметр rows;
-# объём набирается пагинацией (замер 2026-08-04: num_pages=33 по «developer»).
+# The board returns exactly 20 records per page and ignores the rows parameter;
+# volume comes from pagination (measured 2026-08-04: num_pages=33 for «developer»).
 PAGES_PER_QUERY = 5
 
 
@@ -61,7 +61,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "company": company,
         "url": url,
         "location_raw": location,
-        # Борд национальный: удалёнку определяем по тексту, а не по умолчанию.
+    # The board is national: remoteness is judged from the text, not assumed.
         "remote": None,
         "tags": tags,
         "description_text": common.strip_html(str(item.get("description") or "")),
@@ -89,12 +89,12 @@ def fetch(queries: Optional[List[str]] = None,
                 resp.raise_for_status()
                 payload = resp.json()
             except Exception as exc:  # noqa: BLE001
-                errors.append(f"{query} стр.{page}: {type(exc).__name__}")
+                errors.append(f"{query} page {page}: {type(exc).__name__}")
                 break
 
             items = payload.get("documents") if isinstance(payload, dict) else None
             if not isinstance(items, list):
-                errors.append(f"{query}: в ответе нет списка documents")
+                errors.append(f"{query}: no documents list in the response")
                 break
             if not items:
                 break
@@ -111,7 +111,7 @@ def fetch(queries: Optional[List[str]] = None,
 
     note = []
     if skipped:
-        note.append(f"пропущено {skipped} некорректных")
+        note.append(f"skipped {skipped} malformed")
     if errors:
         note.append("; ".join(errors[:3]))
     return records, ("; ".join(note) or None)
@@ -121,14 +121,14 @@ def main() -> None:
     import argparse
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Сбор вакансий с jobs.ch (Швейцария)")
+    parser = argparse.ArgumentParser(description="Collect vacancies from jobs.ch (Switzerland)")
     identity_mod.add_identity_arg(parser)
     parser.add_argument("--query", action="append")
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
 
     records, note = fetch(args.query)
-    print(f"{SOURCE_NAME}: {len(records)} записей ({note or 'без замечаний'})")
+    print(f"{SOURCE_NAME}: {len(records)} records ({note or 'no remarks'})")
 
 
 if __name__ == "__main__":

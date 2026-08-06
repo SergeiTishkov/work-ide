@@ -1,14 +1,13 @@
 """
-Фетчер источника Arbeitnow (https://www.arbeitnow.com/api/job-board-api).
+Fetcher for the Arbeitnow source (https://www.arbeitnow.com/api/job-board-api).
 
-Публичный JSON API, без ключа. Основной источник — структура стабильная и
-чистая (title, company_name, description, remote, url, tags, job_types,
+A public JSON API, no key. A primary source — the structure is stable and
+clean (title, company_name, description, remote, url, tags, job_types,
 location, created_at).
 
-Функция fetch() никогда не бросает исключение наружу в normal flow пайплайна:
-сетевые/форматные ошибки возвращаются как (records, error) чтобы pipeline.py
-мог залогировать проблему в state.json и продолжить работу с другими
-источниками.
+fetch() never raises out into the pipeline's normal flow: network and format
+errors come back as (records, error) so that pipeline.py can log the problem
+in state.json and carry on with the other sources.
 """
 from __future__ import annotations
 
@@ -24,10 +23,10 @@ API_URL = "https://www.arbeitnow.com/api/job-board-api"
 
 
 def fetch(url: str = API_URL, timeout: int = common.DEFAULT_TIMEOUT):
-    """Возвращает (records: list[dict], error: Optional[str]).
+    """Returns (records: list[dict], error: Optional[str]).
 
-    Каждый record — "сырой нормализованный" словарь в общем промежуточном
-    формате, который затем достраивает tools/normalize.py.
+    Each record is a "raw normalised" dict in the shared intermediate format,
+    which tools/normalize.py then completes.
     """
     import requests
 
@@ -66,7 +65,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
     company = (item.get("company_name") or "").strip()
     url = (item.get("url") or "").strip()
     if not title or not company or not url:
-        return None  # без этих трёх полей запись бесполезна для отчёта
+        return None  # without these three fields the record is useless
 
     return {
         "source": SOURCE_NAME,
@@ -79,7 +78,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "tags": list(item.get("tags") or []) + list(item.get("job_types") or []),
         "description_html": item.get("description") or "",
         "posted_at_epoch": item.get("created_at"),
-        "salary_raw": None,  # arbeitnow редко указывает зарплату отдельным полем
+        "salary_raw": None,  # arbeitnow rarely gives salary as its own field
     }
 
 

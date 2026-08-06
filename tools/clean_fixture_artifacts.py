@@ -1,29 +1,29 @@
 """
-Уборка следов тестовых фикстур из папок реальных данных и отчётов.
+Clearing test-fixture traces out of the real data and report folders.
 
-ЗАЧЕМ ЭТО СУЩЕСТВУЕТ
+WHY THIS EXISTS
 --------------------
-Тесты работают от имени замороженной фикстуры (`ftf`). Если тест забыл
-изолировать пути, он пишет в НАСТОЯЩИЕ `reports/` и `data/` — те самые папки,
-куда человек смотрит. Так в отчётах завелись `ftf_latest.md` и
-`reports/archive/ftf/`, а до них — пустые `aaaa` и `bbbb` от тестов изоляции.
+The tests run under a frozen fixture (`ftf`). If a test forgets to isolate its
+paths, it writes into the REAL `reports/` and `data/` — the very folders a
+person looks at. That is how `ftf_latest.md` and `reports/archive/ftf/` turned
+up among the reports, and before them empty `aaaa` and `bbbb` from isolation tests.
 
-Страховка в `tests/conftest.py` такие записи ОБНАРУЖИВАЕТ и роняет прогон.
-Практика показала, что этого мало: 2026-08-04 страховка честно отработала,
-причину я устранил, а сам файл так и остался лежать — и человек нашёл его
-через сутки. Обнаружение без уборки оставляет мусор ровно там, где он мешает.
+The safety net in `tests/conftest.py` DETECTS such writes and fails the run.
+Practice showed that is not enough: on 2026-08-04 the net did its job, I fixed
+the cause, and the file itself simply stayed there — a person found it a day
+later. Detection without cleanup leaves litter exactly where it gets in the way.
 
-ПРИНЦИП БЕЗОПАСНОСТИ
+THE SAFETY PRINCIPLE
 --------------------
-Модуль удаляет только то, что заведомо является следом фикстуры:
+This module deletes only what is certainly a fixture's trace:
 
-  * префикс должен принадлежать идентичности с `kind: fixture`;
-  * удаляются РОВНО два пути: `reports/<p>_latest.md` и `reports/archive/<p>/`,
-    плюс `data/<p>/`, если он появился;
-  * ничего с другими именами не трогается ни при каких условиях.
+  * the prefix must belong to an identity with `kind: fixture`;
+  * EXACTLY two paths are removed: `reports/<p>_latest.md` and
+    `reports/archive/<p>/`, plus `data/<p>/` if it appeared;
+  * nothing under any other name is touched under any circumstances.
 
-Живые идентичности (`kind: personal`) не удаляются никогда, даже если явно
-передать их префикс: перепутать флаг проще, чем восстановить накопленную базу.
+Live identities (`kind: personal`) are never deleted, even if their prefix is
+passed explicitly: mixing up a flag is easier than restoring an accumulated base.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ import common  # noqa: E402
 
 
 def fixture_prefixes() -> List[str]:
-    """Префиксы всех идентичностей с kind: fixture."""
+    """Prefixes of every identity with kind: fixture."""
     import identity as identity_mod
 
     return [p for p in identity_mod.list_identities(include_fixtures=True)
@@ -45,7 +45,7 @@ def fixture_prefixes() -> List[str]:
 
 
 def artifact_paths(prefix: str) -> List[Path]:
-    """Пути, которые фикстура может создать в реальных папках."""
+    """Paths a fixture may create in the real folders."""
     return [
         common.REPORTS_ROOT / f"{prefix}_latest.md",
         common.REPORTS_ROOT / "archive" / prefix,
@@ -54,19 +54,19 @@ def artifact_paths(prefix: str) -> List[Path]:
 
 
 def clean(prefixes: List[str] = None, dry_run: bool = False) -> List[str]:
-    """Удаляет следы фикстур. Возвращает список того, что убрано."""
+    """Removes fixture traces. Returns a list of what was cleared."""
     import identity as identity_mod
 
     prefixes = prefixes if prefixes is not None else fixture_prefixes()
     removed: List[str] = []
 
     for prefix in prefixes:
-        # Двойная проверка вместо доверия аргументу: удаление данных живой
-        # идентичности необратимо, а опечатка в префиксе — дело одной секунды.
+        # A double check rather than trusting the argument: deleting a live
+        # identity's data is irreversible, and a typo in a prefix takes a second.
         if identity_mod._read_kind(prefix) != "fixture":
             raise ValueError(
-                f"'{prefix}' — не тестовая фикстура (kind != fixture). "
-                "Этот инструмент удаляет только следы фикстур."
+                f"'{prefix}' is not a test fixture (kind != fixture). "
+                "This tool removes fixture traces only."
             )
 
         for path in artifact_paths(prefix):
@@ -86,17 +86,17 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Убрать следы тестовых фикстур из reports/ и data/"
+        description="Clear test-fixture traces out of reports/ and data/"
     )
     parser.add_argument("--dry-run", action="store_true",
-                        help="Показать, что было бы удалено, ничего не трогая")
+                        help="Show what would be deleted, touching nothing")
     args = parser.parse_args()
 
     removed = clean(dry_run=args.dry_run)
     if not removed:
-        print("Следов тестовых фикстур не найдено — чисто.")
+        print("No test-fixture traces found — clean.")
         return
-    verb = "было бы удалено" if args.dry_run else "удалено"
+    verb = "would be deleted" if args.dry_run else "deleted"
     print(f"{verb.capitalize()}:")
     for path in removed:
         print(f"  - {path}")

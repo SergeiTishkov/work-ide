@@ -1,14 +1,14 @@
 """
-Фетчер MyCareersFuture — государственный портал вакансий Сингапура.
+Fetcher for MyCareersFuture — Singapore's government job portal.
 
-Редкий случай: официальный государственный API с чистыми структурными
-данными, без ключа и без анти-бот защиты (замер 2026-08-04: HTTP 200, 919
-результатов по запросу «software engineer»).
+A rare case: an official government API with clean structured data, no key
+and no anti-bot protection (measured 2026-08-04: HTTP 200, 919 results for
+"software engineer").
 
-Сингапур — хаб региона и выраженный импортёр разработки: инженеров не
-хватает, зарубежный найм обычная практика. Собственные коммерческие борды
-(NodeFlair, Glints) отвечают 403, так что этот портал — единственный
-доступный вход на рынок.
+Singapore is the region's hub and a pronounced importer of development work:
+engineers are scarce and hiring from abroad is routine. Its own commercial
+boards (NodeFlair, Glints) answer 403, so this portal is the only available
+way into the market.
 """
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "company": company,
         "url": f"https://www.mycareersfuture.gov.sg/job/{uuid}",
         "location_raw": location,
-        # Портал национальный: удалёнка определяется текстом и тегами.
+        # The portal is national: remoteness comes from the text and the tags.
         "remote": None,
         "tags": tags,
         "description_text": common.strip_html(str(item.get("description") or "")),
@@ -96,12 +96,12 @@ def fetch(queries: Optional[List[str]] = None,
                 resp.raise_for_status()
                 payload = resp.json()
             except Exception as exc:  # noqa: BLE001
-                errors.append(f"{query} стр.{page}: {type(exc).__name__}")
+                errors.append(f"{query} page {page}: {type(exc).__name__}")
                 break
 
             items = payload.get("results") if isinstance(payload, dict) else None
             if not isinstance(items, list):
-                errors.append(f"{query}: в ответе нет списка results")
+                errors.append(f"{query}: no results list in the response")
                 break
             if not items:
                 break
@@ -118,7 +118,7 @@ def fetch(queries: Optional[List[str]] = None,
 
     note = []
     if skipped:
-        note.append(f"пропущено {skipped} некорректных")
+        note.append(f"skipped {skipped} malformed")
     if errors:
         note.append("; ".join(errors[:3]))
     return records, ("; ".join(note) or None)
@@ -128,14 +128,14 @@ def main() -> None:
     import argparse
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Сбор вакансий с MyCareersFuture (Сингапур)")
+    parser = argparse.ArgumentParser(description="Collect vacancies from MyCareersFuture (Singapore)")
     identity_mod.add_identity_arg(parser)
     parser.add_argument("--query", action="append")
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
 
     records, note = fetch(args.query)
-    print(f"{SOURCE_NAME}: {len(records)} записей ({note or 'без замечаний'})")
+    print(f"{SOURCE_NAME}: {len(records)} records ({note or 'no remarks'})")
 
 
 if __name__ == "__main__":

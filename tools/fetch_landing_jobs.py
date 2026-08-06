@@ -1,10 +1,10 @@
 """
-Фетчер Landing.jobs — европейский борд (база в Португалии).
+Fetcher for Landing.jobs — a European board, based in Portugal.
 
-Публичный JSON без ключа (замер 2026-08-04: HTTP 200). Ценность в
-структурных полях, которых нет у большинства источников: явный флаг `remote`,
-вилка `gross_salary_low/high` и признак `relocation_paid` — по последнему
-сразу видно, ждёт ли компания переезда, а не удалённой работы.
+Public JSON, no key (measured 2026-08-04: HTTP 200). Its value lies in
+structured fields most sources lack: an explicit `remote` flag, a
+`gross_salary_low/high` range, and a `relocation_paid` marker — the last of
+which shows at once whether the company expects a move rather than remote work.
 """
 from __future__ import annotations
 
@@ -41,8 +41,8 @@ def _to_common_schema(item: dict) -> Optional[dict]:
     if not title or not url:
         return None
     if not company:
-        # Часть вакансий публикуется анонимно. Компанию можно достать из
-        # ссылки: landing.jobs/at/<company>/<vacancy-slug>.
+        # Some vacancies are posted anonymously. The company can be recovered
+        # from the link: landing.jobs/at/<company>/<vacancy-slug>.
         parts = [p for p in url.split("/") if p]
         company = parts[parts.index("at") + 1] if "at" in parts else ""
     if not company:
@@ -85,7 +85,7 @@ def fetch(url: str = API_URL, timeout: int = common.DEFAULT_TIMEOUT):
 
     items = payload if isinstance(payload, list) else payload.get("jobs")
     if not isinstance(items, list):
-        return [], "ожидался список вакансий"
+        return [], "expected a list of vacancies"
 
     records, skipped = [], 0
     for item in items:
@@ -94,19 +94,19 @@ def fetch(url: str = API_URL, timeout: int = common.DEFAULT_TIMEOUT):
             skipped += 1
             continue
         records.append(rec)
-    return records, (f"пропущено {skipped} некорректных" if skipped else None)
+    return records, (f"skipped {skipped} malformed" if skipped else None)
 
 
 def main() -> None:
     import argparse
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Сбор вакансий с Landing.jobs")
+    parser = argparse.ArgumentParser(description="Collect vacancies from Landing.jobs")
     identity_mod.add_identity_arg(parser)
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
     records, note = fetch()
-    print(f"{SOURCE_NAME}: {len(records)} записей ({note or 'без замечаний'})")
+    print(f"{SOURCE_NAME}: {len(records)} records ({note or 'no remarks'})")
 
 
 if __name__ == "__main__":

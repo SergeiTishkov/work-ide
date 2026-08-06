@@ -1,12 +1,12 @@
 """
-Фетчер WorkingNomads — курируемая подборка удалённых вакансий.
+Fetcher for WorkingNomads — a curated selection of remote vacancies.
 
-Публичный JSON без ключа (замер 2026-08-04: HTTP 200). Площадка remote-only:
-флаг удалёнки от источника достаточен, отдельного подтверждения в тексте не
-требуется (см. docs/SOURCES.md, раздел про remote_only).
+Public JSON, no key (measured 2026-08-04: HTTP 200). The board is remote-only:
+its remote flag is sufficient on its own, with no separate confirmation needed
+in the text (see docs/SOURCES.md, on remote_only).
 
-Формат предельно компактный: title, company_name, location, tags, url,
-description. Именно поэтому фетчер такой короткий — разбирать почти нечего.
+The format is extremely compact: title, company_name, location, tags, url,
+description. Which is why this fetcher is so short — there is little to parse.
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "company": company,
         "url": url,
         "location_raw": str(item.get("location") or "").strip(),
-        "remote": True,          # площадка публикует только удалённые вакансии
+        "remote": True,          # the board publishes remote vacancies only
         "tags": tags,
         "description_text": common.strip_html(str(item.get("description") or "")),
         "posted_at": item.get("pub_date"),
@@ -60,7 +60,7 @@ def fetch(url: str = API_URL, timeout: int = common.DEFAULT_TIMEOUT):
         return [], f"{type(exc).__name__}: {exc}"
 
     if not isinstance(payload, list):
-        return [], f"ожидался список, пришло {type(payload).__name__}"
+        return [], f"expected a list, got {type(payload).__name__}"
 
     records, skipped = [], 0
     for item in payload:
@@ -70,19 +70,19 @@ def fetch(url: str = API_URL, timeout: int = common.DEFAULT_TIMEOUT):
             continue
         records.append(rec)
 
-    return records, (f"пропущено {skipped} некорректных" if skipped else None)
+    return records, (f"skipped {skipped} malformed" if skipped else None)
 
 
 def main() -> None:
     import argparse
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Сбор вакансий с WorkingNomads")
+    parser = argparse.ArgumentParser(description="Collect vacancies from WorkingNomads")
     identity_mod.add_identity_arg(parser)
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
     records, note = fetch()
-    print(f"{SOURCE_NAME}: {len(records)} записей ({note or 'без замечаний'})")
+    print(f"{SOURCE_NAME}: {len(records)} records ({note or 'no remarks'})")
 
 
 if __name__ == "__main__":

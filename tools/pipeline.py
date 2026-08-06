@@ -1,17 +1,17 @@
 """
-Оркестратор исследовательского цикла Work IDE.
+Orchestrates the Work IDE research cycle.
 
-python tools/pipeline.py            -> полный цикл: fetch всех enabled
-                                        источников -> normalize -> merge в
-                                        базу знаний -> rescoring ВСЕЙ базы
-                                        (не только новых записей — так
-                                        улучшения в criteria.yaml применяются
-                                        ретроактивно) -> перестройка
-                                        companies.json -> отчёт.
+python tools/pipeline.py            -> the full cycle: fetch from every enabled
+                                       source -> normalize -> merge into the
+                                       knowledge base -> rescore THE WHOLE base
+                                       (not only new records, so that
+                                       improvements to criteria.yaml apply
+                                       retroactively) -> rebuild companies.json
+                                       -> report.
 
-Никогда не падает целиком из-за одного упавшего источника: каждый источник
-обёрнут в try/except, ошибка попадает в data/state.json и в отчёт, пайплайн
-идёт дальше.
+It never fails wholesale because one source failed: each source is wrapped in
+try/except, the error lands in data/state.json and in the report, and the
+pipeline carries on.
 """
 from __future__ import annotations
 
@@ -68,16 +68,16 @@ FETCHERS = {
 
 
 def _archive_raw_records(source_name: str, raw_records: list) -> None:
-    """Аудиторский след: сырые данные с источника, как они были на момент
-    запуска, до какой-либо нормализации/скоринга. Не критично для работы
-    пайплайна — ошибка записи не должна его останавливать."""
+    """An audit trail: the source's raw data as it was at run time, before any
+    normalisation or scoring. Not critical to the pipeline — a write error must
+    not stop it."""
     if not raw_records:
         return
     try:
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         path = common.RAW_DIR / source_name / f"{date_str}.jsonl"
         common.append_jsonl(path, raw_records)
-    except Exception as exc:  # noqa: BLE001 - аудит необязателен для успеха пайплайна
+    except Exception as exc:  # noqa: BLE001 - the audit trail is optional
         common.eprint(f"[pipeline] failed to archive raw records for '{source_name}': {exc}")
 
 
@@ -86,16 +86,16 @@ def load_sources_config() -> list:
 
 
 def fetch_params(src: dict) -> dict:
-    """Аргументы, которые получит фетчер: эндпоинт из общего каталога плюс
-    параметры идентичности.
+    """The arguments a fetcher will receive: the endpoint from the shared
+    catalogue plus the identity's parameters.
 
-    До разделения конфигов поле `url` в конфигурации источников было мёртвым:
-    каждый фетчер хардкодил свой API_URL, а пайплайн звал `fetch_fn()` вообще
-    без аргументов. Теперь конфигурация действительно управляет запросом.
+    Before the configs were split, the `url` field in source configuration was
+    dead: every fetcher hard-coded its own API_URL, and the pipeline called
+    `fetch_fn()` with no arguments at all. Now configuration really does drive
     """
     params = dict(src.get("params") or {})
-    # url/urls берём из каталога, но только если фетчер их принимает и
-    # идентичность не задала своё значение.
+    # url/urls come from the catalogue, but only if the fetcher accepts them and
+    # the identity did not set its own value.
     for key in ("url", "urls"):
         if key in src and key not in params:
             params[key] = src[key]
@@ -103,12 +103,12 @@ def fetch_params(src: dict) -> dict:
 
 
 def fetch_source_safely(name: str, fetch_fn, params: Optional[dict] = None):
-    """Никогда не бросает исключение — сетевые/парсинговые баги одного
-    источника не должны валить весь исследовательский цикл.
+    """Never raises — network or parsing bugs in one source must not bring down
+    the whole research cycle.
 
-    Неизвестный фетчеру параметр — не повод падать: конфиг мог уйти вперёд кода
-    (или наоборот). Такой параметр отбрасывается с записью в лог, а сбор
-    продолжается тем, что фетчер понимает.
+    A parameter the fetcher does not know is no reason to fail: the config may
+    have moved ahead of the code, or the other way round. Such a parameter is
+    dropped with a log line, and collection continues with what the fetcher does
     """
     params = params or {}
     try:
@@ -117,27 +117,27 @@ def fetch_source_safely(name: str, fetch_fn, params: Optional[dict] = None):
         except TypeError as exc:
             if params and "unexpected keyword argument" in str(exc):
                 common.eprint(
-                    f"[pipeline] источник '{name}' не принимает часть параметров "
-                    f"({exc}); вызываю без них"
+                    f"[pipeline] source '{name}' does not accept some parameters "
+                    f"({exc}); calling without them"
                 )
                 records, note = fetch_fn()
             else:
                 raise
         return records or [], note
-    except Exception as exc:  # noqa: BLE001 - намеренно широкий catch на границе источника
+    except Exception as exc:  # noqa: BLE001 - deliberately broad at a source boundary
         tb = traceback.format_exc(limit=3)
         common.eprint(f"[pipeline] source '{name}' crashed:\n{tb}")
         return [], f"CRASHED: {type(exc).__name__}: {exc}"
 
 
 def rescore_all(vacancies: dict, criteria: dict, profile: dict, companies: Optional[dict] = None) -> None:
-    """Ретроактивный rescoring ВСЕЙ базы — если criteria.yaml/profile.yaml
-    стали умнее со времени прошлого запуска, старые вакансии тоже должны
-    получить актуальную оценку, а не только новые. Используется и полным
-    пайплайном, и tools/ingest_manual.py.
+    """Retroactive rescoring of THE WHOLE base — if criteria.yaml or profile.yaml
+    have grown smarter since the last run, old vacancies must get the current
+    verdict too, not only new ones. Used both by the full pipeline and by
+    tools/ingest_manual.py.
 
-    companies нужен, чтобы прокинуть в скоринг репутацию работодателя —
-    она хранится на уровне компании, а score считается на уровне вакансии."""
+    companies is needed in order to feed employer reputation into scoring — it
+    is stored per company, while score is computed per vacancy."""
     if companies:
         kb.attach_company_reputation(vacancies, companies)
     for v in vacancies.values():
@@ -146,29 +146,29 @@ def rescore_all(vacancies: dict, criteria: dict, profile: dict, companies: Optio
 
 
 def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> str:
-    """Общий хвост цикла: пересчёт компаний, сохранение KB/state, генерация
-    отчёта. Возвращает путь к отчёту."""
+    """The shared tail of the cycle: recompute companies, save KB and state,
+    generate the report. Returns the path to the report."""
     criteria = score.load_criteria()
     profile = score.load_profile()
-    # prev_companies содержит уже накопленную репутацию — передаём её в
-    # скоринг до пересборки companies.json.
+    # prev_companies holds the reputation gathered so far — it is passed into
+    # scoring before companies.json is rebuilt.
     rescore_all(vacancies, criteria, profile, prev_companies)
     kb.mark_duplicates(vacancies)
     link_stats = link_check.check_links(vacancies)
     state["last_link_check"] = link_stats
     companies = kb.build_companies_from_vacancies(vacancies, prev_companies)
 
-    # Обогащение компаний из выдачи фактами из Wikidata (год основания, размер).
+    # Enriching shortlist companies with Wikidata facts (year founded, size).
     #
-    # Раньше этот модуль существовал, был задокументирован и упоминался в
-    # отчёте — но не вызывался ниоткуда. Ревизия 2026-08-04: из 1083 компаний
-    # возраст был известен у 22, и все они попали туда ручными запусками.
-    # Признак "зрелая компания 10+ лет" при этом прямо записан в
-    # ideal_company_traits, то есть система просила то, чего не собирала.
+    # This module used to exist, be documented and be mentioned in the report —
+    # and be called from nowhere. Audit 2026-08-04: of 1083 companies, 22 had a
+    # known age, and all of them got there through manual runs. Meanwhile the
+    # trait "mature company, 10+ years" is written into ideal_company_traits
+    # outright — the system was asking for what it did not collect.
     #
-    # Обогащаем ТОЛЬКО компании из видимой части выдачи: остальные всё равно
-    # отсеяны, а Wikidata не заслуживает сотен запросов впустую. Кэш на 30
-    # дней — по тому же принципу, что и в link_check.
+    # ONLY companies in the visible part of the shortlist are enriched: the rest
+    # are filtered out anyway, and Wikidata does not deserve hundreds of pointless
+    # requests. A 30-day cache, on the same principle as link_check.
     shortlist_companies = {
         v.get("company")
         for v in vacancies.values()
@@ -181,16 +181,16 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
             state["last_company_intel"] = company_intel.enrich_companies(
                 companies, only_names=shortlist_companies, limit=60
             )
-        except Exception as exc:  # noqa: BLE001 — обогащение не должно ронять цикл
+        except Exception as exc:  # noqa: BLE001 — enrichment must not kill the cycle
             state["last_company_intel"] = {"error": f"{type(exc).__name__}: {exc}"}
-        # Пересчёт после обогащения: возраст компании участвует в score.
+        # Rescore after enrichment: company age takes part in the score.
         rescore_all(vacancies, criteria, profile, companies)
 
-    # Репутация компаний головы выдачи — отдельный учёт, потому что собрать её
-    # скриптом нельзя (площадки отвечают 403), а знать, что она не собрана,
-    # система обязана. Список того, что осталось проверить, кладётся в state и
-    # печатается в отчёте: невыполненная работа должна быть видна, а не жить в
-    # чьей-то памяти. Подробно — tools/reputation.py.
+    # Reputation of shortlist companies is tracked separately, because it cannot
+    # be collected by script (the sites answer 403) while the system is obliged
+    # to know that it has not been collected. What remains to check goes into
+    # state and is printed in the report: work not done must be visible rather
+    # than living in somebody's memory. Details in tools/reputation.py.
     state["reputation_coverage"] = reputation.coverage(vacancies, companies)
     state["reputation_worklist"] = [
         item["company"] for item in reputation.worklist(vacancies, companies)
@@ -202,9 +202,9 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
 
     if not (common.KNOWLEDGE_DIR / "insights.md").exists():
         (common.KNOWLEDGE_DIR / "insights.md").write_text(
-            "# Insights — накопленные закономерности о рынке\n\n"
-            "_Этот файл ведётся вручную агентом/владельцем по итогам анализа "
-            "отчётов. Пайплайн его не перезаписывает._\n",
+            "# Insights — accumulated patterns about the market\n\n"
+            "_This file is maintained by hand, by the agent or the owner, from "
+            "the analysis of reports. The pipeline never overwrites it._\n",
             encoding="utf-8",
         )
 
@@ -285,13 +285,13 @@ def run_pipeline(include_manual_placeholder_note: bool = True) -> dict:
 def main() -> None:
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Полный исследовательский цикл Work IDE")
+    parser = argparse.ArgumentParser(description="The full Work IDE research cycle")
     identity_mod.add_identity_arg(parser)
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
 
     result = run_pipeline()
-    print("Пайплайн завершён:")
+    print("Pipeline finished:")
     for k, v in result.items():
         print(f"  {k}: {v}")
 

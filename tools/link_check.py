@@ -1,19 +1,18 @@
 """
-Проверка "живости" ссылок на вакансии.
+Checks whether vacancy links are still alive.
 
-Осознанно консервативный подход (подтверждено владельцем явно, 2026-07-30,
-после того как в отчёте попались нерабочие ссылки): однозначно мёртвыми
-("dead") считаются только 404/410 — единственные статусы, которые сайты
-используют для "этой страницы больше нет" без двусмысленности. Всё
-остальное (таймауты, 403/429/999 от анти-бот защиты, 5xx) помечается как
-"unknown" и НЕ скрывается из отчёта — лучше по ошибке показать сомнительную
-ссылку, чем по ошибке спрятать настоящую вакансию (тот же принцип, что и в
-kb.mark_duplicates).
+A deliberately conservative approach (confirmed explicitly by the owner,
+2026-07-30, after dead links turned up in a report): only 404 and 410 count as
+unambiguously "dead" — they are the only statuses sites use for "this page is
+gone" without ambiguity. Everything else (timeouts, 403/429/999 from anti-bot
+protection, 5xx) is marked "unknown" and is NOT hidden from the report — better
+to show a doubtful link by mistake than to hide a real vacancy by mistake (the
+same principle as in kb.mark_duplicates).
 
-Проверяются не чаще, чем раз в `recheck_after_hours` часов на вакансию —
-чтобы не долбить одни и те же джоб-борды на каждом запуске пайплайна.
-Дубли (`duplicate_of` уже проставлен) не проверяются вовсе — их и так не
-покажут в отчёте, незачем тратить внешний запрос.
+Links are checked no more often than once per `recheck_after_hours` hours per
+vacancy, so as not to hammer the same job boards on every pipeline run.
+Duplicates (`duplicate_of` already set) are not checked at all — they will not
+appear in the report anyway, so an external request would be wasted.
 """
 from __future__ import annotations
 
@@ -53,7 +52,7 @@ def _try_request(session, method: str, url: str, timeout: int):
         else:
             resp = session.get(url, timeout=timeout, allow_redirects=True, stream=True)
         return resp, None
-    except Exception as exc:  # noqa: BLE001 - сеть непредсказуема, никогда не роняем поток
+    except Exception as exc:  # noqa: BLE001 - the network is unpredictable; never fail
         return None, exc
 
 
@@ -85,8 +84,8 @@ def check_links(
     timeout: int = DEFAULT_TIMEOUT,
     recheck_after_hours: int = DEFAULT_RECHECK_AFTER_HOURS,
 ) -> dict:
-    """Мутирует vacancies на месте (добавляет/обновляет `link_check` на
-    каждой проверенной записи). Возвращает статистику прогона."""
+    """Mutates vacancies in place (adding or updating `link_check` on every
+    record checked). Returns statistics for the run."""
     import requests
 
     now = datetime.now(timezone.utc)

@@ -1,8 +1,8 @@
 """
-Приведение "сырых" записей от разных источников к единой канонической схеме
-вакансии. Здесь же живёт вся defensive-валидация: если запись не может быть
-осмысленно нормализована — она отбрасывается (с причиной), а не ломает
-пайплайн.
+Brings "raw" records from different sources to one canonical vacancy schema.
+All the defensive validation lives here too: a record that cannot be
+meaningfully normalised is discarded, with a reason, rather than breaking the
+pipeline.
 """
 from __future__ import annotations
 
@@ -27,10 +27,10 @@ def epoch_to_iso(epoch) -> Optional[str]:
 
 
 def normalize_record(raw: dict) -> Optional[dict]:
-    """raw -> canonical vacancy dict (без полей first_seen/last_seen/computed/
-    manual — те добавляются при слиянии с базой знаний в kb.py).
+    """raw -> canonical vacancy dict (without first_seen/last_seen/computed/
+    manual — those are added when merging into the knowledge base in kb.py).
 
-    Возвращает None, если запись не годится (нет обязательных полей).
+    Returns None if the record will not do (required fields missing).
     """
     if not isinstance(raw, dict):
         return None
@@ -69,9 +69,9 @@ def normalize_record(raw: dict) -> Optional[dict]:
         "title": title,
         "company": company,
         "url": url,
-        # Официальный сайт компании, если источник его отдал. Нужен, чтобы
-        # откликаться напрямую у работодателя, минуя аккаунт на джоб-борде
-        # (актуально для WWR: он держит воронку отклика у себя).
+        # The company's official site, if the source gave one. Needed in order
+        # to apply directly with the employer, bypassing a job-board account
+        # (relevant for WWR: it keeps the application funnel to itself).
         "company_url": str(raw.get("company_url") or "").strip() or None,
         "location_raw": str(raw.get("location_raw") or "").strip(),
         "remote": remote,
@@ -83,7 +83,7 @@ def normalize_record(raw: dict) -> Optional[dict]:
 
 
 def normalize_batch(raw_records: list) -> tuple:
-    """Возвращает (normalized: list[dict], skipped_count: int)."""
+    """Returns (normalized: list[dict], skipped_count: int)."""
     normalized = []
     skipped = 0
     for raw in raw_records or []:

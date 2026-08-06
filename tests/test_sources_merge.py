@@ -136,7 +136,7 @@ def test_fetcher_not_accepting_param_does_not_crash_pipeline(capsys):
     )
     assert records == [{"ok": True}]
     assert err is None
-    assert "не принимает часть параметров" in capsys.readouterr().err
+    assert "does not accept some parameters" in capsys.readouterr().err
 
 
 def test_himalayas_company_survives_a_renamed_api_field():

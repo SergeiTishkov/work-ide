@@ -1,12 +1,12 @@
 """
-Фетчер источника Remotive (https://remotive.com/api/remote-jobs).
+Fetcher for the Remotive source (https://remotive.com/api/remote-jobs).
 
-Публичный JSON API, без ключа, только удалённые вакансии (remote_only).
+A public JSON API, no key, remote vacancies only (remote_only).
 
-Ценность источника: поле `candidate_required_location` — явное, структурное
-гео-ограничение ("Worldwide", "USA Only", "Europe", ...), надёжнее, чем
-угадывание по тексту описания. Прокидываем его в location_raw как есть,
-чтобы score.py применил свою обычную логику restrictive_region_signal.
+The source's value: the `candidate_required_location` field — an explicit,
+structured geography restriction ("Worldwide", "USA Only", "Europe", ...),
+more dependable than guessing from description text. It is passed through into
+location_raw as it is, so score.py applies its usual restrictive_region_signal.
 """
 from __future__ import annotations
 
@@ -70,9 +70,9 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "title": title,
         "company": company,
         "url": url,
-        # Структурное гео-ограничение площадки — важнее и надёжнее текста.
+        # The board's structured geography restriction beats any text.
         "location_raw": (item.get("candidate_required_location") or "").strip(),
-        "remote": True,  # Remotive — remote-only площадка по определению
+        "remote": True,  # Remotive is a remote-only board by definition
         "tags": tags,
         "description_html": item.get("description") or "",
         "posted_at": item.get("publication_date"),
