@@ -100,9 +100,6 @@ DATA_ROOT = Path(os.environ.get("WORK_IDE_DATA_ROOT") or (ROOT / "data"))
 # opens by hand, and hunting for it under data/<prefix>/reports/ is a nuisance.
 # Here the latest shortlist of every identity sits side by side.
 REPORTS_ROOT = Path(os.environ.get("WORK_IDE_REPORTS_ROOT") or (ROOT / "reports"))
-LOCAL_CONSTITUTION_DIR = Path(
-    os.environ.get("WORK_IDE_LOCAL_CONSTITUTION") or (ROOT / "local-constitution")
-)
 
 # --- Identity-level paths (None until activation) -------------------------
 # NOTE: `CONFIG_DIR` is deliberately absent. It used to point at the shared
@@ -196,7 +193,7 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
             "on which identity you happen to keep active."
         )
 
-    profile, _ = resolve_local_fields(prefix, raw_profile)
+    profile = raw_profile
 
     # Scaffolding is not yet an identity. Found for real on a fresh-clone run,
     # 2026-08-04: `identity.py new` plus `pipeline.py` ran to completion and
@@ -274,124 +271,22 @@ def deactivate_identity() -> None:
         hook()
 
 
-LOCAL_SENTINEL = "local"
-
-
-def personal_dir(prefix: str) -> Path:
-    """An identity's personal-files folder in the Local Constitution
-    (outside git)."""
-    return LOCAL_CONSTITUTION_DIR / "personal" / prefix
-
-
-def load_local_overlay(prefix: str) -> dict:
-    """The personal part of a profile: what must not reach the shared repository.
-
-    A missing file is not an error in itself: a profile may not use the `local`
-    sentinel at all. It becomes an error only if the profile does reference it,
-    and then resolve_local_fields() says so.
-    """
-    overlay = {}
-    path = personal_dir(prefix) / f"{prefix}_owner.yaml"
-    if path.exists():
-        overlay = load_yaml(path) or {}
-
-    # The contact has historically lived in its own file — it predates the
-    # general overlay. Left as it is: the Local Constitution's layout is
-    # documented in docs/LOCAL_CONSTITUTION.md, and breaking it for the sake of
-    # uniformity would buy nothing.
-    contact_path = personal_dir(prefix) / f"{prefix}_contact.yaml"
-    if contact_path.exists():
-        contact_cfg = load_yaml(contact_path) or {}
-        value = (contact_cfg.get("user_agent_contact") or "").strip()
-        if value:
-            overlay.setdefault("contact", {}).setdefault("user_agent_contact", value)
-
-    return overlay
-
-
-def _walk_local_sentinels(node, path=""):
-    """Every path to a value equal to `local`, as 'owner.name'."""
-    if isinstance(node, dict):
-        for key, value in node.items():
-            child = f"{path}.{key}" if path else str(key)
-            if isinstance(value, str) and value.strip() == LOCAL_SENTINEL:
-                yield child
-            else:
-                for found in _walk_local_sentinels(value, child):
-                    yield found
-
-
-def _dig(data: dict, dotted: str):
-    node = data
-    for part in dotted.split("."):
-        if not isinstance(node, dict) or part not in node:
-            return None, False
-        node = node[part]
-    return node, True
-
-
-def _plant(data: dict, dotted: str, value) -> None:
-    parts = dotted.split(".")
-    node = data
-    for part in parts[:-1]:
-        node = node.setdefault(part, {})
-    node[parts[-1]] = value
-
-
-def resolve_local_fields(prefix: str, profile: dict):
-    """Merges personal data from the Local Constitution into an identity profile.
-
-    WHY. An identity describes a SEARCH: stack, working arrangement, the marks
-    of a suitable company. A person's name, their LinkedIn, residency, CV and
-    pay expectations are no part of describing a search and must not reach the
-    shared repository — otherwise everyone who clones the project gets the
-    author's personal file.
-
-    The mechanism is not new: the `local` sentinel was already used for the
-    User-Agent contact. Here it is generalised to any profile field — the
-    identity file holds `local`, and the real value lives in
-    `local-constitution/personal/<prefix>/<prefix>_owner.yaml`.
-
-    Returns (profile_with_values_substituted, list_of_what_is_missing). The
-    profile is not mutated: the caller may have their own copy.
-    """
-    import copy
-
-    merged = copy.deepcopy(profile)
-    overlay = load_local_overlay(prefix)
-    missing = []
-
-    for dotted in list(_walk_local_sentinels(profile)):
-        value, found = _dig(overlay, dotted)
-        if found and value not in (None, "", []):
-            _plant(merged, dotted, value)
-        else:
-            missing.append(dotted)
-
-    return merged, missing
-
-
 def load_profile(prefix: Optional[str] = None) -> dict:
-    """The active identity's profile with personal data merged in.
+    """The active identity's resolved profile.
 
-    The single place a profile is read — otherwise some code would see the
-    `local` sentinel instead of the real value and quietly treat it as a
-    string.
+    A profile is ASSEMBLED FROM LAYERS: the template copy supplies the kind of
+    search, the personal file beside it supplies the person's circumstances.
+    Reading a single file will not do — the template has no residency, and the
+    personal file has no stack — so this is the single place a profile is read.
     """
-    import identity as identity_mod
-
     if prefix is None:
         require_identity()
         prefix = ACTIVE_IDENTITY
-    # A profile is ASSEMBLED FROM LAYERS: the template copy supplies the kind of
-    # search, the personal file beside it supplies the person's circumstances.
-    # Reading a single file will not do: the template has no residency, and the
-    # personal file has no stack.
+
     import settings
 
-    raw, _ = settings.resolve("profile", prefix)
-    merged, _ = resolve_local_fields(prefix, raw)
-    return merged
+    profile, _ = settings.resolve("profile", prefix)
+    return profile
 
 
 def _build_user_agent(prefix: str, profile: dict) -> str:
@@ -399,12 +294,11 @@ def _build_user_agent(prefix: str, profile: dict) -> str:
     the project (see the constitution, on politeness towards other people's
     servers).
 
-    The contact arrives already resolved (see resolve_local_fields): the
-    identity file holds `local`, the value lives in the Local Constitution.
+    The contact comes from the identity's own profile, which is outside git, so
+    there is nowhere left to hide it from. An empty value is not an error: the
+    project runs without a contact and doctor warns about it.
     """
     contact = ((profile.get("contact") or {}).get("user_agent_contact") or "").strip()
-    if contact == LOCAL_SENTINEL:
-        contact = ""  # no overlay — run without a contact; doctor will warn
 
     if contact:
         return (
@@ -519,10 +413,10 @@ def load_yaml(path: Path) -> dict:
 def write_yaml(path: Path, data: dict) -> None:
     """Writes human-readable YAML.
 
-    Used only for files the project generates itself (`local-constitution/
-    active.yaml`, for one). Identity configs are edited by a person — rewriting
-    them would erase the comments, and there the comments carry half the
-    meaning.
+    Used only for files the project generates itself (`identity.yaml` inside a
+    local identity, for one). Identity configs are edited by a person —
+    rewriting them would erase the comments, and there the comments carry half
+    the meaning.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:

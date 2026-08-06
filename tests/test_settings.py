@@ -49,7 +49,7 @@ def test_later_layer_wins_and_provenance_says_which(layered):
 
 
 def test_local_layer_beats_identity(layered):
-    """The Local Constitution beats the identity — it is about a specific person."""
+    """The personal layer beats the template — it is about a specific person."""
     defaults, identity, local = layered
     _write(defaults, "thresholds:\n  hot: 60\n")
     _write(identity, "thresholds:\n  hot: 45\n")

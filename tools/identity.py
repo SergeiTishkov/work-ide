@@ -274,13 +274,6 @@ def validate(prefix: str, *, strict_prefix_check: bool = True) -> List[str]:
     return problems
 
 
-# The opening of the message about unfilled PERSONAL fields. Kept as a
-# constant so that tests and calling code can tell "personal data is missing"
-# — a normal stage on someone else's machine — from "the identity is
-# assembled incompletely", which is a defect, without depending on the exact
-# wording.
-LOCAL_FIELDS_MISSING_PREFIX = "personal fields are not filled in"
-
 # A template placeholder: `<something>` in angle brackets. That is exactly how
 # fields awaiting the person's answers are marked.
 PLACEHOLDER_RE = re.compile(r"<[^<>\n]{2,80}>")
@@ -316,20 +309,6 @@ def readiness_problems(prefix: str) -> List[str]:
     import settings
 
     profile, _ = settings.resolve("profile", prefix)
-    profile, missing_local = common.resolve_local_fields(prefix, profile)
-
-    if missing_local:
-        # One line rather than one per field: on a fresh clone there are seven
-        # of them, and seven identical sentences repeating the same path read
-        # as a wall of text instead of a clear task.
-        overlay_path = common.personal_dir(prefix) / f"{prefix}_owner.yaml"
-        problems.append(
-            f"{LOCAL_FIELDS_MISSING_PREFIX} (marked `local`): "
-            + ", ".join(missing_local)
-            + f".\n    They belong in {overlay_path}"
-            + "\n    Scaffold that file with `python tools/identity.py "
-            f"init-local --identity {prefix}`"
-        )
 
     for dotted, why in REQUIRED_PROFILE_FIELDS:
         node = profile
@@ -407,39 +386,6 @@ def validate_all() -> dict:
     return {p: validate(p) for p in list_identities(include_fixtures=True)}
 
 
-# --- Legacy local-constitution support -------------------------------------
-
-def local_constitution_path() -> Path:
-    return common.LOCAL_CONSTITUTION_DIR / "active.yaml"
-
-
-def load_local_constitution() -> dict:
-    """Reads the legacy local-constitution/active.yaml, if one still exists.
-
-    Its absence is not an error: that is the normal state of a machine where
-    onboarding has not been run, and of every machine created after the layer
-    was retired (docs/LOCAL_CONSTITUTION.md)."""
-    path = local_constitution_path()
-    if not path.exists():
-        return {}
-    return common.load_yaml(path) or {}
-
-
-def active_identities() -> List[str]:
-    cfg = load_local_constitution()
-    entries = cfg.get("active_identities") or []
-    result = []
-    for e in entries:
-        prefix = e.get("prefix") if isinstance(e, dict) else e
-        if prefix:
-            result.append(prefix)
-    return result
-
-
-def default_identity() -> Optional[str]:
-    return (load_local_constitution() or {}).get("default_identity")
-
-
 # --- Resolving the active identity ----------------------------------------
 
 def resolve_identity(cli_value: Optional[str] = None) -> str:
@@ -463,12 +409,6 @@ def resolve_identity(cli_value: Optional[str] = None) -> str:
     env_value = os.environ.get("WORK_IDE_IDENTITY")
     if env_value:
         return env_value
-
-    # The retired local-constitution layer may still exist for anyone who has
-    # not migrated; if it names a default explicitly, that is respected.
-    default = default_identity()
-    if default:
-        return default
 
     available = list_identities()
     if len(available) == 1:
@@ -572,18 +512,10 @@ def cmd_list(_args) -> None:
     if not identities:
         print("No identities are set up.")
         return
-    active = set(active_identities())
-    default = default_identity()
     print(f"Identities in {common.IDENTITIES_DIR}:")
     for prefix in identities:
         kind = _read_kind(prefix) or "?"
-        marks = []
-        if prefix in active:
-            marks.append("active")
-        if prefix == default:
-            marks.append("default")
-        mark_str = f"  [{', '.join(marks)}]" if marks else ""
-        print(f"  {prefix:<8} kind={kind:<14} {describe(prefix)}{mark_str}")
+        print(f"  {prefix:<8} kind={kind:<14} {describe(prefix)}")
 
 
 def clone_identity(source: str, prefix: str, full_name: str) -> List[Path]:
@@ -675,7 +607,7 @@ def cmd_clone(args) -> None:
         "non-resident it is total disqualification. A copied rule with the sign\n"
         "the wrong way round silently throws away half the market.\n"
         f"\nData is not copied: '{args.prefix}' starts with an empty database.\n"
-        f"Activate it: python tools/identity.py init-local --identity {args.prefix}"
+        f"Check it: python tools/identity.py validate --identity {args.prefix}"
     )
 
 
@@ -709,225 +641,24 @@ def cmd_new(args) -> None:
         "     geography rules and language filters are DERIVED from the person's\n"
         "     residency and languages via the tables in config/derivation/ — they\n"
         "     are never copied from a neighbouring identity;\n"
-        "  3. register the identity in local-constitution/active.yaml."
+        f"  3. check it: python tools/identity.py validate --identity {prefix}."
     )
 
     # A trap otherwise discovered only through commands that stopped working:
-    # while exactly one identity is active, tools pick it silently. The moment
-    # a second one appears without a default_identity, EVERY call without
-    # --identity starts failing — including the ones that worked for the first
-    # identity for months.
-    already_active = active_identities()
-    if already_active and prefix not in already_active:
-        current_default = default_identity()
+    # while exactly one identity exists, tools pick it silently. The moment a
+    # second one appears, EVERY call without --identity starts refusing —
+    # including the ones that worked for the first identity for months.
+    #
+    # The refusal is deliberate (silently picking the wrong identity is the
+    # failure this whole system prevents), but it should not be a surprise.
+    others = [p for p in list_identities() if p != prefix]
+    if others:
         print(
-            f"\nNOTE: these are already active on this machine: "
-            f"{', '.join(already_active)}.\n"
-            f"Once you add '{prefix}' to active.yaml there will be "
-            f"{len(already_active) + 1} of them."
+            f"\nNOTE: another identity already exists here: {', '.join(others)}.\n"
+            "  From now on a command without --identity will refuse and name both,\n"
+            "  including for the identity that has been working until now.\n"
+            f"  Pass the flag explicitly: --identity {prefix}"
         )
-        if not current_default:
-            print(
-                "  default_identity is currently NOT set. With two active identities\n"
-                "  it becomes mandatory: without it every command that omits\n"
-                "  --identity starts refusing to run — including for the already\n"
-                f"  configured identity '{already_active[0]}'.\n"
-                "  Set default_identity at the same time as you add the entry."
-            )
-        else:
-            print(
-                f"  default_identity is set ('{current_default}') — commands without\n"
-                f"  --identity keep using it. For '{prefix}', pass the flag explicitly."
-            )
-
-
-def init_local_constitution(prefix: Optional[str] = None, note: str = "") -> List[str]:
-    """Sets up the Local Constitution and registers an identity in it.
-
-    THE RETIRED LAYER. Identities now live in `local-identities/`, and this
-    folder is kept for machines that were set up before the change. New
-    installations do not need it (docs/LOCAL_CONSTITUTION.md).
-
-    This used to be the instruction "copy docs/templates/local-constitution
-    with xcopy, then edit active.yaml by hand" — a command that only worked
-    on Windows, plus hand-editing YAML at the exact spot where a mistake is
-    quietest: `default_identity` is mandatory once two identities are active,
-    and without it the commands of the FIRST one break.
-
-    Idempotent: existing files are not overwritten, and registering the same
-    prefix twice damages nothing.
-    """
-    import shutil
-
-    actions: List[str] = []
-    lc = common.LOCAL_CONSTITUTION_DIR
-    template = common.ROOT / "docs" / "templates" / "local-constitution"
-
-    if not lc.exists():
-        lc.mkdir(parents=True)
-        actions.append(f"created folder {lc}")
-
-    if template.is_dir():
-        for src in sorted(template.rglob("*")):
-            if src.is_dir() or src.name == ".gitkeep":
-                continue
-            # active.example.yaml is a sample, not a working file; the real
-            # active.yaml is assembled below from actual data.
-            if src.name == "active.example.yaml":
-                continue
-            dest = lc / src.relative_to(template)
-            if dest.exists():
-                continue
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dest)
-            actions.append(f"copied {dest.relative_to(lc)}")
-
-    if prefix:
-        personal = common.personal_dir(prefix)
-        if not personal.exists():
-            personal.mkdir(parents=True)
-            actions.append(f"created personal-files folder {personal}")
-        actions.extend(_write_owner_skeleton(prefix))
-        actions.extend(_register_identity_locally(prefix, note))
-
-    return actions
-
-
-def _write_owner_skeleton(prefix: str) -> List[str]:
-    """Scaffolds `<p>_owner.yaml` for exactly the fields this identity marks
-    with the `local` sentinel.
-
-    The field list is not universal: every identity has its own. Handing a
-    person a file listing precisely what THEY need is far more useful than
-    sending them off to read a specification and build the structure by hand.
-    """
-    path = common.personal_dir(prefix) / f"{prefix}_owner.yaml"
-    if path.exists():
-        return []
-
-    profile_path = identity_file(prefix, "profile.yaml")
-    if not profile_path.exists():
-        return []
-    profile = common.load_yaml(profile_path) or {}
-    fields = sorted(common._walk_local_sentinels(profile))
-    if not fields:
-        return []
-
-    lines = [
-        f"# The personal part of identity `{prefix}`'s profile. OUTSIDE GIT.",
-        "#",
-        "# This holds what belongs to a PARTICULAR PERSON rather than to a kind",
-        "# of search: name, residency, languages, CV, pay expectations. In the",
-        "# shared repository those places hold `local`.",
-        "#",
-        "# Fill in the values below — the paths match those in the profile.",
-        "# Specification: docs/LOCAL_CONSTITUTION.md",
-        "",
-        "schema_version: 1",
-        "",
-    ]
-    tree: dict = {}
-    for dotted in fields:
-        node = tree
-        parts = dotted.split(".")
-        for part in parts[:-1]:
-            node = node.setdefault(part, {})
-        node[parts[-1]] = None
-
-    def render(node: dict, indent: int = 0):
-        for key, value in node.items():
-            pad = "  " * indent
-            if isinstance(value, dict):
-                lines.append(f"{pad}{key}:")
-                render(value, indent + 1)
-            else:
-                lines.append(f"{pad}{key}:      # fill this in")
-
-    render(tree)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return [f"scaffolded {path.name} ({len(fields)} fields to fill in)"]
-
-
-def _register_identity_locally(prefix: str, note: str = "") -> List[str]:
-    """Appends an identity to active.yaml, preserving what is already there."""
-    import datetime
-
-    actions: List[str] = []
-    path = local_constitution_path()
-    cfg = load_local_constitution() or {}
-    entries = cfg.get("active_identities") or []
-
-    already_registered = any(
-        (e.get("prefix") if isinstance(e, dict) else e) == prefix for e in entries
-    )
-    needs_default = len(entries) > 1 and not cfg.get("default_identity")
-
-    # NOTHING CHANGES — so nothing is written. This is not a micro-optimisation:
-    # the file was written by a person and is full of comments, and rewriting it
-    # through a YAML dumper erases them. It actually happened while this command
-    # was being built, 2026-08-04: a harmless repeat run wiped every line of
-    # documentation inside active.yaml.
-    if already_registered and not needs_default:
-        return [f"'{prefix}' is already registered in active.yaml — file untouched"]
-
-    if already_registered:
-        actions.append(f"'{prefix}' is already registered in active.yaml")
-    else:
-        entries.append({
-            "prefix": prefix,
-            "activated_at": datetime.date.today().isoformat(),
-            "relationship": "owner",
-            "personal_dir": f"personal/{prefix}",
-            "note": note or "",
-        })
-        cfg["active_identities"] = entries
-        actions.append(f"'{prefix}' added to active.yaml")
-
-    cfg.setdefault("schema_version", 1)
-
-    # The key moment this command exists for. While there is one identity, tools
-    # pick it silently. The instant a second appears without a default_identity,
-    # it is the FIRST one's commands that start refusing — the one that had been
-    # working for months. So the default is set exactly when it becomes
-    # mandatory.
-    if len(cfg["active_identities"]) > 1 and not cfg.get("default_identity"):
-        first = cfg["active_identities"][0]
-        cfg["default_identity"] = first.get("prefix") if isinstance(first, dict) else first
-        actions.append(
-            f"set default_identity: {cfg['default_identity']} "
-            "(mandatory with two or more active identities — otherwise commands "
-            "without --identity stop working for the previously configured one)"
-        )
-
-    # The file is rewritten only when there is no way round it, and then a copy
-    # is left beside it: a person's comments cannot survive the rewrite, and
-    # losing somebody else's text silently is not acceptable.
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        backup = path.with_suffix(".yaml.bak")
-        backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
-        actions.append(
-            f"previous version saved as {backup.name} "
-            "(the rewrite erases comments — compare, then delete the copy)"
-        )
-    common.write_yaml(path, cfg)
-    return actions
-
-
-def cmd_init_local(args) -> None:
-    actions = init_local_constitution(args.identity, note=args.note or "")
-    print(f"Local Constitution: {common.LOCAL_CONSTITUTION_DIR}")
-    for a in actions:
-        print(f"  + {a}")
-    if not actions:
-        print("  (everything was already in place — nothing needed changing)")
-    print(
-        "\nWhat next:\n"
-        "  - put your CV in personal/<prefix>/ (under its own name);\n"
-        "  - the personal profile fields (name, residency, languages, pay) go in\n"
-        "    personal/<prefix>/<prefix>_owner.yaml, see docs/LOCAL_CONSTITUTION.md;\n"
-        "  - the folder is not in git and must never get there."
-    )
 
 
 def cmd_validate(args) -> None:
@@ -994,9 +725,8 @@ def scaffold_identity(prefix: str, full_name: str) -> List[Path]:
     six-step manual procedure performed from memory produces that mistake
     sooner or later; a function does not.
 
-    It does NOT touch the Local Constitution: "which identities are active on
-    this machine" is a separate, deliberate decision by a person, and it lives
-    outside git.
+    It creates scaffolding and nothing else: filling it in is a separate,
+    deliberate step taken together with the person (docs/ONBOARDING.md).
     """
     if not PREFIX_RE.match(prefix):
         raise InvalidIdentityError(
@@ -1138,8 +868,6 @@ def cmd_which(args) -> None:
         reason = "named explicitly via --identity"
     elif os.environ.get("WORK_IDE_IDENTITY"):
         reason = "the WORK_IDE_IDENTITY environment variable"
-    elif default_identity():
-        reason = f"default_identity in {local_constitution_path()}"
     else:
         reason = "the only identity present"
     print(f"{describe(prefix)}\n  reason: {reason}")
@@ -1175,15 +903,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_clone.add_argument("--name", required=True,
                          help='Expansion as a phrase, e.g. "KISEL for Germany"')
     p_clone.set_defaults(func=cmd_clone)
-
-    p_init = sub.add_parser(
-        "init-local",
-        help="Set up the Local Constitution and register an identity in it",
-    )
-    p_init.add_argument("--identity", default=None,
-                        help="Prefix to activate on this machine")
-    p_init.add_argument("--note", default=None, help="What you want this identity for")
-    p_init.set_defaults(func=cmd_init_local)
 
     p_val = sub.add_parser("validate",
                            help="Check one identity's structure (or all of them)")

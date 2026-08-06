@@ -12,15 +12,6 @@
 # --- registry of active identities.
 /local-identities/
 
-# --- The retired local layer: which identities were active ON THIS MACHINE,
-# --- plus personal files (CVs, contacts, private notes). Kept ignored for
-# --- machines set up before the split; see docs/LOCAL_CONSTITUTION.md.
-# The leading slash is mandatory: without it the rule matches at ANY depth and
-# also swallows docs/templates/local-constitution/ — the very skeleton a new
-# person should find in their clone (a real bug, found during the audit before
-# publication, 2026-08-04).
-/local-constitution/
-
 # --- Accumulated data: the vacancy base, companies, raw dumps, state.
 # --- Each user has their own; somebody else's vacancies are useless and only
 # --- bloat the repository (~148 MB for the owner). Layout: data/<prefix>/...

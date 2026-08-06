@@ -6,8 +6,9 @@ WHY A TEMPLATE RATHER THAN AN IDENTITY IN GIT
 Identities used to live in git and were two things at once: shared property and
 somebody's personal configuration. Residency, pay expectations and other
 circumstances of a particular person ended up in the shared repository, and
-separating them took a third layer (the Local Constitution) with a `local`
-sentinel — a mechanism where picking the wrong layer was easy.
+separating them took a third layer with a `local` sentinel — a mechanism where
+picking the wrong layer was easy. That layer was retired on 2026-08-06: with
+identities outside git there is nobody left to hide personal fields from.
 
 The split now follows the git boundary:
 

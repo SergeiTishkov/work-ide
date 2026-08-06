@@ -1395,7 +1395,7 @@ def test_data_pipeline_exception_survives_the_title_gate():
 
 # --- Personal market bonus and role penalty (2026-08-05) ---------------------
 
-def test_personal_market_bonus_comes_from_the_local_constitution(monkeypatch):
+def test_personal_market_bonus_comes_from_the_local_identity(monkeypatch):
     """The bonus exists because of one person's circumstances (tax, pension,
     family) rather than the market or the search profile. So its values live
     outside git, and the mechanism must work without them: another person has none."""
@@ -1607,7 +1607,7 @@ def test_engineering_support_role_counts_as_legacy_signal():
 def test_personal_tech_bonus_prefers_one_known_stack_over_another():
     """stack_fit answers «can the person do this at all» and is the same for
     everyone using the identity. How much more one familiar stack is preferred
-    over another is personal experience, so the weights live in the Local Constitution."""
+    over another is personal experience, so the weights live in the local identity."""
     profile = dict(PROFILE)
     profile["personal_tech_bonus"] = {
         "dotnet": {"points": 12, "keywords": ["c#", "asp.net"]},
@@ -1955,9 +1955,10 @@ def test_local_override_can_soften_a_red_flag_and_even_flip_its_sign():
     assert per_flag["late_payment"]["source"] == "catalogue"
 
 
-def test_unfilled_local_sentinel_does_not_break_scoring():
-    """If the Local Constitution said nothing, the `local` sentinel reaches scoring
-    as a string. That is not a weights dict, and falling over on it is not allowed."""
+def test_a_string_where_a_weights_dict_is_expected_does_not_break_scoring():
+    """Configuration can hold a string where scoring expects a dict — a typo, or
+    a leftover from the retired `local` sentinel. Falling over on it is not
+    allowed: one bad key must not take down a run over 11000 vacancies."""
     points, _ = score._score_red_flags(["late payments"],
                                        {"company_red_flag_severity": "local"})
     assert points < 0

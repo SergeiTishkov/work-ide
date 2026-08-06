@@ -244,6 +244,47 @@ file outside git cannot quietly lift a boundary.
 
 ## Rejected approaches
 
+### The Local Constitution: a third layer, retired (2026-08-06)
+
+For a while there were three layers, not two: the constitution, the identity
+(in git) and a "Local Constitution" outside it. The third existed for one reason
+— identities lived in git, so residency, pay expectations and a CV path had to
+be hidden somewhere. The mechanism was a `local` sentinel: the shared file held
+the string `local`, and the real value was merged in from
+`local-constitution/personal/<prefix>/<prefix>_owner.yaml`.
+
+It also held a registry of active identities (`active.yaml`) and a
+`default_identity`.
+
+**Why it went.** When identities themselves moved outside git
+(`local-identities/`), the layer lost its only reason to exist: there is nobody
+left to hide a personal field from in a file that is not published. What
+remained was cost:
+
+  * a whole class of bug where scoring received the string `"local"` where a
+    list or a dict was expected;
+  * a registry that could drift away from what was on disk — the folders cannot;
+  * `default_identity`, whose absence broke the commands of the identity that
+    had been working, not of the new one;
+  * about 200 lines of code and 10 tests serving none of it.
+
+**What replaced what:**
+
+| was | is now |
+|---|---|
+| `personal/<p>/<p>_owner.yaml` | `local-identities/<folder>/<p>_profile.yaml` |
+| `personal/<p>/<p>_contact.yaml` | the same file, under `contact` |
+| `personal/<p>/CV *.pdf` | `local-identities/<folder>/documents/` |
+| `active.yaml` | nothing — the folders are the registry |
+| `default_identity` | nothing — with several identities, `--identity` is required |
+
+**When to revisit.** If identities ever need to go back into git — to be shared
+through a PR, say — the problem returns and so does the need for a mechanism.
+It should not be this one: a sentinel inside a shared file is a value that lies
+about its own type. A separate file with an explicit overlay, or simply keeping
+personal identities out of git, both cost less.
+
+
 ### Fuzzy deduplication of titles (difflib, threshold ~0.92)
 The first version of `kb.mark_duplicates` grouped a company's vacancies and
 collapsed similar titles with `difflib.SequenceMatcher`. On real data that

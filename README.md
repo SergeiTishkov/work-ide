@@ -202,7 +202,6 @@ texts — your own settings sit elsewhere and cannot be lost.
 | [docs/BUILDING_BLOCKS.md](docs/BUILDING_BLOCKS.md) | A catalogue of sources and tools |
 | [docs/OVERRIDES.md](docs/OVERRIDES.md) | What overrides what between layers, and what cannot be overridden |
 | [docs/TECH_MATCHING.md](docs/TECH_MATCHING.md) | How to look for technology names in vacancy text |
-| [docs/LOCAL_CONSTITUTION.md](docs/LOCAL_CONSTITUTION.md) | A retired layer: what to do with the folder from earlier versions |
 | [docs/VACANCY_CHECKLIST.md](docs/VACANCY_CHECKLIST.md) | The mandatory manual check on candidates |
 | [docs/SOURCES.md](docs/SOURCES.md) | The sources, and the boundary of what is allowed when collecting |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Decisions and rejected alternatives |

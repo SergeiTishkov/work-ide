@@ -144,25 +144,6 @@ def test_env_used_when_no_cli(monkeypatch):
     assert identity.resolve_identity() == "fromenv"
 
 
-def test_default_identity_used(monkeypatch, tmp_path):
-    monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
-    lc = tmp_path / "local-constitution"
-    lc.mkdir()
-    (lc / "active.yaml").write_text(
-        "default_identity: chosen\nactive_identities:\n  - prefix: chosen\n  - prefix: other\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
-    assert identity.resolve_identity() == "chosen"
-
-
-# The test "a single entry in active.yaml is chosen silently" was removed
-# 2026-08-05: there is no list of active identities any more. It was replaced
-# by a registry that cannot lie — the folders in local-identities/ themselves.
-# The equivalent behaviour is covered by
-# test_a_single_identity_is_chosen_without_asking below.
-
-
 def test_several_identities_without_a_choice_refuses(monkeypatch, tmp_path):
     """Silently choosing the wrong identity is precisely the failure this whole
     system was built to prevent. Better to refuse and ask.
@@ -171,7 +152,6 @@ def test_several_identities_without_a_choice_refuses(monkeypatch, tmp_path):
     file: a registry can drift away from the disk, folders cannot.
     """
     monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "nonexistent")
     monkeypatch.setattr(identity, "list_identities", lambda *a, **k: ["aaaa", "bbbb"])
 
     with pytest.raises(identity.IdentityError) as exc:
@@ -182,14 +162,12 @@ def test_several_identities_without_a_choice_refuses(monkeypatch, tmp_path):
 def test_a_single_identity_is_chosen_without_asking(monkeypatch, tmp_path):
     """One folder, no question: there is no ambiguity to resolve."""
     monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "nonexistent")
     monkeypatch.setattr(identity, "list_identities", lambda *a, **k: ["only"])
     assert identity.resolve_identity() == "only"
 
 
 def test_no_identity_at_all_refuses_with_onboarding_hint(monkeypatch, tmp_path):
     monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "nonexistent")
 
     monkeypatch.setattr(identity, "list_identities", lambda *a, **k: [])
 
@@ -351,17 +329,6 @@ def test_scaffold_refuses_bad_prefix(sandbox_identities, bad):
         identity.scaffold_identity(bad, "Some Search")
 
 
-def test_scaffold_does_not_touch_the_local_constitution(sandbox_identities, tmp_path, monkeypatch):
-    # Which identities are active is a person's deliberate decision, living
-    # outside git. Creating scaffolding must not activate it silently.
-    lc = tmp_path / "lc"
-    lc.mkdir()
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
-    identity.scaffold_identity("newp", "New Product Search")
-    assert not (lc / "active.yaml").exists()
-    assert identity.active_identities() == []
-
-
 # --- Folder name: prefix plus expansion ------------------------------------
 #
 # The two levels of naming are deliberately different. A folder is seen rarely,
@@ -445,7 +412,6 @@ def test_fresh_scaffold_is_not_ready(sandbox_identities):
 
 def test_activation_refuses_an_unfilled_identity(sandbox_identities, monkeypatch, tmp_path):
     identity.scaffold_identity("newp", "New Product Search")
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "lc")
     with pytest.raises(identity.IdentityNotReadyError) as exc:
         common.activate_identity("newp", data_root=tmp_path / "data")
     assert "not filled in" in str(exc.value)
@@ -479,122 +445,9 @@ def test_shipped_identity_is_complete_except_for_personal_data():
     ready to run immediately, or the gate is tuned too strictly and blocks the
     normal path.
     """
-    problems = identity.readiness_problems("kisel")
-    non_personal = [p for p in problems
-                    if not p.startswith(identity.LOCAL_FIELDS_MISSING_PREFIX)]
-    assert non_personal == [], (
-        "nothing in the shared part of an identity should be left unfilled: "
-        f"{non_personal}"
+    assert identity.readiness_problems("kisel") == [], (
+        "a shipped identity must be ready to run straight away"
     )
-
-
-# --- The personal-data overlay from the Local Constitution -----------------
-
-def test_local_sentinel_is_resolved_from_the_local_constitution(tmp_path, monkeypatch):
-    lc = tmp_path / "lc"
-    (lc / "personal" / "abcd").mkdir(parents=True)
-    (lc / "personal" / "abcd" / "abcd_owner.yaml").write_text(
-        "owner:\n  name: Real Name\n  languages: [English]\n", encoding="utf-8"
-    )
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
-
-    profile = {"owner": {"name": "local", "languages": "local", "role": "Developer"}}
-    merged, missing = common.resolve_local_fields("abcd", profile)
-
-    assert merged["owner"]["name"] == "Real Name"
-    assert merged["owner"]["languages"] == ["English"]
-    assert merged["owner"]["role"] == "Developer", "non-personal fields are untouched"
-    assert missing == []
-    assert profile["owner"]["name"] == "local", "the source profile is not mutated"
-
-
-def test_missing_local_value_is_reported_not_silently_empty(tmp_path, monkeypatch):
-    """Silently substituting emptiness is the worst option: scoring would run
-    against empty languages and produce plausible rubbish."""
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "empty")
-    merged, missing = common.resolve_local_fields("abcd", {"owner": {"name": "local"}})
-    assert missing == ["owner.name"]
-
-
-# --- init-local: setting up the Local Constitution -------------------------
-
-def test_init_local_creates_the_folder_and_registers_the_identity(tmp_path, monkeypatch):
-    lc = tmp_path / "lc"
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
-    identity.init_local_constitution("abcd", note="test search")
-
-    cfg = identity.load_local_constitution()
-    prefixes = [e["prefix"] for e in cfg["active_identities"]]
-    assert prefixes == ["abcd"]
-    assert (lc / "personal" / "abcd").is_dir()
-
-
-def test_init_local_does_not_rewrite_an_unchanged_file(tmp_path, monkeypatch):
-    """active.yaml is written by a person and is full of comments, which a YAML
-    dumper erases. It happened while the command was being built, 2026-08-04:
-    a harmless repeat run wiped every line of documentation inside the file."""
-    lc = tmp_path / "lc"
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
-    identity.init_local_constitution("abcd")
-
-    path = identity.local_constitution_path()
-    handwritten = ("# my comment, which must not be lost\n"
-                   + path.read_text(encoding="utf-8"))
-    path.write_text(handwritten, encoding="utf-8")
-
-    identity.init_local_constitution("abcd")
-    assert path.read_text(encoding="utf-8") == handwritten
-
-
-def test_init_local_sets_default_identity_when_a_second_one_appears(tmp_path, monkeypatch):
-    """Without default_identity, a second identity breaks the FIRST one's
-    commands — the ones that had been working until now."""
-    lc = tmp_path / "lc"
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
-    identity.init_local_constitution("abcd")
-    assert identity.default_identity() is None, \
-        "with one identity no default is needed"
-
-    identity.init_local_constitution("efgh")
-    assert identity.default_identity() == "abcd"
-
-
-def test_init_local_backs_up_before_rewriting(tmp_path, monkeypatch):
-    lc = tmp_path / "lc"
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
-    identity.init_local_constitution("abcd")
-    identity.init_local_constitution("efgh")   # this entry forces a rewrite
-    assert (lc / "active.yaml.bak").exists()
-
-
-def test_init_local_writes_an_owner_skeleton_for_the_local_fields(tmp_path, monkeypatch, sandbox_identities):
-    """Handing a person a file with the fields THEY need is more useful than
-    sending them off to build the structure from a specification."""
-    identity.scaffold_identity("newp", "New Product Search")
-    profile_path = identity.identity_file("newp", "profile.yaml")
-    profile_path.write_text(
-        "identity:\n  kind: personal\nowner:\n  name: local\n  location: local\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "lc")
-
-    identity.init_local_constitution("newp")
-
-    skeleton = common.personal_dir("newp") / "newp_owner.yaml"
-    text = skeleton.read_text(encoding="utf-8")
-    assert "owner:" in text and "name:" in text and "location:" in text
-    assert "OUTSIDE GIT" in text
-
-
-def test_owner_skeleton_never_overwrites_a_filled_file(tmp_path, monkeypatch, sandbox_identities):
-    identity.scaffold_identity("newp", "New Product Search")
-    monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "lc")
-    identity.init_local_constitution("newp")
-
-    skeleton = common.personal_dir("newp") / "newp_owner.yaml"
-    skeleton.write_text("owner:\n  name: Already filled in\n", encoding="utf-8")
-    identity.init_local_constitution("newp")
-    assert "Already filled in" in skeleton.read_text(encoding="utf-8")
 
 
 # --- Cloning an identity ---------------------------------------------------

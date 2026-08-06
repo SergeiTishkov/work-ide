@@ -36,8 +36,10 @@ def test_template_version_matches_changelog(name):
 
 @pytest.mark.parametrize("name", sorted(templates.template_folders()))
 def test_template_has_no_leftover_local_sentinels(name):
-    """The `local` sentinel belongs to the previous architecture. Left in a
-    template, it reaches scoring as the string 'local' instead of a value."""
+    """The `local` sentinel belonged to an architecture retired on 2026-08-06,
+    when identities moved outside git and there was nobody left to hide personal
+    fields from. Left in a template, it reaches scoring as the string 'local'
+    instead of a value, so this guards against reintroducing the pattern."""
     folder = templates.template_dir(name)
     offenders = []
     for path in folder.glob("*.yaml"):

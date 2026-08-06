@@ -384,8 +384,6 @@ history.
   file if anything is about to change.
 - `docs/ONBOARDING.md` — how to create an identity from nothing.
 - `docs/QUESTIONNAIRE.md` — how to run the interview with a person.
-- `docs/LOCAL_CONSTITUTION.md` — the specification of the retired local folder,
-  kept for machines set up before the split into templates and local identities.
 - `docs/BUILDING_BLOCKS.md` — a catalogue of sources and tools with their
   strengths and weaknesses.
 - `docs/ARCHITECTURE.md` — architectural decisions and **rejected

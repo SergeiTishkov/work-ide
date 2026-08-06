@@ -30,8 +30,11 @@ Plus the data: `data/<prefix>/`, the accumulated base, outside git.
 
 An earlier architecture had a third layer, a "Local Constitution", holding a
 registry of active identities and a `local` sentinel in the shared configs. It
-was retired on 2026-08-05 — see `docs/LOCAL_CONSTITUTION.md` for what to do with
-the folder if you have one from an earlier version.
+was retired, and removed entirely on 2026-08-06: with identities outside git
+there is nobody left to hide personal fields from. If you have the folder from
+an earlier version, check that everything you need has moved into your local
+identity and delete it — nothing reads it. The reasoning is in
+`docs/ARCHITECTURE.md`.
 
 ## The template copy inside a local identity
 
@@ -395,6 +398,5 @@ python tools/doctor.py --identity kisel
 - `docs/ONBOARDING.md` — how to create an identity from nothing
 - `docs/QUESTIONNAIRE.md` — how to run the interview
 - `docs/OVERRIDES.md` — what overrides what between the layers
-- `docs/LOCAL_CONSTITUTION.md` — the retired layer, and what to do with it
 - `docs/BUILDING_BLOCKS.md` — a catalogue of sources and tools
 - `identity-templates/README.md` — rules for template authors
