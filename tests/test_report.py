@@ -13,7 +13,7 @@ def test_salary_info_shows_raw_text_when_present():
     comp_bd = {"explicit": True, "hourly_amounts_found": [65.0]}
     text = report._fmt_salary_info(vacancy, comp_bd)
     assert "$65/hour" in text
-    assert "указано в вакансии" in text
+    assert "stated in the vacancy" in text
 
 
 def test_salary_info_falls_back_to_extracted_amounts_when_no_raw_field():
@@ -22,7 +22,7 @@ def test_salary_info_falls_back_to_extracted_amounts_when_no_raw_field():
     text = report._fmt_salary_info(vacancy, comp_bd)
     assert "70,000" in text or "$70,000" in text
     assert "90,000" in text
-    assert "указано в вакансии" in text
+    assert "stated in the vacancy" in text
 
 
 def test_salary_info_shows_external_estimate_with_source():
@@ -39,7 +39,7 @@ def test_salary_info_shows_external_estimate_with_source():
     }
     text = report._fmt_salary_info(vacancy, comp_bd)
     assert "Glassdoor" in text
-    assert "найдено вручную" in text
+    assert "found manually" in text
     assert "average for similar roles" in text
     assert "60,000" in text and "80,000" in text
 
@@ -48,8 +48,8 @@ def test_salary_info_shows_no_data_when_nothing_found():
     vacancy = {}
     comp_bd = {"explicit": False}
     text = report._fmt_salary_info(vacancy, comp_bd)
-    assert "не указана" in text
-    assert "нет данных" in text
+    assert "not stated" in text
+    assert "no data" in text
 
 
 def test_vacancy_line_always_includes_salary_sub_line():
@@ -66,8 +66,8 @@ def test_vacancy_line_always_includes_salary_sub_line():
         },
     }
     line = report._fmt_vacancy_line(vacancy)
-    assert "💰 ЗП:" in line
-    assert "не указана" in line
+    assert "💰 salary:" in line
+    assert "not stated" in line
 
 
 def test_scoring_philosophy_comes_from_the_identity_profile(monkeypatch):
@@ -87,8 +87,10 @@ def test_scoring_philosophy_falls_back_to_a_neutral_line(monkeypatch):
 
     monkeypatch.setattr(common, "load_profile", lambda *a, **k: {"identity": {}})
     text = report._scoring_philosophy()
-    assert "профилю этой идентичности" in text
-    assert "легаси" not in text, "нейтральный дефолт не должен навязывать чужую философию"
+    assert "identity's profile" in text
+    assert "legacy" not in text, (
+        "a neutral default must not impose one profile's philosophy on every identity"
+    )
 
 
 def test_hiring_country_prefers_the_office_that_posted_over_company_hq():
@@ -103,14 +105,14 @@ def test_hiring_country_prefers_the_office_that_posted_over_company_hq():
         "computed": {"score_breakdown": {"remote_location_fit": {
             "header_scope": {"header_lines": ["headquarters: united states"]}}}},
     }
-    assert report.hiring_country(swiss_office) == ("Switzerland", "офис найма")
+    assert report.hiring_country(swiss_office) == ("Switzerland", report.HIRING_OFFICE)
 
 
 def test_hiring_country_trusts_the_market_tag_over_the_location_string():
     """Тег `market:<страна>` записывает фетчер — это страна, по которой он
     делал запрос, то есть факт, а не разбор строки."""
     v = {"tags": ["market:United Kingdom"], "location_raw": "Remote"}
-    assert report.hiring_country(v) == ("United Kingdom", "офис найма")
+    assert report.hiring_country(v) == ("United Kingdom", report.HIRING_OFFICE)
 
 
 def test_hiring_country_falls_back_to_headquarters_and_says_so():
@@ -121,7 +123,7 @@ def test_hiring_country_falls_back_to_headquarters_and_says_so():
         "computed": {"score_breakdown": {"remote_location_fit": {
             "header_scope": {"header_lines": ["headquarters: sweden"]}}}},
     }
-    assert report.hiring_country(v) == ("Sweden", "штаб-квартира компании")
+    assert report.hiring_country(v) == ("Sweden", report.COMPANY_HOME)
 
 
 def test_hiring_country_handles_common_platform_spellings():
@@ -145,7 +147,7 @@ def test_reputation_has_three_states_not_two():
         {"has_data": False, "verdict": "insufficient_sources",
          "checked_at": "2026-08-06T10:00:00+00:00", "searched": "Glassdoor, Indeed"},
         "hot_lead")
-    assert "недостаточно источников" in checked_empty
+    assert "not enough sources" in checked_empty
     assert "2026-08-06" in checked_empty
     assert "Glassdoor, Indeed" in checked_empty
 
@@ -171,6 +173,6 @@ def test_reputation_coverage_block_names_what_is_left():
         "незнакомая": {"name": "Незнакомая"},
     }
     block = report._reputation_coverage_block(vacancies, companies)
-    assert "не проверено: 1" in block
+    assert "not checked: 1" in block
     assert "Незнакомая" in block
     assert "Известная" not in block.split("Осталось проверить")[-1]

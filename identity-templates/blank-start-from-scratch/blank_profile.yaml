@@ -141,3 +141,17 @@ eor_platforms_signal:
   - "Remofirst"
   - "Rippling EOR"
   - "Safeguard Global"
+
+# ==== PREFERENCES: about the person, not about the search ====
+preferences:
+  # Language of the REPORT. Everything else in this repository is English so
+  # that anyone can read it; the report is the one file its owner opens by
+  # hand every morning, and it should speak their language.
+  #
+  # Default is the language the owner talks to the agent in. The agent fills
+  # this in during onboarding without asking a separate question — it already
+  # knows which language the conversation is happening in.
+  #
+  # Two-letter code: en, ru, de, … An unknown code falls back to English
+  # rather than to a half-translated report.
+  language: "en"

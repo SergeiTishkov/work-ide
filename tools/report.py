@@ -14,7 +14,12 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
+import i18n  # noqa: E402
 import kb  # noqa: E402
+
+# Английский текст — исходник, перевод берётся из словаря. Подробности и
+# обоснование выбора «ключ = английская фраза» — в tools/i18n.py.
+t = i18n.translate
 
 TOP_N_PER_SECTION = 15
 
@@ -34,30 +39,35 @@ def _fmt_salary_info(vacancy: dict, comp_bd: dict) -> str:
     if comp_bd.get("explicit"):
         raw = vacancy.get("salary_raw")
         if raw:
-            return f"{raw} _(источник: указано в вакансии)_"
-        period_ru = {"annual_amounts_found": "год", "monthly_amounts_found": "мес", "hourly_amounts_found": "час"}
+            return f"{raw} _({t('source: stated in the vacancy')})_"
+        periods = {"annual_amounts_found": t("year"),
+                   "monthly_amounts_found": t("month"),
+                   "hourly_amounts_found": t("hour")}
         parts = []
-        for key, unit in period_ru.items():
+        for key, unit in periods.items():
             amounts = comp_bd.get(key) or []
             if not amounts:
                 continue
             lo, hi = min(amounts), max(amounts)
             parts.append(f"{_fmt_amount(lo)}/{unit}" if lo == hi else f"{_fmt_amount(lo)}-{_fmt_amount(hi)}/{unit}")
-        text = ", ".join(parts) if parts else "сумма упомянута в описании, но не распознана точно"
-        return f"{text} _(источник: указано в вакансии)_"
+        text = (", ".join(parts) if parts
+                else t("amount mentioned in the description but not parsed reliably"))
+        return f"{text} _({t('source: stated in the vacancy')})_"
 
     estimate = comp_bd.get("external_estimate")
     if estimate:
-        period_ru = {"year": "год", "month": "мес", "hour": "час"}.get(estimate.get("period"), estimate.get("period"))
-        source = estimate.get("source", "неизвестный сторонний источник")
+        period = {"year": t("year"), "month": t("month"),
+                  "hour": t("hour")}.get(estimate.get("period"), estimate.get("period"))
+        source = estimate.get("source", t("unknown third-party source"))
         note = estimate.get("note")
-        note_str = f", заметка: {note}" if note else ""
+        note_str = f", {t('note')}: {note}" if note else ""
         return (
-            f"{_fmt_amount(estimate['low'])}-{_fmt_amount(estimate['high'])}/{period_ru} "
-            f"_(источник: {source}, найдено вручную на стороннем сайте{note_str})_"
+            f"{_fmt_amount(estimate['low'])}-{_fmt_amount(estimate['high'])}/{period} "
+            f"_({t('source')}: {source}, {t('found manually on a third-party site')}{note_str})_"
         )
 
-    return "не указана _(источник: нет данных — ни в вакансии, ни найдено вручную)_"
+    return (t("not stated") + " _("
+            + t("source: no data — neither in the vacancy nor found manually") + ")_")
 
 
 def _fmt_reputation(rep_bd: dict, classification: str = "") -> str:
@@ -70,41 +80,44 @@ def _fmt_reputation(rep_bd: dict, classification: str = "") -> str:
     # из двух он видит.
     if rep_bd.get("verdict") == "insufficient_sources":
         when = (rep_bd.get("checked_at") or "")[:10]
-        where = rep_bd.get("searched") or "Glassdoor, Indeed, Trustpilot, веб-поиск"
-        return (f"проверялась{' ' + when if when else ''}, не определена — "
-                f"недостаточно источников _(искали: {where}; обычно так у "
-                "небольших и малоизвестных компаний)_")
+        where = rep_bd.get("searched") or "Glassdoor, Indeed, Trustpilot, web search"
+        return (f"{t('checked')}{' ' + when if when else ''}, "
+                f"{t('not determined — not enough sources')} "
+                f"_({t('searched')}: {where}; "
+                f"{t('usually the case for small, little-known companies')})_")
 
     if not rep_bd.get("has_data"):
         import reputation
 
         if classification in reputation.REQUIRED_CLASSES:
             return (
-                "❗ ещё не проверялась _(это пробел в процессе, а не свойство "
-                "компании: `python tools/reputation.py worklist`)_"
+                "❗ " + t("not checked yet") + " _("
+                + t("this is a gap in the process, not a property of the company")
+                + ": `python tools/reputation.py worklist`)_"
             )
         # В хвосте выдачи проверка не делается сознательно — см. reputation.py.
-        return ("не проверялась _(хвост выдачи: проверяются компании уровня "
-                "worth_a_look и выше)_")
+        return (t("not checked") + " _("
+                + t("tail of the shortlist: companies at worth_a_look and above are checked")
+                + ")_")
     parts = []
     if rep_bd.get("overall_rating") is not None:
-        parts.append(f"общий {rep_bd['overall_rating']}/5")
+        parts.append(f"{t('overall')} {rep_bd['overall_rating']}/5")
     if rep_bd.get("work_life_balance") is not None:
-        parts.append(f"work-life balance {rep_bd['work_life_balance']}/5")
-    text = ", ".join(parts) if parts else "оценка без цифр"
+        parts.append(f"{t('work-life balance')} {rep_bd['work_life_balance']}/5")
+    text = ", ".join(parts) if parts else t("rating without numbers")
     source = rep_bd.get("source", "?")
     # Показываем не только ЧТО за источник, но и КАК данные получены:
     # цифры из поисковой выдачи — это вторая рука, сам первоисточник
     # (Glassdoor и т.п.) отдаёт 403 скриптам и агентом не открывался.
     retrieval_note = {
-        "web_search": ", данные из поисковой выдачи — первоисточник не открывался",
-        "direct": ", страница первоисточника прочитана",
-        "owner": ", со слов владельца",
+        "web_search": ", " + t("data from search results — the primary source was not opened"),
+        "direct": ", " + t("the primary source page was read"),
+        "owner": ", " + t("as told by the owner"),
     }.get(rep_bd.get("retrieval"), "")
     flags = rep_bd.get("red_flags") or []
-    flag_str = f" ⚠ красные флаги: {', '.join(flags)}" if flags else ""
-    alarming = " 🚨 очень низкий рейтинг" if rep_bd.get("alarming_rating") else ""
-    return f"{text} _(источник: {source}{retrieval_note})_{alarming}{flag_str}"
+    flag_str = f" ⚠ {t('red flags')}: {', '.join(flags)}" if flags else ""
+    alarming = " 🚨 " + t("very low rating") if rep_bd.get("alarming_rating") else ""
+    return f"{text} _({t('source')}: {source}{retrieval_note})_{alarming}{flag_str}"
 
 
 _TECH_VOCABULARY_CACHE = {}
@@ -165,6 +178,11 @@ _COUNTRY_ALIASES = {
     "czechia": "Czech Republic", "czech republic": "Czech Republic",
 }
 
+# Откуда узнали страну. Константы, а не строки на месте: их СРАВНИВАЮТ, и
+# перевод сравниваемого значения — классический способ тихо сломать логику.
+HIRING_OFFICE = "hiring office"
+COMPANY_HOME = "company home country"
+
 _COUNTRY_INDEX_CACHE = {}
 
 
@@ -211,7 +229,7 @@ def hiring_country(vacancy: dict):
         tag = str(tag)
         if tag.startswith("market:"):
             name = index.get(common.normalize_for_matching(tag[7:]), tag[7:])
-            return name, "офис найма"
+            return name, HIRING_OFFICE
 
     location = (vacancy.get("location_raw") or "").strip()
     if location:
@@ -219,11 +237,11 @@ def hiring_country(vacancy: dict):
         if parts:
             direct = index.get(common.normalize_for_matching(parts[-1]))
             if direct:
-                return direct, "офис найма"
+                return direct, HIRING_OFFICE
         normalized = common.normalize_for_matching(location)
         for needle, canonical in index.items():
             if needle and needle in normalized:
-                return canonical, "офис найма"
+                return canonical, HIRING_OFFICE
 
     header = (vacancy.get("computed", {}).get("score_breakdown", {})
               .get("remote_location_fit", {}).get("header_scope", {}))
@@ -232,7 +250,7 @@ def hiring_country(vacancy: dict):
             continue
         for needle, canonical in index.items():
             if needle and needle in line:
-                return canonical, "штаб-квартира компании"
+                return canonical, COMPANY_HOME
 
     return None, None
 
@@ -258,37 +276,38 @@ def _fmt_vacancy_line(v: dict) -> str:
         highlights.append("EOR/contractor: " + ", ".join(rl["eor_or_contractor_hits"][:3]))
     intensity = bd.get("low_intensity_signal", {})
     if intensity.get("positive_hits"):
-        highlights.append("низкая нагрузка: " + ", ".join(intensity["positive_hits"][:4]))
+        highlights.append(t("low intensity") + ": " + ", ".join(intensity["positive_hits"][:4]))
     complexity = bd.get("role_complexity_signal", {})
     if complexity.get("gate_triggered"):
-        highlights.append("⚠ похоже на сложную/R&D роль, не 'простую'")
+        highlights.append("⚠ " + t("looks like a complex/R&D role, not a simple one"))
     if c.get("needs_manual_review"):
-        highlights.append("🔎 требует ручной проверки (см. ниже)")
+        highlights.append("🔎 " + t("needs a manual check (see below)"))
     link_status = v.get("link_check", {}).get("status")
     if link_status == "unknown":
-        highlights.append("🔗 ссылку не удалось однозначно проверить")
+        highlights.append("🔗 " + t("the link could not be verified conclusively"))
 
     highlight_str = f" — _{'; '.join(highlights)}_" if highlights else ""
     salary_line = _fmt_salary_info(v, bd.get("compensation_signal", {}))
     lines = [
-        f"- **[{score}] {title}** @ {company} — [ссылка]({url}) — статус: `{status}`{highlight_str}",
-        f"  - 💰 ЗП: {salary_line}",
+        f"- **[{score}] {title}** @ {company} — [{t('link')}]({url}) — "
+        f"{t('status')}: `{status}`{highlight_str}",
+        f"  - 💰 {t('salary')}: {salary_line}",
     ]
     # Прямой сайт работодателя, если известен — чтобы можно было найти ту же
     # вакансию на карьерной странице и откликнуться без аккаунта на
     # джоб-борде (WWR держит воронку отклика у себя, см. docs/SOURCES.md).
     company_url = v.get("company_url")
     if company_url:
-        lines.append(f"  - 🏢 сайт компании (отклик напрямую): {company_url}")
+        lines.append(f"  - 🏢 {t('company site (apply directly)')}: {company_url}")
     techs = expected_technologies(v)
     if techs:
-        lines.append(f"  - 🧰 технологии: {', '.join(techs)}")
-    lines.append("  - ⭐ репутация: " + _fmt_reputation(
+        lines.append(f"  - 🧰 {t('technologies')}: {', '.join(techs)}")
+    lines.append("  - ⭐ " + t("reputation") + ": " + _fmt_reputation(
         bd.get("company_reputation_signal", {}), c.get("classification", "")))
     country, country_source = hiring_country(v)
     if country:
-        suffix = "" if country_source == "офис найма" else f" _({country_source})_"
-        lines.append(f"  - 🌍 страна найма: {country}{suffix}")
+        suffix = "" if country_source == HIRING_OFFICE else f" _({t(country_source)})_"
+        lines.append(f"  - 🌍 {t('hiring country')}: {country}{suffix}")
     else:
         # Отсутствие страны бывает двух разных видов, и путать их не стоит:
         # либо вакансия сознательно без географии, либо площадка не сказала.
@@ -296,19 +315,19 @@ def _fmt_vacancy_line(v: dict) -> str:
                    .get("structured_location", {}).get("verdict"))
         location = (v.get("location_raw") or "").strip()
         if verdict in ("worldwide", "worldwide_by_continents", "remote_without_country"):
-            lines.append("  - 🌍 страна найма: без привязки к стране")
+            lines.append(f"  - 🌍 {t('hiring country')}: {t('without a country')}")
         else:
-            lines.append("  - 🌍 страна найма: не определена"
-                         + (f" _(площадка указала «{location}»)_" if location else ""))
+            lines.append(f"  - 🌍 {t('hiring country')}: {t('not determined')}"
+                         + (f" _({t('the board said')}: «{location}»)_" if location else ""))
     age_bd = bd.get("company_age_signal", {})
     if age_bd.get("has_data"):
-        emp = f", ~{age_bd['employees']} сотрудников" if age_bd.get("employees") else ""
+        emp = f", ~{age_bd['employees']} {t('employees')}" if age_bd.get("employees") else ""
         lines.append(
-            f"  - 🏛 компания: основана {age_bd['founded_year']} "
-            f"({age_bd['age_years']} лет{emp}) _(Wikidata)_"
+            f"  - 🏛 {t('company')}: {t('founded')} {age_bd['founded_year']} "
+            f"({age_bd['age_years']} {t('years old')}{emp}) _(Wikidata)_"
         )
     if manual.get("notes"):
-        lines.append(f"  - заметка: {manual['notes']}")
+        lines.append(f"  - {t('note')}: {manual['notes']}")
     return "\n".join(lines)
 
 
@@ -319,10 +338,11 @@ NATIONAL_MARKET_LIMIT = 25
 
 def _section(title: str, items: list) -> str:
     if not items:
-        return f"### {title}\n\n_Пока пусто._\n"
+        return f"### {title}\n\n_{t('Empty for now.')}_\n"
     body = "\n".join(_fmt_vacancy_line(v) for v in items[:TOP_N_PER_SECTION])
     extra = len(items) - TOP_N_PER_SECTION
-    footer = f"\n\n_(ещё {extra} записей этого класса не показаны — см. `python tools/kb.py list`)_" if extra > 0 else ""
+    footer = (f"\n\n_({t('and one more')} {extra} — `python tools/kb.py list`)_"
+              if extra > 0 else "")
     return f"### {title} ({len(items)})\n\n{body}{footer}\n"
 
 
@@ -337,8 +357,8 @@ def _rel(path: Optional[Path]) -> str:
 
 
 _DEFAULT_PHILOSOPHY = (
-    "Чем выше score (0-100), тем больше вакансия соответствует профилю этой "
-    "идентичности."
+    "The higher the score (0-100), the closer the vacancy is to this "
+    "identity's profile."
 )
 
 
@@ -364,7 +384,7 @@ def _identity_display_name() -> str:
 
         return identity_mod.describe(common.ACTIVE_IDENTITY)
     except Exception:  # noqa: BLE001 - подпись не должна ронять отчёт
-        return common.ACTIVE_IDENTITY or "не определена"
+        return common.ACTIVE_IDENTITY or t("not determined")
 
 
 def _ambiguous_places_hint(criteria: Optional[dict]) -> str:
@@ -374,19 +394,22 @@ def _ambiguous_places_hint(criteria: Optional[dict]) -> str:
     rules = ((criteria or {}).get("remote_location_fit") or {}).get("ambiguous_place_names") or []
     names = [r.get("name") for r in rules if r.get("name")]
     if not names:
-        return "неоднозначная гео-локация"
+        return t("an ambiguous place name")
     quoted = ", ".join(f'"{n}"' for n in names[:3])
-    return f"неоднозначная гео-локация (например {quoted})"
+    return f"{t('an ambiguous place name')} ({t('for example')} {quoted})"
 
 
 def _format_link_check_stats(stats: Optional[dict]) -> str:
     if not stats:
-        return "_нет данных (первый запуск после добавления проверки ссылок)_"
+        return f"_{t('no data')} ({t('first run after link checking was added')})_"
     return (
-        f"Проверено на этом запуске: {stats.get('checked', 0)} "
-        f"(пропущено — недавно проверенные или дубли: {stats.get('skipped_recent_or_duplicate', 0)}). "
-        f"Живые: {stats.get('ok', 0)}, убраны как мёртвые (404/410): {stats.get('dead', 0)}, "
-        f"не удалось однозначно проверить (не скрыты): {stats.get('unknown', 0)}."
+        f"{t('checked on this run')}: {stats.get('checked', 0)} "
+        f"({t('skipped — recently checked or duplicates')}: "
+        f"{stats.get('skipped_recent_or_duplicate', 0)}). "
+        f"{t('alive')}: {stats.get('ok', 0)}, "
+        f"{t('removed as dead (404/410)')}: {stats.get('dead', 0)}, "
+        f"{t('could not be verified conclusively (kept visible)')}: "
+        f"{stats.get('unknown', 0)}."
     )
 
 
@@ -416,10 +439,11 @@ def _source_usefulness(vacancies: dict) -> str:
             entry["shortlist"] += 1
 
     if not stats:
-        return "_нет данных_"
+        return f"_{t('no data')}_"
 
     rows = sorted(stats.items(), key=lambda kv: -kv[1]["shortlist"])
-    lines = ["| Источник | Записей | В выдаче | На 100 записей |", "|---|---:|---:|---:|"]
+    lines = [f"| {t('Source')} | {t('Records')} | {t('In shortlist')} | "
+             f"{t('Per 100 records')} |", "|---|---:|---:|---:|"]
     for name, s in rows:
         rate = (100.0 * s["shortlist"] / s["total"]) if s["total"] else 0.0
         lines.append(f"| {name} | {s['total']} | {s['shortlist']} | {rate:.1f} |")
@@ -438,29 +462,31 @@ def _reputation_coverage_block(vacancies: dict, companies: dict) -> str:
 
     stats = reputation.coverage(vacancies, companies)
     if not stats["companies"]:
-        return "_В выдаче пока нет компаний уровня hot_lead / worth_a_look._"
+        return f'_{t("The shortlist has no hot_lead / worth_a_look companies yet.")}_'
 
     lines = [
-        f"Компаний в голове выдачи (hot_lead + worth_a_look): **{stats['companies']}**",
+        f"{t('Companies at the head of the shortlist (hot_lead + worth_a_look)')}: "
+        f"**{stats['companies']}**",
         "",
-        f"- репутация найдена: **{stats['found']}**",
-        f"- проверено, достоверных отзывов нет: **{stats['insufficient']}** "
-        "_(обычно небольшие и малоизвестные компании)_",
-        f"- **не проверено: {stats['unchecked']}**",
+        f"- {t('reputation found')}: **{stats['found']}**",
+        f"- {t('checked, no credible reviews exist')}: **{stats['insufficient']}** "
+        f"_({t('usually the case for small, little-known companies')})_",
+        f"- **{t('not checked')}: {stats['unchecked']}**",
     ]
     if stats["unchecked"]:
         todo = reputation.worklist(vacancies, companies, limit=12)
         lines += [
             "",
-            "> ⚠ Непроверенные компании — это пробел в процессе, а не свойство "
-            "компаний. Пока проверка не сделана, отчёт не может отличить "
-            "«отзывов нет» от «мы не смотрели», а для решения это разные вещи.",
+            "> ⚠ " + t("Unchecked companies are a gap in the process, not a property "
+            "of the companies. Until the check is done the report cannot tell "
+            "'no reviews exist' from 'we did not look', and for a decision "
+                       "those are different things."),
             "",
-            "Осталось проверить:",
+            t('Still to check') + ':',
             "",
         ] + [f"- {item['classification']}: {item['company']}" for item in todo]
         if stats["unchecked"] > len(todo):
-            lines.append(f"- _…и ещё {stats['unchecked'] - len(todo)}_")
+            lines.append(f"- _…{t('and one more')} {stats['unchecked'] - len(todo)}_")
         lines += [
             "",
             "```bash",
@@ -471,7 +497,7 @@ def _reputation_coverage_block(vacancies: dict, companies: dict) -> str:
             "```",
         ]
     else:
-        lines += ["", "Пробелов нет: у каждой компании головы выдачи есть результат проверки."]
+        lines += ['', t('No gaps: every company at the head of the shortlist has a result.')]
     return "\n".join(lines)
 
 
@@ -529,8 +555,10 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     for name, info in sorted((state.get("sources") or {}).items()):
         status = "OK" if not info.get("last_error") else f"ERROR: {info['last_error']}"
         source_lines.append(
-            f"- **{name}**: {info.get('fetched_count', 0)} записей на последнем запуске, "
-            f"{status}, подряд неудач: {info.get('consecutive_failures', 0)}"
+            f"- **{name}**: {info.get('fetched_count', 0)} "
+            f"{t('records on the last run')}, "
+            f"{status}, {t('consecutive failures')}: "
+            f"{info.get('consecutive_failures', 0)}"
         )
 
     run_stats = state.get("last_run_stats", {})
@@ -538,81 +566,85 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     parts = [
         # Идентичность в заголовке: отчёт часто открывают отдельной вкладкой или
         # пересылают, и он обязан себя опознавать без контекста.
-        f"# Work IDE [{common.ACTIVE_IDENTITY or '?'}] — отчёт от "
+        f"# Work IDE [{common.ACTIVE_IDENTITY or '?'}] — {t('report of')} "
         f"{now.strftime('%Y-%m-%d %H:%M UTC')}",
         "",
-        f"_Идентичность поиска: {_identity_display_name()}_",
+        f"_{t('Search identity')}: {_identity_display_name()}_",
         "",
-        f"Запуск №{state.get('run_count', '?')}. "
-        f"Показано вакансий: {len(items)} "
-        f"(схлопнуто {duplicate_count} почти-дублей, убрано {dead_link_count} с "
-        f"подтверждённо нерабочей ссылкой — см. `python tools/kb.py stats`). "
-        f"Новых на этом запуске: {run_stats.get('new_vacancies', '?')}. "
-        f"Компаний в базе: {len(companies)}.",
+        f"{t('Run')} #{state.get('run_count', '?')}. "
+        f"{t('Vacancies shown')}: {len(items)} "
+        f"({t('collapsed')} {duplicate_count} {t('near-duplicates')}, "
+        f"{t('removed')} {dead_link_count} "
+        f"{t('with a confirmed dead link')} — `python tools/kb.py stats`). "
+        f"{t('New on this run')}: {run_stats.get('new_vacancies', '?')}. "
+        f"{t('Companies in the database')}: {len(companies)}.",
         "",
-        "## Как читать этот отчёт",
+        f"## {t('How to read this report')}",
         "",
         f"{_scoring_philosophy()} "
-        "`hot_lead` — смотреть в первую очередь. Полная разбивка score по каждой "
-        "вакансии: `python tools/kb.py show --id <id>`.",
+        f"`hot_lead` — {t('look at these first')}. "
+        f"{t('Full score breakdown for any vacancy')}: "
+        "`python tools/kb.py show --id <id>`.",
         "",
-        "## 🔥 Hot leads — смотреть в первую очередь",
+        f"## 🔥 {t('Hot leads — look at these first')}",
         "",
         _section("hot_lead", hot),
-        "## 👀 Worth a look",
+        f"## 👀 {t('Worth a look')}",
         "",
         _section("worth_a_look", worth),
-        "## 🕰️ Long shot (низкий приоритет, но не исключено)",
+        f"## 🕰️ {t('Long shot (low priority, but not impossible)')}",
         "",
         _section("long_shot", long_shot),
-        "## 🌍 Национальные рынки — сильные вакансии, привязанные к стране",
+        f"## 🌍 {t('National markets — strong vacancies tied to a country')}",
         "",
-        "Здесь вакансии, к которым нет НИКАКИХ претензий, кроме одной: "
-        "площадка указала страну. Почти всегда это значит «удалённо, но в "
-        "пределах этой страны» — и тогда мимо. Но не всегда: часть "
-        "работодателей спокойно оформляет контракт B2B с подрядчиком "
-        "снаружи, и по тексту вакансии этого не видно. "
-        f"Показано {len(national)} лучших из {class_counts.get('national_market', 0)}.",
+        t("These vacancies have no objection against them except one: the "
+        "board named a country. Almost always that means remote within that "
+        "country, and then it is a miss. But not always: some employers "
+        "happily sign a B2B contract with a contractor abroad, and the text "
+        "of the vacancy does not show it.") + " " +
+        f"{t('Showing')} {len(national)} {t('best of')} "
+        f"{class_counts.get('national_market', 0)}.",
         "",
         _section("national_market", national),
-        "## 🔎 Требуют ручной проверки агентом/владельцем",
+        f"## 🔎 {t('Needs a manual check by the agent or the owner')}",
         "",
-        "Это вакансии, где автоматика не уверена в оценке — чаще всего "
-        f"{_ambiguous_places_hint(criteria)}, либо непонятно, готова ли компания "
-        "нанять человека из вашей страны. Стоит явно перепроверить через "
-        "веб-поиск и, если нужно, обновить запись через `tools/kb.py`.",
+        t("These are vacancies the automation is unsure about — most often ") +
+        f"{_ambiguous_places_hint(criteria)}, " +
+        t("or it is unclear whether the company will hire someone from your "
+        "country. Worth re-checking with a web search and, if needed, "
+        "updating the record through `tools/kb.py`."),
         "",
         _section("needs_manual_review", review_items),
-        "## ⭐ Проверка репутации компаний",
+        f"## ⭐ {t('Company reputation checks')}",
         "",
         _reputation_coverage_block(vacancies, companies),
         "",
-        "## 📊 Статистика по классам",
+        f"## 📊 {t('Class statistics')}",
         "",
-        "\n".join(f"- {cls}: {n}" for cls, n in sorted(class_counts.items(), key=lambda kv: -kv[1])) or "_нет данных_",
+        "\n".join(f"- {cls}: {n}" for cls, n in sorted(class_counts.items(), key=lambda kv: -kv[1])) or f"_{t('no data')}_",
         "",
-        "## 📡 Здоровье источников",
+        f"## 📡 {t('Source health')}",
         "",
         "\n".join(source_lines) or "_нет данных_",
         "",
-        "## 📈 Польза источников",
+        f"## 📈 {t('Source usefulness')}",
         "",
-        "Объём и польза — разные вещи. Источник, приносящий тысячи записей и "
-        "ноль кандидатов, стоит только времени прогона.",
+        t("Volume and usefulness are different things. A source bringing "
+        "thousands of records and zero candidates costs only run time."),
         "",
         _source_usefulness(vacancies),
         "",
-        "## 🔗 Проверка ссылок",
+        f"## 🔗 {t('Link check')}",
         "",
         _format_link_check_stats(state.get("last_link_check")),
         "",
-        "## Дальше",
+        f"## {t('What next')}",
         "",
-        f"- Накопленные закономерности о рынке: `{_rel(common.INSIGHTS_PATH)}`",
-        f"- Полная база вакансий: `{_rel(common.VACANCIES_PATH)}` "
+        f"- {t('Accumulated market findings')}: `{_rel(common.INSIGHTS_PATH)}`",
+        f"- {t('Full vacancy database')}: `{_rel(common.VACANCIES_PATH)}` "
         f"(или `python tools/kb.py list --identity {common.ACTIVE_IDENTITY}`)",
-        f"- Архив прошлых отчётов: `{_rel(common.REPORTS_ARCHIVE_DIR)}`",
-        "- Отметить статус после отклика: `python tools/kb.py set-status "
+        f"- {t('Archive of past reports')}: `{_rel(common.REPORTS_ARCHIVE_DIR)}`",
+        f"- {t('Mark status after applying')}: `python tools/kb.py set-status "
         f"--identity {common.ACTIVE_IDENTITY} --id <id> --status applied --notes \"...\"`",
         "",
     ]
@@ -651,7 +683,8 @@ def write_report(markdown_text: str, run_date: Optional[str] = None) -> Path:
 def main() -> None:
     import identity as identity_mod
 
-    parser = argparse.ArgumentParser(description="Пересобирает отчёт по текущей базе знаний")
+    parser = argparse.ArgumentParser(
+        description="Rebuild the report from the current knowledge base")
     identity_mod.add_identity_arg(parser)
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
@@ -661,7 +694,7 @@ def main() -> None:
     state = common.load_json(common.STATE_PATH, default={})
     md = build_report_markdown(vacancies, companies, state)
     path = write_report(md)
-    print(f"Отчёт сохранён: {path}")
+    print(f"Report saved: {path}")
 
 
 if __name__ == "__main__":
