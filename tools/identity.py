@@ -1,28 +1,28 @@
 """
-Поисковые идентичности: реестр, валидация, разрешение активной.
+Search identities: registry, validation, resolving the active one.
 
-ЗАЧЕМ ЭТО СУЩЕСТВУЕТ
---------------------
-Проект обслуживает разных людей с разными профилями поиска. Смешение их данных —
-худший из отказов: тихий, невидимый в отчёте, систематически портящий результат.
-Поэтому "какая идентичность активна" — не удобная настройка, а обязательное
-состояние, без которого система отказывается работать (Большая Конституция,
-правило №0).
+WHY THIS EXISTS
+---------------
+The project serves different people with different search profiles. Mixing
+their data is the worst failure available to it: silent, invisible in the
+report, and systematically wrong. So "which identity is active" is not a
+convenience setting but a required state, without which the system refuses
+to work at all (constitution, rule zero).
 
-ЧТО ТАКОЕ ИДЕНТИЧНОСТЬ
-----------------------
-Папка `identities/<префикс>/`, где ВСЕ файлы начинаются с `<префикс>_`. Префикс —
-короткая звучная латинская аббревиатура, осмысленно описывающая суть поиска
-(например `kisel` = Keep It Simple, Easy, Legacy). Единое префиксование —
-не косметика: два файла `notes.md` в разных папках агент однажды перепутает,
-`kisel_notes.md` и `jvst_notes.md` — практически нет.
+WHAT AN IDENTITY IS
+-------------------
+A folder under `local-identities/` in which EVERY file starts with the same
+prefix. The prefix is a short, pronounceable Latin abbreviation that says
+what the search is about (`kisel` = Keep It Simple, Easy, Legacy). Uniform
+prefixing is not cosmetic: an agent will eventually confuse two files named
+`notes.md` in different folders; it will practically never confuse
+`kisel_notes.md` with `jvst_notes.md`.
 
-ГДЕ ЖИВЁТ "КАКАЯ ИДЕНТИЧНОСТЬ МОЯ"
------------------------------------
-В Малой Конституции — `local-constitution/`, которой нет в гите (у каждого
-человека и каждой машины она своя). Её спецификация — в
-`docs/LOCAL_CONSTITUTION.md`, скелет для копирования — в
-`docs/templates/local-constitution/`.
+WHERE "WHICH IDENTITY IS MINE" LIVES
+------------------------------------
+In the folders themselves. There is no registry file listing active
+identities, deliberately: a list can drift away from what is on disk, and
+folders cannot. Templates to clone from live in `identity-templates/`.
 """
 from __future__ import annotations
 
@@ -36,64 +36,67 @@ from typing import List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 
-# Префикс: 3-6 латинских строчных букв/цифр, начинается с буквы.
-# Коротко — чтобы имена файлов оставались читаемыми; строчные — чтобы не
-# зависеть от регистронезависимости файловой системы Windows.
+# Prefix: 3-6 lowercase Latin letters or digits, starting with a letter.
+# Short, so file names stay readable; lowercase, so nothing depends on the
+# case-insensitivity of the Windows file system.
 PREFIX_RE = re.compile(r"^[a-z][a-z0-9]{2,5}$")
 
 PREFIX_RULE_TEXT = (
-    "Префикс идентичности: 3-6 символов, только строчные латинские буквы и цифры, "
-    "первый символ — буква. Должен быть звучным и осмысленно описывать суть поиска "
-    "(например: kisel = Keep It Simple, Easy, Legacy)."
+    "Identity prefix: 3-6 characters, lowercase Latin letters and digits only, "
+    "first character a letter. It should be pronounceable and should describe "
+    "what the search is about (for example: kisel = Keep It Simple, Easy, "
+    "Legacy)."
 )
 
-# Имя папки идентичности: <префикс>-<расшифровка-через-дефис>.
-# Например `kisel-keep-it-simple-easy-legacy`.
+# Identity folder name: <prefix>-<expansion-with-hyphens>, for example
+# `kisel-keep-it-simple-easy-legacy`.
 #
-# ЗАЧЕМ ДВА УРОВНЯ ИМЕНОВАНИЯ. Папку видно в дереве проекта редко, но когда
-# видно — по одному `kisel` невозможно вспомнить, что это за поиск и зачем он
-# заводился. Расшифровка в имени папки отвечает на этот вопрос без открытия
-# файлов. А вот ФАЙЛЫ внутри остаются короткими (`kisel_criteria.yaml`, а не
-# `kisel-keep-it-simple-easy-legacy_criteria.yaml`): их имена встречаются в
-# каждой команде, в выводе grep, во вкладках редактора и в путях внутри
-# отчётов — длинное имя там только мешает читать.
+# WHY TWO LEVELS OF NAMING. A folder is seen rarely, but when it is, `kisel`
+# alone gives no way to remember what that search was or why it was set up.
+# The expansion in the folder name answers that without opening a file.
+#
+# The FILES inside stay short (`kisel_criteria.yaml`, not
+# `kisel-keep-it-simple-easy-legacy_criteria.yaml`): their names appear in
+# every command, in grep output, in editor tabs and in paths inside reports,
+# where a long name only makes reading harder.
 FOLDER_RE = re.compile(r"^([a-z][a-z0-9]{2,5})(-[a-z0-9]+(?:-[a-z0-9]+)*)?$")
 
 FOLDER_RULE_TEXT = (
-    "Имя папки идентичности: <префикс>-<расшифровка через дефис>, только строчные "
-    "латинские буквы, цифры и дефисы (например: kisel-keep-it-simple-easy-legacy). "
-    "Расшифровка объясняет, что это за поиск; файлы внутри остаются короткими и "
-    "начинаются с одного лишь префикса."
+    "Identity folder name: <prefix>-<expansion with hyphens>, lowercase Latin "
+    "letters, digits and hyphens only (for example: "
+    "kisel-keep-it-simple-easy-legacy). The expansion explains what the search "
+    "is; files inside stay short and start with the prefix alone."
 )
 
-# Файлы, без которых идентичность считается неполной. Порядок = порядок проверки.
+# Files without which an identity is incomplete. Order is check order.
 REQUIRED_FILES = (
-    "identity.md",        # человекочитаемое описание: что это, для кого, как работает
-    "profile.yaml",       # кто владелец идентичности и что он ищет
-    "criteria.yaml",      # рубрика скоринга
-    "sources.yaml",       # какие источники включены и с какими параметрами
-    "questionnaire.yaml",  # заполненный вопросник — origin story идентичности
+    "identity.md",        # human-readable: what this is, for whom, how it works
+    "profile.yaml",       # who the identity belongs to and what they seek
+    "criteria.yaml",      # the scoring rubric
+    "sources.yaml",       # which sources are enabled, and with what parameters
+    "questionnaire.yaml",  # the filled-in questionnaire: the identity's origin story
 )
 
-# Папки в identities/, которые идентичностями не являются.
+# Folders that are not identities.
 NON_IDENTITY_DIRS = {"__pycache__"}
 
-# Служебные имена внутри локальной идентичности. Правило единого префикса на
-# них не распространяется: они одинаковы у всех идентичностей и потому не
-# могут быть перепутаны между собой — а именно от этого правило и защищает.
+# Housekeeping names inside a local identity. The single-prefix rule does not
+# apply to them: they are identical across every identity and therefore
+# cannot be confused with one another, which is the only thing that rule
+# protects against.
 KNOWN_SUBDIRS = {
-    "template",    # дословная копия шаблона; не редактируется
-    "documents",   # личные файлы (CV и прочее) под своими именами
+    "template",    # verbatim copy of the template; never edited
+    "documents",   # personal files (CVs and the like) under their own names
     "__pycache__",
 }
 KNOWN_FILES = {
-    "identity.yaml",   # какой шаблон, какая версия
-    "CHANGELOG.md",    # журнал изменений этой идентичности
+    "identity.yaml",   # which template, which version
+    "CHANGELOG.md",    # this identity's change log
 }
 
 
 class IdentityError(RuntimeError):
-    """Базовая ошибка системы идентичностей."""
+    """Base error of the identity system."""
 
 
 class UnknownIdentityError(IdentityError):
@@ -105,25 +108,25 @@ class InvalidIdentityError(IdentityError):
 
 
 class IdentityNotReadyError(IdentityError):
-    """Идентичность структурно цела, но ещё не заполнена ответами человека.
+    """Structurally complete, but not yet filled in with the person's answers.
 
-    Отдельный класс, а не InvalidIdentityError: это не поломка, а нормальная
-    стадия онбординга, и сообщение о ней должно звучать иначе — «осталось
-    заполнить вот это», а не «что-то сломано».
+    A separate class rather than InvalidIdentityError: this is not damage but
+    a normal stage of onboarding, and it should read as "here is what is left
+    to fill in" rather than "something is broken".
     """
 
 
-# --- Реестр ---------------------------------------------------------------
+# --- Registry -------------------------------------------------------------
 
 def folder_prefix(folder_name: str) -> Optional[str]:
-    """'kisel-keep-it-simple-easy-legacy' -> 'kisel'. None, если имя не подходит."""
+    """'kisel-keep-it-simple-easy-legacy' -> 'kisel'. None if the name does not fit."""
     m = FOLDER_RE.match(folder_name)
     return m.group(1) if m else None
 
 
 def identity_folders() -> dict:
-    """Отображение префикс -> папка. Единственное место, которое знает, что
-    имя папки длиннее префикса; всё остальное работает с префиксами."""
+    """Prefix -> folder. The only place that knows a folder name is longer than
+    a prefix; everything else works with prefixes."""
     result = {}
     roots = [common.IDENTITIES_DIR, common.FIXTURES_DIR]
     for root in roots:
@@ -134,23 +137,23 @@ def identity_folders() -> dict:
                 continue
             prefix = folder_prefix(path.name)
             if prefix is None:
-                continue  # мусор в папке — про него скажет validate_layout()
+                continue  # stray content: validate_layout() will report it
             if prefix in result:
-                # Две папки с одним префиксом — неразрешимая неоднозначность:
-                # какая из них "та самая", определить нечем, а тихий выбор
-                # одной из двух даст перемешанные данные.
+                # Two folders with one prefix is an unresolvable ambiguity:
+                # nothing can say which is "the" one, and silently picking
+                # either would mix the two sets of data.
                 raise InvalidIdentityError(
-                    f"две папки с префиксом '{prefix}': {result[prefix].name} "
-                    f"и {path.name}. Префикс обязан быть уникальным — "
-                    "переименуйте одну из папок."
+                    f"two folders share the prefix '{prefix}': "
+                    f"{result[prefix].name} and {path.name}. A prefix must be "
+                    "unique — rename one of them."
                 )
             result[prefix] = path
     return result
 
 
 def list_identities(include_fixtures: bool = False) -> List[str]:
-    """Префиксы всех идентичностей репозитория. Папки, начинающиеся с "_"
-    (например `_template`), идентичностями не считаются — это заготовки."""
+    """Prefixes of every identity found. Folders starting with "_" are not
+    identities — they are scaffolding."""
     found = []
     for prefix in identity_folders():
         if not include_fixtures and _read_kind(prefix) == "fixture":
@@ -160,26 +163,27 @@ def list_identities(include_fixtures: bool = False) -> List[str]:
 
 
 def identity_dir(prefix: str) -> Path:
-    """Папка идентичности по префиксу.
+    """An identity's folder, by prefix.
 
-    Если папки ещё нет (её только собираются создать) — возвращается путь вида
-    `identities/<префикс>`, без расшифровки: имя с расшифровкой знает только
-    тот, кто создаёт идентичность, и передаёт его явно.
+    If the folder does not exist yet — it is about to be created — the path
+    comes back without an expansion: only whoever creates the identity knows
+    the expanded name, and they pass it explicitly.
     """
     folder = identity_folders().get(prefix)
     return folder if folder is not None else common.IDENTITIES_DIR / prefix
 
 
 def identity_file(prefix: str, name: str) -> Path:
-    """Путь к документу идентичности для ЧТЕНИЯ.
+    """Path to an identity document, for READING.
 
-    Файл может лежать в двух местах: в корне папки (личные настройки) или в
-    `template/` (дословная копия шаблона, снятая при клонировании). Для чтения
-    берётся личный, если он есть, иначе шаблонный — так работает код, которому
-    нужен один файл целиком (проверки, готовность, отчёт о раскладке).
+    A document may sit in two places: at the folder root (personal settings)
+    or in `template/` (the verbatim copy taken at clone time). Reading
+    prefers the personal one and falls back to the template — which is what
+    code needing a whole single file expects (validation, readiness, layout
+    reporting).
 
-    Полное послойное значение даёт settings.resolve(): личный файл содержит
-    только отличия, и читать его как весь профиль нельзя.
+    The fully layered value comes from settings.resolve(): the personal file
+    holds differences only and must not be read as an entire profile.
     """
     folder = identity_dir(prefix)
     own = folder / f"{prefix}_{name}"
@@ -190,19 +194,19 @@ def identity_file(prefix: str, name: str) -> Path:
 
 
 def _read_kind(prefix: str) -> Optional[str]:
-    """kind идентичности без её активации: personal | shared_example | fixture."""
+    """An identity's kind without activating it: personal | shared_example | fixture."""
     profile_path = identity_file(prefix, "profile.yaml")
     if not profile_path.exists():
         return None
     try:
         data = common.load_yaml(profile_path) or {}
         return (data.get("identity") or {}).get("kind")
-    except Exception:  # noqa: BLE001 - битый YAML разберёт validate()
+    except Exception:  # noqa: BLE001 - broken YAML is validate()'s problem
         return None
 
 
 def describe(prefix: str) -> str:
-    """Короткая строка для баннеров и сообщений об ошибке."""
+    """A short line for banners and error messages."""
     try:
         data = common.load_yaml(identity_file(prefix, "profile.yaml")) or {}
         meta = data.get("identity") or {}
@@ -212,38 +216,40 @@ def describe(prefix: str) -> str:
         return prefix
 
 
-# --- Валидация ------------------------------------------------------------
+# --- Validation -----------------------------------------------------------
 
 def validate(prefix: str, *, strict_prefix_check: bool = True) -> List[str]:
-    """Возвращает список проблем (пустой = идентичность в порядке).
+    """Returns a list of problems; empty means the identity is sound.
 
-    Проверяет ровно то, что защищает от путаницы между идентичностями:
-    формат префикса, наличие обязательных файлов, префиксование ВСЕХ файлов
-    внутри папки, и отсутствие ссылок на чужие префиксы в содержимом.
+    It checks exactly what protects against confusing one identity with
+    another: prefix format, the presence of required files, prefixing of ALL
+    files inside the folder, and the absence of references to other prefixes
+    in their contents.
     """
     problems: List[str] = []
 
     if not PREFIX_RE.match(prefix):
-        problems.append(f"неверный формат префикса '{prefix}'. {PREFIX_RULE_TEXT}")
-        return problems  # дальше проверять бессмысленно
+        problems.append(f"invalid prefix format '{prefix}'. {PREFIX_RULE_TEXT}")
+        return problems  # nothing further is worth checking
 
     d = identity_dir(prefix)
     if not d.is_dir():
-        problems.append(f"папка идентичности не найдена: {d}")
+        problems.append(f"identity folder not found: {d}")
         return problems
 
-    # Имя папки обязано содержать расшифровку: `kisel` не говорит ничего, а
-    # `kisel-keep-it-simple-easy-legacy` объясняет, что это за поиск, прямо в
-    # дереве проекта. Это единственное место, где длинное имя уместно.
+    # A folder name must carry an expansion: `kisel` says nothing, while
+    # `kisel-keep-it-simple-easy-legacy` explains what the search is right in
+    # the project tree. This is the one place a long name belongs.
     if folder_prefix(d.name) == d.name:
         problems.append(
-            f"папка '{d.name}' названа одним префиксом, без расшифровки. {FOLDER_RULE_TEXT}"
+            f"folder '{d.name}' is named by the prefix alone, with no "
+            f"expansion. {FOLDER_RULE_TEXT}"
         )
 
     for name in REQUIRED_FILES:
         path = identity_file(prefix, name)
         if not path.exists():
-            problems.append(f"нет обязательного файла: {path.name} (ожидался в {d})")
+            problems.append(f"required file missing: {path.name} (expected in {d})")
 
     if strict_prefix_check:
         for path in sorted(d.iterdir()):
@@ -251,71 +257,77 @@ def validate(prefix: str, *, strict_prefix_check: bool = True) -> List[str]:
                 if path.name in KNOWN_SUBDIRS:
                     continue
                 problems.append(
-                    f"вложенная папка '{path.name}' в идентичности — не поддерживается. "
-                    f"Разрешены только: {', '.join(sorted(KNOWN_SUBDIRS))}"
+                    f"nested folder '{path.name}' inside an identity is not "
+                    f"supported. Allowed: {', '.join(sorted(KNOWN_SUBDIRS))}"
                 )
                 continue
             if path.name in KNOWN_FILES:
                 continue
             if not path.name.startswith(f"{prefix}_"):
                 problems.append(
-                    f"файл '{path.name}' не начинается с '{prefix}_' — правило единого "
-                    "префикса нарушено (именно оно защищает от путаницы между идентичностями)"
+                    f"file '{path.name}' does not start with '{prefix}_' — the "
+                    "single-prefix rule is broken, and that rule is the thing "
+                    "protecting against mixing identities up"
                 )
 
     problems.extend(_check_foreign_prefix_leaks(prefix))
     return problems
 
 
-# Начало сообщения о незаполненных ЛИЧНЫХ полях. Вынесено в константу, чтобы
-# тесты и вызывающий код отличали «не хватает личных данных» (нормальная стадия
-# на чужой машине) от «идентичность собрана неполно» (дефект самой идентичности),
-# не завися от точной формулировки текста.
-LOCAL_FIELDS_MISSING_PREFIX = "не заполнены личные поля"
+# The opening of the message about unfilled PERSONAL fields. Kept as a
+# constant so that tests and calling code can tell "personal data is missing"
+# — a normal stage on someone else's machine — from "the identity is
+# assembled incompletely", which is a defect, without depending on the exact
+# wording.
+LOCAL_FIELDS_MISSING_PREFIX = "personal fields are not filled in"
 
-# Плейсхолдер шаблона: `<что-то>` в угловых скобках. Ровно так размечены поля,
-# которые человек должен заполнить своими ответами.
+# A template placeholder: `<something>` in angle brackets. That is exactly how
+# fields awaiting the person's answers are marked.
 PLACEHOLDER_RE = re.compile(r"<[^<>\n]{2,80}>")
 
-# Поля профиля, без которых поиск бессмысленен. Список намеренно короткий: это
-# не «всё, что хорошо бы заполнить», а «без этого скоринг выдаёт мусор».
+# Profile fields without which a search is meaningless. The list is
+# deliberately short: not "everything worth filling in" but "without this,
+# scoring produces garbage".
 REQUIRED_PROFILE_FIELDS = (
-    ("owner.languages", "языки — из них выводится языковой фильтр"),
-    ("owner.location", "резидентство — из него выводятся гео-правила"),
-    ("tech_stack.core", "core-стек — без него гейт релевантности пропускает всё подряд"),
+    ("owner.languages", "languages — the language filter is derived from them"),
+    ("owner.location", "residency — the geography rules are derived from it"),
+    ("tech_stack.core",
+     "the core stack — without it the relevance gate lets everything through"),
 )
 
 
 def readiness_problems(prefix: str) -> List[str]:
-    """Чего не хватает, чтобы идентичность можно было использовать для поиска.
+    """What is missing before this identity can be used for a search.
 
-    Отличается от validate(): та проверяет СТРУКТУРУ (файлы на месте, префиксы
-    верные), а эта — СОДЕРЖАНИЕ (человек ответил на обязательные вопросы).
-    Заготовка из шаблона структурно безупречна и при этом совершенно непригодна.
+    Distinct from validate(): that checks STRUCTURE — files present, prefixes
+    correct — while this checks CONTENT, meaning the person answered the
+    required questions. Fresh scaffolding is structurally flawless and
+    completely unusable.
     """
     problems: List[str] = []
     d = identity_dir(prefix)
     if not d.is_dir():
-        return [f"папка идентичности не найдена: {d}"]
+        return [f"identity folder not found: {d}"]
 
-    # Профиль собирается ИЗ СЛОЁВ: копия шаблона даёт тип поиска, личный файл
-    # рядом — обстоятельства человека. Проверять один файл бессмысленно: в
-    # шаблоне намеренно нет резидентства, а в личном файле — стека.
+    # The profile is assembled FROM LAYERS: the template copy supplies the type
+    # of search, the personal file beside it supplies the person's
+    # circumstances. Checking one file is pointless — the template has no
+    # residency by design, and the personal file has no stack.
     import settings
 
     profile, _ = settings.resolve("profile", prefix)
     profile, missing_local = common.resolve_local_fields(prefix, profile)
 
     if missing_local:
-        # Одной строкой, а не по строке на поле: на свежем клоне таких полей
-        # семь, и семь одинаковых предложений с повторённым путём читаются
-        # как стена текста вместо понятной задачи.
+        # One line rather than one per field: on a fresh clone there are seven
+        # of them, and seven identical sentences repeating the same path read
+        # as a wall of text instead of a clear task.
         overlay_path = common.personal_dir(prefix) / f"{prefix}_owner.yaml"
         problems.append(
-            f"{LOCAL_FIELDS_MISSING_PREFIX} (помечены как `local`): "
+            f"{LOCAL_FIELDS_MISSING_PREFIX} (marked `local`): "
             + ", ".join(missing_local)
-            + f".\n    Их место — {overlay_path}"
-            + "\n    Заготовку этого файла создаёт `python tools/identity.py "
+            + f".\n    They belong in {overlay_path}"
+            + "\n    Scaffold that file with `python tools/identity.py "
             f"init-local --identity {prefix}`"
         )
 
@@ -324,30 +336,30 @@ def readiness_problems(prefix: str) -> List[str]:
         for part in dotted.split("."):
             node = (node or {}).get(part) if isinstance(node, dict) else None
         if not node:
-            problems.append(f"не заполнено {dotted} ({why})")
+            problems.append(f"{dotted} is not filled in ({why})")
 
-    # Плейсхолдеры шаблона в ЗНАЧЕНИЯХ YAML-файлов идентичности.
+    # Template placeholders in the VALUES of the identity's YAML files.
     #
-    # Именно в значениях, а не в тексте файла: угловые скобки сплошь и рядом
-    # встречаются в комментариях как часть документации ("<token> подставьте
-    # сюда", "<TZ> ±N часов"). Первая версия проверки читала файл целиком и
-    # объявляла заполненную идентичность незаполненной. YAML-парсер отбрасывает
-    # комментарии — этого достаточно, чтобы проверка стала точной.
+    # In the values, not in the file text: angle brackets appear constantly in
+    # comments as part of the documentation ("put <token> here", "<TZ> ±N
+    # hours"). The first version of this check read the whole file and
+    # declared a filled-in identity unfilled. A YAML parser discards comments,
+    # which is all it takes to make the check exact.
     for path in sorted(d.glob("*.yaml")):
         try:
             data = common.load_yaml(path)
-        except Exception:  # noqa: BLE001 — битый YAML разберёт validate()
+        except Exception:  # noqa: BLE001 — broken YAML is validate()'s problem
             continue
         found = sorted(set(_placeholders_in_values(data)))
         if found:
             shown = ", ".join(found[:3]) + (" ..." if len(found) > 3 else "")
-            problems.append(f"{path.name}: остались незаполненные плейсхолдеры ({shown})")
+            problems.append(f"{path.name}: placeholders left unfilled ({shown})")
 
     return problems
 
 
 def _placeholders_in_values(node):
-    """Все плейсхолдеры шаблона среди строковых ЗНАЧЕНИЙ структуры."""
+    """Every template placeholder among the string VALUES of a structure."""
     if isinstance(node, str):
         for found in PLACEHOLDER_RE.findall(node):
             yield found
@@ -362,10 +374,10 @@ def _placeholders_in_values(node):
 
 
 def _check_foreign_prefix_leaks(prefix: str) -> List[str]:
-    """Ищет в файлах идентичности упоминания ЧУЖИХ префиксов вида `abcd_`.
+    """Looks for mentions of OTHER identities' prefixes, of the form `abcd_`.
 
-    Ловит самую вероятную ошибку при создании новой идентичности — копипасту
-    из чужой папки с недоправленными путями.
+    Catches the likeliest mistake when creating a new identity: copy-paste
+    from someone else's folder with the paths only half corrected.
     """
     problems: List[str] = []
     others = [p for p in list_identities(include_fixtures=True) if p != prefix]
@@ -379,23 +391,23 @@ def _check_foreign_prefix_leaks(prefix: str) -> List[str]:
         try:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
-            continue  # бинарник или нечитаемый файл — не наше дело
+            continue  # a binary or unreadable file is not our business
         for other in others:
             token = f"{other}_"
             if token in text:
                 problems.append(
-                    f"в файле {path.name} встречается чужой префикс '{token}' — "
-                    f"похоже на копипасту из идентичности '{other}'"
+                    f"file {path.name} mentions the foreign prefix '{token}' — "
+                    f"this looks like copy-paste from identity '{other}'"
                 )
     return problems
 
 
 def validate_all() -> dict:
-    """Прогоняет validate() по всем идентичностям, включая фикстуры."""
+    """Runs validate() over every identity, fixtures included."""
     return {p: validate(p) for p in list_identities(include_fixtures=True)}
 
 
-# --- Малая Конституция ----------------------------------------------------
+# --- Legacy local-constitution support -------------------------------------
 
 def local_constitution_path() -> Path:
     return common.LOCAL_CONSTITUTION_DIR / "active.yaml"

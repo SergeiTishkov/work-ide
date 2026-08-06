@@ -73,13 +73,13 @@ def test_existing_identities_are_valid():
 def test_validate_rejects_unknown_prefix():
     problems = identity.validate("nosuch")
     assert problems
-    assert any("не найдена" in p for p in problems)
+    assert any("not found" in p for p in problems)
 
 
 def test_validate_rejects_bad_prefix_format():
     problems = identity.validate("BAD-PREFIX")
     assert problems
-    assert any("формат префикса" in p for p in problems)
+    assert any("prefix format" in p for p in problems)
 
 
 def test_validate_catches_unprefixed_file(tmp_path, monkeypatch):
@@ -394,7 +394,7 @@ def test_folder_without_description_is_reported(tmp_path, monkeypatch):
     monkeypatch.setattr(common, "IDENTITIES_DIR", identities_dir)
 
     problems = identity.validate("abcd")
-    assert any("без расшифровки" in p for p in problems)
+    assert any("no " in p and "expansion" in p for p in problems)
 
 
 def test_two_folders_with_the_same_prefix_are_refused(tmp_path, monkeypatch):
