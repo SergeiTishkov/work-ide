@@ -1,11 +1,13 @@
-# Вопросник шаблона: ЗАЧЕМ настройки именно такие.
+# The template's questionnaire: WHY the settings are what they are.
 #
-# Здесь ответы уровня ТИПА поиска — они одинаковы для всех, кто выбрал этот
-# шаблон. Ответы про конкретного человека (где живёт, сколько хочет получать,
-# какие языки знает, с какими странами уже есть опыт) в шаблон не попадают:
-# их место в локальной идентичности, и туда же агент запишет их при онбординге.
+# The answers here are at the level of the KIND of search — the same for
+# everybody who chose this template. Answers about a particular person (where
+# they live, what they want to earn, which languages they speak, which
+# countries they have experience with) do not reach the template: their place
+# is in the local identity, and that is where the agent writes them during
+# onboarding.
 #
-# Полный список вопросов и порядок опроса — docs/QUESTIONNAIRE.md.
+# The full list of questions and the order to ask them: docs/QUESTIONNAIRE.md.
 
 schema_version: 1
 identity_prefix: kisel
@@ -13,69 +15,69 @@ kind: template
 
 answers:
 
-  - question: "Что именно вы ищете?"
+  - question: "What exactly are you looking for?"
     answer: >
-      Лёгкую работу. Цель — НАГРУЗКА, а не количество часов: ненапряжная
-      полная ставка подходит так же, как средненагруженный неполный день.
-      Сокращённый график, четырёхдневная неделя и частичная занятость — формы
-      низкой нагрузки, а не самостоятельные требования.
+      Easy work. The goal is INTENSITY rather than a number of hours: an
+      undemanding full-time role suits as well as a moderately loaded part-time
+      one. Reduced hours, a four-day week and part-time work are forms of low
+      intensity rather than requirements in themselves.
 
-  - question: "Что НЕ является целью?"
+  - question: "What is NOT the goal?"
     answer: >
-      Интересные задачи, карьерный рост, амбициозные проекты, обучение новому
-      стеку. Это осознанный выбор, а не компромисс: именно отказ от них даёт
-      доступ к вакансиям с низкой конкуренцией.
+      Interesting problems, career growth, ambitious projects, learning a new
+      stack. A deliberate choice rather than a compromise: it is precisely
+      giving them up that opens access to vacancies with little competition.
 
-  - question: "Почему legacy — это плюс?"
+  - question: "Why is legacy a plus?"
     answer: >
-      Устоявшийся код меняется медленно, требования известны, процессы
-      описаны, а конкуренция за место низкая: большинство кандидатов бежит от
-      слов "legacy" и "maintenance". Плюс современные LLM хорошо знают именно
-      распространённый, хорошо задокументированный стек в его "устаревшем"
-      изводе.
+      Settled code changes slowly, the requirements are known, the processes
+      are documented, and competition is low: most candidates run from the
+      words "legacy" and "maintenance". On top of that, modern LLMs know
+      precisely the widespread, well-documented stack in its "ageing" edition
+      particularly well.
 
-  - question: "Какие роли отсекаются полностью и почему?"
+  - question: "Which roles are cut entirely, and why?"
     answer: >
-      Менеджмент, продажи, пресейл, DevRel, аналитика, QA, мобильная
-      разработка, инфраструктура/DevOps и краудворк по обучению ИИ. Все они
-      добавлялись по одной, после реальной находки в выдаче: шанс попасть на
-      такую вакансию прикладному разработчику нулевой, а балльный штраф
-      нулевой шанс не выражает.
+      Management, sales, pre-sales, DevRel, analytics, QA, mobile development,
+      infrastructure/DevOps and AI-training crowdwork. Every one was added
+      singly, after a real finding in the shortlist: an applied developer's
+      chance at such a vacancy is zero, and a points penalty does not express
+      a zero chance.
 
-  - question: "Как оценивается нагрузка, если про неё никто не пишет?"
+  - question: "How is intensity judged when nobody writes about it?"
     answer: >
-      Косвенно. Прямых слов "у нас спокойно" в вакансиях не бывает; признаки
-      выводятся из стека (старые технологии), отрасли (банки, госсектор,
-      страхование), формулировок про режим работы и из площадок, которые сами
-      сортируют работодателей по режиму (4dayweek.io).
+      Indirectly. Vacancies never say "it is calm here"; the signals are
+      derived from the stack (old technologies), the industry (banks, the
+      public sector, insurance), the wording about working patterns, and from
+      boards that sort employers by pattern themselves (4dayweek.io).
 
-  # --- ВОПРОСЫ, ОТВЕТЫ НА КОТОРЫЕ ЛИЧНЫЕ -----------------------------------
-  # Шаблон их перечисляет, но не отвечает: ответ зависит от человека и живёт
-  # в его локальной идентичности.
+  # --- QUESTIONS WHOSE ANSWERS ARE PERSONAL --------------------------------
+  # The template lists them but does not answer: the answer depends on the
+  # person and lives in their local identity.
 
-  - question: "Где вы живёте и какое у вас резидентство?"
+  - question: "Where do you live, and what is your residency?"
     answer: null
     note: >
-      Из резидентства ВЫВОДЯТСЯ гео-правила: одна и та же фраза "US only" для
-      резидента США — плюс, для всех остальных — дисквалификация. Таблица
-      вывода — config/derivation/regions.yaml.
+      The geography rules are DERIVED from residency: the same phrase "US only"
+      is a plus for a US resident and a disqualification for everybody else.
+      The derivation table is config/derivation/regions.yaml.
 
-  - question: "Какие языки вы знаете?"
+  - question: "Which languages do you know?"
     answer: null
-    note: "Из этого выводится языковой фильтр: какие вакансии отсеивать."
+    note: "The language filter is derived from this: which vacancies to reject."
 
-  - question: "На какие деньги рассчитываете?"
+  - question: "What money are you expecting?"
     answer: null
 
-  - question: "Есть ли страны, где найм для вас особенно вероятен?"
-    answer: null
-    note: >
-      Обычно из-за уже имеющегося опыта работы с компаниями оттуда или связей.
-      Попадает в acceptable_region_signal локальной идентичности.
-
-  - question: "Есть ли топонимы, неоднозначные лично для вас?"
+  - question: "Are there countries where hiring is especially likely for you?"
     answer: null
     note: >
-      Например, для жителей одноимённой страны — «Georgia»: в вакансиях это
-      "Georgia" почти всегда означает штат. Заготовки частых ловушек —
+      Usually because of existing experience with companies there, or contacts.
+      It goes into the local identity's acceptable_region_signal.
+
+  - question: "Are there place names that are ambiguous for you personally?"
+    answer: null
+    note: >
+      For residents of the country of that name, "Georgia": in vacancies it
+      almost always means the US state. Starting points for the frequent traps
       config/derivation/ambiguous_places.yaml.

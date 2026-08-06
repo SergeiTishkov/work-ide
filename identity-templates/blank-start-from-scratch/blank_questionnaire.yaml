@@ -1,66 +1,66 @@
 # =============================================================================
-#  ШАБЛОН ВОПРОСНИКА ПОИСКОВОЙ ИДЕНТИЧНОСТИ
+#  THE SEARCH IDENTITY QUESTIONNAIRE TEMPLATE
 # =============================================================================
-#  Копируется в новую идентичность как <префикс>_questionnaire.yaml и
-#  заполняется агентом ВМЕСТЕ С ЧЕЛОВЕКОМ. Процедура — docs/ONBOARDING.md,
-#  как вести разговор — docs/QUESTIONNAIRE.md.
+#  Copied into a new identity as <prefix>_questionnaire.yaml and filled in by
+#  the agent TOGETHER WITH THE PERSON. The procedure is docs/ONBOARDING.md;
+#  how to run the conversation is docs/QUESTIONNAIRE.md.
 #
-#  Заполненный вопросник — не формальность, а origin story идентичности: по
-#  нему потом понятно, ПОЧЕМУ настройки именно такие, и что придётся
-#  пересмотреть, если ответ изменится.
+#  A filled-in questionnaire is not a formality but the identity's origin
+#  story: from it you can later tell WHY the settings are what they are, and
+#  what will need revisiting if an answer changes.
 #
-#  Формат ответа:
-#    answer            — что сказал человек ("не важно" тоже валидный ответ)
-#    drives            — что этот ответ порождает; при смене ответа проверьте
-#                        перечисленное
-#    required          — true = без ответа идентичность не собрать
-#    tier              — essential | later (см. ниже)
+#  The answer format:
+#    answer            — what the person said ("I don't mind" is valid too)
+#    drives            — what this answer produces; if it changes, check
+#                        everything listed
+#    required          — true = without an answer the identity cannot be built
+#    tier              — essential | later (see below)
 #
-#  ДВА КРУГА ВОПРОСОВ. Их 53, и подряд они займут час — почти всегда лишний.
+#  TWO ROUNDS OF QUESTIONS. There are 53, and asked in one go they take an
 #
-#    tier: essential (9 штук) — минимум, после которого поиск уже работает.
-#      Префикс, рассказ о себе, резидентство, языки, формат работы, core-стек,
-#      источники, приватность. У этих вопросов нет безопасного значения по
-#      умолчанию: ошибка здесь тихо ломает поиск, а не выдаёт заметную ерунду.
-#      Реально занимает 5-10 минут.
+#    tier: essential (9 of them) — the minimum after which the search works.
+#      Prefix, an account of yourself, residency, languages, working
+#      arrangement, core stack, sources, privacy. These have no safe default:
+#      a mistake here breaks the search quietly rather than producing visible
+#      nonsense. It really takes 5-10 minutes.
 #
-#    tier: later (остальные) — уточнения. Задавать их лучше ПОСЛЕ первого
-#      прогона: увидев реальную выдачу, человек отвечает точнее, чем в
-#      вакууме («вот эту вакансию я бы не хотел» полезнее, чем
-#      «перечислите нежелательные отрасли»). Первый прогон всё равно вскрывает
-#      неточности настроек лучше любого опросника — это записано в
-#      docs/ONBOARDING.md как ожидаемое поведение, а не как проблема.
+#    tier: later (the rest) — refinements. Better asked AFTER the first run:
+#      having seen a real shortlist, a person answers more accurately than in
+#      a vacuum ("I would not want this one" is more useful than "list the
+#      industries you avoid"). The first run exposes inaccuracies better than
+#      any questionnaire anyway — that is recorded in docs/ONBOARDING.md as
+#      expected behaviour rather than as a problem.
 #
-#  Пропущенный вопрос — это null в answer, а не удалённый пункт: по нему потом
-#  видно, что именно осталось невыясненным.
+#  A skipped question is a null in answer rather than a deleted entry: that way
+#  it is later visible what was left unresolved.
 
-#  ЛИЧНЫЕ ВОПРОСЫ (personal: true). Этот файл лежит в ОБЩЕМ репозитории —
-#  значит, ответы на них сюда не пишутся. В `answer` ставится `local`, а само
-#  значение уходит в local-constitution/personal/<префикс>/<префикс>_owner.yaml.
+#  PERSONAL QUESTIONS (personal: true). This file is in the SHARED repository,
+#  so the answers to them are not written here. The value goes into your local
+#  identity instead.
 #
-#  Смысл при этом не теряется: вопросник существует, чтобы объяснить, ПОЧЕМУ
-#  настройки именно такие, а для этого достаточно решения, а не личных
-#  обстоятельств. «Требование эксклюзивности — дисквалификация» объясняет
-#  конфиг; «у меня уже есть работа» не добавляет ничего, кроме утечки.
+#  Nothing is lost by that: the questionnaire exists to explain WHY the
+#  settings are what they are, and the decision is enough for that, not the
+#  circumstances. "An exclusivity requirement disqualifies" explains the
+#  config; "I already have a job" adds nothing but a leak.
 # =============================================================================
 
 schema_version: 1
-identity_prefix: null          # заполняется при создании
-filled_with_user_at: null      # дата разговора
+identity_prefix: null          # filled in at creation
+filled_with_user_at: null      # the date of the conversation
 
 answers:
-  # --- §0 Мета идентичности ------------------------------------------------
+  # --- §0 Identity meta ----------------------------------------------------
   - id: meta.purpose
     tier: essential
-    q: "Для чего этот поиск? Опишите одним абзацем, как если бы объясняли другу."
-    why: "Задаёт всю систему приоритетов. Поиск полной ставки и поиск занятости на пару часов в день — разные вселенные."
+    q: "What is this search for? Describe it in one paragraph, as if to a friend."
+    why: "It sets the whole system of priorities. A full-time search and a two-hours-a-day search are different universes."
     answer: null
     required: true
-    drives: ["<p>_identity.md", "общая расстановка весов в criteria"]
+    drives: ["<p>_identity.md", "the overall arrangement of weights in criteria"]
 
   - id: meta.kind
     tier: later
-    q: "Это личная идентичность или шаблон, которым смогут пользоваться другие?"
+    q: "Is this a personal identity, or a template others will be able to use?"
     answer: null
     default: "personal"
     drives: ["profile.identity.kind"]
@@ -68,71 +68,71 @@ answers:
   - id: meta.prefix
     tier: essential
     q: >
-      Префикс идентичности. Агент предлагает 2-3 варианта с расшифровкой,
-      человек выбирает. 3-6 латинских строчных букв, звучный, описывает СУТЬ
-      поиска (не имя человека — идентичность переживёт смену стека).
+      The identity prefix. The agent offers 2-3 options with expansions and the
+      person chooses. 3-6 lowercase Latin letters, pronounceable, describing
+      WHAT THE SEARCH IS ABOUT (not the person — it outlives a change of stack).
     answer: null
     required: true
-    drives: ["имя папки", "префикс всех файлов идентичности"]
+    drives: ["the folder name", "the prefix of every file in the identity"]
 
-  # --- §1 Кто вы (спрашивается ПЕРВЫМ) -------------------------------------
+  # --- §1 Who you are (asked FIRST) ----------------------------------------
   - id: person.intro
     tier: essential
     q: >
-      Расскажите о себе: пришлите CV файлом, дайте ссылку на LinkedIn, или
-      просто опишите свой опыт словами. Любого из трёх достаточно.
-    why: "Требование онбординга: без этого нельзя корректно собрать стек и уровень."
+      Tell us about yourself: send a CV file, give a LinkedIn link, or simply
+      describe your experience in words. Any one of the three will do.
+    why: "An onboarding requirement: without it the stack and level cannot be assembled correctly."
     answer: null
     required: true
     drives: ["profile.owner.*", "profile.tech_stack"]
 
   - id: person.name
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: later
-    q: "Имя — или псевдоним, если не хотите видеть настоящее в общем репозитории."
+    q: "Your name — or a pseudonym, if you would rather not see the real one in a shared repository."
     answer: null
     drives: ["profile.owner.name"]
 
   - id: person.cv_location
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: later
     q: >
-      Если есть CV файлом — положите его в local-constitution/personal/<префикс>/
-      (эта папка не попадает в гит). Куда положили?
+      If you have a CV as a file, put it in your identity's documents/ folder
+      (which does not reach git). Where did you put it?
     note_for_agent: >
-      Файл копируется под своим именем. Не переименовывать — правило префиксов
-      действует только на файлы, которые создаёт проект (docs/LOCAL_CONSTITUTION.md).
+      The file is copied under its own name. Do not rename it — the prefix rule
+      applies only to files the project creates (CLAUDE.md §5).
     answer: null
     drives: ["profile.owner.cv_files"]
 
   - id: person.experience
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: later
-    q: "Сколько лет опыта и какой у вас уровень (junior / middle / senior / lead)?"
+    q: "How many years of experience, and what level (junior / middle / senior / lead)?"
     answer: null
     drives: ["profile.owner.years_experience", "profile.owner.role"]
 
   - id: person.contact
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: later
     q: >
-      Контакт для User-Agent бота (чтобы владелец сайта мог понять, кто к нему
-      ходит). Положить в общий репозиторий, в Малую Конституцию, или не
-      указывать вовсе?
+      A contact for the bot's User-Agent (so a site's owner can tell who is
+      visiting). Put it in the shared repository, in your local identity, or
+      leave it out altogether?
     answer: null
-    default: "в Малую Конституцию"
+    default: "in the local identity"
     drives: ["profile.contact.user_agent_contact"]
 
-  # --- §2 Резидентство: порождает ВСЮ гео-логику ---------------------------
+  # --- §2 Residency: it generates ALL the geography logic -------------------
   - id: residency.country
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: essential
-    q: "В какой стране вы физически живёте? (Резидентство, не гражданство.)"
+    q: "Which country do you physically live in? (Residency, not citizenship.)"
     why: >
-      Из этого выводятся ВСЕ гео-дисквалификаторы. Ошибка здесь тихо
-      выбрасывает половину рынка либо, наоборот, наполняет выдачу вакансиями,
-      куда вас не возьмут. Правила ВЫВОДЯТСЯ (config/derivation/regions.yaml),
-      а не копируются у другого человека.
+      ALL the geography disqualifiers are derived from this. A mistake here
+      silently throws away half the market, or fills the shortlist with
+      vacancies you will not be hired for. The rules are DERIVED
+      (config/derivation/regions.yaml), not copied from somebody else.
     answer: null
     required: true
     drives:
@@ -142,243 +142,243 @@ answers:
       - "profile.owner.location"
 
   - id: residency.citizenship
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: later
-    q: "Гражданство (или гражданства)?"
-    why: "Определяет, оставлять ли в дисквалификаторах фразы про гражданские цензы."
+    q: "Citizenship (or citizenships)?"
+    why: "It decides whether citizenship-test phrases stay among the disqualifiers."
     answer: null
     required: true
     drives: ["criteria.remote_location_fit.hard_dealbreakers"]
 
   - id: residency.permits
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: later
-    q: "Есть ли разрешения на работу, визы, ВНЖ где-либо (США, ЕС, UK, Канада…)?"
-    why: "Наличие разрешения переворачивает знак: 'US only' из отсева становится плюсом."
+    q: "Do you have any work permits, visas or residence permits anywhere (US, EU, UK, Canada…)?"
+    why: "A permit flips the sign: 'US only' turns from a rejection into a plus."
     answer: null
-    drives: ["criteria.remote_location_fit (знак правил по регионам)"]
+    drives: ["criteria.remote_location_fit (the sign of the regional rules)"]
 
   - id: residency.timezone
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: later
-    q: "Ваш часовой пояс. Какое пересечение с работодателем приемлемо?"
+    q: "Your time zone. What overlap with an employer is acceptable?"
     answer: null
     drives: ["profile.owner.timezone_notes"]
 
   - id: residency.clearance
     tier: later
-    q: "Можете ли вы получить security clearance / допуск?"
-    default: "нет"
-    drives: ["оставлять ли 'security clearance' и 'itar' в дисквалификаторах"]
+    q: "Can you obtain a security clearance?"
+    default: "no"
+    drives: ["whether 'security clearance' and 'itar' stay among the disqualifiers"]
     answer: null
 
-  # --- §3 Неоднозначные топонимы -------------------------------------------
+  # --- §3 Ambiguous place names --------------------------------------------
   - id: ambiguous_places
     tier: later
     q: >
-      Название вашей страны или города совпадает с каким-то другим местом?
-      (Агент подскажет из config/derivation/ambiguous_places.yaml: Georgia,
+      Does the name of your country or city coincide with somewhere else?
+      (The agent will prompt from config/derivation/ambiguous_places.yaml:
       Cambridge, Washington, Ontario, Odessa, Birmingham, Victoria…)
-    why: "Иначе система будет путать 'ваше' место с одноимённым чужим."
+    why: "Otherwise the system confuses 'your' place with a namesake elsewhere."
     answer: null
     drives: ["criteria.remote_location_fit.ambiguous_place_names"]
 
-  # --- §4 Языки ------------------------------------------------------------
+  # --- §4 Languages --------------------------------------------------------
   - id: languages.spoken
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: essential
-    q: "Какими языками владеете достаточно для работы?"
+    q: "Which languages do you speak well enough to work in?"
     why: >
-      В фильтр попадают языки, которых вы НЕ знаете (config/derivation/
-      languages.yaml). Копировать чужой языковой фильтр нельзя.
+      The filter gets the languages you do NOT know
+      (config/derivation/languages.yaml). Copying somebody else's will not do.
     answer: null
     required: true
     drives: ["profile.owner.languages", "criteria.language_requirement_signal"]
 
   - id: languages.policy
     tier: later
-    q: "Требование языка, которого вы не знаете — сразу отсев или просто минус?"
-    default: "отсев"
+    q: "A requirement for a language you do not know — an outright rejection, or just a minus?"
+    default: "rejection"
     answer: null
-    drives: ["language_requirement_signal как гейт или как штраф"]
+    drives: ["language_requirement_signal as a gate or as a penalty"]
 
-  # --- §5 Формат работы ----------------------------------------------------
+  # --- §5 Working arrangement ----------------------------------------------
   - id: format.mode
     tier: essential
-    q: "Только удалённо, гибрид тоже подойдёт, или готовы в офис?"
+    q: "Remote only, hybrid also acceptable, or willing to go into an office?"
     why: >
-      Определяет, остаются ли 'onsite'/'in-office'/'hybrid' в
-      дисквалификаторах, и работает ли гейт 'не подтверждено как remote'.
+      It decides whether 'onsite'/'in-office'/'hybrid' stay among the
+      disqualifiers, and whether the 'not confirmed as remote' gate applies.
     answer: null
     required: true
-    drives: ["criteria.remote_location_fit.hard_dealbreakers", "гейт подтверждения remote"]
+    drives: ["criteria.remote_location_fit.hard_dealbreakers", "the remote confirmation gate"]
 
   - id: format.cities
     tier: later
-    q: "Если гибрид/офис приемлемы — в каких городах?"
+    q: "If hybrid or office work is acceptable, in which cities?"
     answer: null
-    drives: ["criteria.remote_location_fit (город как плюс, а не отсев)"]
+    drives: ["criteria.remote_location_fit (a city as a plus rather than a rejection)"]
 
   - id: format.oncall
     tier: later
-    q: "Дежурства, ночные вызовы, работа по выходным — приемлемо?"
-    default: "нет"
+    q: "On-call, night call-outs, weekend work — acceptable?"
+    default: "no"
     answer: null
     drives: ["criteria.low_intensity_signal.negative_keywords"]
 
-  # --- §6 Целевые регионы --------------------------------------------------
+  # --- §6 Target regions ---------------------------------------------------
   - id: regions.dream
     tier: later
-    q: "Регионы мечты: высокий потолок оплаты, пусть и меньше шансов."
+    q: "Dream regions: a high pay ceiling, even if the chances are lower."
     answer: null
     drives: ["profile.target_regions.dream"]
 
   - id: regions.realistic
     tier: later
-    q: "Реалистичные регионы: где вас с наибольшей вероятностью реально наймут."
+    q: "Realistic regions: where you are most likely to actually be hired."
     answer: null
     drives: ["profile.target_regions.solid_realistic", "acceptable_region_signal"]
 
   - id: regions.excluded
     tier: later
-    q: "Регионы, с которыми не хотите работать ни при каких условиях."
+    q: "Regions you would not work with under any conditions."
     answer: null
     drives: ["criteria.remote_location_fit.restrictive_region_signal"]
 
-  # --- §7 Тип занятости ----------------------------------------------------
+  # --- §7 Employment type --------------------------------------------------
   - id: employment.exclusivity
     tier: later
-    q: "Требования эксклюзивности занятости — приемлемы или дисквалификация?"
+    q: "Exclusivity requirements — acceptable, or a disqualification?"
     why: >
-      Если да, пункты об эксклюзивности занятости
-      становятся дисквалификаторами.
+      If they disqualify, exclusivity clauses become
+      disqualifiers.
     answer: null
     required: true
     drives: ["profile.employment_type_priority.dealbreaker_signals"]
 
   - id: employment.preferred
     tier: later
-    q: "Предпочтительный тип: контракт/1099, part-time, full-time, fractional, freelance?"
+    q: "Preferred type: contract/1099, part-time, full-time, fractional, freelance?"
     answer: null
     drives: ["profile.employment_type_priority"]
 
   - id: employment.eor
     tier: later
-    q: "Оформление через EOR (Deel, Remote.com, Oyster, Papaya, Multiplier, G-P) приемлемо?"
-    default: "да"
+    q: "Is engagement through an EOR (Deel, Remote.com, Oyster, Papaya, Multiplier, G-P) acceptable?"
+    default: "yes"
     answer: null
     drives: ["profile.eor_platforms_signal", "criteria.contractor_friendliness"]
 
-  # --- §8 Нагрузка ---------------------------------------------------------
+  # --- §8 Intensity --------------------------------------------------------
   - id: load.hours
     tier: later
-    q: "Сколько часов в день / в неделю готовы работать?"
+    q: "How many hours a day or a week are you willing to work?"
     answer: null
     required: true
     drives: ["profile.goal.hours_per_day_target"]
 
   - id: load.meetings
     tier: later
-    q: "Терпимость к созвонам: много / мало / почти нет?"
+    q: "Tolerance for calls: many / few / almost none?"
     answer: null
     drives: ["criteria.low_intensity_signal"]
 
   - id: load.tradeoff
     tier: later
     q: >
-      ГЛАВНЫЙ РАЗМЕН. Что выбираете: гарантированно спокойную и предсказуемую
-      работу по нижней границе вашей вилки — или заметно больше денег, но с
-      признаками стресса и высокого темпа?
+      THE CENTRAL TRADE-OFF. Which do you choose: guaranteed calm, predictable
+      work at the bottom of your range — or noticeably more money, with signs
+      of stress and a high pace?
     why: >
-      Задаёт соотношение весов low_intensity_signal и compensation_signal.
-      Это самый содержательный вопрос всего опросника.
+      It sets the ratio between low_intensity_signal and compensation_signal.
+      The most substantive question in the whole questionnaire.
     answer: null
     required: true
     drives: ["weights.low_intensity_signal", "weights.compensation_signal"]
 
   - id: load.ai
     tier: later
-    q: "Планируете активно использовать AI-ассистентов в работе?"
-    why: "Если да — растёт ценность хорошо задокументированных зрелых стеков."
+    q: "Do you plan to use AI assistants actively in the work?"
+    why: "If so, well-documented mature stacks become more valuable."
     answer: null
     drives: ["profile.goal.ai_assisted"]
 
-  # --- §9 Деньги -----------------------------------------------------------
+  # --- §9 Money ------------------------------------------------------------
   - id: comp.range
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: later
-    q: "Целевая вилка. Укажите в любом удобном виде: в месяц, в год, в час."
+    q: "Your target range. Give it however suits: per month, per year, per hour."
     answer: null
     required: true
     drives: ["profile.goal.target_compensation"]
 
   - id: comp.floor
-    personal: true   # ответ -> Малая Конституция, в этот файл пишется `local`
+    personal: true   # the answer goes into the local identity, not here
     tier: later
-    q: "Есть ли жёсткий минимум, ниже которого вакансия не рассматривается вообще?"
-    default: "нет, только штраф"
+    q: "Is there a hard minimum below which a vacancy is not considered at all?"
+    default: "no, only a penalty"
     answer: null
-    drives: ["criteria.compensation_signal.below_target_penalty или дисквалификатор"]
+    drives: ["criteria.compensation_signal.below_target_penalty, or a disqualifier"]
 
   - id: comp.no_data
     tier: later
-    q: "Как трактовать вакансию без указанной зарплаты — нейтрально или как минус?"
-    default: "нейтрально"
-    why: "Нет данных ≠ плохая зарплата. Большинство вакансий вилку не публикуют."
+    q: "How should a vacancy with no salary be read — neutrally, or as a minus?"
+    default: "neutrally"
+    why: "No data is not bad pay. Most vacancies do not publish a range."
     answer: null
     drives: ["criteria.compensation_signal.no_range_points"]
 
-  # --- §10 Стек ------------------------------------------------------------
+  # --- §10 Stack -----------------------------------------------------------
   - id: stack.core
     tier: essential
-    q: "CORE: технологии, которые были в большинстве ваших последних работ."
-    why: "Основа гейта релевантности: без совпадения по core/strong вакансия отсеивается."
+    q: "CORE: the technologies that were in most of your recent jobs."
+    why: "The basis of the relevance gate: without a core or strong match a vacancy is rejected."
     answer: null
     required: true
     drives: ["profile.tech_stack.core", "criteria.stack_fit.primary_language_keywords"]
 
   - id: stack.strong
     tier: later
-    q: "STRONG: технологии, с которыми работали регулярно, но не всегда."
+    q: "STRONG: technologies you worked with regularly, but not always."
     answer: null
     drives: ["profile.tech_stack.strong"]
 
   - id: stack.familiar
     tier: later
-    q: "FAMILIAR: то, с чем сталкивались в одной-двух ролях."
+    q: "FAMILIAR: what you came across in one or two roles."
     answer: null
     drives: ["profile.tech_stack.familiar"]
 
   - id: stack.refuse
     tier: later
-    q: "Технологии, с которыми не готовы работать даже за деньги."
+    q: "Technologies you would not work with even for money."
     answer: null
-    drives: ["criteria.stack_fit (исключения)"]
+    drives: ["criteria.stack_fit (exclusions)"]
 
   - id: stack.contextual
     tier: later
     q: >
-      Есть ли технология, которая подходит вам ТОЛЬКО в определённом контексте?
-      (Пример из практики: Java/Scala — да для дата-пайплайнов, нет для веба.)
+      Is there a technology that suits you ONLY in a particular context?
+      (From practice: Java/Scala — yes for data pipelines, no for the web.)
     answer: null
-    drives: ["criteria.stack_fit.data_pipeline_language_keywords и _context_keywords"]
+    drives: ["criteria.stack_fit.data_pipeline_language_keywords and _context_keywords"]
 
   - id: stack.substring_traps
     tier: later
     q: >
-      Есть ли среди ваших ключевых слов такие, что являются подстрокой обычных
-      слов или чужих технологий?
+      Are any of your keywords a substring of ordinary words or of other
+      technologies' names?
     why: >
-      Дешёвый вопрос, экономящий цикл отладки. Проект уже обжигался трижды:
-      ".NET" ловил "VB.NET", "LESS" ловил "no less than", "eor" ловил
+      A cheap question that saves a debugging cycle. The project has been
+      burned three times: ".NET" caught "VB.NET", "LESS" caught "no less
       "theoretical".
     answer: null
-    drives: ["какие ключевые слова вообще включать в tech_stack"]
+    drives: ["which keywords to put in tech_stack at all"]
 
-  # --- §11 Роли ------------------------------------------------------------
+  # --- §11 Roles -----------------------------------------------------------
   - id: roles.target
     tier: later
-    q: "Какие названия должностей — это вы?"
+    q: "Which job titles are you?"
     answer: null
     required: true
     drives: ["criteria.role_relevance_signal.developer_role_override_patterns"]
@@ -386,103 +386,103 @@ answers:
   - id: roles.excluded
     tier: later
     q: >
-      Какие роли исключить полностью? (менеджмент, продажи, поддержка, DevRel,
-      DevOps/SRE, продакт…)
-    why: "Для одного человека DevOps — отсев, для другого — цель. Не копировать."
+      Which roles should be excluded entirely? (management, sales, support,
+      DevRel, DevOps/SRE, product…)
+    why: "For one person DevOps is a rejection, for another the goal. Do not copy."
     answer: null
-    drives: ["criteria.role_relevance_signal (оба списка)"]
+    drives: ["criteria.role_relevance_signal (both lists)"]
 
   - id: roles.greenfield
     tier: later
-    q: "Greenfield, R&D, «построить с нуля» — хотите или избегаете?"
-    why: "Определяет, работает ли role_complexity_signal как гейт или наоборот как плюс."
+    q: "Greenfield, R&D, building from scratch — wanted or avoided?"
+    why: "It decides whether role_complexity_signal acts as a gate or, conversely, as a plus."
     answer: null
     drives: ["criteria.role_complexity_signal"]
 
   - id: roles.startup_vs_legacy
     tier: later
-    q: "Стартап или зрелая компания с легаси?"
-    why: "Определяет ЗНАК legacy_enterprise_signal — плюс или минус."
+    q: "A startup, or a mature company with legacy?"
+    why: "It decides the SIGN of legacy_enterprise_signal — plus or minus."
     answer: null
     required: true
     drives: ["criteria.legacy_enterprise_signal", "criteria.low_intensity_signal"]
 
   - id: roles.industries
     tier: later
-    q: "Индустрии, которые предпочитаете или избегаете (crypto, оборонка, гемблинг, healthcare…)?"
+    q: "Industries you prefer or avoid (crypto, defence, gambling, healthcare…)?"
     answer: null
     drives: ["criteria.low_intensity_signal", "criteria.legacy_enterprise_signal"]
 
-  # --- §12 Компании --------------------------------------------------------
+  # --- §12 Companies -------------------------------------------------------
   - id: company.age
     tier: later
-    q: "Предпочтение по возрасту компании: зрелая (10+ лет), устоявшаяся, молодая?"
+    q: "A preference on company age: mature (10+ years), established, young?"
     answer: null
     drives: ["criteria.company_reputation_signal.company_age"]
 
   - id: company.reputation
     tier: later
     q: >
-      Насколько важны отзывы сотрудников? Что важнее — общий рейтинг или
+      How much do employee reviews matter? Which matters more — the overall
       work-life balance?
     answer: null
     drives: ["criteria.company_reputation_signal"]
 
-  # --- §13 Инструменты и источники -----------------------------------------
+  # --- §13 Tools and sources -----------------------------------------------
   - id: tools.sources
     tier: essential
     q: >
-      Какие источники включить? Агент показывает каталог из
-      docs/BUILDING_BLOCKS.md с сильными и слабыми сторонами каждого.
+      Which sources should be enabled? The agent shows the catalogue from
+      docs/BUILDING_BLOCKS.md, with each one's strengths and weaknesses.
     answer: null
     required: true
     drives: ["<p>_sources.yaml"]
 
   - id: tools.ats_targets
     tier: later
-    q: "Карьерные страницы каких компаний отслеживать напрямую?"
-    why: "Главный рычаг качества этого источника — именно список компаний."
+    q: "Whose careers pages should be watched directly?"
+    why: "The main lever on this source's quality is precisely the company list."
     answer: null
     drives: ["<p>_ats_targets.yaml"]
 
   - id: tools.hn_keywords
     tier: later
-    q: "Ключевые слова для поиска в HN «Who is hiring» (максимум 5 — каждое стоит запроса)."
+    q: "Keywords for searching HN Who is hiring (5 at most — each costs a request)."
     answer: null
     drives: ["<p>_sources.yaml -> hn_whoishiring.params.keywords"]
 
   - id: tools.forbidden
     tier: later
-    q: "Есть ли что-то, чего агент не должен делать для этой идентичности никогда?"
+    q: "Is there anything the agent must never do for this identity?"
     answer: null
-    drives: ["<p>_identity.md (раздел ограничений)"]
+    drives: ["<p>_identity.md (the constraints section)"]
 
-  # --- §14 Отчётность ------------------------------------------------------
+  # --- §14 Reporting -------------------------------------------------------
   - id: report.language
     tier: later
-    q: "На каком языке хотите отчёт?"
-    default: "русский"
+    q: "Which language would you like the report in?"
+    default: "the language you speak to the agent in"
     answer: null
-    drives: ["формат отчёта"]
+    drives: ["preferences.language; the report format"]
 
   - id: report.cadence
     tier: later
-    q: "Как часто планируете запускать цикл поиска?"
+    q: "How often do you plan to run the search cycle?"
     answer: null
-    drives: ["ожидания по объёму выдачи"]
+    drives: ["expectations about the size of the shortlist"]
 
-  # --- §15 Приватность -----------------------------------------------------
+  # --- §15 Privacy ---------------------------------------------------------
   - id: privacy.git
     tier: essential
     q: >
-      Что можно коммитить в общий identities/ (его увидят все, у кого есть
-      репозиторий), а что должно остаться только в Малой Конституции?
+      What may be committed into the shared repository (everyone with the
+      repository will see it), and what must stay in your local identity only?
     answer: null
     required: true
     drives: ["profile.contact", "profile.owner.cv_files"]
 
   - id: privacy.never
     tier: later
-    q: "Есть ли файлы или данные, которые агент не должен читать или копировать?"
+    q: "Are there files or data the agent must not read or copy?"
     answer: null
-    drives: ["<p>_identity.md (раздел ограничений)"]
+    drives: ["<p>_identity.md (the constraints section)"]

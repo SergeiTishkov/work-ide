@@ -6,6 +6,21 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V2 — the template is in English
+
+Every comment and every explanatory string in the template was translated into
+English. **No value changed**: the thresholds, weights, keyword lists and gates
+are byte-for-byte what they were, which was confirmed by rescoring the whole
+accumulated database — 11,414 vacancies, 0 differences in class or score.
+
+**Does this affect your local settings?** No. Your own files sit beside the
+`template/` folder and take no part in the update. If you overrode a key, the
+override keeps winning.
+
+**What you will notice.** The comments in `template/` become English. If you
+read the report in another language, it does not change: the report language
+follows `preferences.language` in your own profile.
+
 ## V1 — the first version
 
 A template for a calm legacy search, assembled from a working identity after

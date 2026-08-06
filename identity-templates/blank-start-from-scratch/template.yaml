@@ -6,7 +6,7 @@
 # running the pipeline on placeholders produced plausible rubbish over 1734
 
 name: blank
-version: 1
+version: 2
 summary: >
   Empty scaffolding with every file and detailed comments, but no ready-made
   settings. Filled in per docs/ONBOARDING.md together with the agent.

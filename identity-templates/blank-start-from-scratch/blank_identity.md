@@ -1,89 +1,93 @@
-# <ПРЕФИКС> — <краткое название идентичности>
+# <PREFIX> — <a short name for the identity>
 
 <!--
-  ШАБЛОН. Копируется в новую идентичность как <префикс>_identity.md.
-  Замените всё в угловых скобках и удалите эти комментарии.
+  A TEMPLATE. Copied into a new identity as <prefix>_identity.md.
+  Replace everything in angle brackets and delete these comments.
 
-  Этот файл — главный документ идентичности. Его читает агент, когда берётся
-  за поиск, и человек, который хочет понять, чем эта идентичность отличается
-  от соседней. Пишите так, чтобы через полгода было понятно БЕЗ вас.
+  This file is the identity's principal document. The agent reads it when it
+  takes up a search, and so does a person wanting to understand how this
+  identity differs from the one next door. Write it so that in six months it
+  makes sense WITHOUT you.
 -->
 
-> **<ПРЕФИКС> = <расшифровка аббревиатуры>.**
-> <Одно предложение: что это за поиск.>
+> **<PREFIX> = <what the abbreviation stands for>.**
+> <One sentence: what this search is.>
 >
-> <Почему выбрана именно такая аббревиатура — она должна называть СУТЬ поиска,
-> а не имя человека, чтобы пережить смену стека и работодателя.>
+> <Why this particular abbreviation was chosen — it should name what the search
+> is ABOUT rather than a person, so that it outlives a change of stack and
+> employer.>
 
-## Что это за идентичность
+## What this identity is
 
-<Абзац, понятный постороннему: что за работу ищем и почему именно такую.
-Если приоритеты необычны — объясните. Например: «здесь не нужны интересные
-задачи, нужна предсказуемая рутина» звучит странно, пока не сказано, что это
-занятость на неполный день.>
+<A paragraph comprehensible to an outsider: what work is being looked for, and
+why that kind. If the priorities are unusual, explain them. "Interesting
+problems are not wanted here, predictable routine is" sounds strange until you
+say it is part-time work alongside another job.>
 
-## Для кого
+## Who it is for
 
-<Уровень, специализация, где физически находится человек.>
+<Level, specialisation, where the person physically is.>
 
-<Если название страны/города неоднозначно (Georgia, Cambridge, Washington…) —
-предупредите об этом здесь ЯВНО, это самая частая ловушка при ручной проверке.>
+<If the name of the country or city is ambiguous (Georgia, Cambridge,
+Washington…), warn about it here EXPLICITLY — it is the commonest trap in a
+manual check.>
 
-### Жёсткие дисквалификаторы (0% шанс, не «низкий приоритет»)
+### Hard disqualifiers (0% chance, not "low priority")
 
-<Перечислите то, что делает вакансию невозможной. Это гейты в score.py, а не
-штрафы в баллах — мягкий штраф тонет в общих словах бойлерплейта.>
+<List what makes a vacancy impossible. These are gates in score.py rather than
+penalties in points — a soft penalty drowns in the generic words of
+boilerplate.>
 
 1. <...>
 2. <...>
 
-### География
+### Geography
 
-<Регионы мечты и реалистичные. Важно различать «компания находится в X»
-(нейтрально/плюс) и «нужно резидентство в X» (дисквалификация, если у вас его
-нет).>
+<Dream regions and realistic ones. It matters to distinguish "the company is in
+X" (neutral or a plus) from "residency in X is required" (a disqualification, if
+you do not have it).>
 
-### <Главный размен этой идентичности>
+### <The central trade-off of this identity>
 
-<Например: деньги против спокойствия, или скорость роста против стабильности.
-Укажите, как это отражено в весах criteria, и попросите не «чинить» асимметрию,
-если она намеренная.>
+<For example: money against calm, or speed of growth against stability. Say how
+it is reflected in the criteria weights, and ask that the asymmetry not be
+"fixed" if it is deliberate.>
 
-## Что значит «подходящая работа» для этого скиллсета
+## What "suitable work" means for this skill set
 
-<Разберите стек по фактической частоте в резюме, а не по субъективному
-ощущению. Три уровня: ежедневное / регулярное / было пару раз.>
+<Work through the stack by its actual frequency in the CV rather than by
+subjective impression. Three levels: daily / regular / a couple of times.>
 
-**Основное (в большинстве последних ролей):** <...>
+**Core (in most recent roles):** <...>
 
-**Уверенно, но не всегда:** <...>
+**Confident, but not always:** <...>
 
-**Периферийное (1-2 роли):** <...>
+**Peripheral (1-2 roles):** <...>
 
-**Чего в резюме нет**, хотя может показаться: <...>
+**What the CV does NOT have**, though it might appear to: <...>
 
-<Если есть технология, подходящая только в определённом контексте — опишите
-здесь. Пример: «Java подходит для дата-пайплайнов, но не для веба».>
+<If a technology suits only in a particular context, describe it here. Example:
+"Java suits data pipelines but not the web".>
 
-## Какие инструменты и источники использует
+## Which tools and sources it uses
 
-<Таблица: инструмент — как и зачем используется в этой идентичности. Полный
-список включённых источников — в <префикс>_sources.yaml, каталог возможностей —
-в docs/BUILDING_BLOCKS.md.>
+<A table: tool — how and why it is used in this identity. The full list of
+enabled sources is in <prefix>_sources.yaml, the catalogue of what is available
+in docs/BUILDING_BLOCKS.md.>
 
-| Инструмент | Как используется |
+| Tool | How it is used |
 |---|---|
 | <...> | <...> |
 
-## Ограничения
+## Constraints
 
-<Что агент не должен делать в рамках этой идентичности. Если ничего особенного
-— так и напишите.>
+<What the agent must not do within this identity. If there is nothing special,
+say so.>
 
-## Журнал решений
+## Decision log
 
-<Датированные решения, подтверждённые человеком. Это самая ценная часть файла:
-через месяц никто не вспомнит, почему именно так, а перенастройка «по памяти»
-ломает то, что чинили раньше.>
+<Dated decisions, confirmed by the person. This is the most valuable part of the
+file: in a month nobody will remember why it is the way it is, and reconfiguring
+from memory breaks what was fixed earlier.>
 
-- **<ГГГГ-ММ-ДД>** — <решение и его причина>
+- **<YYYY-MM-DD>** — <the decision and its reason>

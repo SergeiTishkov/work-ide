@@ -2,6 +2,11 @@
 
 New versions go on TOP.
 
+## V2 — the template is in English
+
+Every comment, placeholder and question in the scaffolding was translated into
+English. Nothing else changed: the file set and the structure are the same.
+
 ## V1 — the first version
 
 A full set of identity files with placeholders and comments explaining what

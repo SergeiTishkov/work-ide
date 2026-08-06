@@ -1,14 +1,14 @@
-# Шаблоны поисковых идентичностей
+# Search identity templates
 
-Здесь лежат **типы поиска**, а не чьи-то настройки. Всё в этой папке попадает
-в общий репозиторий, поэтому личных фактов — резидентства, зарплатных ожиданий,
-имени, CV — тут нет и быть не может.
+What lives here are **kinds of search**, not anybody's settings. Everything in
+this folder goes into the shared repository, so there are no personal facts here
+— no residency, no pay expectations, no name, no CV — and there cannot be.
 
-## Как этим пользуются
+## How they are used
 
 ```
-identity-templates/<шаблон>/       ← это. В гите. Из него КЛОНИРУЮТ.
-local-identities/<моя папка>/      ← рабочая копия. Вне гита. Правят её.
+identity-templates/<template>/     ← this. In git. CLONED FROM.
+local-identities/<my folder>/      ← the working copy. Outside git. Edited.
 ```
 
 ```bash
@@ -16,167 +16,166 @@ python tools/templates.py list
 python tools/templates.py clone kisel mypx "My Personal Search"
 ```
 
-Клонирование кладёт файлы шаблона в `local-identities/<папка>/template/`
-дословно и закрепляет номер версии. Свои настройки человек пишет **файлами
-уровнем выше** — они накладываются поверх (`tools/settings.py`).
+Cloning puts the template's files into `local-identities/<folder>/template/`
+verbatim and pins the version number. A person writes their own settings in
+**files one level up**, and those are layered on top (`tools/settings.py`).
 
-Из этого следует главное свойство: **`git pull` не меняет ничьё поведение.**
-Шаблон в репозитории обновился — копия внутри идентичности осталась прежней.
-Обновление происходит только по явному согласию и является заменой папки
-`template/`, а не слиянием текстов: личные файлы в операции не участвуют и
-потеряться не могут.
+The key property follows from that: **`git pull` changes nobody's behaviour.**
+The template in the repository moved on; the copy inside the identity did not.
+An update happens only by explicit consent and is a replacement of the
+`template/` folder rather than a merge of texts: personal files take no part in
+the operation and cannot be lost.
 
-## Версии
+## Versions
 
-У каждого шаблона есть `template.yaml` с номером версии и `CHANGELOG.md`
-с объяснением изменений, новыми версиями вверх. Правило: изменил файл шаблона —
-подними версию и опиши изменение. Это проверяется тестом
-`test_template_version_matches_changelog`, а не памятью.
+Every template has a `template.yaml` with a version number and a `CHANGELOG.md`
+explaining the changes, newest first. The rule: if you changed a template file,
+raise the version and describe the change. That is checked by the test
+`test_template_version_matches_changelog` rather than by memory.
 
-Проверить, не ушёл ли шаблон вперёд:
+To check whether a template has moved ahead:
 
 ```bash
-python tools/templates.py check --identity <префикс>
+python tools/templates.py check --identity <prefix>
 ```
 
-## Что такое поисковая идентичность
+## What a search identity is
 
+A complete set of answers to "who is looking for work, and what kind": the
+person's profile, the scoring rubric, the sources enabled, the target companies,
+and the filled-in questionnaire all of it was derived from.
 
-Полный набор ответов на вопрос «кто ищет работу и какую именно»: профиль человека,
-рубрика скоринга, включённые источники, целевые компании и заполненный вопросник,
-из которого всё это выведено.
+One identity = one folder `local-identities/<prefix>-<expansion>/`. Inside it, a
+verbatim copy of the template in `template/` and the personal files beside it.
+Editing one identity physically cannot touch another: they live in different
+folders and do not reference each other (`docs/IDENTITIES.md`, on the blast
+radius).
 
-Одна идентичность = одна папка `local-identities/<префикс>-<расшифровка>/`.
-Внутри — дословная копия шаблона в `template/` и личные файлы рядом с ней.
-Правка одной идентичности физически не может задеть другую: они лежат в
-разных папках и не ссылаются друг на друга (`docs/IDENTITIES.md`, раздел про
-радиус поражения).
-
-## Два уровня именования: длинная папка, короткие файлы
+## Two levels of naming: a long folder, short files
 
 ```
 local-identities/
-  kisel-keep-it-simple-easy-legacy/     <- ПАПКА: префикс + расшифровка
-    kisel_profile.yaml                  <- ФАЙЛЫ: только префикс
+  kisel-keep-it-simple-easy-legacy/     <- FOLDER: prefix plus expansion
+    kisel_profile.yaml                  <- FILES: the prefix alone
     kisel_criteria.yaml
     kisel_identity.md
 ```
 
-Разделение намеренное, и путать уровни не надо.
+The split is deliberate, and the levels should not be confused.
 
-**Папка называется `<префикс>-<расшифровка-через-дефис>`.** Папку видно редко, но
-когда видно — по одному `kisel` невозможно вспомнить, что это за поиск и зачем он
-заводился. Расшифровка отвечает на вопрос прямо в дереве проекта, без открытия
-файлов. Проверяется `identity.py validate`: папка, названная одним префиксом,
-считается проблемой.
+**A folder is named `<prefix>-<expansion-with-hyphens>`.** A folder is seen
+rarely, but when it is, `kisel` alone gives no way to remember what that search
+was or why it was set up. The expansion answers that right in the project tree,
+without opening a file. `identity.py validate` checks it: a folder named by the
+prefix alone counts as a problem.
 
-**Файлы внутри остаются короткими: `kisel_criteria.yaml`.** Превращать префикс
-файлов в полное имя (`kisel-keep-it-simple-easy-legacy_criteria.yaml`) — плохая
-идея, и вот почему: имена файлов встречаются несравнимо чаще, чем имя папки. Они
-в каждой команде, в выводе `grep`, во вкладках редактора, в путях внутри отчётов
-и сообщений об ошибках. Длинное имя там не добавляет информации (контекст и так
-понятен), но заметно ухудшает читаемость — а читаемость имён это ровно то, ради
-чего правило префиксов вообще существует.
+**The files inside stay short: `kisel_criteria.yaml`.** Turning the file prefix
+into the full name (`kisel-keep-it-simple-easy-legacy_criteria.yaml`) is a bad
+idea, and here is why: file names occur incomparably more often than the folder
+name. They are in every command, in `grep` output, in editor tabs, in paths
+inside reports and error messages. A long name adds no information there (the
+context is clear anyway) while noticeably hurting readability — and the
+readability of names is exactly what the prefix rule exists for.
 
-Расшифровку не надо приводить к виду имени папки руками: `identity.py new`
-принимает её обычной фразой и делает это сам.
+There is no need to turn the expansion into a folder name by hand: the clone
+command takes it as an ordinary phrase and does that itself.
 
 ```bash
-python tools/identity.py new --prefix kisel --name "Keep It Simple, Easy, Legacy"
-# -> identities/kisel-keep-it-simple-easy-legacy/
+python tools/templates.py clone kisel kisel "Keep It Simple, Easy, Legacy"
+# -> local-identities/kisel-keep-it-simple-easy-legacy/
 ```
 
-## Правило единого префикса
+## The single-prefix rule
 
-**Каждый файл внутри папки идентичности начинается с `<префикс>_`.**
+**Every file inside an identity folder begins with `<prefix>_`.**
 
-Это не косметика, а защита от конкретного отказа. Агент, работающий одновременно с
-несколькими идентичностями, однажды перепутает два файла `notes.md` из разных
-папок — и сделает это молча. Файлы `kisel_notes.md` и `jvst_notes.md` перепутать
-практически невозможно: имя само себя опознаёт в любом контексте — в поиске по
-проекту, во вкладке редактора, в выводе grep.
+This is not cosmetic but protection against a specific failure. An agent working
+with several identities at once will one day confuse two `notes.md` files from
+different folders — and will do it silently. `kisel_notes.md` and
+`jvst_notes.md` are practically impossible to confuse: the name identifies
+itself in any context — in a project search, in an editor tab, in grep output.
 
-Правило проверяется автоматически: `python tools/identity.py validate`.
+The rule is checked automatically: `python tools/identity.py validate`.
 
-## Правила выбора префикса
+## Rules for choosing a prefix
 
-- 3–6 символов, только строчные латинские буквы и цифры, первый символ — буква.
-- **Звучный и осмысленный**: должен описывать суть поиска, а не имя человека.
-  Идентичность переживает смену стека и работодателя, а «поиск спокойной легаси-
-  удалёнки» остаётся собой.
-- Язык-источник неважен, важна латиница на выходе. Русские аббревиатуры
-  транслитерируются по звучанию: «АБВГД» → `abvgd`, «Скука» → `skuk`.
-- Лучше не брать обычное английское слово: префикс часто ищут через grep, а
-  `bore_` утонет в тексте вакансий, тогда как `kisel_` — нет.
+- 3-6 characters, lowercase Latin letters and digits only, first character a
+  letter.
+- **Pronounceable and meaningful**: it should describe what the search is about
+  rather than name a person. An identity outlives a change of stack and
+  employer, while "the search for calm legacy remote work" stays itself.
+- The source language does not matter; Latin script on the output does.
+  Non-Latin abbreviations are transliterated by sound.
+- Better not to take an ordinary English word: a prefix is often looked for with
+  grep, and `bore_` would drown in vacancy text where `kisel_` would not.
 
-Примеры разбора:
+Some worked examples:
 
-| Префикс | Расшифровка | Комментарий |
+| Prefix | Expansion | Comment |
 |---|---|---|
-| `kisel` | **K**eep **I**t **S**imple, **E**asy, **L**egacy | Называет смысл, да ещё и читается как «кисель» — тягучее и медленное |
-| `jvst` | **J**a**v**a **St**artup | Стек + среда |
-| `usts` | **US** + **TS** (TypeScript) | Резидентство + стек |
-| `spdn` | «**Сп**окойный **Д**от**н**ет» (транслит) | Пример русской аббревиатуры |
+| `kisel` | **K**eep **I**t **S**imple, **E**asy, **L**egacy | Names the point, and happens to be pronounceable |
+| `jvst` | **J**a**v**a **St**artup | Stack plus environment |
+| `usts` | **US** + **TS** (TypeScript) | Residency plus stack |
 
+### Reserved prefixes
 
-### Зарезервированные префиксы
+These prefixes must not be taken — they are used in the tests, and a collision
+would make a test run write into a live identity's folders:
 
-Эти префиксы занимать нельзя — они используются в тестах, и совпадение приведёт
-к тому, что тестовый прогон будет писать в папки живой идентичности:
-
-| Префикс | Кем занят |
+| Prefix | Taken by |
 |---|---|
-| `ftf` | Замороженная тестовая фикстура (`identities/ftf-frozen-test-fixture/`) |
-| `tmpl` | Префикс шаблона `_template/` |
-| `aaaa`, `bbbb` | Тесты изоляции идентичностей (`tests/test_identity_isolation.py`) |
-| `newp`, `srcp`, `dstp`, `abcd`, `efgh` | Тесты создания и клонирования |
+| `ftf` | The frozen test fixture (`tests/fixtures/ftf-frozen-test-fixture/`) |
+| `blank` | The blank template |
+| `aaaa`, `bbbb` | The identity isolation tests (`tests/test_identity_isolation.py`) |
+| `newp`, `srcp`, `dstp`, `abcd`, `efgh` | The creation and cloning tests |
 
-Список неполон по построению: тесты добавляются. Поэтому берите **осмысленный**
-префикс, описывающий суть поиска, — тогда столкновение практически невозможно.
-`identity.py new` откажется занять префикс существующей папки, но про префиксы,
-живущие только внутри тестов, он не знает.
+The list is incomplete by construction: tests get added. So take a
+**meaningful** prefix describing what the search is about, and a collision
+becomes practically impossible. The clone command refuses a prefix that an
+existing folder already uses, but it knows nothing about prefixes that live only
+inside the tests.
 
-## Состав идентичности
+## What an identity consists of
 
-Обязательные файлы (проверяются `identity.py validate`):
+The required files (checked by `identity.py validate`):
 
-| Файл | Что внутри |
+| File | What is inside |
 |---|---|
-| `<p>_identity.md` | Человекочитаемое описание: что это за идентичность, что значит аббревиатура, для кого, какие инструменты и источники использует и почему, как работает скоринг именно здесь, журнал решений |
-| `<p>_profile.yaml` | Кто владелец идентичности и что ищет: резидентство, языки, стек, ожидания по деньгам |
-| `<p>_criteria.yaml` | Полная рубрика скоринга (машинерия + личный тюнинг, с баннерами секций) |
-| `<p>_sources.yaml` | Какие источники включены и с какими параметрами |
-| `<p>_questionnaire.yaml` | Заполненный вопросник — origin story: почему настройки именно такие |
+| `<p>_identity.md` | The human-readable description: what this identity is, what the abbreviation means, for whom, which tools and sources it uses and why, how scoring works here in particular, and a log of decisions |
+| `<p>_profile.yaml` | Who the identity belongs to and what they seek: residency, languages, stack, expectations about money |
+| `<p>_criteria.yaml` | The full scoring rubric (machinery plus personal tuning, with section banners) |
+| `<p>_sources.yaml` | Which sources are enabled, and with what parameters |
+| `<p>_questionnaire.yaml` | The filled-in questionnaire — the origin story: why the settings are what they are |
 
-Необязательные: `<p>_ats_targets.yaml` (карьерные страницы компаний),
-`<p>_notes.md` (рабочие заметки по этой идентичности).
+Optional: `<p>_ats_targets.yaml` (companies' careers pages), `<p>_notes.md`
+(working notes on this identity).
 
-## Папки, которые идентичностями не являются
+## Folders that are not templates
 
-Папки, начинающиеся с `_`, пропускаются загрузчиком:
+Folders beginning with `_` are skipped by the loader.
 
-- `_template/` — заготовка, копируется при создании новой идентичности.
-
-## Как создать свою
+## How to create your own
 
 ```bash
-python tools/identity.py new --prefix <префикс> --name "<расшифровка фразой>"
+python tools/templates.py clone <template> <prefix> "<expansion as a phrase>"
 ```
 
-Команда собирает имя папки из префикса и расшифровки, разворачивает шаблон,
-переименовывает файлы под короткий префикс и сразу проверяет структуру. Не копируйте чужую папку руками — велик риск утащить чужие
-настройки и не заметить.
+The command assembles the folder name from the prefix and the expansion, copies
+the template, renames the files to the short prefix and checks the structure
+straight away. Do not copy somebody else's folder by hand — the risk of dragging
+their settings along without noticing is high.
 
-Заготовка — это ещё не идентичность: её нужно наполнить ответами. Полный путь
-описан в `docs/ONBOARDING.md`: агент спрашивает у вас CV / LinkedIn /
-описание, вместе с вами заполняет вопросник и генерирует идентичность из ответов.
-Гео-правила и языковые фильтры при этом **выводятся** из вашего резидентства, а не
-копируются: для резидента США фраза «US only» — плюс, для резидента Грузии — полная
-дисквалификация. Копипаста здесь молча ломает поиск.
+Scaffolding is not yet an identity: it has to be filled with answers. The full
+path is described in `docs/ONBOARDING.md`: the agent asks you for a CV, a
+LinkedIn link or a description, fills in the questionnaire together with you,
+and generates the identity from the answers. The geography rules and language
+filters are **derived** from your residency rather than copied: for a US
+resident the phrase "US only" is a plus, for a resident of Georgia total
+disqualification. Copy-paste here breaks the search silently.
 
-## Что где лежит
+## Where things live
 
-- Эти папки — **в гите**, они общие. Идентичность можно предложить другим через PR.
-- Какие идентичности активны **на вашей машине** — в `local-constitution/`
-  (Малая Конституция, в гит не попадает). См. `docs/LOCAL_CONSTITUTION.md`.
-- Накопленные данные — в `data/<префикс>/`, тоже вне гита.
+- These folders are **in git** and are shared. A template can be offered to
+  others through a PR.
+- Your own searches live in `local-identities/`, outside git.
+- Accumulated data is in `data/<prefix>/`, also outside git.

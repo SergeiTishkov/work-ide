@@ -1,59 +1,60 @@
-# FTF — тестовая фикстура
+# FTF — the test fixture
 
 > **FTF = Frozen Test Fixture.**
-> Это не идентичность живого человека. Это замороженный слепок конфигурации,
-> к которому откалиброван тестовый набор проекта.
+> This is not a live person's identity. It is a frozen snapshot of the
+> configuration the project's test suite is calibrated against.
 
-## Зачем она существует
+## Why it exists
 
-Тесты скоринга проверяют конкретные числа и классификации: «легаси-вакансия
-набирает больше, чем стартап», «вакансия без гео-сигнала отклоняется», «одного
-familiar-совпадения по стеку недостаточно». Все эти утверждения зависят от
-содержимого `criteria.yaml` и `profile.yaml`.
+The scoring tests check specific numbers and classifications: "a legacy vacancy
+scores more than a startup", "a vacancy with no geography signal is rejected",
+"one familiar stack match is not enough". Every one of those statements depends
+on the contents of `criteria.yaml` and `profile.yaml`.
 
-Если бы тесты читали конфиг активной идентичности, случилось бы две плохие вещи:
+If the tests read the active identity's config, two bad things would happen:
 
-1. Результат тестов зависел бы от того, какую идентичность разработчик держит
-   активной. Один и тот же коммит был бы зелёным у одного и красным у другого.
-2. Любой тюнинг личных критериев ломал бы тесты — и человек, настраивающий свой
-   поиск, был бы вынужден чинить чужие ассерты. Это быстро приучает
-   «подгонять тест под код», а не наоборот.
+1. The test results would depend on which identity a developer happens to keep
+   active. The same commit would be green for one person and red for another.
+2. Any tuning of personal criteria would break the tests — and somebody
+   configuring their own search would be forced to fix somebody else's
+   assertions. That quickly teaches people to "fit the test to the code" rather
+   than the other way round.
 
-Отдельная замороженная фикстура снимает обе проблемы.
+A separate frozen fixture removes both problems.
 
-## Правило заморозки
+## The freeze rule
 
-**Файлы `ftf_*` не синхронизируются с чужими идентичностями и не обновляются
-«заодно».**
+**The `ftf_*` files are not synchronised with other identities and are not
+updated "while we are at it".**
 
-Менять их можно только вместе с осознанным изменением тестов, в одном коммите, с
-объяснением в сообщении коммита. Расхождение между `ftf` и живыми
-идентичностями — не проблема, а рабочий механизм: оно превращает каждое
-изменение машинерии в явный, отрецензированный апдейт тестов.
+They may be changed only together with a deliberate change to the tests, in one
+commit, with an explanation in the commit message. A divergence between `ftf`
+and live identities is not a problem but a working mechanism: it turns every
+change to the machinery into an explicit, reviewed update to the tests.
 
-Это контринтуитивно, и агент без этой заметки обязательно попытается «привести в
-порядок». Не приводите.
+That is counter-intuitive, and an agent without this note will certainly try to
+"tidy it up". Do not tidy it up.
 
-## Происхождение
+## Where it came from
 
-Побайтовая копия `config/{profile,criteria,sources,ats_targets}.yaml` на момент
-перехода проекта на мультиидентичностную архитектуру (2026-07-31), плюс блок
-`identity: {kind: fixture}`.
+A byte-for-byte copy of the project's configuration at the moment it moved to a
+multi-identity architecture (2026-07-31), plus an `identity: {kind: fixture}`
+block.
 
-Копия сделана намеренно, а не написана с нуля: тестовый набор — 111 проверок,
-откалиброванных именно к этим значениям. Синтетическая «нейтральная» фикстура
-потребовала бы переписать большинство ассертов в том же рефакторинге, который и
-так двигает каждый путь в проекте. Слишком много риска за раз.
+The copy was deliberate rather than written from scratch: the test suite was 111
+checks calibrated to exactly these values. A synthetic "neutral" fixture would
+have meant rewriting most of the assertions inside the very refactor that was
+already moving every path in the project. Too much risk at once.
 
-## Защита от случайного использования
+## Protection against accidental use
 
-`kind: fixture` заставляет `common.activate_identity()` отказать, если не передан
-`allow_fixture=True`. Единственное место, где этот флаг взводится, —
-`tests/conftest.py`. Реальный поиск по фикстуре невозможен.
+`kind: fixture` makes `common.activate_identity()` refuse unless
+`allow_fixture=True` is passed. The one place that flag is set is
+`tests/conftest.py`. A real search against the fixture is impossible.
 
-## Какие инструменты использует
+## Which tools it uses
 
-Никаких по-настоящему: сетевые вызовы в тестах замоканы, а данные пишутся во
-временные каталоги (`tmp_path`), а не в `data/ftf/`. Файлы источников и ATS
-скопированы для полноты структуры — чтобы фикстура проходила `identity.py
-validate` наравне с настоящими идентичностями.
+None, really: network calls in the tests are mocked and data is written into
+temporary directories (`tmp_path`) rather than into `data/ftf/`. The source and
+ATS files were copied for structural completeness — so that the fixture passes
+`identity.py validate` on the same terms as a real identity.
