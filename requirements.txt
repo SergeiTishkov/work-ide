@@ -1,8 +1,9 @@
-# Work IDE — минимальные зависимости. Сознательно избегаем тяжёлых
-# библиотек (feedparser, bs4, rapidfuzz) — RSS парсится stdlib
-# xml.etree.ElementTree, HTML чистится собственным regex-стриппером
-# (tools/common.py:strip_html), нечёткое сравнение строк — stdlib difflib.
-# Чем меньше зависимостей, тем надёжнее `pip install` через годы.
+# Work IDE — the minimal set of dependencies. Heavy libraries (feedparser, bs4,
+# rapidfuzz) are avoided deliberately: RSS is parsed with the standard library's
+# xml.etree.ElementTree, HTML is cleaned by our own regex stripper
+# (tools/common.py:strip_html), and fuzzy string comparison turned out not to be
+# needed at all. The fewer dependencies, the more reliably `pip install` works
+# years from now.
 
 requests>=2.31,<3
 PyYAML>=6.0,<7

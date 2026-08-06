@@ -1,118 +1,121 @@
-# Как вести вопросник
+# How to run the questionnaire
 
-Инструкция для агента: как разговаривать с человеком, чтобы собрать рабочую
-идентичность. Сам список вопросов — в
-`identities/_template/tmpl_questionnaire.yaml`.
+Instructions for the agent: how to talk to a person in order to assemble a
+working identity. The list of questions itself is in each template's
+`<prefix>_questionnaire.yaml`.
 
-## Принципы
+## Principles
 
-**Это разговор, а не форма.** Человек не обязан знать, что такое
-`restrictive_region_signal`. Он говорит «живу в Грузии, английский и русский,
-хочу спокойную работу на пару часов в день» — превращение этого в конфиг ваша работа, не его.
+**This is a conversation, not a form.** A person is not obliged to know what
+`restrictive_region_signal` is. They say "I live in Georgia, English and
+Russian, I want calm work a couple of hours a day" — turning that into
+configuration is your job, not theirs.
 
-**Догадки запрещены.** Не заполненный ответ лучше выдуманного: пустое поле видно
-и его можно уточнить, а выдуманное будет годами тихо портить выдачу.
+**Guessing is forbidden.** An unfilled answer is better than an invented one: an
+empty field is visible and can be clarified, while an invented one quietly
+spoils the shortlist for years.
 
-**«Мне всё равно» — валидный ответ.** У большинства вопросов есть разумное
-умолчание. Не давите.
+**"I don't mind" is a valid answer.** Most questions have a sensible default. Do
+not push.
 
-**Объясняйте, зачем спрашиваете**, когда вопрос выглядит странно. «Почему важно
-резидентство, а не гражданство» — законный вопрос, и ответ на него делает
-разговор осмысленным.
+**Explain why you are asking** when a question looks odd. "Why does residency
+matter rather than citizenship" is a fair question, and answering it makes the
+conversation meaningful.
 
-## Порядок
+## Order
 
-Спрашивать в порядке файла шаблона: он идёт от общего к частному, и поздние
-вопросы опираются на ранние. Исключение — §1 «кто вы»: его нужно задать
-**первым**, до всего остального, потому что из CV/LinkedIn часто уже видны
-ответы на половину последующих вопросов, и их останется только подтвердить.
+Ask in the order of the template file: it goes from general to specific, and
+later questions build on earlier ones. The exception is §1, "who you are": ask
+that **first**, before anything else, because a CV or LinkedIn profile often
+already answers half of what follows, leaving only confirmation.
 
-## Четыре обязательных блока
+## The four mandatory blocks
 
-У них нет безопасного умолчания. Без них `identity` не собрать, и это
-практическое воплощение правила «нет идентичности — нет поиска»:
+These have no safe default. Without them an identity cannot be assembled, and
+that is the practical form of "no identity, no search":
 
-| Блок | Почему нельзя угадать |
+| Block | Why it cannot be guessed |
 |---|---|
-| **Резидентство** | Из него выводятся ВСЕ гео-дисквалификаторы. Ошибка выбросит половину рынка либо наполнит выдачу недоступными вакансиями |
-| **Языки** | В фильтр попадают языки, которых человек не знает. Неверный список молча отсечёт годные вакансии |
-| **Core-стек** | Основа гейта релевантности: без совпадения вакансия отсеивается целиком |
-| **Источники** | Пустой набор = пустая выдача |
+| **Residency** | ALL the geography disqualifiers are derived from it. A mistake either throws away half the market or fills the shortlist with unreachable vacancies |
+| **Languages** | The filter gets the languages the person does not know. A wrong list silently cuts perfectly good vacancies |
+| **The core stack** | The basis of the relevance gate: with no match, a vacancy is rejected outright |
+| **Sources** | An empty set means an empty shortlist |
 
-## Вопросы, которые требуют осторожности
+## Questions that need care
 
-### Резидентство vs гражданство vs разрешение на работу
+### Residency vs citizenship vs the right to work
 
-Три разные вещи, и люди их путают.
+Three different things, and people confuse them.
 
-- *Резидентство* — где человек физически живёт. Определяет, какие «X only»
-  вакансии ему недоступны.
-- *Гражданство* — определяет, проходит ли он цензы вида «US citizen required».
-- *Разрешение на работу* — переворачивает знак: с разрешением на работу в США
-  фраза «us only» из дисквалификатора становится плюсом.
+- *Residency* — where the person physically lives. It determines which "X only"
+  vacancies are unavailable to them.
+- *Citizenship* — determines whether they pass tests like "US citizen required".
+- *The right to work* — flips the sign: with the right to work in the US, the
+  phrase "us only" turns from a disqualifier into a plus.
 
-Спрашивайте все три отдельно. «Я из России, живу в Грузии, есть польская виза» —
-это три разных ответа, каждый со своими последствиями.
+Ask all three separately. "I am from Russia, I live in Georgia, and I have a
+Polish visa" is three different answers, each with its own consequences.
 
-### Неоднозначные топонимы
+### Ambiguous place names
 
-Человек обычно не подозревает о проблеме. Подскажите сами:
-`config/derivation/ambiguous_places.yaml` содержит частые случаи (Georgia,
+A person usually does not suspect the problem. Prompt them:
+`config/derivation/ambiguous_places.yaml` holds the frequent cases (Georgia,
 Cambridge, Washington, Ontario, Odessa, Birmingham, Victoria).
 
-Формулировка: «ваш город или страна называется так же, как какое-то другое
-место? Это регулярно путает системы поиска».
+The wording: "is your city or country called the same as somewhere else? It
+regularly confuses search systems."
 
-### Главный размен: спокойствие против денег
+### The central trade-off: calm versus money
 
-Самый содержательный вопрос всего опросника — он задаёт соотношение весов
-`low_intensity_signal` и `compensation_signal`.
+The most substantive question in the whole questionnaire — it sets the ratio
+between the weights of `low_intensity_signal` and `compensation_signal`.
 
-Не спрашивайте абстрактно («что важнее — деньги или комфорт?»), это даёт
-бесполезный ответ. Спрашивайте конкретным выбором:
+Do not ask it abstractly ("what matters more, money or comfort?"); that yields a
+useless answer. Ask as a concrete choice:
 
-> «Что выберете: гарантированно спокойную предсказуемую работу по нижней границе
-> вашей вилки — или заметно больше денег, но с признаками стресса и высокого
-> темпа?»
+> "Which would you take: guaranteed calm, predictable work at the bottom of your
+> range — or noticeably more money, with signs of stress and a high pace?"
 
-Ответ должен быть таким, чтобы его можно было процитировать в журнале решений.
+The answer should be quotable in the decision log.
 
-### Стек по трём уровням
+### The stack, at three levels
 
-Люди склонны перечислять всё, что когда-либо трогали. Спрашивайте про **частоту
-в последних ролях**, а не про знакомство:
+People tend to list everything they have ever touched. Ask about **frequency in
+recent roles** rather than about acquaintance:
 
-- core — «было в большинстве ваших последних работ»;
-- strong — «регулярно, но не всегда»;
-- familiar — «сталкивались раз или два».
+- core — "it was in most of your recent jobs";
+- strong — "regularly, but not always";
+- familiar — "you came across it once or twice".
 
-Если есть CV — предложите свою разбивку по нему и попросите подтвердить. Это
-быстрее и точнее, чем вспоминать на ходу.
+If there is a CV, offer your own breakdown from it and ask them to confirm. That
+is faster and more accurate than recalling on the spot.
 
-### Ловушки подстрок
+### Substring traps
 
-Дешёвый вопрос, экономящий цикл отладки. Проект обжигался трижды: `.NET` ловил
-`VB.NET`, `LESS` ловил «no less than», `eor` ловил «theoretical».
+A cheap question that saves a debugging cycle. The project has been burned three
+times: `.NET` matched `VB.NET`, `LESS` matched "no less than", `eor` matched
+"theoretical".
 
-Формулировка: «есть ли среди ваших технологий такие, чьи названия являются
-частью обычных слов или названий других технологий?»
+The wording: "are any of your technologies named in a way that is part of an
+ordinary word, or part of another technology's name?"
 
-### Роли на исключение
+### Roles to exclude
 
-Здесь особенно важно не переносить чужие настройки: для одного человека DevOps —
-дисквалификатор, для другого — цель поиска. Спрашивайте прямо: «какие названия
-должностей — точно не вы, даже если остальное подходит?»
+Here it particularly matters not to carry over somebody else's settings: for one
+person DevOps is a disqualifier, for another it is the goal of the search. Ask
+outright: "which job titles are definitely not you, even if everything else
+fits?"
 
-## После заполнения
+## After it is filled in
 
-1. Сгенерировать `profile.yaml` и `criteria.yaml`; гео и языки — **вывести** по
-   таблицам `config/derivation/`, а не скопировать.
-2. Написать `<префикс>_identity.md` по шаблону: что за идентичность, для кого,
-   какие дисквалификаторы, какие инструменты.
-3. Проверить: `python tools/identity.py validate --identity <префикс>`.
-4. Первый прогон и разбор результатов вместе с человеком.
+1. Generate `profile.yaml` and `criteria.yaml`; **derive** the geography and
+   languages from the tables in `config/derivation/` rather than copying them.
+2. Write `<prefix>_identity.md` from the template: what this identity is, for
+   whom, which disqualifiers, which tools.
+3. Check: `python tools/identity.py validate --identity <prefix>`.
+4. The first run, and go through the results together with the person.
 
-Первый прогон почти всегда вскрывает неточности. Это нормально: правьте
-критерии, перезапускайте, и **каждое подтверждённое решение дописывайте в журнал
-в `<префикс>_identity.md`** — через месяц причина настройки забудется, а
-перенастройка «по памяти» ломает то, что уже чинили.
+The first run almost always exposes inaccuracies. That is normal: edit the
+criteria, run again, and **write every confirmed decision into the log in
+`<prefix>_identity.md`** — in a month the reason for a setting will be
+forgotten, and reconfiguring from memory breaks what was already fixed.

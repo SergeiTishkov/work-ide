@@ -1,133 +1,131 @@
-# Источники вакансий
+# Sources of vacancies
 
-## Принцип отбора
+## The selection principle
 
-Берём всё, что отдаётся **обычным GET-запросом** с честным User-Agent: JSON API,
-RSS, HTML. Не берём ничего, что требует обхода активной защиты — подделки
-отпечатка браузера, решения CAPTCHA, headless-браузера ради обмана детектора.
+We take anything served to an **ordinary GET request** carrying an honest
+User-Agent: JSON API, RSS, HTML. We take nothing that requires circumventing
+active protection — faking a browser fingerprint, solving a CAPTCHA, running a
+headless browser to fool a detector.
 
-Граница проходит по факту ответа сервера, а не по типу формата. Замер
-2026-08-04, один и тот же запрос с одним и тем же User-Agent:
+The boundary runs along what the server actually answers rather than along the
+format. Measured 2026-08-04, the same request with the same User-Agent:
 
-| Площадка | Ответ | Вывод |
+| Site | Response | Conclusion |
 |---|---|---|
-| LinkedIn (гостевой поиск) | **200** | Открыт анониму штатно — берём |
-| Indeed | **403** | Закрыт — не идём |
-| Glassdoor | **403** | Закрыт — не идём |
+| LinkedIn (guest search) | **200** | Open to an anonymous request as designed — we take it |
+| Indeed | **403** | Closed — we do not go |
+| Glassdoor | **403** | Closed — we do not go |
 
-Полный реестр всех проверенных источников, включая отклонённые с причинами и
-кодами ответов, — `config/sources.backlog.yaml`. Он существует, чтобы через
-месяц не проверять те же борды заново.
+The full registry of every source checked, including the rejected ones with
+reasons and response codes, is `config/sources.backlog.yaml`. It exists so that
+the same boards are not checked again a month later.
 
-## Про LinkedIn отдельно
+## LinkedIn in particular
 
-Прежняя редакция этого документа утверждала, что LinkedIn недоступен. Это было
-верно для основного сайта и официального API (тот с 2015 года закрыт
-партнёрской программой и поиск вакансий через него не отдаётся вовсе), но
-гостевой эндпоинт `jobs-guest/jobs/api/seeMoreJobPostings/search` никто не
-проверял. Он отвечает 200, отдаёт 30 карточек на страницу и поддерживает
-пагинацию.
+An earlier version of this document asserted that LinkedIn was unreachable. That
+was true of the main site and of the official API (closed behind a partner
+programme since 2015, and it does not serve job search at all), but nobody had
+checked the guest endpoint
+`jobs-guest/jobs/api/seeMoreJobPostings/search`. It answers 200, returns 30
+cards per page and supports pagination.
 
-Это главный источник проекта по географии: одним фетчером закрываются Израиль,
-ОАЭ, Саудовская Аравия, Сингапур, Швейцария, Германия, Нидерланды — рынки,
-чьи собственные борды (Bayt, GulfTalent, Drushim, NodeFlair, Glints) отвечают
-403/404, то есть альтернативы им просто нет.
+Geographically it is the project's main source: one fetcher covers Israel, the
+UAE, Saudi Arabia, Singapore, Switzerland, Germany and the Netherlands — markets
+whose own boards (Bayt, GulfTalent, Drushim, NodeFlair, Glints) answer 403/404,
+so there is simply no alternative.
 
-Цена — единственный HTML-парсер в проекте, зависящий от чужой вёрстки. Отсюда
-два обязательства: парсер возвращает **ноль и явную ошибку** при смене
-разметки (проверяется тестом на слепке), а карточки догружаются описанием со
-страницы вакансии, потому что без текста гейт стека отсекает три четверти
-найденного (замер: 447 из 621).
+The price is the project's only HTML parser that depends on somebody else's
+markup. Hence two obligations: the parser returns **zero and an explicit error**
+when the markup changes (pinned by a test against a snapshot), and the cards are
+enriched with the description from the vacancy page, because without the text
+the stack gate rejects three quarters of what was found (measured: 447 of 621).
 
-## Страны: импортёры и экспортёры разработки
+## Countries: importers and exporters of development work
 
-`config/derivation/market_tiers.yaml` делит рынки по направлению потока работы.
-Импортёры (США, Швейцария, Израиль, ОАЭ, Сингапур…) нанимают снаружи — там
-выше ставки и лучше отношение к удалённому подрядчику. Экспортёры (Индия,
-Пакистан, Филиппины…) сами поставляют инженеров, и локальные вакансии там
-конкурируют по цене вниз.
+`config/derivation/market_tiers.yaml` splits markets by the direction the work
+flows. Importers (the US, Switzerland, Israel, the UAE, Singapore…) hire from
+outside — the rates are higher there and remote contractors are treated better.
+Exporters (India, Pakistan, the Philippines…) supply engineers themselves, and
+local vacancies there compete downwards on price.
 
-Это описание направления потока, а не оценка людей или стран. Выбор ярусов
-принадлежит идентичности (`profile.target_markets`), сама таблица — общая.
+This describes the direction of flow rather than judging people or countries.
+Which tiers to use belongs to the identity (`profile.target_markets`); the table
+itself is shared.
 
-## Автоматические источники (`tools/fetch_*.py`)
+## Automatic sources (`tools/fetch_*.py`)
 
-| Источник | Тип | Вакансий за прогон | Почему включён |
+| Source | Kind | Vacancies per run | Why it is enabled |
 |---|---|---|---|
-| [We Work Remotely](https://weworkremotely.com/) — **5 категорийных RSS** | публичный RSS | **242** | Лучший источник проекта. Только удалённые вакансии, англоязычные, есть поле `region` ("Anywhere in the World" / "USA Only") — самый надёжный структурный гео-сигнал. **Важно**: используем все пять фидов (programming / full-stack / back-end / front-end / devops-sysadmin). Раньше использовался только `remote-programming-jobs` — это давало 25 вакансий вместо 242 (см. `data/<префикс>/knowledge/<префикс>_insights.md`, 2026-07-30). |
-| [RemoteOK](https://remoteok.com/api) | публичный JSON API | ~100 | Только remote. **Внимание**: фид периодически отдаёт нерелевантный контент (не вакансии) — парсер строго валидирует обязательные поля. Отдаёт только последние ~100 вакансий, глубины по времени нет. |
-| [Jobicy](https://jobicy.com/api/v2/remote-jobs) | публичный JSON API | ~100 | Только remote. Фильтр `industry=dev`. Даёт структурированную зарплату (`salaryMin/Max/Currency/Period`) и гео (`jobGeo`). Параметр `tag=` на практике возвращает пусто — не использовать. |
-| [Remotive](https://remotive.com/api/remote-jobs) | публичный JSON API | ~35 | Только remote. Поле `candidate_required_location` — явное структурное гео-ограничение. Параметры `limit`/`search`/`category` на практике игнорируются. |
-| [Himalayas](https://himalayas.app/jobs/api) | публичный JSON API | ~20 | Только remote. `locationRestrictions` — список разрешённых стран (пустой = worldwide), самый явный гео-сигнал из всех источников. Отдаёт ~20 вакансий независимо от `limit`. |
-| [Hacker News "Who is hiring?"](https://hn.algolia.com/) | публичный Algolia HN Search API | ~22 | Легаси/enterprise вакансии часто попадают именно сюда, а не на обычные джоб-борды. Формат вольный, много шума — но иногда именно здесь "тихие" вакансии без конкуренции. |
-| [Arbeitnow](https://www.arbeitnow.com/api/job-board-api) | публичный JSON API | ~175 | **НЕ основной источник, вопреки первоначальному предположению.** Замер 2026-07-30: по факту это преимущественно немецкий рынок труда — подавляющее большинство вакансий немецкоязычные ("m/w/d", "Deutschkenntnisse") и сразу отсекаются языковым фильтром, remote среди них меньшинство. Давал 68% всей базы при ~6% полезного выхода. Оставлен включённым ради редких англоязычных европейских remote-вакансий. |
+| [We Work Remotely](https://weworkremotely.com/) — **5 category RSS feeds** | public RSS | **242** | The project's best source. Remote vacancies only, in English, with a `region` field ("Anywhere in the World" / "USA Only") — the most dependable structured geography signal. **Important**: we use all five feeds (programming / full-stack / back-end / front-end / devops-sysadmin). Only `remote-programming-jobs` used to be used, which gave 25 vacancies instead of 242 (see the identity's `insights.md`, 2026-07-30). |
+| [RemoteOK](https://remoteok.com/api) | public JSON API | ~100 | Remote only. **Note**: the feed periodically returns irrelevant content that is not a vacancy, so the parser validates required fields strictly. It returns only the latest ~100 vacancies; there is no depth in time. |
+| [Jobicy](https://jobicy.com/api/v2/remote-jobs) | public JSON API | ~100 | Remote only. Filtered by `industry=dev`. Gives structured salary (`salaryMin/Max/Currency/Period`) and geography (`jobGeo`). The `tag=` parameter returns nothing in practice — do not use it. |
+| [Remotive](https://remotive.com/api/remote-jobs) | public JSON API | ~35 | Remote only. The `candidate_required_location` field is an explicit structured geography restriction. The `limit`, `search` and `category` parameters are ignored in practice. |
+| [Himalayas](https://himalayas.app/jobs/api) | public JSON API | ~20 | Remote only. `locationRestrictions` is a list of permitted countries (empty = worldwide), the most explicit geography signal of any source. Returns ~20 vacancies regardless of `limit`. |
+| [Hacker News "Who is hiring?"](https://hn.algolia.com/) | public Algolia HN Search API | ~22 | Legacy and enterprise vacancies often land here rather than on the ordinary job boards. The format is free-form and noisy — but sometimes this is where the quiet, uncontested vacancies are. |
+| [Arbeitnow](https://www.arbeitnow.com/api/job-board-api) | public JSON API | ~175 | **NOT a primary source, contrary to the initial assumption.** Measured 2026-07-30: in practice this is predominantly the German labour market — the overwhelming majority are German-language ("m/w/d", "Deutschkenntnisse") and are cut immediately by the language filter, and remote is a minority among them. It gave 68% of the whole base at about 6% useful yield. Left enabled for the occasional English-language European remote vacancy. |
+| [LinkedIn guest search](https://www.linkedin.com/jobs/) | undocumented HTML page, 200 to an ordinary GET | varies by query | See the section above. The one source that covers every market of interest at once. |
 
-### We Work Remotely: проверка добросовестности (2026-07-30)
+### We Work Remotely: a check on good faith (2026-07-30)
 
-Пользователь заметил, что WWR требует денег, и справедливо усомнился: не
-приманка ли это — выкладывать отличные вакансии, чтобы продавать подписки.
-Проверено:
+The user noticed that WWR charges money and reasonably wondered whether it was
+bait — posting excellent vacancies in order to sell subscriptions. Checked:
 
-- **Площадка не скам.** Создана 37signals (Basecamp, Ruby on Rails) в 2013,
-  работает больше 10 лет. Работодатель платит за размещение (~$299) — это
-  и есть основная модель, она же служит фильтром от мусорных объявлений.
-- **Соискателю платить не нужно.** Basic-аккаунт бесплатный: просмотр,
-  отклик, резюме, сохранённые вакансии. Платный Pro ($14.95/мес) даёт
-  только надстройки (AI-копилот, расширенные алерты).
-- **Но у Pro-подписки тёмный паттерн.** Цена «$2.95 за первый месяц»
-  подаётся так, что выглядит помесячной, а на деле это годовой контракт с
-  помесячной оплатой. По данным Trustpilot (март 2026) 34% отзывов —
-  одна звезда, и доминирующая тема жалоб именно биллинг и невозможность
-  отменить; есть сообщения о списаниях после удаления аккаунта.
-  **Вывод: подписку Pro не оформлять.**
-- **Вакансии настоящие.** В наших 242 записях встречаются прямые ссылки на
-  корпоративные сайты и настоящие ATS: `career.proxify.io`, `lemon.io`,
+- **The site is not a scam.** Created by 37signals (Basecamp, Ruby on Rails) in
+  2013, running for more than ten years. The employer pays to post (~$299),
+  which is the business model and also the filter against rubbish postings.
+- **A candidate does not have to pay.** A basic account is free: browsing,
+  applying, a CV, saved vacancies. The paid Pro tier ($14.95/month) only adds
+  extras (an AI copilot, extended alerts).
+- **But the Pro subscription has a dark pattern.** The price "$2.95 for the
+  first month" is presented so as to look monthly, while in fact it is an annual
+  contract billed monthly. According to Trustpilot (March 2026), 34% of reviews
+  are one star, and the dominant theme of the complaints is billing and the
+  inability to cancel; there are reports of charges after an account was
+  deleted. **Conclusion: do not take out the Pro subscription.**
+- **The vacancies are real.** Our 242 records include direct links to corporate
+  sites and real ATS instances: `career.proxify.io`, `lemon.io`,
   `redditinc.com`, `careers.tether.io`, `tether.recruitee.com`,
-  `wevote.applytojob.com`, `mindrift.ai`. Это не выдуманные объявления.
-- **Важный нюанс: воронку отклика WWR держит у себя.** В 71% вакансий поле
-  "To apply:" ведёт обратно на weworkremotely.com, а не к работодателю.
-  Поэтому фетчер извлекает из структурного блока описания
-  ("Headquarters: … / URL: …") официальный сайт компании в поле
-  `company_url`, и отчёт показывает его отдельной строкой — чтобы можно
-  было найти ту же вакансию на карьерной странице компании и откликнуться
-  напрямую, вообще не заводя аккаунт на WWR. Покрытие: ~24% вакансий
-  (58 из 242 в последнем прогоне).
+  `wevote.applytojob.com`, `mindrift.ai`. These are not invented postings.
+- **An important wrinkle: WWR keeps the application funnel to itself.** In 71%
+  of vacancies the "To apply:" field leads back to weworkremotely.com rather
+  than to the employer. So the fetcher extracts the company's official site from
+  the structured block of the description ("Headquarters: … / URL: …") into the
+  `company_url` field, and the report shows it on its own line — so that the
+  same vacancy can be found on the company's careers page and applied to
+  directly, without opening a WWR account at all. Coverage: about 24% of
+  vacancies (58 of 242 in the last run).
 
-### Флаг `remote_only`
+### The `remote_only` flag
 
-Источники, публикующие **только** удалённые вакансии (WWR, RemoteOK,
-Remotive, Jobicy, Himalayas), помечены в `config/sources.catalog.yaml` как
-`remote_only: true`. Это критично для скоринга: гейт "не подтверждено как
-remote" к ним не применяется. Реальный найденный баг (2026-07-30): вакансии
-с таких площадок отклонялись только потому, что в тексте описания не
-встретилось английское слово "remote" — чистый ложноотрицательный
-результат, вырезавший десятки живых кандидатов.
+Sources that publish **only** remote vacancies (WWR, RemoteOK, Remotive, Jobicy,
+Himalayas) are marked in `config/sources.catalog.yaml` as `remote_only: true`.
+That matters for scoring: the "not confirmed as remote" gate does not apply to
+them. A real bug found (2026-07-30): vacancies from such boards were being
+rejected purely because the English word "remote" did not appear in the
+description text — a pure false negative that cut dozens of live candidates.
 
-## Ручной источник (`tools/ingest_manual.py`)
+## The manual source (`tools/ingest_manual.py`)
 
-Всё, что требует авторизации, платной подписки или интерактивного обхода
-анти-бота, автоматикой не трогается:
+Anything that requires authorisation, a paid subscription or interactive
+circumvention of anti-bot protection is left alone by the automation:
 
-- **LinkedIn Jobs** — главный кандидат на лучшие находки (enterprise,
-  Big Four, банки/страховые), но авторизация и активная защита от
-  скрейпинга делают автоматизацию нелегитимной. Агент ищет вручную через
-  WebSearch (`site:linkedin.com/jobs ...`) и заносит вручную.
-- **Indeed, Dice, ClearanceJobs, Glassdoor** — то же самое: доступны для
-  просмотра человеком/агентом через обычный веб-поиск, но не для
-  программного скрейпинга в этом проекте.
-- **Карьерные страницы конкретных компаний** — у каждой свой формат,
-  нет смысла писать по парсеру на каждую; агент проверяет точечно те
-  компании, которые уже показали хорошие сигналы (legacy/enterprise/EOR)
-  в базе знаний идентичности.
-- **ATS-доски компаний** — исключение из правила выше: у Greenhouse, Lever,
-  Ashby и Recruitee есть официальные публичные JSON API, они читаются
-  автоматически (источник `ats`). Забора там нет.
+- **Indeed, Dice, ClearanceJobs, Glassdoor** — reachable for a person or an
+  agent to look at through ordinary web search, but not for programmatic
+  scraping in this project: they answer 403 to a plain request.
+- **Particular companies' careers pages** — each has its own format, and writing
+  a parser per company is pointless; the agent checks, one at a time, the
+  companies that have already shown good signals (legacy, enterprise, EOR) in
+  the identity's knowledge base.
+- **Companies' ATS boards** — the exception to the rule above: Greenhouse,
+  Lever, Ashby, Recruitee, Workable and SmartRecruiters have official public
+  JSON APIs, and they are read automatically (the `ats` source). There is no
+  fence there.
 
-## Явно НЕ делаем
+## What we explicitly do not do
 
-- Не обходим anti-bot/CAPTCHA ни для одного источника.
-- Не логинимся под учётными записями для скрейпинга.
-- Не превышаем разумную частоту запросов к публичным API (пайплайн
-  запускается по требению, не по cron каждую минуту).
-- Не храним никаких учётных данных/токенов в репозитории — все текущие
-  источники этого не требуют.
+- We do not circumvent anti-bot protection or CAPTCHAs for any source.
+- We do not log in under an account in order to scrape.
+- We do not exceed a reasonable request rate against public APIs (the pipeline
+  runs on demand, not from a cron entry every minute).
+- We store no credentials or tokens in the repository — none of the current
+  sources require any.

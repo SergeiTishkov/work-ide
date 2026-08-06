@@ -1,332 +1,315 @@
-# Онбординг: как начать работу с нуля
+# Onboarding: starting from nothing
 
-Процедура для агента, который открыл этот проект и не имеет активной
-идентичности. Пока идентичности нет — **поиск запрещён** (Большая Конституция,
-правило №0), и первая задача агента не искать вакансии, а провести человека
-через эту процедуру.
+The procedure for an agent that has opened this project and has no active
+identity. Until an identity exists, **searching is forbidden** (the
+constitution, rule zero), and the agent's first task is not to look for
+vacancies but to take the person through this procedure.
 
-Исключение: доработка самих инструментов разрешена всегда, она не привязана к
-идентичности.
+The exception: work on the tools themselves is always allowed — it is not tied
+to an identity.
 
-## Шаг 0. Понять, в каком состоянии система
+## Step 0. Establish the state of the system
 
 ```bash
 python tools/identity.py which
 ```
 
-| Ответ | Что делать |
+| Answer | What to do |
 |---|---|
-| Показал идентичность | Всё готово, онбординг не нужен |
-| «Не выбрана поисковая идентичность» | Идти дальше по этому документу |
-| «Активных несколько, дефолт не задан» | Спросить человека, какая нужна сейчас |
+| It named an identity | Everything is ready, no onboarding needed |
+| "No search is set up" | Carry on with this document |
+| "Several exist and none was chosen" | Ask the person which one is wanted now |
 
-## Шаг 1. Выяснить, есть ли подходящая идентичность
-
-```bash
-python tools/identity.py list
-```
-
-Если в репозитории уже есть идентичность, которая человеку подходит (например,
-её принёс коллега через PR) — переходите к шагу 5, регистрации.
-
-Чужую идентичность **нельзя копировать и править**: гео-правила и языковые
-фильтры выведены из чужого резидентства и чужих языков. Их нужно генерировать
-заново, см. шаг 4.
-
-## Шаг 2. Попросить у человека информацию о себе
-
-**Это первое, что нужно спросить.** Без этого нельзя собрать ни стек, ни
-уровень, ни ожидания.
-
-Достаточно любого из трёх, лучше нескольких:
-
-- **CV файлом** — попросить положить его в
-  `local-constitution/personal/<будущий-префикс>/` (папка вне гита) либо указать
-  путь, чтобы агент скопировал сам;
-- **ссылку на LinkedIn** — но с оговоркой: публичный срез без логина неполон и
-  однажды выдал недостоверные данные о языках. При расхождении с CV или словами
-  человека верить человеку;
-- **рассказ своими словами** — тоже полностью рабочий вариант.
-
-Если человек прислал CV, но папки ещё нет — создать её на шаге 3 и положить файл
-туда, а не оставлять в корне репозитория: личные документы не должны попасть в
-общий репозиторий (они в `.gitignore`, но лучше не проверять это на практике).
-
-**Имя файла при этом не менять.** Правило префиксов на чужие документы не
-распространяется: `CV Ivan Petrov Software Engineer.pdf` так и остаётся —
-копируем, а не переименовываем. Путь с пробелами спокойно пишется в
-`profile.owner.cv_files`. См. `docs/LOCAL_CONSTITUTION.md`.
-
-## Шаг 3. Придумать префикс и создать папку
-
-Агент предлагает 2–3 варианта с расшифровкой, человек выбирает. Требования — в
-`identities/README.md`: 3–6 строчных латинских символов, звучный, называет
-**суть поиска**, а не имя человека.
+## Step 1. Find out whether a suitable template exists
 
 ```bash
-python tools/identity.py new --prefix <префикс> --name "<расшифровка фразой>"
+python tools/templates.py list
 ```
 
-Расшифровка станет частью имени папки:
-`identities/<префикс>-<расшифровка-через-дефис>/`. Диктовать её человек может
-обычной фразой — приводить к виду имени папки будет инструмент. Файлы внутри
-останутся короткими (`<префикс>_criteria.yaml`), см. `identities/README.md`.
+A template is a KIND of search — stack, criteria, sources — with not one
+personal fact in it. If one fits the person, clone it (step 3). If none fits,
+`blank` is a full set of files with comments and no decisions made for you.
 
-Команда копирует шаблон, переименовывает каждый файл под префикс, подставляет
-префикс внутри файлов и сразу прогоняет структурную проверку. Малую Конституцию
-она **не трогает**: активация — отдельное решение человека (шаг 5).
+## Step 2. Ask the person about themselves
 
-Копировать файлы руками не нужно, и лучше этого не делать. Раньше здесь стоял
-список из шести `copy` с переименованием каждого файла — и проект на нём уже
-обжёгся: в тестовую фикстуру попал файл, ссылавшийся на `kisel_`, то есть ровно
-та копипаста, от которой защищает правило префиксов.
+**This is the first thing to ask.** Without it there is no way to assemble a
+stack, a level or a set of expectations.
 
-## Шаг 3a. Отделить личное от характеристик поиска
+Any one of the three will do, and several are better:
 
-Делается не в конце, а сразу: как только начали заполнять профиль. Иначе личные
-данные попадут в файлы, которые уедут в общий репозиторий, и вычищать их придётся
-задним числом.
+- **a CV file** — ask them to put it in the identity's `documents/` folder
+  (outside git) once it exists, or to give a path so the agent can copy it;
+- **a LinkedIn link** — with a caveat: the public view without a login is
+  incomplete, and once produced wrong data about languages. Where it disagrees
+  with the CV or with the person, believe the person;
+- **an account in their own words** — a perfectly workable option too.
 
-Проверочный вопрос ровно один:
+If the person sent a CV before the folder exists, create the identity in step 3
+and put the file there rather than leaving it at the repository root: personal
+documents must not reach the shared repository (they are in `.gitignore`, but
+better not to test that in practice).
 
-> **Изменится ли это, если тем же поиском воспользуется другой человек?**
-> Да — в Малую Конституцию. Нет — в идентичность.
+**Do not change the file name.** The prefix rule does not extend to somebody
+else's documents: `CV Ivan Petrov Software Engineer.pdf` stays as it is — copy
+it, do not rename it. A path with spaces goes into `profile.owner.cv_files`
+without trouble.
 
-| В Малую Конституцию (вне гита) | В идентичность (в гите) |
+## Step 3. Choose a prefix and clone the template
+
+The agent offers two or three options with expansions and the person picks one.
+The requirements are in `identity-templates/README.md`: 3-6 lowercase Latin
+characters, pronounceable, naming **what the search is about** rather than the
+person.
+
+```bash
+python tools/templates.py clone <template> <prefix> "<expansion as a phrase>"
+```
+
+The expansion becomes part of the folder name:
+`local-identities/<prefix>-<expansion-with-hyphens>/`. The person can dictate it
+as an ordinary phrase — turning it into a folder name is the tool's job. The
+files inside stay short (`<prefix>_criteria.yaml`).
+
+The command copies the template's files into `<identity>/template/` verbatim,
+renames each to the new prefix, writes `identity.yaml` pinning the template
+version, and creates `documents/` for personal files.
+
+Do not copy files by hand, and preferably do not try. This step used to be a
+list of six `copy` commands with a rename each — and the project has already
+been burned on it: a file referencing `kisel_` ended up inside the test fixture,
+which is precisely the copy-paste the prefix rule protects against.
+
+## Step 3a. Separate the personal from what describes the search
+
+Do this at once, as soon as you start filling in the profile, rather than at the
+end. Otherwise personal data lands in files that will go to the shared
+repository, and cleaning it out afterwards is work.
+
+There is exactly one test question:
+
+> **Would this change if another person used the same search?**
+> Yes — into your local identity. No — into the template.
+
+| Local identity (outside git) | Template (in git) |
 |---|---|
-| Имя, LinkedIn, CV, почта | Уровень, стек, тип занятости |
-| Страна проживания, часовой пояс | Гео-правила и языковой фильтр, **выведенные** из них |
-| Стаж в годах | Целевые регионы найма |
-| Зарплатные ожидания | Признаки подходящей компании, источники |
+| Name, LinkedIn, CV, email | Level, stack, employment type |
+| Country of residence, time zone | The geography rules and language filter **derived** from them |
+| Years of experience | Target hiring markets |
+| Pay expectations | Marks of a suitable company, sources |
 
-В профиле идентичности на месте личного поля ставится `local` — значение
-подставится из `local-constitution/personal/<префикс>/<префикс>_owner.yaml`
-(шаг 5 создаёт этот файл заготовкой). Без него идентичность считается
-незаполненной и поиск не запустится: молча подставить пустоту нельзя.
+Personal settings go into files at the root of your identity folder, beside the
+`template/` copy: `<prefix>_profile.yaml` holds only your DIFFERENCES from the
+template, and they are layered on top (see `docs/OVERRIDES.md`). Until the
+required personal fields are filled in, the identity counts as unfinished and
+the search will not run: substituting emptiness silently is not allowed.
 
-**Исключение — поиск, привязанный к стране по существу.** «Ищу работу именно в
-Германии» означает, что страна не личные данные, а определение идентичности:
-тогда она пишется литерально. Подробнее и с примером —
-`docs/IDENTITIES.md`, раздел «Граница: что личное, что характеристика поиска».
+**The exception is a search tied to a country in substance.** "I am looking for
+work in Germany specifically" means the country is not personal data but part of
+the identity's definition, and then it is written literally. More, with an
+example, in `docs/IDENTITIES.md`, "The boundary: what is personal, what
+describes the search".
 
-## Шаг 4. Заполнить вопросник вместе с человеком
+## Step 4. Fill in the questionnaire together with the person
 
-Как вести разговор — `docs/QUESTIONNAIRE.md`. Коротко:
+How to run the conversation is in `docs/QUESTIONNAIRE.md`. In short:
 
-- вопросы задаются **вместе с человеком**, а не заполняются догадками;
-- «мне всё равно» — валидный ответ, у большинства вопросов есть разумное
-  умолчание;
-- четыре блока обязательны и умолчания не имеют: **резидентство, языки,
-  core-стек, набор источников**. Без них идентичность не собрать — и это
-  практическое воплощение правила «нет идентичности — нет поиска».
+- the questions are asked **together with the person**, not filled in by
+  guesswork;
+- "I don't mind" is a valid answer; most questions have a sensible default;
+- four blocks are mandatory and have no default: **residency, languages, the
+  core stack, and the set of sources**. Without them an identity cannot be
+  assembled — that is the practical form of "no identity, no search".
 
-По ответам заполняются `<префикс>_profile.yaml` и `<префикс>_criteria.yaml`.
+The answers fill in `<prefix>_profile.yaml` and `<prefix>_criteria.yaml`.
 
-**Гео-правила и языковые фильтры выводятся**, а не копируются, по таблицам из
-`config/derivation/`:
+**Geography rules and language filters are derived**, not copied, from the
+tables in `config/derivation/`:
 
-- резидент региона → фразы «only в этом регионе» становятся **плюсом**;
-- не резидент → те же фразы становятся **дисквалификатором**;
-- в языковой фильтр попадают языки, которых человек **не** знает.
+- resident of a region → phrases saying "only in this region" become a **plus**;
+- not a resident → the same phrases become a **disqualifier**;
+- the language filter gets the languages the person does **not** know.
 
-Ошибиться здесь легко, а последствия тихие: система будет либо выбрасывать
-половину рынка, либо наполнять выдачу вакансиями, куда человека не возьмут.
+It is easy to get this wrong, and the consequences are quiet: the system will
+either throw away half the market, or fill the shortlist with vacancies the
+person will never be hired for.
 
-## Шаг 5. Зарегистрировать идентичность в Малой Конституции
+## Step 5. Personal files
 
-```bash
-python tools/identity.py init-local --identity <префикс> --note "<зачем этот поиск>"
-```
+Put the CV in `local-identities/<prefix>-<expansion>/documents/`, under its own
+name. The whole folder is outside git.
 
-Команда разворачивает `local-constitution/`, создаёт папку личных файлов и
-добавляет запись в `active.yaml`. Идемпотентна: повторный запуск ничего не
-портит, а файл с уже правильным содержимым вообще не трогает — в нём человек
-пишет комментарии, и перезапись их стёрла бы.
+If the person has an email address to use in the User-Agent, put it in their
+`<prefix>_profile.yaml` under `contact.user_agent_contact`. That keeps the
+User-Agent honest while the address stays outside the shared repository.
 
-Если это **не первая** идентичность на машине, команда заодно проставит
-`default_identity`. Без него две активные идентичности ломают команды у той,
-что работала до сих пор — см. `docs/IDENTITIES.md`.
-
-Если у человека есть личная почта для User-Agent — положить её в
-`local-constitution/personal/<префикс>/<префикс>_contact.yaml`, а в профиле
-оставить `user_agent_contact: "local"`. Так честный User-Agent сохраняется, а
-личная почта не попадает в общий репозиторий.
-
-## Шаг 6. Проверить
+## Step 6. Check
 
 ```bash
-python tools/identity.py validate --identity <префикс>
+python tools/identity.py validate --identity <prefix>
 python tools/identity.py which
-python tools/doctor.py --identity <префикс>
+python tools/doctor.py --identity <prefix>
 ```
 
-`doctor` должен показать зелёное по идентичности, конфигам и записи в `data/`.
-Проверки доступности источников — предупреждения, а не ошибки.
+`doctor` should be green on the identity, the configuration and writing to
+`data/`. Source reachability checks are warnings rather than errors.
 
-## Шаг 6a. Сказать человеку, что идентичность может быть не одна
+## Step 6a. Tell the person there can be more than one identity
 
-Короткая, но обязательная реплика — её легко забыть, а человек сам не догадается,
-потому что просил «настроить поиск работы», а не «мультипрофильную систему».
+A short but mandatory remark — easy to forget, and the person will not think of
+it themselves, because they asked to "set up a job search", not for a
+multi-profile system.
 
-Сказать нужно ровно две вещи:
+Exactly two things need saying:
 
-1. **Идентичностей может быть несколько, и они не мешают друг другу.** У каждой
-   своя база вакансий, свой отчёт, свои фильтры. Пересечений нет — ни в данных,
-   ни в настройках.
-2. **Зачем это бывает нужно.** Типовые случаи, которые стоит назвать вслух:
-   - один и тот же человек ищет **два разных типа работы**: спокойную
-     занятость на 2–4 часа в день и, параллельно, полную ставку. Это
-     противоположные критерии: то, что для одной идентичности плюс (part-time,
-     контракт, «скучно»), для другой минус. В одной рубрике их не выразить;
-   - человек хочет **попробовать другой стек или регион**, не ломая уже
-     настроенный поиск;
-   - проектом пользуется **кто-то ещё** — коллега, друг, супруг: у него свой CV,
-     своё резидентство, свои языки.
+1. **There can be several identities, and they do not interfere.** Each has its
+   own vacancy database, its own report, its own filters. There is no overlap,
+   in the data or in the settings.
+2. **Why that is sometimes wanted.** The typical cases worth naming aloud:
+   - the same person looking for **two different kinds of work**: calm work at
+     2-4 hours a day and, in parallel, a full-time role. Those are opposite
+     criteria: what is a plus for one identity (part-time, contract, "dull") is
+     a minus for the other. One rubric cannot express both;
+   - the person wanting to **try another stack or region** without breaking a
+     search that is already tuned;
+   - **somebody else** using the project — a colleague, a friend, a partner:
+     they have their own CV, their own residency, their own languages.
 
-Не уговаривать. Достаточно, чтобы человек знал о такой возможности и мог
-вернуться к ней позже — процедура для «позже» описана ниже, в разделе
-«Вторая и последующие идентичности».
+Do not push. It is enough that the person knows the possibility exists and can
+come back to it later — the procedure for "later" is below, under "Second and
+subsequent identities".
 
-## Шаг 7. Первый прогон
+## Step 7. The first run
 
 ```bash
-python tools/pipeline.py --identity <префикс>
+python tools/pipeline.py --identity <prefix>
 ```
 
-Дальше — обычный цикл из `RUNBOOK.md`, включая **обязательный** ручной чек-лист
-по кандидатам (`docs/VACANCY_CHECKLIST.md`).
+After that it is the ordinary cycle from `RUNBOOK.md`, including the
+**mandatory** manual candidate checklist (`docs/VACANCY_CHECKLIST.md`).
 
-Первый прогон почти наверняка вскроет неточности в настройках: слишком строгий
-фильтр, ненужный источник, пропущенный дисквалификатор. Это нормально и
-ожидаемо — правьте `<префикс>_criteria.yaml` и перезапускайте. Каждую правку,
-подтверждённую человеком, дописывайте в журнал решений в
-`<префикс>_identity.md`, иначе через месяц никто не вспомнит, почему настройка
-именно такая.
+The first run will almost certainly expose inaccuracies in the settings: a
+filter too strict, an unwanted source, a missing disqualifier. That is normal
+and expected — edit `<prefix>_criteria.yaml` and run again. Write every change
+the person confirms into the decision log in `<prefix>_identity.md`, or in a
+month nobody will remember why a setting is what it is.
 
 ---
 
-# Вторая и последующие идентичности
+# Second and subsequent identities
 
-Отдельный раздел, потому что это **другая** ситуация: идентичность уже есть, она
-работает, у неё накоплена база и история. Всё выше написано для состояния «нет
-ничего», и шаг 0 там прямо говорит «показал идентичность → онбординг не нужен».
-Здесь онбординг как раз нужен, просто другой.
+A separate section, because this is a **different** situation: an identity
+already exists, it works, and it has an accumulated base and history. Everything
+above is written for "there is nothing", and step 0 there says outright "it
+named an identity → no onboarding needed". Here onboarding IS needed, just a
+different one.
 
-## Как распознать этот запрос
+## Recognising the request
 
-Человек почти никогда не говорит «добавь идентичность». Он говорит:
+A person almost never says "add an identity". They say:
 
-- «а можно настроить ещё один фильтр / ещё один поиск?»
-- «хочу параллельно поискать полную ставку»
-- «а можно то же самое, но для моего друга / жены?»
-- «хочу попробовать другой стек, но текущий поиск не ломать»
+- "can we set up another filter, another search?"
+- "I want to look for a full-time role in parallel"
+- "can we do the same for my friend / my wife?"
+- "I want to try another stack without breaking the current search"
 
-Всё это — запрос на новую идентичность. **Не** правка существующей: если начать
-подмешивать вторую цель в уже настроенные критерии, обе выдачи станут хуже, и
-заметить это по отчёту будет почти невозможно.
+All of that is a request for a new identity. It is **not** an edit to the
+existing one: blending a second goal into criteria that are already tuned makes
+both shortlists worse, and the report will make that almost impossible to spot.
 
-## Алгоритм
+## The procedure
 
-**1. Понять, точно ли нужна новая идентичность.** Три вопроса, по порядку:
+**1. Decide whether a new identity is really needed.** Three questions, in
+order:
 
-| Вопрос | Если «да» |
+| Question | If yes |
 |---|---|
-| Это другой **человек** (другой CV, резидентство, языки)? | Новая идентичность, без вариантов |
-| Это тот же человек, но **противоположные критерии** (part-time против полной ставки, «скучное» против интересного)? | Новая идентичность |
-| Это просто **уточнение** текущего поиска (добавить источник, снять лишний фильтр)? | НЕ новая идентичность — правьте существующую |
+| Is this a different **person** (different CV, residency, languages)? | A new identity, no question |
+| Is it the same person but with **opposite criteria** (part-time versus full-time, "dull" versus interesting)? | A new identity |
+| Is it simply a **refinement** of the current search (add a source, drop an unwanted filter)? | NOT a new identity — edit the existing one |
 
-Третий случай встречается чаще всего, и путать его с первыми двумя дорого:
-лишняя идентичность разделит накопленную базу на две неполные.
+The third case is the commonest, and confusing it with the first two is
+expensive: a superfluous identity splits an accumulated base into two incomplete
+ones.
 
-**1a. Если новый поиск похож на существующий — клонировать, а не собирать
-заново.** Типичный случай: «то же самое, но по другой стране».
-
-```bash
-python tools/identity.py clone --from <исходный> --prefix <новый> --name "<расшифровка>"
-```
-
-Стек, тип занятости, признаки компании и источники у такого поиска общие;
-различаются гео-правила, языковой фильтр и часовой пояс. Команда печатает
-список того, что обязательно проверить в клоне. Подробнее — `docs/IDENTITIES.md`,
-раздел «Клонирование».
-
-Если же новый поиск не похож на существующий — идите по обычному пути:
-
-**2. Пройти шаги 2–4 обычного онбординга** — информация о человеке, префикс,
-вопросник. Ничего не переиспользовать из существующей идентичности, даже если
-это тот же человек: гео-правила и языки выводятся из ответов, а цели у двух
-идентичностей разные по определению.
-
-Если это тот же человек, у которого уже есть CV в Малой Конституции — сам файл
-CV копировать не нужно, достаточно указать на него путь в новом
-`<префикс>_profile.yaml → owner.cv_files`. Личные документы не дублируются.
-
-**3. Зарегистрировать в Малой Конституции — и сразу задать `default_identity`.**
-
-Это единственный шаг, где легко сломать то, что работало. Вот механика:
-
-| Активных идентичностей | Команда без `--identity` |
-|---|---|
-| 1 | Работает молча, берёт единственную |
-| 2+ и `default_identity` задан | Работает, берёт дефолт, печатает баннер |
-| 2+ и `default_identity` НЕ задан | **Отказывается работать** |
-
-То есть добавление второй записи в `active.yaml` без `default_identity` ломает
-не новую идентичность, а **старую**: все привычные команды вида
-`python tools/pipeline.py` начнут падать. `identity.py new` предупреждает об этом
-прямо в выводе, но проверить стоит самому:
+**1a. If the new search resembles an existing one, clone it rather than
+assembling it again.** The typical case: "the same thing, but for another
+country".
 
 ```bash
-python tools/identity.py which     # должен назвать идентичность, а не список
+python tools/identity.py clone --from <source> --prefix <new> --name "<expansion>"
 ```
 
-**4. Сверить с шаблоном.** Существующая идентичность могла обогнать шаблон или
-отстать от него:
+Stack, employment type, marks of a suitable company and sources are shared for
+such a search; the geography rules, language filter and time zone are not. The
+command prints the list of what must be checked in the clone. More in
+`docs/IDENTITIES.md`, "Cloning".
+
+If the new search does not resemble the existing one, take the ordinary route:
+
+**2. Go through steps 2-4 of ordinary onboarding** — information about the
+person, a prefix, the questionnaire. Reuse nothing from the existing identity,
+even for the same person: the geography rules and languages are derived from the
+answers, and the two identities' goals differ by definition.
+
+If it is the same person, whose CV is already in another identity's
+`documents/`, there is no need to copy the file: point the new
+`<prefix>_profile.yaml → owner.cv_files` at the existing path. Personal
+documents are not duplicated.
+
+**3. Check how a run will be launched from now on.** With one identity, tools
+pick it silently. With two, a command without `--identity` refuses, naming both:
 
 ```bash
-python tools/identity.py diff-template --identity <новый-префикс>
+python tools/identity.py which     # should name an identity, not a list
 ```
 
-Отчёт покажет, каких блоков машинерии нет. Слияние **только вручную**: чужой
-блок может изменить поведение поиска.
+That refusal is deliberate — silently picking the wrong identity is the failure
+the whole system exists to prevent. But it does mean that the habit of typing
+`python tools/pipeline.py` with no flags stops working, including for the
+identity that had been working for months. Agree with the person which identity
+is the usual one and remind them the flag is now needed.
 
-**5. Прогнать и проверить.**
+**4. Compare against the template.** The existing identity may have moved ahead
+of its template or fallen behind:
 
 ```bash
-python tools/doctor.py   --identity <новый-префикс>
-python tools/pipeline.py --identity <новый-префикс>
+python tools/templates.py check --identity <new-prefix>
 ```
 
-У новой идентичности своя папка `data/<префикс>/` — база начинается с нуля, и
-это нормально. Первые прогоны дадут мало кандидатов.
-
-**6. Проговорить с человеком, как теперь запускать.** После появления второй
-идентичности «запусти обычный цикл» стало неоднозначным. Договоритесь, какая
-идентичность по умолчанию, и напомните, что для второй нужен флаг. Запишите
-договорённость в `local-constitution/ACTIVE_IDENTITIES.md` — человекочитаемое
-зеркало `active.yaml`, оно существует именно для таких заметок.
-
-## Проверка изоляции
-
-Стоит один раз убедиться своими глазами, что идентичности действительно не
-пересекаются:
+**5. Run and check.**
 
 ```bash
-python tools/identity.py list                       # обе на месте
-python tools/kb.py stats --identity <первый>        # своя база
-python tools/kb.py stats --identity <второй>        # своя, другая
+python tools/doctor.py   --identity <new-prefix>
+python tools/pipeline.py --identity <new-prefix>
 ```
 
-Числа обязаны различаться, а `data/<первый>/` и `data/<второй>/` — быть
-разными папками. Изоляция обеспечена кодом (`common.require_identity()` и
-маркер `data/<префикс>/.identity`), но увидеть её один раз полезно.
+A new identity has its own `data/<prefix>/` folder — the base starts from
+nothing, and that is normal. The first runs will yield few candidates.
+
+## Checking the isolation
+
+It is worth confirming once, with your own eyes, that the identities really do
+not overlap:
+
+```bash
+python tools/identity.py list                       # both present
+python tools/kb.py stats --identity <first>         # its own base
+python tools/kb.py stats --identity <second>        # its own, different
+```
+
+The numbers must differ, and `data/<first>/` and `data/<second>/` must be
+different folders. The isolation is guaranteed by code
+(`common.require_identity()` and the `data/<prefix>/.identity` marker), but
+seeing it once is useful.
 
 ---
 
-## Чего делать нельзя
+## What must not be done
 
-- Начинать поиск без активной идентичности.
-- Копировать чужую идентичность и править под себя (гео и языки чужие).
-- Класть CV или личную почту в `identities/` — это общая папка.
-- Синхронизировать `identities/ftf/` с живыми идентичностями: она заморожена
-  намеренно.
+- Starting a search without an active identity.
+- Copying somebody else's identity and editing it to fit (their geography and
+  languages are theirs).
+- Putting a CV or a personal email address into `identity-templates/` — that
+  folder is shared and is in git.
+- Synchronising the `ftf` fixture with live identities: it is frozen
+  deliberately.

@@ -1,169 +1,177 @@
-# Малая Конституция — спецификация (СЛОЙ УПРАЗДНЁН 2026-08-06)
+# The Local Constitution — specification (LAYER RETIRED 2026-08-06)
 
-> **Этот слой больше не используется.** Документ оставлен, чтобы объяснить, что
-> делать с папкой `local-constitution/`, если она у вас есть с прежних версий.
+> **This layer is no longer used.** The document is kept to explain what to do
+> with a `local-constitution/` folder if you have one from an earlier version.
 >
-> **Чем заменён.** Раньше слоёв было три: Большая Конституция (в гите),
-> идентичность (в гите) и Малая Конституция (вне гита) — последняя существовала
-> ровно затем, чтобы личные данные не попали в общий репозиторий. Теперь граница
-> проходит по самому гиту:
+> **What replaced it.** There used to be three layers: the constitution (in
+> git), the identity (in git) and the Local Constitution (outside git) — the
+> last existing precisely so that personal data did not reach the shared
+> repository. The boundary now runs along git itself:
 >
 > ```
-> identity-templates/   ТИП поиска, в гите, ни одного личного факта
-> local-identities/     ВАШ поиск, вне гита, здесь можно всё
+> identity-templates/   the KIND of search, in git, not one personal fact
+> local-identities/     YOUR search, outside git, anything goes
 > ```
 >
-> Прятать личные поля внутри публичного файла больше не от кого, поэтому вместе
-> со слоем исчез и сентинел `local`, и весь класс ошибок вокруг него: скоринг
-> больше не может получить строку `"local"` вместо списка языков.
+> There is no longer anybody to hide personal fields from inside a public file,
+> so the `local` sentinel went with the layer, and the whole class of mistakes
+> around it: scoring can no longer receive the string `"local"` where a list of
+> languages was expected.
 >
-> Реестр активных идентичностей (`active.yaml`) тоже упразднён: количество папок
-> в `local-identities/` и есть ответ на вопрос «какие поиски настроены», и
-> разойтись с диском оно не может.
+> The registry of active identities (`active.yaml`) is retired too: the number
+> of folders in `local-identities/` IS the answer to "which searches are set
+> up", and it cannot drift away from the disk.
 >
-> **Что делать с папкой.** Ничего обязательного. При миграции содержимое
-> копируется в вашу локальную идентичность:
+> **What to do with the folder.** Nothing is required. When migrating, the
+> contents move into your local identity:
 >
-> | было | стало |
+> | was | is now |
 > |---|---|
-> | `personal/<p>/<p>_owner.yaml` | `local-identities/<папка>/<p>_profile.yaml` |
-> | `personal/<p>/<p>_contact.yaml` | там же, ключ `contact` |
-> | `personal/<p>/CV *.pdf` | `local-identities/<папка>/documents/` |
-> | `active.yaml` | не нужен — реестр это сами папки |
+> | `personal/<p>/<p>_owner.yaml` | `local-identities/<folder>/<p>_profile.yaml` |
+> | `personal/<p>/<p>_contact.yaml` | the same file, under the `contact` key |
+> | `personal/<p>/CV *.pdf` | `local-identities/<folder>/documents/` |
+> | `active.yaml` | not needed — the folders are the registry |
 >
-> Оригиналы при этом **не удаляются**: проект не трогает личные файлы человека
-> (CLAUDE.md §5). Убедитесь, что всё нужное переехало, и удалите папку сами —
-> или оставьте, она ничему не мешает.
+> The originals are **not deleted**: the project does not touch a person's
+> personal files (CLAUDE.md §5). Check that everything you need has moved, then
+> delete the folder yourself — or leave it, it gets in nobody's way.
 >
-> Актуальная архитектура — [IDENTITIES.md](IDENTITIES.md) и
-> [OVERRIDES.md](OVERRIDES.md). Ниже — прежняя спецификация, как она была.
+> The current architecture is in [IDENTITIES.md](IDENTITIES.md) and
+> [OVERRIDES.md](OVERRIDES.md). What follows is the former specification, as it
+> stood.
 
 ---
 
-## Что это
+## What it was
 
-Локальный слой: какие идентичности активны на этой машине у этого человека, и
-его личные файлы. Репозиторий общий, выбор идентичности и CV — личные.
+A local layer: which identities were active on this machine for this person, and
+their personal files. The repository is shared; the choice of identity and the
+CV are personal.
 
-Название по контрасту с Большой Конституцией (`CLAUDE.md`): та задаёт правила
-для всех и лежит в гите, эта — для одного человека и в гит не попадает.
+The name contrasted with the constitution (`CLAUDE.md`): that one sets the rules
+for everybody and lives in git, this one was for one person and stayed out of
+it.
 
-## Раскладка
+## The layout
 
 ```
 local-constitution/
-├─ README.md                 # что это (копия из docs/templates/)
-├─ active.yaml               # МАШИНОЧИТАЕМОЕ: какие идентичности активны
-├─ ACTIVE_IDENTITIES.md      # человекочитаемое зеркало: почему именно эти
-├─ LOCAL_NOTES.md            # личные выводы, не годящиеся для общих слоёв
+├─ README.md                 # what this is (a copy from docs/templates/)
+├─ active.yaml               # MACHINE-READABLE: which identities are active
+├─ ACTIVE_IDENTITIES.md      # a human-readable mirror: why these ones
+├─ LOCAL_NOTES.md            # personal conclusions unfit for the shared layers
 └─ personal/
-   └─ <префикс>/
-      ├─ CV Ivan Petrov Software Engineer.pdf   # имя от владельца, НЕ переименовывать
-      ├─ <префикс>_owner.yaml                   # личная часть профиля идентичности
-      ├─ <префикс>_contact.yaml                 # контакт для честного User-Agent
-      └─ <префикс>_private_notes.md             # создан проектом — с префиксом
+   └─ <prefix>/
+      ├─ CV Ivan Petrov Software Engineer.pdf   # the owner's name, NOT renamed
+      ├─ <prefix>_owner.yaml                    # the personal part of the profile
+      ├─ <prefix>_contact.yaml                  # a contact for an honest User-Agent
+      └─ <prefix>_private_notes.md              # created by the project, so prefixed
 ```
 
-## Личные предпочтения, влияющие на оценку
+## Personal preferences that affect the score
 
-Отдельный случай, который легко положить не в тот слой: причина предпочесть
-что-то, никак не связанная ни с рынком, ни с профилем поиска.
+A separate case, easy to put in the wrong layer: a reason to prefer something
+that has nothing to do with the market or with the search profile.
 
-Пример из практики (2026-08-05): удалённая работа на белорусскую компанию
-ценна тем, что позволяет платить налоги дома и набирать пенсионный стаж. Это
-не свойство рынка (рынок про ставки) и не свойство поиска (идентичность
-«спокойная легаси-удалёнка» переиспользуема кем угодно) — это обстоятельство
-конкретного человека.
+A case from practice (2026-08-05): remote work for a company in a particular
+country was valuable because it let the person pay tax at home and accrue
+pension credit. That is not a property of the market (the market is about rates)
+nor of the search (an identity for "calm legacy remote work" is reusable by
+anyone) — it is a circumstance of one person.
 
 ```yaml
-# local-constitution/personal/<префикс>/<префикс>_owner.yaml
+# local-constitution/personal/<prefix>/<prefix>_owner.yaml
 personal_market_bonus:
   Belarus:
     points: 12
-    remote_only: true      # надбавка имеет смысл только для удалённой работы
-    why: "Налоги дома идут в пенсионный стаж"
+    remote_only: true      # the bonus only makes sense for remote work
+    why: "Tax paid at home counts towards pension credit"
 ```
 
-В профиле идентичности стоит `personal_market_bonus: local` — то есть сама
-идентичность лишь объявляет, что такая надбавка возможна, а её содержание
-остаётся локальным. Другой человек с тем же профилем поиска получит свои
-причины или никаких.
+The identity profile carried `personal_market_bonus: local` — that is, the
+identity merely declared such a bonus possible, while its content stayed local.
+Another person with the same search profile would have their own reasons, or
+none.
 
-**Надбавка мягкая по устройству.** Она двигает вакансию вверх в выдаче, но не
-делает непроходную проходной: гейты отрабатывают раньше и независимо. Это
-проверяется тестом — иначе личное предпочтение однажды протащило бы вакансию,
-которая человеку недоступна.
+**The bonus is soft by construction.** It moves a vacancy up the shortlist but
+does not make an unpassable one passable: the gates fire earlier and
+independently. That is pinned by a test — otherwise a personal preference would
+one day drag through a vacancy the person cannot take.
 
-## `<префикс>_owner.yaml` — личная часть профиля
+This mechanism survives the retirement of the layer: the values now live in the
+local identity's own `<prefix>_profile.yaml`, which is outside git for the same
+reason.
 
-Идентичность в `identities/` лежит в общем репозитории и описывает **поиск**:
-стек, формат работы, признаки подходящей компании. Всё, что относится к
-конкретному человеку, живёт здесь:
+## `<prefix>_owner.yaml` — the personal part of the profile
 
-| Поле | Почему личное |
+Under the old scheme the identity in `identities/` lived in the shared
+repository and described the **search**: stack, working arrangement, marks of a
+suitable company. Everything belonging to a particular person lived here:
+
+| Field | Why it is personal |
 |---|---|
-| `owner.name`, `owner.linkedin` | Идентифицируют человека |
-| `owner.cv_files` | Личный документ |
-| `owner.location` (страна, `utc_offset`) | Резидентство — и из него выводятся гео-правила |
-| `owner.languages` | Из них выводится языковой фильтр |
-| `goal.target_compensation` | Деньги |
+| `owner.name`, `owner.linkedin` | They identify the person |
+| `owner.cv_files` | A personal document |
+| `owner.location` (country, `utc_offset`) | Residency — and the geography rules are derived from it |
+| `owner.languages` | The language filter is derived from them |
+| `goal.target_compensation` | Money |
 
-В файле идентичности на этих местах стоит сентинел `local`:
+The identity file carried the `local` sentinel in those places:
 
 ```yaml
-# identities/kisel-…/kisel_profile.yaml   (в гите)
+# identities/kisel-…/kisel_profile.yaml   (in git)
 owner:
-  role: "Senior Software Engineer (.NET / C#)"   # часть профиля ПОИСКА
-  name: local                                    # значение — здесь, локально
+  role: "Senior Software Engineer (.NET / C#)"   # part of the SEARCH profile
+  name: local                                    # the value lives locally
   languages: local
   location: local
 ```
 
 ```yaml
-# local-constitution/personal/kisel/kisel_owner.yaml   (вне гита)
+# local-constitution/personal/kisel/kisel_owner.yaml   (outside git)
 owner:
-  name: "Иван Петров"
+  name: "Ivan Petrov"
   languages: ["English", "Russian"]
   location:
     country: "Georgia"
     utc_offset: 4
 ```
 
-Пути совпадают дословно — при активации значения подмешиваются в профиль
-(`common.resolve_local_fields`). Если поле помечено `local`, а здесь его нет,
-идентичность считается **незаполненной** и поиск по ней не запускается: молча
-подставить пустоту нельзя, иначе скоринг отработает на пустых языках и выдаст
-правдоподобный мусор.
+The paths matched exactly, and on activation the values were merged into the
+profile (`common.resolve_local_fields`). If a field was marked `local` and was
+absent here, the identity counted as **unfinished** and no search would run:
+substituting emptiness silently is not allowed, or scoring would run against
+empty languages and produce plausible rubbish.
 
-### Личные файлы владельца не переименовываются
+### The owner's personal files are not renamed
 
-Правило префиксов распространяется только на файлы, **которые создаёт сам
-проект**. Документы, которые человек приносит с собой — CV, портфолио,
-сопроводительные письма, — сохраняют то имя, которое дал им владелец. Ни
-переименования, ни «приведения к единому стилю».
+The prefix rule applies only to files **the project creates itself**. Documents
+a person brings with them — CVs, portfolios, covering letters — keep the name
+their owner gave them. No renaming, no "bringing them into line".
 
-Причина простая: это чужие файлы. Человек их узнаёт по имени, ищет по имени в
-проводнике, отправляет работодателю по имени. Переименование ничего не даёт
-проекту (код эти файлы не читает — путь берётся из `profile.owner.cv_files`) и
-ломает то, что было у человека. Тот же принцип, что «никогда не удалять чужие
-файлы» из Большой Конституции: внутри своей папки проект хозяин, к чужому
-имуществу не прикасается.
+The reason is simple: they are somebody else's files. A person recognises them
+by name, finds them by name in a file manager, and sends them to employers by
+name. Renaming buys the project nothing (the code does not read these files —
+the path comes from `profile.owner.cv_files`) and breaks what the person had.
+The same principle as "never delete somebody else's files" in the constitution:
+inside its own folder the project is in charge; it does not touch other people's
+property.
 
-Ошибка была допущена на практике (2026-07-31, при первом переносе в Малую
-Конституцию: `CV Ivan Petrov Software Engineer.pdf` → `ivpt_cv.pdf`) и владелец
-её сразу заметил. Поэтому правило записано явно.
+The mistake was made in practice (2026-07-31, during the first move into the
+Local Constitution: `CV Ivan Petrov Software Engineer.pdf` → `ivpt_cv.pdf`) and
+the owner noticed immediately. Hence the rule is written down explicitly.
 
-Путь к CV в `<префикс>_profile.yaml → owner.cv_files` указывается **как есть**,
-с пробелами и заглавными буквами. Ничего не сломается: это просто строка, по
-которой агент открывает файл.
+The path to the CV in `<prefix>_profile.yaml → owner.cv_files` is written **as
+it is**, with spaces and capitals. Nothing breaks: it is just a string the agent
+uses to open the file.
 
-## active.yaml — единственный файл, который читает код
+## active.yaml — the only file the code read
 
 ```yaml
 schema_version: 1
 
-# Обязателен, если активных идентичностей больше одной. Без него инструменты
-# откажутся работать и потребуют явного --identity.
+# Mandatory once more than one identity is active. Without it the tools refused
+# to run and demanded an explicit --identity.
 default_identity: kisel
 
 active_identities:
@@ -171,85 +179,89 @@ active_identities:
     activated_at: "2026-07-31"
     relationship: owner          # owner | fork_of:<prefix> | using_shared
     personal_dir: personal/kisel
-    note: "Основной поиск на неполный день."
+    note: "The main part-time search."
 ```
 
-| Поле | Смысл |
+| Field | Meaning |
 |---|---|
-| `default_identity` | Что использовать, когда `--identity` не передан. Обязателен при >1 активной |
-| `prefix` | Папка в `identities/`, должна существовать |
-| `activated_at` | Дата — чтобы через полгода помнить, когда и зачем добавили |
-| `relationship` | `owner` — ваша; `fork_of:<p>` — ответвление от чужой; `using_shared` — пользуетесь общей как есть |
-| `personal_dir` | Где личные файлы этой идентичности |
-| `note` | Зачем она вам |
+| `default_identity` | What to use when `--identity` is absent. Mandatory with more than one active |
+| `prefix` | The folder in `identities/`; it had to exist |
+| `activated_at` | The date — so that six months on you remember when and why it was added |
+| `relationship` | `owner` — yours; `fork_of:<p>` — a branch from somebody else's; `using_shared` — using a shared one as it is |
+| `personal_dir` | Where this identity's personal files live |
+| `note` | What you wanted it for |
 
-Порядок разрешения активной идентичности — в `docs/IDENTITIES.md`.
+The current order in which the active identity is resolved is in
+`docs/IDENTITIES.md`.
 
-## personal/<префикс>/<префикс>_contact.yaml
+## personal/<prefix>/<prefix>_contact.yaml
 
 ```yaml
 user_agent_contact: "you@example.com"
 ```
 
-Читается, если в профиле идентичности стоит `user_agent_contact: "local"`.
-Так User-Agent исходящих запросов остаётся честным (инженерное обязательство
-проекта), но личная почта не попадает в общий репозиторий.
+Read when the identity profile carried `user_agent_contact: "local"`. That kept
+the User-Agent of outgoing requests honest (an engineering commitment of the
+project) while the personal address stayed out of the shared repository.
 
-Без контакта проект работает, но `doctor` выдаст предупреждение.
+The project works without a contact, but `doctor` warns about it.
 
-## LOCAL_NOTES.md — что сюда писать
+## LOCAL_NOTES.md — what belonged here
 
-Наблюдения, которые не должны попасть ни в общую документацию, ни в
-идентичность. Проверочный вопрос: *«будет ли это полезно другому человеку, если
-он склонирует репозиторий?»* Нет — значит сюда.
+Observations that should reach neither the shared documentation nor an identity.
+The test question: *"would this be useful to another person who cloned the
+repository?"* No — then it goes here.
 
-Примеры:
+Examples:
 
-- «на этой машине венв лежит не там, где обычно»;
-- «в эту компанию не откликаться, там работает знакомый»;
-- «после отклика в X пришёл спам, больше не связываться»;
-- личные заметки о ходе переговоров.
+- "on this machine the venv is not where it usually is";
+- "do not apply to this company, somebody I know works there";
+- "applying to X brought spam, do not engage again";
+- personal notes on how a negotiation is going.
 
-Не сюда: улучшения инструментов (это `tools/` + Большая Конституция) и
-уточнения профиля поиска (это папка идентичности).
+Not here: improvements to the tools (those are `tools/` plus the constitution)
+and refinements to the search profile (that is the identity folder).
 
-## Воссоздание на новой машине
+## Recreating things on a new machine
 
 ```bash
 git clone <repo> && cd work-ide
 python -m venv .venv
-# активация venv: Windows -> .venv\Scripts\activate
-#                 macOS / Linux -> source .venv/bin/activate
+# activating the venv: Windows -> .venv\Scripts\activate
+#                      macOS / Linux -> source .venv/bin/activate
 python -m pip install -r requirements.txt
 
-python tools/identity.py init-local --identity <префикс>
-# положить CV в local-constitution/personal/<префикс>/ — под его
-# собственным именем, не переименовывая;
-# личные поля профиля — в <префикс>_owner.yaml (см. ниже)
+python tools/templates.py clone <template> <prefix> "<expansion>"
+# put the CV in local-identities/<folder>/documents/ — under its own
+# name, without renaming it;
+# the personal profile fields go in local-identities/<folder>/<prefix>_profile.yaml
 
 python tools/identity.py which
-python tools/doctor.py --identity <префикс>
+python tools/doctor.py --identity <prefix>
 ```
 
-Данные (`data/<префикс>/`) и отчёты (`reports/`) при этом не восстановятся — они
-тоже вне гита. **Создавать их руками не нужно**: инструменты делают обе папки
-сами при первом прогоне (`mkdir(parents=True, exist_ok=True)`). Их отсутствие в
-свежем клоне — нормальное состояние, а не поломка.
+The data (`data/<prefix>/`) and the reports (`reports/`) are not restored by
+this — they are outside git too. **There is no need to create them by hand**:
+the tools create both folders themselves on the first run
+(`mkdir(parents=True, exist_ok=True)`). Their absence in a fresh clone is a
+normal state rather than breakage.
 
-База наберётся заново за несколько прогонов. Если нужна именно накопленная
-история (статусы откликов, репутация компаний, insights) — переносите папку
-`data/<префикс>/` вручную, например архивом; вместе с ней имеет смысл перенести
-и `reports/archive/<префикс>/`, если история подборок нужна.
+The base fills up again over a few runs. If it is specifically the accumulated
+history you need (application statuses, company reputation, insights), move the
+`data/<prefix>/` folder across by hand, in an archive for instance; it is worth
+moving `reports/archive/<prefix>/` with it if you want the history of
+shortlists.
 
-## Переопределение путей
+## Overriding the paths
 
-Локации можно вынести за пределы репозитория переменными окружения:
+Locations can be moved outside the repository with environment variables:
 
-| Переменная | Что задаёт |
+| Variable | What it sets |
 |---|---|
-| `WORK_IDE_LOCAL_CONSTITUTION` | Путь к Малой Конституции |
-| `WORK_IDE_DATA_ROOT` | Корень данных (вместо `data/`) |
-| `WORK_IDE_REPORTS_ROOT` | Корень отчётов (вместо `reports/` в корне репозитория) |
-| `WORK_IDE_IDENTITY` | Активная идентичность (приоритетнее `active.yaml`) |
+| `WORK_IDE_IDENTITIES` | The root of local identities (instead of `local-identities/`) |
+| `WORK_IDE_DATA_ROOT` | The data root (instead of `data/`) |
+| `WORK_IDE_REPORTS_ROOT` | The reports root (instead of `reports/` at the repository root) |
+| `WORK_IDE_IDENTITY` | The active identity |
+| `WORK_IDE_LOCAL_CONSTITUTION` | The path to the retired local folder, if you still have one |
 
-Полезно, если данные держат на другом диске или в облачной папке.
+Useful if the data is kept on another drive or in a cloud folder.

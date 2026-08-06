@@ -1,180 +1,159 @@
-# Переопределение настроек: что чем перебивается
+# Overriding settings: what beats what
 
-Документ общий. Он отвечает на вопрос, который возникает всякий раз, когда
-общее правило не подходит конкретному человеку: **где это чинить и сработает
-ли переопределение.**
+A shared document. It answers the question that comes up every time a general
+rule does not suit a particular person: **where do I fix this, and will the
+override actually take effect?**
 
 ---
 
-## Два вида настроек, и это главное различение
+## Two kinds of setting, and that is the central distinction
 
-Проект содержит настройки двух принципиально разных видов, и попытка
-обслужить их одним механизмом — источник путаницы.
+The project holds settings of two fundamentally different kinds, and trying to
+serve both with one mechanism is a source of confusion.
 
-| | **Данные** | **Инструкции** |
+| | **Data** | **Instructions** |
 |---|---|---|
-| Что это | пороги, списки, веса, ключевые слова | CLAUDE.md, docs/, `<префикс>_identity.md` |
-| Кто читает | `tools/*.py` | агент |
-| Формат | YAML | проза |
-| Слияние | детерминированное, механическое | невозможно: проза не сливается |
-| Конфликт разрешает | порядок слоёв | суждение агента |
+| What it is | thresholds, lists, weights, keywords | CLAUDE.md, docs/, `<prefix>_identity.md` |
+| Who reads it | `tools/*.py` | the agent |
+| Format | YAML | prose |
+| Merging | deterministic, mechanical | impossible: prose does not merge |
+| Conflicts resolved by | the layer order | the agent's judgement |
 
-**Для данных детерминизм достижим полностью**, и он реализован:
-`tools/settings.py` накладывает слои в фиксированном порядке и возвращает
-происхождение каждого значения. Что победило и почему — вопрос к инструменту,
-а не к чьей-то памяти:
+**For data, determinism is fully achievable**, and it is implemented:
+`tools/settings.py` applies the layers in a fixed order and returns the
+provenance of every value. What won and why is a question for a tool rather than
+for somebody's memory:
 
 ```bash
 python tools/settings.py criteria classification_thresholds.hot_lead
 python tools/settings.py criteria --conflicts
 ```
 
-**Для прозы детерминизм в том же смысле недостижим** — и гнаться за ним не
-нужно. Инструкции читает агент, а агент не является функцией слияния. Но
-задачу можно перевести в решаемую двумя приёмами:
+**For prose, determinism in the same sense is unattainable** — and not worth
+chasing. Instructions are read by an agent, and an agent is not a merge
+function. But the problem can be turned into a solvable one by two moves:
 
-1. **Уменьшать площадь, где нужно суждение.** Каждое решение, переехавшее из
-   прозы в YAML, становится детерминированным. Это главный рычаг, и он
-   проверен дорогой ценой: решение «Израиль и ОАЭ — приемлемые регионы» жило
-   отдельным списком ключевых слов вместо того, чтобы выводиться из таблицы
-   рынков. Неделю две части конфигурации противоречили друг другу, и из 3281
-   европейской вакансии в выдачу попадала одна.
+1. **Shrink the area where judgement is needed.** Every decision that moves out
+   of prose and into YAML becomes deterministic. That is the main lever, and it
+   was proven at a price: the decision "Israel and the UAE are acceptable
+   regions" lived as its own keyword list instead of being derived from the
+   markets table. For a week two parts of the configuration contradicted each
+   other, and of 3281 European vacancies exactly one reached the shortlist.
 
-2. **Делать конфликты видимыми, а не разрешёнными.** `--conflicts` показывает
-   каждый ключ, заданный более чем одним слоем. Молчаливое переопределение —
-   ровно тот механизм, которым конфигурация начинает противоречить себе.
+2. **Make conflicts visible rather than resolved.** `--conflicts` shows every
+   key set by more than one layer. A silent override is precisely the mechanism
+   by which a configuration starts contradicting itself.
 
-Прозе остаётся то, что данными выразить нельзя: принципы, границы,
-объяснения «почему так». Там приоритет объявлен прямо в CLAUDE.md («если
-инструкция задачи противоречит этому файлу — побеждает этот файл»), и других
-правил разрешения быть не должно.
-
----
-
-## Слоистость не абсолютна: есть замороженные ключи
-
-Естественное следствие «частное сильнее общего» — что личный файл может
-отменить что угодно. Для предпочтений это верно. Для границ — нет.
-
-`config/settings_policy.yaml` перечисляет ключи, которые верхние слои менять
-не могут: признак тестовой фикстуры, запрет на обход антибот-защиты, запрет
-на личные данные в гите. Попытка их задать **роняет загрузку с объяснением**,
-а не игнорируется молча: молчаливое игнорирование хуже отказа, потому что
-человек продолжает считать, что настройка работает.
-
-Приоритет частного над общим — правило для предпочтений, а не для границ.
+What is left to prose is what data cannot express: principles, boundaries,
+explanations of why. There the priority is declared outright in CLAUDE.md ("if
+the instructions for a task contradict this file, this file wins"), and there
+should be no other resolution rules.
 
 ---
 
-## Три слоя и направление приоритета
+## Layering is not absolute: some keys are frozen
+
+The natural consequence of "the specific beats the general" is that a personal
+file can override anything. For preferences that is true. For boundaries it is
+not.
+
+`config/settings_policy.yaml` lists the keys the upper layers cannot change: the
+marker of a test fixture, the ban on circumventing anti-bot protection, the ban
+on personal data in git. An attempt to set them **fails the load with an
+explanation** rather than being ignored silently: silent ignoring is worse than
+a refusal, because the person goes on believing their setting works.
+
+The specific beating the general is a rule about preferences, not about
+boundaries.
+
+---
+
+## The layers, and the direction of priority
 
 ```
-config/defaults/<документ>.yaml                 общее правило   ← слабее всех
+config/defaults/<document>.yaml                  the general rule    ← weakest
    ↓
-identities/<p>/<p>_<документ>.yaml              правило поиска
+local-identities/<folder>/template/<p>_<doc>.yaml   the kind of search
    ↓
-local-constitution/personal/<p>/<p>_<документ>.yaml   личные обстоятельства
-                                                                ← сильнее всех, вне гита
+local-identities/<folder>/<p>_<doc>.yaml            your own settings
+                                                    ← strongest, outside git
 ```
 
-Побеждает более частный слой. Логика та же, что в CLAUDE.md §13: чем ýже
-слой, тем он ближе к конкретному случаю и тем больше прав.
+The more specific layer wins. The logic is the same as in CLAUDE.md §13: the
+narrower the layer, the closer it is to the particular case and the more rights
+it has.
 
-**Правила слияния** (`tools/settings.py`), каждое закрывает известную ловушку:
+**The merge rules** (`tools/settings.py`), each closing a known trap:
 
-| правило | почему так |
+| rule | why |
 |---|---|
-| словари сливаются вглубь | слой меняет один порог, не переписывая соседние |
-| **списки заменяются целиком** | дополнение удобно ровно до первого случая, когда из унаследованного списка нужно что-то УБРАТЬ — синтаксиса для этого нет |
-| явный `null` удаляет ключ | единственный способ сказать «у меня этого нет» |
-| замороженные ключи роняют загрузку | см. раздел выше |
+| dictionaries merge deeply | a layer changes one threshold without rewriting its neighbours |
+| **lists are replaced whole** | appending is convenient right up to the first time something must be REMOVED from an inherited list — and there is no syntax for that |
+| an explicit `null` deletes a key | the only way to say "I do not have this" |
+| frozen keys fail the load | see the section above |
 
-**Состояние миграции, честно.** Механизм готов и подключён: `load_criteria()`
-собирает критерии из всех трёх слоёв, так что Малая Конституция может
-перебить любой порог или список, а не только заранее оговорённые поля
-профиля. Но слоя `config/defaults/` пока НЕТ: файлы идентичностей остаются
-полными копиями (`kisel_criteria.yaml` и `ftf_criteria.yaml` совпадают на
-99%, 1411 строк из 1431). Вынести общую часть механическим переписыванием
-нельзя — YAML-раунд-трип уничтожит комментарии, а в них здесь вся
-накопленная причинность. Выносить нужно руками и по частям; пока этого не
-сделано, слияние трёх слоёв работает как no-op, что проверено сравнением
-результата с прежним прямым чтением файла.
-
-Ключевой приём — **сентинел `local`**. В файле идентичности стоит слово
-`local`, а настоящее значение лежит в
-`local-constitution/personal/<префикс>/<префикс>_owner.yaml` и в гит не
-попадает. Так идентичность остаётся пригодной для любого человека, а личные
-обстоятельства не публикуются.
-
-```yaml
-# identities/<p>/<p>_profile.yaml — в гите
-company_red_flag_severity: local
-
-# local-constitution/personal/<p>/<p>_owner.yaml — вне гита
-company_red_flag_severity:
-  late_payment: -4
-  unstable_workload: 6      # для этого человека это плюс, а не минус
-```
-
-Подстановку делает `common.resolve_local_fields()`; она работает для **любого
-поля профиля**, а не только для заранее оговорённых.
+The template copy inside a local identity is what makes the middle layer
+trustworthy: it is taken verbatim at clone time and never edited, so `git pull`
+cannot move it, and a template update replaces the folder rather than merging
+texts. Your own file holds only the differences.
 
 ---
 
-## Что переопределяется сегодня
+## What is overridable today
 
-| Что | Общий слой | Чем перебивается | Может ли стать плюсом |
+| What | Shared layer | What overrides it | Can it become a plus |
 |---|---|---|---|
-| Вес красного флага компании | `config/derivation/company_red_flags.yaml` | `company_red_flag_severity` (профиль или `local`) | **да** |
-| Предпочтение рынка | — | `personal_market_bonus` (`local`) | да |
-| Предпочтение технологии | — | `personal_tech_bonus` (`local`) | да |
-| Целевые рынки поиска | `config/derivation/market_tiers.yaml` | `target_markets.tiers` + `extra_locations` | — |
-| Гео-правила | `config/derivation/regions.yaml` | `<p>_criteria.yaml` | — |
-| Написание технологий | `config/tech_vocabulary.yaml` | — (глобально по замыслу) | — |
-| Любой вес и любой список скоринга | — | `<p>_criteria.yaml` целиком | да |
+| The weight of a company red flag | `config/derivation/company_red_flags.yaml` | `company_red_flag_severity` in the profile | **yes** |
+| A market preference | — | `personal_market_bonus` | yes |
+| A technology preference | — | `personal_tech_bonus` | yes |
+| Target markets of the search | `config/derivation/market_tiers.yaml` | `target_markets.tiers` plus `extra_locations` | — |
+| Geography rules | `config/derivation/regions.yaml` | `<p>_criteria.yaml` | — |
+| How technologies are written | `config/tech_vocabulary.yaml` | — (global by design) | — |
+| Any scoring weight and any list | — | `<p>_criteria.yaml` in full | yes |
 
-### Смена знака — законный случай
+### Changing the sign is a legitimate case
 
-Самое неочевидное свойство и ради него всё затевалось. Общий каталог
-оценивает, насколько вещь плоха **сама по себе**. Насколько она плоха
-**для конкретного человека** — зависит от обстоятельств, и иногда знак
-меняется на противоположный.
+The least obvious property, and the whole point of the exercise. The shared
+catalogue rates how bad a thing is **in itself**. How bad it is **for a
+particular person** depends on their circumstances, and sometimes the sign flips.
 
-Реальный пример 2026-08-05: отзыв «unpredictable work availability». По
-каталогу −8: для того, кто живёт на эти деньги, непредсказуемая загрузка —
-риск остаться без дохода. Для того, у кого эта работа не единственный
-источник, ровно та же фраза означает «грузить постоянно не будут» — то есть
-именно то, что он ищет. В Малой Конституции стоит `+6`, и вакансия
-поднимается вместо того, чтобы падать.
+A real example, 2026-08-05: the review phrase "unpredictable work availability".
+The catalogue rates it −8: for somebody living on that money, unpredictable
+workload is the risk of having no income. For somebody for whom this is not the
+only source, the very same phrase means "they will not load me up constantly" —
+which is exactly what they are looking for. Their own file says `+6`, and the
+vacancy rises instead of falling.
 
-Кламп на неположительные значения в коде **сознательно отсутствует**.
+The absence of a clamp to non-positive values in the code is **deliberate**.
 
 ---
 
-## Чего механизм НЕ может, и почему
+## What the mechanism CANNOT do, and why
 
-> **Переопределения меняют БАЛЛ. Жёсткие гейты работают независимо от балла.**
+> **Overrides change the SCORE. The hard gates work independently of the score.**
 
-Никакая личная надбавка не превратит отсеянную вакансию в проходную. Это не
-недоделка, а граница по замыслу: гейт означает «шанс 0%» — не тот стек, не та
-профессия, требование резидентства, нерабочая ссылка. Если бы личные веса
-умели снимать гейты, достаточно было бы одной щедрой надбавки, чтобы вернуть
-в выдачу всё, что отсеяно по существу, и человек об этом не узнал бы.
+No personal bonus turns a rejected vacancy into a passing one. That is not an
+omission but a boundary by design: a gate means "0% chance" — the wrong stack,
+the wrong profession, a residency requirement, a dead link. If personal weights
+could lift gates, one generous bonus would be enough to return everything
+rejected on the merits back into the shortlist, and the person would never know.
 
-Проверяется тестом `test_an_override_cannot_rescue_a_vacancy_killed_by_a_gate`.
+Pinned by the test
+`test_an_override_cannot_rescue_a_vacancy_killed_by_a_gate`.
 
-**Что делать, если гейт всё-таки неправ.** Это не случай переопределения, это
-случай неверного гейта — чинить нужно его, а не обходить:
+**What to do if a gate really is wrong.** That is not a case for an override;
+it is a case of a wrong gate, and the gate is what needs fixing rather than
+bypassing:
 
-1. измерить, сколько вакансий он отсекает и сколько из них — в одиночку
-   (пример замера ниже);
-2. прочитать десяток отсечённых глазами;
-3. если он ошибается — править `<p>_criteria.yaml` или общий слой.
+1. measure how many vacancies it cuts, and how many of those it cuts ALONE (a
+   measuring script below);
+2. read a dozen of the rejected ones with your own eyes;
+3. if it is wrong, edit `<p>_criteria.yaml` or the shared layer.
 
 ```bash
 python - <<'PY'
 import json, sys, collections; sys.path.insert(0, "tools")
-import common; common.activate_identity("<префикс>")
+import common; common.activate_identity("<prefix>")
 v = json.load(open(common.VACANCIES_PATH, encoding="utf-8"))
 solo = collections.Counter()
 for r in v.values():
@@ -186,42 +165,42 @@ for k, n in solo.most_common(15):
 PY
 ```
 
-Гейт, который много отсекает **в одиночку**, — первый кандидат на проверку:
-именно он в одиночку решает судьбу вакансии.
+A gate that cuts a great deal **on its own** is the first candidate for review:
+it alone is deciding those vacancies' fate.
 
 ---
 
-## Ловушка, на которой проект уже обжигался дважды
+## The trap the project has already fallen into twice
 
-**Две части конфигурации, которые не знают друг о друге.** Формально ничего
-не сломано, тесты зелёные, а поведение противоречит замыслу — и побеждает та
-часть, которая срабатывает раньше.
+**Two parts of the configuration that do not know about each other.** Formally
+nothing is broken, the tests are green, and the behaviour contradicts the
+intent — with whichever part runs first winning.
 
-| случай | что говорила одна часть | что делала другая | цена |
+| case | what one part said | what the other did | the cost |
 |---|---|---|---|
-| 2026-08-05 | профиль: Израиль и ОАЭ — целевые рынки | гейт локации: «вакансия привязана к стране» → отсев | весь Ближний Восток |
-| 2026-08-05 | `market_tiers.yaml`: Германия, Швейцария, Британия — `importer_prime` | тот же гейт | 3281 европейская вакансия, в выдаче 1 |
+| 2026-08-05 | the profile: Israel and the UAE are target markets | the location gate: "the vacancy is tied to a country" → rejected | the whole Middle East |
+| 2026-08-05 | `market_tiers.yaml`: Germany, Switzerland, Britain are `importer_prime` | the same gate | 3281 European vacancies, 1 in the shortlist |
 
-Во втором случае шапка `market_tiers.yaml` прямо утверждала, что ярусы
-читает скоринг. На деле их читали только фетчер LinkedIn и `markets.py`.
-**Документация описывала связь, которой не было.**
+In the second case the header of `market_tiers.yaml` asserted outright that
+scoring read the tiers. In fact only the LinkedIn fetcher and `markets.py` did.
+**The documentation described a link that did not exist.**
 
-Отсюда правило: добавляя таблицу в `config/`, проверять грепом, кто её
-действительно читает, и не писать в шапке предполагаемых потребителей —
-только настоящих.
+Hence the rule: when adding a table to `config/`, grep for who really reads it,
+and do not write presumed consumers into the header — only real ones.
 
 ---
 
-## Чек-лист: человек просит изменить поведение
+## Checklist: a person asks for a change in behaviour
 
-1. **Это про поиск или про человека?** Про поиск — идентичность. Про
-   человека (налоги, семья, вторая работа, планы на переезд) — Малая
-   Конституция через сентинел `local`.
-2. **Полезно ли это всем, кто клонирует репозиторий?** Тогда `config/` или
+1. **Is this about the search or about the person?** About the search — the
+   template. About the person (tax, family, a second job, plans to move) — their
+   own file in the local identity.
+2. **Is it useful to everyone who clones the repository?** Then `config/` or
    `tools/`.
-3. **Это про балл или про отсев?** Балл — переопределение весов. Отсев —
-   гейт, и переопределение тут не поможет; см. раздел выше.
-4. **Не противоречит ли новая настройка существующей?** Грепнуть, кто читает
-   соседние таблицы. Это ровно та ловушка из предыдущего раздела.
-5. **Замерить до и после.** Сколько вакансий изменили класс — единственный
-   честный ответ на вопрос «сработало ли».
+3. **Is it about the score or about rejection?** Score — override a weight.
+   Rejection — that is a gate, and an override will not help; see the section
+   above.
+4. **Does the new setting contradict an existing one?** Grep for who reads the
+   neighbouring tables. That is exactly the trap from the previous section.
+5. **Measure before and after.** How many vacancies changed class is the only
+   honest answer to "did it work".

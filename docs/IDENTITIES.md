@@ -1,364 +1,400 @@
-# Система поисковых идентичностей
+# The search-identity system
 
-Центральный документ архитектуры. Если вы агент и вам предстоит что-то менять в
-проекте — читать этот файл вторым, сразу после `CLAUDE.md`.
+The central architecture document. If you are an agent about to change anything
+in the project, read this file second, straight after `CLAUDE.md`.
 
-## Зачем это существует
+## Why it exists
 
-Проект начинался как инструмент для одного человека. Когда им захотели
-пользоваться несколько людей с разными профилями (другой стек, другая страна,
-другие требования), выяснилось, что личные данные размазаны по всему проекту:
-по конфигам, по Конституции, по документации и даже по коду.
+The project started as a tool for one person. When several people with different
+profiles wanted to use it (a different stack, a different country, different
+requirements), it turned out that personal data was smeared across the whole
+project: through the configs, the constitution, the documentation and even the
+code.
 
-Наивное решение — «просто скопировать папку и поправить» — ломается тихо. Агент,
-работающий с двумя идентичностями, рано или поздно прочитает документ не той,
-применит чужие гео-правила и выдаст результат, который выглядит нормально, но
-неправилен. Такой отказ не видно в отчёте, и он накапливается.
+The naive answer — "just copy the folder and edit it" — breaks silently. An
+agent working with two identities will sooner or later read the wrong one's
+document, apply somebody else's geography rules, and produce a result that looks
+fine and is wrong. That failure is invisible in the report, and it accumulates.
 
-Поэтому изоляция здесь — не удобство, а требование корректности.
+So isolation here is not a convenience but a correctness requirement.
 
-## Три слоя
+## Two layers, split along the git boundary
 
-| Слой | Где | В гите | Для кого |
+| Layer | Where | In git | For whom |
 |---|---|---|---|
-| **Большая Конституция** | `CLAUDE.md` | да | Все пользователи. Принципы, инженерные правила, границы |
-| **Идентичность** | `identities/<префикс>-<расшифровка>/` | да | Все, кто пользуется этим профилем поиска |
-| **Малая Конституция** | `local-constitution/` | **нет** | Только вы и только эта машина |
+| **The constitution** | `CLAUDE.md` | yes | Every user. Principles, engineering rules, boundaries |
+| **Identity template** | `identity-templates/<name>/` | yes | Everyone who searches with this kind of profile |
+| **Local identity** | `local-identities/<prefix>-<expansion>/` | **no** | You alone, on this machine |
 
-Плюс данные: `data/<префикс>/` — накопленная база, вне гита.
+Plus the data: `data/<prefix>/`, the accumulated base, outside git.
 
-## Имя папки: префикс плюс расшифровка
+An earlier architecture had a third layer, a "Local Constitution", holding a
+registry of active identities and a `local` sentinel in the shared configs. It
+was retired on 2026-08-05 — see `docs/LOCAL_CONSTITUTION.md` for what to do with
+the folder if you have one from an earlier version.
+
+## The template copy inside a local identity
 
 ```
-identities/kisel-keep-it-simple-easy-legacy/kisel_criteria.yaml
-           └──────── папка: объясняет ────────┘ └─ файл: короткий ─┘
+local-identities/kisel-keep-it-simple-easy-legacy/
+  identity.yaml            which template, and which version it is pinned to
+  template/                a VERBATIM copy of the template, never edited
+    kisel_profile.yaml
+    kisel_criteria.yaml
+    …
+  kisel_profile.yaml       YOUR differences, layered on top
+  kisel_criteria.yaml
+  documents/               your CV, under its own name
+  CHANGELOG.md
 ```
 
-Папка называется `<префикс>-<расшифровка-через-дефис>`, потому что по одному
-`kisel` через полгода не вспомнить, что это был за поиск. Расшифровка в имени
-папки отвечает на этот вопрос в дереве проекта, не заставляя открывать файлы.
-Папку без расшифровки `identity.py validate` считает проблемой.
+This is the key decision, and it removes text merging altogether:
 
-**Файлы при этом остаются короткими, и это не непоследовательность.** Имя папки
-попадается на глаза изредка; имена файлов — в каждой команде, в выводе `grep`,
-во вкладках редактора, в путях внутри отчётов. Длинный префикс у файла не
-добавил бы информации (папка рядом и так всё объясняет), зато испортил бы
-читаемость — то самое свойство, ради которого правило префиксов и введено.
+- **`git pull` cannot change your shortlist.** The template in the repository
+  moved on; your copy did not. Silent configuration drift is impossible by
+  construction rather than by discipline.
+- **An update is a FOLDER REPLACEMENT, not a merge.** Your own settings live in
+  separate files and take no part in the operation, so there is nowhere for an
+  agent to quietly lose them.
+- **A conflict is computed exactly**: the intersection of the keys you overrode
+  with the keys that changed between versions. A list, not a judgement call.
 
-Между префиксом и расшифровкой — дефис; между префиксом и именем файла —
-подчёркивание. Разные разделители выбраны не случайно: по символу сразу видно,
-на каком уровне находишься.
+A template's version is a number in `template.yaml`, and `CHANGELOG.md` beside
+it explains to a person what changed. Comparing versions means comparing numbers
+rather than parsing prose.
 
-## Правило единого префикса
+```bash
+python tools/templates.py list                        # what is available
+python tools/templates.py clone kisel mine "My Search"
+python tools/templates.py check  --identity mine      # has the template moved on
+python tools/templates.py update --identity mine      # move onto its version
+```
 
-**Каждый файл внутри папки идентичности начинается с `<префикс>_`.**
+## The folder name: prefix plus expansion
 
-Причина конкретна: два файла `notes.md` в разных папках агент однажды перепутает,
-и это будет молчаливая ошибка. Файлы `kisel_notes.md` и `jvst_notes.md` перепутать
-практически невозможно — имя опознаётся в любом контексте: в поиске по проекту,
-во вкладке редактора, в выводе `grep`.
+```
+local-identities/kisel-keep-it-simple-easy-legacy/kisel_criteria.yaml
+                 └──────── folder: explains itself ─────┘ └ file: short ┘
+```
 
-Правило распространяется и на данные: `data/kisel/knowledge/kisel_vacancies.json`,
-`reports/kisel_latest.md`. Отчёт, открытый в отдельной вкладке или пересланный
-кому-то, обязан себя опознавать.
+A folder is named `<prefix>-<expansion-with-hyphens>`, because six months on,
+`kisel` alone gives no way to remember what that search was. The expansion in
+the folder name answers that in the project tree, without opening a file.
+`identity.py validate` treats a folder with no expansion as a problem.
 
-Проверяется автоматически: `python tools/identity.py validate`.
+**The files stay short, and that is not an inconsistency.** A folder name is
+seen occasionally; file names appear in every command, in `grep` output, in
+editor tabs and in paths inside reports. A long prefix on a file would add no
+information (the folder beside it explains everything) while spoiling
+readability — the very property the prefix rule exists for.
 
-### Где префикс не нужен: папка уже принадлежит идентичности
+A hyphen separates the prefix from the expansion; an underscore separates the
+prefix from a file name. The different separators are not accidental: the
+character alone tells you which level you are at.
 
-Точная формулировка правила: префикс обязателен там, где файлы **разных**
-идентичностей лежат в одной папке. Когда сама папка принадлежит одной
-идентичности, повторять префикс в каждом имени незачем.
+## The single-prefix rule
 
-Отсюда раскладка архива отчётов:
+**Every file inside an identity folder begins with `<prefix>_`.**
+
+The reason is specific: an agent will one day confuse two files named `notes.md`
+in different folders, and that will be a silent mistake. `kisel_notes.md` and
+`jvst_notes.md` are practically impossible to confuse — the name is recognisable
+in any context: in a project-wide search, in an editor tab, in `grep` output.
+
+The rule extends to the data:
+`data/kisel/knowledge/kisel_vacancies.json`, `reports/kisel_latest.md`. A report
+opened in its own tab or forwarded to somebody has to identify itself.
+
+Checked automatically: `python tools/identity.py validate`.
+
+### Where no prefix is needed: the folder already belongs to the identity
+
+The precise statement of the rule: a prefix is mandatory where files of
+**different** identities share a folder. When the folder itself belongs to one
+identity, repeating the prefix in every name buys nothing.
+
+Hence the layout of the report archive:
 
 ```
 reports/
-  kisel_latest.md            # общая папка -> префикс обязателен
+  kisel_latest.md            # shared folder -> prefix mandatory
   jvst_latest.md
   archive/
     kisel/
-      2026-07-31.md         # папка уже kisel -> в имени только дата
+      2026-07-31.md          # the folder is already kisel -> just the date
       2026-08-01.md
     jvst/
       2026-08-01.md
 ```
 
-Свойство «файл опознаёт себя» при этом сохраняется другим способом: любой отчёт
-начинается строкой `# Work IDE [kisel] — отчёт от …`. Даже если файл переслали
-или открыли в отдельной вкладке, первая строка называет идентичность.
+The "a file identifies itself" property is preserved another way: every report
+starts with the line `# Work IDE [kisel] — report of …`. Even if the file is
+forwarded or opened in its own tab, the first line names the identity.
 
-### Граница правила: только файлы, созданные проектом
+### The rule's boundary: only files the project creates
 
-Правило действует на всё, что **проект создаёт сам**: конфиги идентичности,
-накопленные данные, отчёты, служебные файлы вроде `<префикс>_contact.yaml`.
+The rule applies to everything **the project creates itself**: identity configs,
+accumulated data, reports, housekeeping files.
 
-Оно **не** действует на документы, которые человек принёс с собой — CV,
-портфолио, сопроводительные письма в `local-constitution/personal/<префикс>/`.
-Они остаются под своими именами: `CV Ivan Petrov Software Engineer.pdf`, а не
-`ivpt_cv.pdf`. Код их не читает (путь берётся из `profile.owner.cv_files`, это
-просто строка), поэтому переименование не даёт ничего, но ломает то, как
-владелец их узнаёт и ищет. Подробнее — `docs/LOCAL_CONSTITUTION.md`.
+It does **not** apply to documents a person brought with them — CVs, portfolios,
+covering letters in `local-identities/<prefix>/documents/`. Those keep their own
+names: `CV Ivan Petrov Software Engineer.pdf`, not `ivpt_cv.pdf`. The code does
+not read them (the path comes from `profile.owner.cv_files`, just a string), so
+renaming buys nothing while breaking how the owner recognises and finds them.
 
-### Требования к префиксу
+### Requirements for a prefix
 
-3–6 символов, строчная латиница и цифры, первый символ — буква. Должен называть
-**суть поиска**, а не человека: идентичность переживёт смену стека и
-работодателя. Русские аббревиатуры транслитерируются по звучанию
-(«Скука» → `skuk`). Лучше избегать обычных английских слов — префикс часто ищут
-через `grep`, и `bore_` утонет в тексте вакансий.
+3-6 characters, lowercase Latin letters and digits, first character a letter. It
+should name **what the search is about** rather than the person: an identity
+outlives a change of stack or employer. Non-Latin abbreviations are
+transliterated by sound. Better to avoid ordinary English words — a prefix is
+often looked for with `grep`, and `bore_` would drown in vacancy text.
 
-## Радиус поражения изменения
+## The blast radius of a change
 
-Ключевое свойство архитектуры, ради которого выбраны полные самодостаточные
-копии конфигов вместо наследования от общей базы:
+The key property of the architecture, and the reason for a verbatim template
+copy plus a personal overlay rather than inheritance from a shared base:
 
-> **Изменение может затронуть только ту идентичность, чей префикс стоит на
-> изменённом файле.**
+> **A change can affect only the identity whose prefix is on the file changed.**
 
-Правка `kisel_criteria.yaml` физически не может повлиять на `jvst`. При схеме
-«общая база + переопределения» правка базы ради одной идентичности молча меняла
-бы дисквалификаторы у всех остальных, и в диффе это было бы не видно — файл с
-чужим префиксом не менялся.
+An edit to `kisel_criteria.yaml` physically cannot affect `jvst`. Under a
+"shared base plus overrides" scheme, editing the base for one identity's sake
+would silently change the disqualifiers for all the others, and it would not
+show in the diff — the file carrying their prefix did not change.
 
-Цена решения: улучшения машинерии не расходятся сами. Поэтому есть
-`python tools/identity.py diff-template --identity <p>` — структурный отчёт о
-том, каких ключей шаблона у идентичности нет. Он **никогда не сливает
-автоматически**: решение принимает человек, потому что применение чужого блока
-может изменить поведение поиска.
+The price: improvements to the machinery do not propagate by themselves. That is
+what the template version number and `templates.py check` are for: a local
+identity that falls behind is detected by comparing numbers, and a test fails
+while it stays behind.
 
-## Граница: что личное, что характеристика поиска
+## The boundary: what is personal, what describes the search
 
-Самый частый вопрос при создании идентичности — «это писать сюда или в Малую
-Конституцию?». Проверочный вопрос один:
+The commonest question when creating an identity is "does this go here or in the
+personal layer?". There is one test question:
 
-> **Изменится ли это, если тем же поиском воспользуется другой человек?**
-> Да — личное, в Малую Конституцию. Нет — характеристика поиска, в идентичность.
+> **Would this change if another person used the same search?**
+> Yes — personal, into the local identity. No — it describes the search, and
+> belongs in the template.
 
-| Данные | Слой | Почему |
+| Data | Layer | Why |
 |---|---|---|
-| Имя, LinkedIn, CV, почта | **Малая Конституция** | Идентифицируют человека и ничего не говорят о поиске |
-| Страна проживания, часовой пояс | **Малая Конституция** по умолчанию | Другой человек с тем же поиском живёт в другом месте |
-| Стаж в годах | **Малая Конституция** | Личное; уровень (senior/lead) — уже характеристика поиска |
-| Зарплатные ожидания | **Малая Конституция** | Зависят от обстоятельств человека, а не от типа работы |
-| Уровень, стек, тип занятости | **Идентичность** | Это и есть описание того, что ищем |
-| Гео-правила, языковой фильтр, окно часового пояса | **Идентичность** | Они **выведены** из личных данных, но сами по себе — правила скоринга |
-| Целевые регионы найма | **Идентичность** | Куда смотрим, а не где живём |
+| Name, LinkedIn, CV, email | **Local identity** | Identifies the person and says nothing about the search |
+| Country of residence, time zone | **Local identity** by default | Another person with the same search lives somewhere else |
+| Years of experience | **Local identity** | Personal; the level (senior/lead) already describes the search |
+| Pay expectations | **Local identity** | They follow from a person's circumstances, not from the kind of work |
+| Level, stack, employment type | **Template** | That IS the description of what is being looked for |
+| Geography rules, language filter, time-zone window | **Template** | They are **derived** from personal data, but in themselves they are scoring rules |
+| Target hiring markets | **Template** | Where we look, not where we live |
 
-Ключевое различие последних двух строк: **страна проживания — личные данные, а
-выведенные из неё правила — нет.** «Живу в Грузии» — факт о человеке;
-«фраза *EU Remote* дисквалифицирует» и «правило неоднозначного топонима
-Georgia» — правила поиска, которые нужны любому в такой ситуации.
+The key distinction in the last two rows: **the country of residence is personal
+data; the rules derived from it are not.** "I live in Georgia" is a fact about a
+person; "the phrase *EU Remote* disqualifies" and "the ambiguous place name
+Georgia" are search rules that anyone in that situation needs.
 
-### Когда страну ПРАВИЛЬНО записать прямо в идентичность
+### When a country belongs in the template after all
 
-Умолчание — не догма. Если поиск **привязан к стране по существу**, страна
-перестаёт быть личными данными и становится определением идентичности:
+The default is not a dogma. If a search is **tied to a country in substance**,
+the country stops being personal data and becomes part of the identity's
+definition:
 
-- «ищу работу именно в Германии» — идентичность про немецкий рынок;
-- «тот же поиск, но отдельно по Германии, Канаде и Нидерландам» — три
-  идентичности, у каждой своя страна;
-- готовый шаблон для других людей: «поиск для резидентов США» — страна здесь
-  часть условия, а не факт о конкретном человеке.
+- "I am looking for work in Germany specifically" — an identity about the German
+  market;
+- "the same search, but separately for Germany, Canada and the Netherlands" —
+  three identities, each with its own country;
+- a template for other people: "a search for US residents" — here the country is
+  part of the condition rather than a fact about one person.
 
-В таком случае в профиле пишется литеральное значение вместо `local`:
+Distinguish **residency** (where a person lives — usually personal) from the
+**target market of the search** (always in the template). They need not agree:
+you can live in one country and look for work in another.
 
-```yaml
-owner:
-  location:
-    country: "Germany"       # не local: идентичность ПРО немецкий рынок
-    utc_offset: 1
-```
-
-Различайте **резидентство** (где человек живёт — обычно личное) и **целевую
-страну поиска** (`target_regions` — всегда в идентичности). Совпадать они не
-обязаны: можно жить в одной стране и искать работу в другой.
-
-## Клонирование: один поиск для нескольких стран
+## Cloning: one search across several countries
 
 ```bash
 python tools/identity.py clone --from kisel --prefix kde --name "Kisel for Germany"
 ```
 
-Ради этого случая команда и сделана. Стек, тип занятости, признаки подходящей
-компании, список источников у «того же поиска в другой стране» одинаковые —
-различаются гео-правила, языковой фильтр и часовой пояс. Собирать вторую
-идентичность с нуля значит переотвечать на 50 вопросов ради изменения трёх.
+This command exists for that case. The stack, employment type, marks of a
+suitable company and list of sources are the same for "the same search in
+another country" — what differs is the geography rules, the language filter and
+the time zone. Building the second identity from scratch means answering fifty
+questions again to change three.
 
-Отличие от `new`: `new` даёт пустую заготовку, `clone` — заполненную копию.
-Все внутренние ссылки на префикс-источник переписываются автоматически, иначе
-клон нарушил бы правило «файлы одной идентичности не ссылаются на другую».
+The difference from `new`: `new` gives empty scaffolding, `clone` a filled copy.
+Every internal reference to the source prefix is rewritten automatically, or the
+clone would break the rule that one identity's files never reference another.
 
-**Что обязательно проверить в клоне** (команда печатает этот список при
-создании):
+**What to check in a clone** (the command prints this list when it creates one):
 
-1. `display_name`, `abbreviation`, `scoring_philosophy`, `target_regions`;
-2. гео-блоки в `criteria.yaml`: `restrictive_region_signal`,
+1. `display_name`, `abbreviation`, `scoring_philosophy`, target markets;
+2. the geography blocks in `criteria.yaml`: `restrictive_region_signal`,
    `acceptable_region_signal`, `hard_dealbreakers`, `timezone_gate`,
-   `ambiguous_place_names`; языковой фильтр;
-3. `identity.md` — чем этот поиск отличается от исходного;
-4. `questionnaire.yaml` — какие ответы изменились.
+   `ambiguous_place_names`; and the language filter;
+3. `identity.md` — how this search differs from the original;
+4. `questionnaire.yaml` — which answers changed.
 
-Гео-правила **выводятся** по таблицам `config/derivation/`, а не правятся на
-глаз: для резидента США фраза «US only» — плюс, для нерезидента — полная
-дисквалификация. Скопированное правило с неверным знаком тихо выбросит половину
-рынка, и по отчёту это будет не видно.
+Geography rules are **derived** from the tables in `config/derivation/` rather
+than edited by eye: for a US resident the phrase "US only" is a plus, for a
+non-resident total disqualification. A copied rule with the sign the wrong way
+round silently throws away half the market, and the report will not show it.
 
-Данные не копируются: у клона своя пустая база в `data/<новый префикс>/`.
-Фикстуру `ftf` клонировать нельзя — она откалибрована под тесты.
+Data is not copied: a clone gets its own empty base in `data/<new prefix>/`. The
+`ftf` fixture cannot be cloned — it is calibrated for the tests.
 
-## Что выводится, а не копируется
+## What is derived rather than copied
 
-Три вещи нельзя перенести из чужой идентичности — они являются **следствием**
-обстоятельств человека:
+Three things cannot be carried over from somebody else's identity — they are a
+**consequence** of a person's circumstances:
 
-1. **Гео-правила.** `restrictive_region_signal` выводится из резидентства. Фраза
-   «us only» для резидента Грузии — полная дисквалификация, для резидента США —
-   плюс. Таблица: `config/derivation/regions.yaml`.
-2. **Языковые фильтры.** В фильтр попадают языки, которых человек **не** знает.
-   Таблица: `config/derivation/languages.yaml`.
-3. **Неоднозначные топонимы.** Зависят от того, где человек живёт. Заготовки:
-   `config/derivation/ambiguous_places.yaml`.
+1. **Geography rules.** `restrictive_region_signal` is derived from residency.
+   The phrase "us only" is total disqualification for a resident of Georgia and
+   a plus for a resident of the US. Table: `config/derivation/regions.yaml`.
+2. **Language filters.** What goes into the filter is the languages a person
+   does **not** know. Table: `config/derivation/languages.yaml`.
+3. **Ambiguous place names.** They depend on where the person lives. Starting
+   points: `config/derivation/ambiguous_places.yaml`.
 
-Отдельно стоит запомнить различие, на котором проект уже обжигался: **«компания
-находится в X» ≠ «нужно резидентство в X»**. Фраза «EU Remote» сначала попала в
-плюсы как «европейская компания», хотя означает требование резидентства в ЕС.
+One distinction is worth remembering separately, because the project has already
+been burned on it: **"the company is in X" ≠ "residency in X is required"**. The
+phrase "EU Remote" first landed among the pluses as "a European company",
+although it means EU residency is required.
 
-## Разрешение активной идентичности
+## Resolving the active identity
 
-Строгий приоритет, без встроенных умолчаний:
+A strict order of precedence, with no built-in default:
 
-1. `--identity <префикс>` — явное намерение всегда побеждает
-2. `WORK_IDE_IDENTITY` — переменная окружения (подпроцессы, CI, тесты)
-3. `local-constitution/active.yaml` → `default_identity`
-4. Единственная активная в Малой Конституции
-5. **Отказ**
+1. `--identity <prefix>` — an explicit intent always wins
+2. `WORK_IDE_IDENTITY` — an environment variable (subprocesses, CI, tests)
+3. the only folder in `local-identities/`
+4. **refusal**
 
-| Активных | Поведение |
+| Identities present | Behaviour |
 |---|---|
-| 0 | Отказ с инструкцией по онбордингу |
-| 1 | Используется молча |
-| >1 с `default_identity` | Используется дефолт, идентичность печатается баннером |
-| >1 без дефолта | Отказ со списком: агент спрашивает или выводит из разговора |
+| 0 | Refusal, with onboarding instructions |
+| 1 | Used silently |
+| >1 | Refusal, with the list: the agent asks, or works it out from the conversation |
 
-Молчаливый выбор при неоднозначности запрещён намеренно: это ровно тот отказ,
-ради предотвращения которого построена вся система.
+Silently choosing under ambiguity is forbidden deliberately: that is precisely
+the failure the whole system was built to prevent.
 
-**Ловушка при добавлении второй идентичности.** Пока активна одна, инструменты
-берут её молча, и человек привыкает запускать `pipeline.py` без флагов. В момент,
-когда в `active.yaml` появляется вторая запись без `default_identity`, ломается
-не новая идентичность, а **старая**: все привычные команды начинают отказываться
-работать. Поэтому `default_identity` задаётся тем же движением, что и вторая
-запись, а `identity.py new` предупреждает об этом в выводе. Процедура целиком —
-`docs/ONBOARDING.md`, раздел «Вторая и последующие идентичности».
+There is no registry file listing active identities, and there deliberately will
+not be: a list can drift away from what is on disk, and folders cannot.
 
-## Запрет в коде, а не только на словах
+## The prohibition is in code, not only in words
 
-`common.require_identity()` роняет любое обращение к конфигам и данным без
-активной идентичности. Вызывается из `identity_config()`, `ensure_dirs()` и всех
-шести загрузчиков `kb.py`. Правило №0 Большой Конституции — исполняемое.
+`common.require_identity()` fails any access to config or data without an active
+identity. It is called from `identity_config()`, `ensure_dirs()` and all six
+loaders in `kb.py`. Rule zero of the constitution is executable.
 
-Дополнительно `data/<префикс>/.identity` хранит имя владельца папки. Если папку
-данных перенесли или переименовали руками, несовпадение обнаружится при первом
-же обращении, а не после записи чужих данных.
+In addition, `data/<prefix>/.identity` records who owns the folder. If the data
+folder was moved or renamed by hand, the mismatch is detected on the first
+access rather than after somebody else's data has been written.
 
-## Папка `reports/`
+## The `reports/` folder
 
-Единственная папка проекта, которую человек открывает руками. Поэтому она лежит
-**в корне репозитория**, рядом с `tools/` и `docs/`, а не внутри
-`data/<префикс>/`: искать готовую подборку в дереве накопленных данных неудобно,
-особенно когда идентичностей несколько.
+The one folder in the project a person opens by hand. So it sits **at the
+repository root**, beside `tools/` and `docs/`, rather than inside
+`data/<prefix>/`: hunting for a finished shortlist in a tree of accumulated data
+is a nuisance, especially with several identities.
 
 ```
 reports/
-  <префикс>_latest.md          свежая подборка — то, что читают
-  archive/<префикс>/<дата>.md  история прогонов
+  <prefix>_latest.md            the latest shortlist — this is what gets read
+  archive/<prefix>/<date>.md    the history of runs
 ```
 
-| Свойство | Как есть | Почему |
+| Property | How it is | Why |
 |---|---|---|
-| В гите | **Нет**, `reports/` в `.gitignore` | Это результат личного поиска конкретного человека — ровно та же причина, что и у `data/` |
-| В свежем клоне | **Нет** | Следствие предыдущего пункта |
-| Создание | **Автоматическое**, при первом же прогоне | `report.write_report()` делает `mkdir(parents=True, exist_ok=True)` для обеих папок. Отсутствие `reports/` — нормальное состояние, а не поломка: чинить руками не нужно, достаточно запустить пайплайн |
-| Общая или личная | Папка общая для всех идентичностей, файлы — нет | Свежие подборки всех своих поисков видны рядом; пересечения нет, см. правило префиксов выше |
+| In git | **No**, `reports/` is in `.gitignore` | It is the result of one person's search — the same reason as `data/` |
+| In a fresh clone | **No** | Follows from the above |
+| Creation | **Automatic**, on the very first run | `report.write_report()` calls `mkdir(parents=True, exist_ok=True)` for both folders. A missing `reports/` is a normal state rather than breakage: nothing to fix by hand, just run the pipeline |
+| Shared or personal | The folder is shared across identities; the files are not | The latest shortlist of each of your searches sits side by side; there is no overlap, see the prefix rule above |
 
-Это единственное намеренное исключение из принципа «пути двух идентичностей не
-пересекаются». Оно безопасно, потому что пересекается только *папка*: имена
-файлов различаются префиксом, архивы разложены по подпапкам. Тест
-`test_reports_folder_is_shared_but_files_are_not` фиксирует и то, и другое,
-чтобы исключение не расползлось.
+This is the one deliberate exception to "two identities' paths do not intersect".
+It is safe because only the *folder* intersects: file names differ by prefix, and
+the archives are split into subfolders. The test
+`test_reports_folder_is_shared_but_files_are_not` pins both, so the exception
+does not spread.
 
-Если нужно держать отчёты вне репозитория (общая папка, облачный диск), путь
-переопределяется переменной `WORK_IDE_REPORTS_ROOT` — см.
-`docs/LOCAL_CONSTITUTION.md`.
+If you need to keep reports outside the repository (a shared folder, a cloud
+drive), the path is overridden by `WORK_IDE_REPORTS_ROOT`.
 
-## Тестовая фикстура
+## The test fixture
 
-`identities/ftf/` — не пример идентичности, а замороженный слепок конфигурации,
-к которому откалиброваны тесты. `kind: fixture` запрещает активацию вне тестов.
+`tests/fixtures/ftf-frozen-test-fixture/` is not an example identity but a
+frozen snapshot of the configuration the tests are calibrated against. `kind:
+fixture` forbids activation outside the tests.
 
-### Фикстура не оставляет следов
+### The fixture leaves no traces
 
-Прогон тестов обязан заканчиваться тем же составом `reports/` и `data/`, с
-каким начался. За этим следит страховка в `tests/conftest.py`: она сравнивает
-состав папок до и после, **убирает** следы фикстуры и **роняет** прогон, чтобы
-дефект теста был виден.
+A test run must end with `reports/` and `data/` holding exactly what they held
+at the start. The safety net in `tests/conftest.py` sees to that: it compares
+the folder contents before and after, **clears** the fixture's traces and
+**fails** the run, so that the defect in the test is visible.
 
-Убрать вручную, если что-то осталось от старых прогонов:
+To clear anything left over from old runs by hand:
 
 ```bash
-python tools/clean_fixture_artifacts.py --dry-run   # посмотреть
-python tools/clean_fixture_artifacts.py             # убрать
+python tools/clean_fixture_artifacts.py --dry-run   # look
+python tools/clean_fixture_artifacts.py             # clear
 ```
 
-Инструмент удаляет ровно три пути и только для идентичности с `kind: fixture`:
-`reports/<p>_latest.md`, `reports/archive/<p>/` и `data/<p>/`. Живую
-идентичность он не тронет, даже если передать её префикс явно — перепутать
-флаг проще, чем восстановить накопленную базу.
+The tool deletes exactly three paths, and only for an identity with `kind:
+fixture`: `reports/<p>_latest.md`, `reports/archive/<p>/` and `data/<p>/`. It
+will not touch a live identity even if you pass its prefix explicitly — mixing
+up a flag is easier than restoring an accumulated base.
 
-**Её нельзя синхронизировать «заодно».** Расхождение между фикстурой и живыми
-идентичностями — рабочий механизм: оно превращает каждое изменение машинерии в
-явный, отрецензированный апдейт тестов. Подробности — в `ftf_identity.md`.
+**It must not be synchronised "while we are at it".** Divergence between the
+fixture and live identities is a working mechanism: it turns every change to the
+machinery into an explicit, reviewed update to the tests. Details in
+`ftf_identity.md`.
 
-## Куда класть изменения
+## Where to put a change
 
-Правило маршрутизации (полностью — в `CLAUDE.md`, раздел про эволюцию проекта):
+The routing rule (in full in `CLAUDE.md`, §13):
 
-- Улучшает проект **для всех** → Большая Конституция или `tools/`
-- Улучшает **конкретный профиль поиска** и осмысленно для любого, кто им
-  воспользуется → папка идентичности
-- Касается **только вас и этой машины** → Малая Конституция
+- Improves the project **for everyone** → the constitution or `tools/`
+- Improves a **kind of search**, and makes sense for anyone using it → the
+  template
+- Concerns **only you and this machine** → your local identity
 
-Проверочный вопрос: *«будет ли это полезно другому человеку, если он склонирует
-репозиторий?»*
+The test question: *"would this be useful to another person who cloned the
+repository?"*
 
-## Практические команды
+## Practical commands
 
 ```bash
-# создать заготовку новой идентичности (первую или очередную)
-python tools/identity.py new --prefix <префикс> --name "<расшифровка фразой>"
+# what templates exist
+python tools/templates.py list
 
-# какие идентичности есть
+# create your own identity from one
+python tools/templates.py clone <template> <prefix> "<expansion as a phrase>"
+
+# which identities are present
 python tools/identity.py list
 
-# какая активна сейчас и почему
+# which one is active right now, and why
 python tools/identity.py which
 
-# структурная целостность (префиксы, обязательные файлы, чужие ссылки)
+# structural integrity (prefixes, required files, foreign references)
 python tools/identity.py validate
 
-# что из машинерии шаблона не доехало до идентичности
-python tools/identity.py diff-template --identity kisel
+# has the template moved ahead of your copy
+python tools/templates.py check --identity kisel
 
-# любой инструмент принимает --identity
+# where a particular setting came from
+python tools/settings.py criteria classification_thresholds.hot_lead
+
+# every tool accepts --identity
 python tools/pipeline.py --identity kisel
 python tools/doctor.py --identity kisel
 ```
 
-## Связанные документы
+## Related documents
 
-- `docs/ONBOARDING.md` — как создать идентичность с нуля
-- `docs/QUESTIONNAIRE.md` — как вести опрос
-- `docs/LOCAL_CONSTITUTION.md` — спецификация локальной папки
-- `docs/BUILDING_BLOCKS.md` — каталог источников и инструментов
-- `identities/README.md` — правила для авторов идентичностей
+- `docs/ONBOARDING.md` — how to create an identity from nothing
+- `docs/QUESTIONNAIRE.md` — how to run the interview
+- `docs/OVERRIDES.md` — what overrides what between the layers
+- `docs/LOCAL_CONSTITUTION.md` — the retired layer, and what to do with it
+- `docs/BUILDING_BLOCKS.md` — a catalogue of sources and tools
+- `identity-templates/README.md` — rules for template authors

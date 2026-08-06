@@ -1,79 +1,78 @@
-# Чек-лист ручной проверки вакансии
+# The manual vacancy checklist
 
-Подтверждено практикой (2026-07-30): автоматический keyword-скоринг
-регулярно пропускает вещи, которые сразу видны человеку при чтении текста
-(буквальное "ONSITE" без слова "required", "ITAR: must be a U.S. person" и
-т.п.). Поэтому для каждой вакансии, которая прошла автоматику и попадает в
-`hot_lead`/`worth_a_look`/`long_shot`/`needs_manual_review` — **перед тем,
-как считать её реальной находкой**, агент обязан прочитать её описание
-целиком (`data/<p>/knowledge/<p>_vacancies.json` → `description_text`,
-локально, без сети) и
-пройти по этому чек-листу пункт за пунктом. Чек-лист живёт в файле
-намеренно — не в памяти агента, — чтобы можно было явно видеть, что все
-пункты закрыты, а не полагаться на "на глаз вроде нормально".
+Confirmed in practice (2026-07-30): automatic keyword scoring regularly misses
+things a person sees immediately on reading the text (a literal "ONSITE" without
+the word "required", "ITAR: must be a U.S. person" and the like). So for every
+vacancy that passed the automation and landed in
+`hot_lead`/`worth_a_look`/`long_shot`/`needs_manual_review` — **before treating
+it as a real find** — the agent must read its description in full
+(`data/<p>/knowledge/<p>_vacancies.json` → `description_text`, locally, no
+network) and work through this checklist point by point. The checklist lives in
+a file deliberately, rather than in the agent's memory, so that every point can
+be seen to be closed rather than relying on "it looked all right".
 
-Отмечать результат каждой проверки нужно явно (в скретч-файле прогона или
-прямо в ответе человеку), а не молча. Если хотя бы один пункт не закрыт —
-вакансия не считается подтверждённой находкой, независимо от score.
+Record the result of each check explicitly (in a scratch file for the run, or
+directly in the reply to the person), not silently. If even one point is not
+closed, the vacancy does not count as a confirmed find, whatever its score.
 
-## Пункты чек-листа
+## The checklist
 
-Для вакансии `<id>` / `<title>` @ `<company>`:
+For vacancy `<id>` / `<title>` @ `<company>`:
 
-- [ ] **Формат работы подтверждён явно в тексте** (не только по
-      классификации score.py). Для remote-профиля — нет слов «onsite»,
-      «on-site», «in-office», «hybrid», «must work from our office» нигде
-      в описании.
-- [ ] **Нет требования гражданства/резидентства/допуска**, которого у
-      человека нет (US citizen, EU resident, ITAR «U.S. person», security
-      clearance, конкретная страна) — читать весь текст, а не только
-      структурированные поля.
-- [ ] **Если указан конкретный регион (не «worldwide»)** — это место
-      нахождения КОМПАНИИ, а не требование резидентства там. Разница
-      принципиальна: «компания из X» приемлемо, «нужно жить в X» —
-      дисквалификация, если человек там не живёт.
-- [ ] **Роль — реальная разработка ПО**, не смежная профессия (менеджмент,
-      продажи, поддержка, администрирование) — по здравому смыслу, не
-      только по названию должности.
-- [ ] **Стек действительно ваш** (см. `tech_stack` в профиле идентичности),
-      а не случайное совпадение одного второстепенного слова.
-- [ ] **Характер роли соответствует профилю.** Если идентичность избегает
-      R&D и «построить с нуля» — проверить, что это действительно
-      поддержка/развитие существующего. Внимательно читать заголовки вида
-      «(AI ...)»: это может означать и «AI как обычный инструмент», и
-      «исследовательская роль» — нужно понять из контекста.
-- [ ] **Язык совпадает с теми, которыми человек владеет** (см. `languages`
-      в профиле). Нет требования незнакомого языка, и текст не написан
-      целиком на нём.
-- [ ] **Нагрузка совместима с целью** (см. `hours_per_day_target`) — нет
-      явных признаков режима, который человеку не подходит: обязательных
-      дежурств, жёсткого присутствия, постоянных дедлайнов.
-- [ ] **Ссылка реально ведёт на вакансию** (не на общую страницу компании,
-      не на 404) — если `link_check.status` не `ok`, посмотреть ссылку
-      отдельно, если возможно.
-- [ ] **Понятно, откуда взялись данные о репутации.** Если в отчёте стоит
-      "данные из поисковой выдачи — первоисточник не открывался", это
-      вторая рука: цифры взяты из сниппетов поиска, саму страницу
-      Glassdoor/Trustpilot агент не видел (они отдают 403 скриптам). Для
-      вакансии, на которую человек реально собирается откликаться, стоит
-      предложить ему открыть первоисточник глазами — особенно если есть
-      красные флаги или рейтинг близок к пороговым значениям.
+- [ ] **The working arrangement is confirmed explicitly in the text** (not only
+      by score.py's classification). For a remote profile: no "onsite",
+      "on-site", "in-office", "hybrid" or "must work from our office" anywhere in
+      the description.
+- [ ] **No requirement of citizenship, residency or clearance** that the person
+      does not have (US citizen, EU resident, ITAR "U.S. person", security
+      clearance, a particular country) — read the whole text, not only the
+      structured fields.
+- [ ] **If a specific region is named (rather than "worldwide")**, it is where
+      the COMPANY is rather than a requirement to live there. The difference is
+      fundamental: "a company from X" is acceptable; "you must live in X"
+      disqualifies if the person does not.
+- [ ] **The role is real software development**, not an adjacent profession
+      (management, sales, support, administration) — by common sense, not only
+      by the job title.
+- [ ] **The stack really is yours** (see `tech_stack` in the identity profile)
+      rather than a chance match on one secondary word.
+- [ ] **The character of the role matches the profile.** If the identity avoids
+      R&D and "build it from scratch", check that this really is maintenance or
+      extension of something existing. Read titles of the form "(AI ...)"
+      carefully: they can mean "AI as an ordinary tool" or "a research role" —
+      work out which from the context.
+- [ ] **The language matches the ones the person speaks** (see `languages` in
+      the profile). No requirement for an unfamiliar language, and the text is
+      not written entirely in one.
+- [ ] **The workload is compatible with the goal** (see `hours_per_day_target`)
+      — no clear signs of an arrangement that does not suit: mandatory on-call,
+      strict attendance, constant deadlines.
+- [ ] **The link really does lead to the vacancy** (not to a general company
+      page, not to a 404) — if `link_check.status` is not `ok`, look at the link
+      separately where possible.
+- [ ] **It is clear where the reputation data came from.** If the report says
+      "data from search results — the primary source was not opened", that is
+      second-hand: the numbers come from search snippets, and the agent never saw
+      the Glassdoor or Trustpilot page itself (they answer 403 to scripts). For a
+      vacancy the person really intends to apply to, it is worth suggesting they
+      open the primary source with their own eyes — especially if there are red
+      flags, or the rating is near a threshold.
 
-## Как использовать
+## How to use it
 
-1. `python tools/kb.py list --identity <p> --limit 50` (или прочитать
-   базу напрямую) — получить список кандидатов из `long_shot` и выше.
-2. Для каждого — прочитать полный `description_text` (не только
-   score_breakdown!).
-3. Пройти чек-лист выше пункт за пунктом, явно зафиксировав результат.
-4. Если все пункты закрыты — вакансия подтверждена, можно включать в
-   финальную выборку.
-5. Если хотя бы один пункт не закрыт — обновить `<p>_criteria.yaml`
-   (добавить недостающий keyword/паттерн, если проблема системная) и/или
-   пометить вакансию через `tools/kb.py set-status --identity <p> --id <id>
-   --status not_relevant --notes "почему"`, и объяснить человеку, что именно
-   было не так и как это исправлено, чтобы в следующий раз автоматика ловила
-   это сама.
+1. `python tools/kb.py list --identity <p> --limit 50` (or read the base
+   directly) to get the list of candidates at `long_shot` and above.
+2. For each, read the full `description_text` — not only the score breakdown.
+3. Work through the checklist above point by point, recording each result
+   explicitly.
+4. If every point is closed, the vacancy is confirmed and can go into the final
+   selection.
+5. If even one point is not closed, update `<p>_criteria.yaml` (add the missing
+   keyword or pattern, if the problem is systemic) and/or mark the vacancy with
+   `tools/kb.py set-status --identity <p> --id <id> --status not_relevant
+   --notes "why"`, and explain to the person what was wrong and how it was
+   fixed, so that next time the automation catches it itself.
 
-Правки критериев кладите в файл ТОЙ идентичности, по которой идёт поиск.
-Правка чужого файла не сработает, а правка общей машинерии затронет всех.
+Put criteria edits in the file of THE identity the search is running under.
+Editing another identity's file will do nothing, and editing the shared
+machinery affects everybody.

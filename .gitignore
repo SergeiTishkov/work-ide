@@ -1,40 +1,46 @@
 # =============================================================================
-#  Что НЕ попадает в репозиторий
+#  What does NOT go into the repository
 # =============================================================================
-#  Репозиторий общий для нескольких людей с разными поисковыми идентичностями.
-#  Правило простое: инструменты и общие идентичности — в гите; всё личное и все
-#  накопленные данные — нет. См. docs/IDENTITIES.md и docs/LOCAL_CONSTITUTION.md.
+#  The repository is shared by several people with different search identities.
+#  The rule is simple: tools and shared templates go into git; everything
+#  personal and everything accumulated does not. See docs/IDENTITIES.md.
 
-# --- Малая Конституция: какие идентичности активны НА ЭТОЙ машине, плюс личные
-# --- файлы (CV, контакты, приватные заметки). Строго локальна для каждого
-# --- человека. Её спецификация лежит в docs/LOCAL_CONSTITUTION.md, а скелет для
-# --- копирования — в docs/templates/local-constitution/.
-# Ведущий слэш обязателен: без него правило матчится на ЛЮБОЙ глубине и
-# заодно проглатывает docs/templates/local-constitution/ — тот самый скелет,
-# который новый человек должен получить в клоне (реальный баг, найден при
-# аудите перед публикацией 2026-08-04).
+# --- Local identities: working copies of templates. Outside git by design —
+# --- this is where residency, pay expectations, CVs and everything else a
+# --- person is under no obligation to show anyone live. However many folders
+# --- are here is how many shortlists the system produces; there is no separate
+# --- registry of active identities.
+/local-identities/
+
+# --- The retired local layer: which identities were active ON THIS MACHINE,
+# --- plus personal files (CVs, contacts, private notes). Kept ignored for
+# --- machines set up before the split; see docs/LOCAL_CONSTITUTION.md.
+# The leading slash is mandatory: without it the rule matches at ANY depth and
+# also swallows docs/templates/local-constitution/ — the very skeleton a new
+# person should find in their clone (a real bug, found during the audit before
+# publication, 2026-08-04).
 /local-constitution/
 
-# --- Накопленные данные: база вакансий, компании, сырые дампы, состояние.
-# --- У каждого пользователя свои; чужие вакансии бесполезны и только раздувают
-# --- репозиторий (у владельца это ~148 МБ). Раскладка: data/<префикс>/...
+# --- Accumulated data: the vacancy base, companies, raw dumps, state.
+# --- Each user has their own; somebody else's vacancies are useless and only
+# --- bloat the repository (~148 MB for the owner). Layout: data/<prefix>/...
 /data/
 
-# --- Отчёты. Лежат в корне (их открывают руками, а не ищут в дереве данных),
-# --- но в гит не попадают ровно по той же причине, что и data/: это результат
-# --- личного поиска конкретного человека. Раскладка:
-# ---   reports/<префикс>_latest.md
-# ---   reports/archive/<префикс>/<дата>.md
+# --- Reports. They sit at the root (they are opened by hand rather than hunted
+# --- for in a data tree), but stay out of git for exactly the same reason as
+# --- data/: they are the result of one person's search. Layout:
+# ---   reports/<prefix>_latest.md
+# ---   reports/archive/<prefix>/<date>.md
 /reports/
 
-# --- Резюме и прочие персональные документы. Место им — в Малой Конституции
-# --- (local-constitution/personal/<префикс>/), а не в общем репозитории.
+# --- CVs and other personal documents. Their place is inside a local identity
+# --- (local-identities/<folder>/documents/), not in the shared repository.
 CV *.pdf
 CV *.docx
 *_cv.pdf
 *_cv.docx
 
-# --- Виртуальное окружение: у каждой машины своё, requirements.txt достаточно.
+# --- The virtual environment: each machine has its own, requirements.txt is enough.
 .venv/
 
 # --- Python
@@ -42,11 +48,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# --- Временные файлы
+# --- Temporary files
 *.tmp
-
-# Локальные идентичности — рабочие копии шаблонов. Вне гита по замыслу: здесь
-# лежат резидентство, зарплатные ожидания, CV и всё прочее, что человек не
-# обязан показывать никому. Количество папок здесь = количество подборок,
-# которые делает система; отдельного реестра активных идентичностей нет.
-/local-identities/

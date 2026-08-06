@@ -1,315 +1,335 @@
-# Архитектурные решения
+# Architectural decisions
 
-Формат: решение → почему. Раздел "Отклонённые подходы" — чтобы будущий
-запуск/агент не наступал на те же грабли повторно (см. CLAUDE.md, раздел 6).
+The format is: decision → why. The "Rejected approaches" section exists so that
+a future run or agent does not cover the same ground twice (see CLAUDE.md,
+section 6).
 
-## Принятые решения
+## Decisions taken
 
-### Файловая система как база данных
-JSON для машиночитаемых структур (`vacancies.json`, `companies.json`,
-`state.json`), Markdown для отчётов и для `insights.md`, YAML для
-конфигурации. Никакого SQL/NoSQL сервера — репозиторий должен быть и
-программой, и базой знаний одновременно, доступной для чтения в обычном
-редакторе (требование ТЗ и CLAUDE.md).
+### The file system as the database
+JSON for machine-readable structures (`vacancies.json`, `companies.json`,
+`state.json`), Markdown for reports and for `insights.md`, YAML for
+configuration. No SQL or NoSQL server — the repository has to be both the
+program and the knowledge base at once, readable in an ordinary editor (a
+requirement of the brief and of CLAUDE.md).
 
-### Скучные, минимальные зависимости
-Только `requests` + `PyYAML` (+ `pytest` для тестов). RSS парсится stdlib
-`xml.etree.ElementTree`, HTML чистится собственным regex-стриппером
-(`tools/common.py:strip_html`), нечёткое сравнение — не понадобилось вообще
-(см. "Отклонённые подходы" ниже). Меньше зависимостей — меньше риска, что
-через год-два `pip install` что-то не соберёт на чужой машине.
+### Boring, minimal dependencies
+Only `requests` and `PyYAML` (plus `pytest` for the tests). RSS is parsed with
+the standard library's `xml.etree.ElementTree`, HTML is cleaned by our own regex
+stripper (`tools/common.py:strip_html`), and fuzzy comparison turned out not to
+be needed at all (see "Rejected approaches" below). Fewer dependencies means
+less risk that in a year or two `pip install` fails to build something on
+somebody else's machine.
 
-### Разделение "детерминированного" и "качественного" слоёв
-`tools/*.py` — детерминированный, воспроизводимый слой (fetch/normalize/
-score/report). Агент в интерактивной сессии — качественный слой: смотрит на
-`needs_manual_review`, гуглит компании, проверяет визовую/EOR-реальность,
-заносит находки через `tools/ingest_manual.py`. Это осознанное разделение
-труда, а не недоработка: автоматика — recall-ориентированный первый фильтр
-(лучше пропустить что-то не совсем релевантное, чем упустить хорошую
-вакансию), агент — precision-ориентированный второй фильтр.
+### The deterministic and the qualitative layers are kept apart
+`tools/*.py` is the deterministic, reproducible layer (fetch, normalize, score,
+report). The agent in an interactive session is the qualitative layer: it looks
+at `needs_manual_review`, searches for companies, checks the real visa and EOR
+situation, and enters findings through `tools/ingest_manual.py`. That is a
+deliberate division of labour rather than an omission: the automation is a
+recall-oriented first filter (better to let through something not quite
+relevant than to miss a good vacancy), the agent a precision-oriented second.
 
-### `companies.json` как производное представление
-Изначально `companies.json` обновлялся инкрементально вместе с вакансиями.
-При тестировании на реальных данных это привело бы к рассинхронизации
-счётчиков между перезапусками. Переделано: `companies.json` **пересобирается
-целиком** на каждом запуске из текущего `vacancies.json`
-(`kb.build_companies_from_vacancies`), с переносом только `notes` и
-`first_seen` из предыдущей версии. Такой подход гарантирует, что
-`vacancy_ids`/счётчики сигналов никогда не разъезжаются с реальным
-состоянием базы вакансий.
+### `companies.json` as a derived view
+Originally `companies.json` was updated incrementally alongside the vacancies.
+Testing on real data showed that would desynchronise the counters between runs.
+Rebuilt: `companies.json` is now **recomputed whole** on every run from the
+current `vacancies.json` (`kb.build_companies_from_vacancies`), carrying over
+only `notes` and `first_seen` from the previous version. That guarantees
+`vacancy_ids` and the signal counters can never drift away from the real state
+of the vacancy database.
 
-### Ретроактивный rescoring всей базы на каждом запуске
-`pipeline.rescore_all()` пересчитывает `computed` для **всех** вакансий, а
-не только для новых. Если `criteria.yaml` стала точнее — старые записи
-немедленно получают актуальную оценку. Это прямое следствие требования
-CLAUDE.md "каждый запуск должен оставлять репозиторий лучше".
+### Retroactive rescoring of the whole base on every run
+`pipeline.rescore_all()` recomputes `computed` for **every** vacancy, not only
+the new ones. If `criteria.yaml` has become more accurate, old records get the
+current verdict immediately. That follows directly from CLAUDE.md's requirement
+that "every run must leave the repository better".
 
-### Гейт по релевантности стека (stack gate)
-На реальных прогонах (см. "Отклонённые подходы") обнаружилось, что вакансии
-без единого совпадения по технологическому стеку всё равно набирали
-приличный балл только за счёт общих слов из бойлерплейта ("we serve clients
-in banking, insurance, government..."). Добавлен жёсткий гейт: если
-`stack_fit.points == 0`, классификация не может подняться выше
-`low_priority`, независимо от остальных компонентов. Это резко снижает
-количество мусора в `long_shot`/`needs_manual_review` без необходимости в
-NLP/LLM-классификации внутри пайплайна.
+### The stack relevance gate
+Real runs (see "Rejected approaches") showed that vacancies without a single
+match against the technology stack still scored respectably, purely on generic
+boilerplate words ("we serve clients in banking, insurance, government..."). A
+hard gate was added: if `stack_fit.points == 0`, the classification cannot rise
+above `low_priority` regardless of the other components. That sharply reduces
+the rubbish in `long_shot` and `needs_manual_review` without needing NLP or LLM
+classification inside the pipeline.
 
-### needs_manual_review — только для того, что уже прошло фильтр
-Изначально флаг ставился на любую вакансию без явного "worldwide"/"US
-only"/EOR сигнала — на реальных данных это оказалось ~85% базы (бесполезно
-как раздел отчёта). Исправлено: общая неопределённость локации помечается
-только для вакансий, которые и так попали в `long_shot` и выше; неоднозначный
-"Georgia" (страна/штат) помечается всегда, вне зависимости от классификации,
-потому что это дешёвая и всегда важная проверка.
+### needs_manual_review only for what already passed the filter
+The flag was originally set on any vacancy without an explicit
+worldwide/US-only/EOR signal — on real data that turned out to be some 85% of
+the base, which is useless as a report section. Fixed: general uncertainty about
+location is flagged only for vacancies that reached `long_shot` and above, while
+an ambiguous "Georgia" (country or state) is flagged always, regardless of
+classification, because that check is cheap and always matters.
 
-### role_complexity_signal — отдельная ось от legacy_enterprise_signal
-Подтверждено человеком явно (2026-07-30) на реальных находках: "Staff
-Software Engineer, Agentic Platform" (tide) и "Principal Machine Learning
-Scientist" проходили как `long_shot` только из-за общих
-enterprise/banking/insurance слов в описании компании — но сама РОЛЬ явно
-не "простая поддержка", а R&D/новая архитектура с нуля. Это ровно тот
-кандидат на улучшение, что был записан в "Дальнейшее развитие" предыдущей
-версии этого файла — теперь реализован как отдельный гейт
-(`<префикс>_criteria.yaml` → `role_complexity_signal`, `score.py` →
-`_score_role_complexity`): совпадение в title (Principal/Staff Scientist,
-Agentic, Founding Engineer и т.п.) гейтит сразу; совпадения в описании
-(build from scratch, greenfield, cutting-edge, PhD required...) нужно
-минимум 2, чтобы не гейтить нормальную роль из-за одного случайного модного
-слова в бойлерплейте.
+### role_complexity_signal — an axis of its own, apart from legacy_enterprise_signal
+Confirmed by the owner explicitly (2026-07-30) on real findings: "Staff Software
+Engineer, Agentic Platform" (tide) and "Principal Machine Learning Scientist"
+were passing as `long_shot` only because of generic enterprise/banking/insurance
+words in the company description — while the ROLE itself is plainly not "quiet
+maintenance" but R&D or new architecture from scratch. This was exactly the
+improvement candidate recorded under "Further development" in the previous
+version of this file; it is now implemented as its own gate
+(`<prefix>_criteria.yaml` → `role_complexity_signal`, `score.py` →
+`_score_role_complexity`): a match in the title (Principal/Staff Scientist,
+Agentic, Founding Engineer and so on) gates immediately, while matches in the
+description (build from scratch, greenfield, cutting-edge, PhD required...) need
+at least two, so that a normal role is not gated over one stray buzzword in
+boilerplate.
 
-### Жёсткая привязка к региону — dealbreaker, а не "ниже приоритет"
-Реальный найденный баг (2026-07-30): HN-вакансия с "remote LATAM" в тексте
-получила приличный score, хотя физически недоступна человеку из Грузии —
-раньше подобные региональные ограничения (кроме явных US-citizenship фраз)
-не считались dealbreaker, только `us_remote_only_no_intl_signal` с 6
-очками. Переделано: `restrictive_region_signal` — единый список фраз
-(US-only, LATAM, APAC, UK only, Canada only, India only и т.д.), при
-совпадении которых БЕЗ одновременного worldwide/EOR-сигнала вакансия
-получает dealbreaker и статус `rejected`. Список принципиально неполный
-(регионов бесконечно много) — это документированное ограничение, а не
-недосмотр; `needs_manual_review` и чтение агентом — последняя линия
-защиты. См. также `<префикс>_profile.yaml` → `target_regions`: регионы,
-где человек реально рассчитывает на найм.
+### A hard tie to a region is a dealbreaker, not "lower priority"
+A real bug found (2026-07-30): an HN vacancy with "remote LATAM" in its text
+scored respectably although it is physically unavailable to a person in Georgia
+— such regional restrictions (apart from explicit US-citizenship phrases) did
+not count as dealbreakers before, only as `us_remote_only_no_intl_signal` worth
+6 points. Rebuilt: `restrictive_region_signal` is a single list of phrases
+(US-only, LATAM, APAC, UK only, Canada only, India only and so on), and a match
+WITHOUT a simultaneous worldwide or EOR signal makes the vacancy a dealbreaker
+with status `rejected`. The list is incomplete in principle — there are
+endlessly many regions — and that is a documented limitation rather than an
+oversight; `needs_manual_review` and the agent reading the text are the last
+line of defence.
 
-**Исправление 2026-07-30 (вечер):** "EU Remote"/"remote Europe" изначально
-были в `acceptable_region_signal` (плюс к score) — это была ошибка: в
-реальной найденной вакансии "(EU Remote)" в заголовке означает требование
-резидентства В ЕС, что дисквалифицирует владельца ровно так же, как "US
-Remote" (Грузия не в ЕС). Перенесено в `restrictive_region_signal`.
-`acceptable_region_signal` теперь содержит только описания местоположения
-КОМПАНИИ (Israel/Tel Aviv/UAE/Dubai/Abu Dhabi), не резидентские требования.
+**Correction, 2026-07-30 (evening):** "EU Remote"/"remote Europe" were
+originally in `acceptable_region_signal` (a plus to the score). That was wrong:
+in the real vacancy found, "(EU Remote)" in the title means residency IN the EU
+is required, which disqualifies the owner exactly as "US Remote" does (Georgia
+is not in the EU). Moved into `restrictive_region_signal`.
+`acceptable_region_signal` now holds only descriptions of where the COMPANY is,
+not residency requirements.
 
-### Три ПОЛНЫХ ОТСЕВА, добавленных 2026-07-30 (вечер) — не просто низкий score
+### Three FULL REJECTIONS added 2026-07-30 (evening) — not merely a low score
 
-Владелец лично прочитал `latest.md` и указал на конкретные, очевидные
-ложноположительные срабатывания. Все три ниже — теперь настоящие
-dealbreaker'ы (`classification = "rejected"`), а не понижение приоритета:
+The owner read `latest.md` personally and pointed at specific, obvious false
+positives. All three below are now genuine dealbreakers (`classification =
+"rejected"`) rather than a demotion:
 
-1. **`role_relevance_signal`** — гейт "это вообще роль разработчика". Реальные
-   находки: "CFO Controller" (score 60, `worth_a_look`!) и "Product
-   Manager, Mapping and Weather Visualization" проходили только за счёт
-   generic legacy/enterprise-слов в описании КОМПАНИИ. Срабатывает по
-   заголовку вакансии (список "неправильных" профессий — CFO/Controller/
-   Product Manager/Sales/Customer Support/Recruiter/Webmaster и т.д.),
-   снимается явным developer-словом в заголовке ("Engineer"/"Developer") или
-   explicit "tech agnostic" заявлением компании где угодно в тексте.
+1. **`role_relevance_signal`** — the gate for "is this a developer role at all".
+   Real findings: "CFO Controller" (score 60, `worth_a_look`!) and "Product
+   Manager, Mapping and Weather Visualization" were passing purely on generic
+   legacy/enterprise words in the COMPANY description. It fires on the vacancy
+   title (a list of "wrong" professions — CFO/Controller/Product Manager/Sales/
+   Customer Support/Recruiter/Webmaster and so on) and is lifted by an explicit
+   developer word in the title ("Engineer"/"Developer") or by an explicit "tech
+   agnostic" statement from the company anywhere in the text.
 
-2. **`language_requirement_signal`** — гейт знания языков. Владелец говорит
-   только на русском и английском (`<префикс>_profile.yaml` → `owner.languages`).
-   Реальная находка: "Web-Administration / Webmaster TYPO3" требовал "sehr
-   gute Deutschkenntnisse". Ловит и явные англоязычные фразы ("fluent
-   german"), и эвристику "вся вакансия написана по-немецки" (частые слова +
-   стандартная немецкая разметка "m/w/d"/"w/m/d", порог 3+ совпадений) —
-   многие вакансии с немецких бордов (arbeitnow) вообще не содержат
-   англоязычной фразы про язык, но целиком на немецком.
+2. **`language_requirement_signal`** — the language gate. The owner speaks only
+   Russian and English (`<prefix>_profile.yaml` → `owner.languages`). A real
+   finding: "Web-Administration / Webmaster TYPO3" required "sehr gute
+   Deutschkenntnisse". It catches both explicit English phrases ("fluent
+   german") and the heuristic "this whole vacancy is written in German"
+   (frequent words plus the standard German markup "m/w/d"/"w/m/d", a threshold
+   of 3+ matches) — many vacancies from German boards (arbeitnow) contain no
+   English phrase about language at all, being entirely in German.
 
-3. **Строгий гейт релевантности стека вместо мягкого.** Раньше было
-   `stack_points > 0` (низкий приоритет при провале). Реальный найденный
-   баг: "LESS" (CSS-препроцессор, familiar-уровень) ложно совпадал с
-   обычным английским словом "less" в описании "CFO Controller"
-   ("...no less than 5 years...") — одного такого совпадения хватало.
-   Переделано на `_check_stack_relevance()`: требуется хотя бы один core
-   ИЛИ strong хит (familiar-хита одного недостаточно). Заодно нашлась и
-   починена настоящая находка владельца: "Java Entwicklung" (чистая
-   Java web-роль) — владелец явно сказал "я дотнетчик, меня на джава
-   позицию не возьмут". НО Java/Scala ДЛЯ ДАТА-ПАЙПЛАЙНОВ (Spark/
-   Databricks/ETL) — владелец явно подтвердил, что это желанный вариант
-   (реальный опыт, предыдущего места работы) — реализовано как точечное
-   исключение (`data_pipeline_language_keywords` + `_context_keywords`),
-   а не полное исключение Java/Scala из стека. Explicit "tech agnostic"
-   заявление компании снимает и этот гейт.
+3. **A strict stack relevance gate instead of a soft one.** It used to be
+   `stack_points > 0` (low priority on failure). A real bug found: "LESS" (the
+   CSS preprocessor, at familiar level) falsely matched the ordinary English
+   word "less" in the "CFO Controller" description ("...no less than 5
+   years..."), and one such match was enough. Rebuilt as
+   `_check_stack_relevance()`: at least one core OR strong hit is required (one
+   familiar hit is not enough). That also surfaced and fixed a real find of the
+   owner's: "Java Entwicklung" (a pure Java web role) — the owner said outright
+   "I am a .NET developer, they will not take me for a Java position". BUT
+   Java/Scala FOR DATA PIPELINES (Spark/Databricks/ETL) is something the owner
+   explicitly confirmed as wanted (real experience, from a previous job) — so it
+   is implemented as a narrow exception (`data_pipeline_language_keywords` plus
+   `_context_keywords`) rather than as removing Java/Scala from the stack
+   entirely. An explicit "tech agnostic" statement lifts this gate too.
 
-Побочный эффект строгого стек-гейта: удалено `LESS` из `tech_stack.familiar`
-(риск такого рода false positive не стоил узкой пользы CSS-препроцессора),
-`Express` переименован в `Express.js` (снижает похожий риск с обычным
-словом "express"). См. также найденный аналогичный баг с "LLM Engineer
-Freelancer" — не пойман первой версией `role_complexity_signal` (только
-"Agentic"/"Principal Scientist"-паттерны), добавлены "llm engineer"/
-"ai engineer" в title-паттерны.
+A side effect of the strict stack gate: `LESS` was removed from
+`tech_stack.familiar` (the risk of that kind of false positive was not worth the
+narrow benefit of a CSS preprocessor), and `Express` was renamed to `Express.js`
+(reducing the same risk with the ordinary word "express"). See also the
+analogous bug found with "LLM Engineer Freelancer" — not caught by the first
+version of `role_complexity_signal`, which had only "Agentic"/"Principal
+Scientist" patterns; "llm engineer" and "ai engineer" were added to the title
+patterns.
 
-### Три уровня доверия к зарплате: явная / внешняя оценка / нет данных
-Подтверждено человеком явно (2026-07-30). Явная ЗП в тексте вакансии —
-полный бонус (как раньше). Новое: агент может вручную занести ЗП-оценку из
-стороннего источника (Glassdoor и т.п.) через
-`tools/kb.py set-salary-estimate` — это даёт МЕНЬШИЙ бонус
-(`external_estimate_points`), и это единственная причина, почему такая
-оценка хранится в новом top-level поле `vacancy.external_signals`, а не в
-`manual` (в отличие от `manual`, `external_signals` явно передаётся в
-`score.score_vacancy()` при rescoring — см. `pipeline.rescore_all`).
-Отсутствие любых данных о зарплате остаётся строго нейтральным (0 очков) —
-не путать "нет данных" с "плохая зарплата".
+### Three levels of trust in a salary: stated / external estimate / no data
+Confirmed by the owner explicitly (2026-07-30). A salary stated in the vacancy
+text is the full bonus, as before. What is new: the agent can enter a pay
+estimate from an external source (Glassdoor and the like) by hand through
+`tools/kb.py set-salary-estimate` — that gives a SMALLER bonus
+(`external_estimate_points`), and it is the only reason such an estimate is
+stored in the new top-level field `vacancy.external_signals` rather than in
+`manual` (unlike `manual`, `external_signals` is explicitly passed into
+`score.score_vacancy()` when rescoring — see `pipeline.rescore_all`). No salary
+data at all remains strictly neutral (0 points) — do not confuse "no data" with
+"bad pay".
 
-### Проверка ссылок — консервативно, только 404/410 считаются "мёртвыми"
-Подтверждено человеком явно (2026-07-30) после того, как в отчёте
-попались нерабочие ссылки. `tools/link_check.py` проверяет каждую (не
-дублированную) вакансию через HEAD с фолбэком на GET. Единственные статусы,
-трактуемые как "точно мертво" — 404 и 410: это единственные коды, которые
-недвусмысленно значат "страницы больше нет". Всё остальное (403/429/999 от
-анти-бот защиты конкретных площадок вроде LinkedIn, таймауты, 5xx) — статус
-`unknown`, и такие записи НЕ скрываются из отчёта: спрятать настоящую
-вакансию — куда хуже, чем изредка показать сомнительную ссылку (тот же
-принцип, что и в `kb.mark_duplicates`). Проверка кэшируется на 12 часов на
-вакансию (`recheck_after_hours`), чтобы не долбить джоб-борды на каждом
-запуске пайплайна.
+### Link checking: conservative, only 404/410 count as "dead"
+Confirmed by the owner explicitly (2026-07-30) after dead links turned up in a
+report. `tools/link_check.py` checks every non-duplicate vacancy with a HEAD
+request, falling back to GET. The only statuses read as "definitely gone" are
+404 and 410: they are the only codes that unambiguously mean "the page is no
+longer there". Everything else (403/429/999 from a site's anti-bot protection,
+timeouts, 5xx) gets status `unknown`, and such records are NOT hidden from the
+report: hiding a real vacancy is far worse than occasionally showing a doubtful
+link (the same principle as in `kb.mark_duplicates`). The check is cached for 12
+hours per vacancy (`recheck_after_hours`) so as not to hammer the job boards on
+every pipeline run.
 
-### Система поисковых идентичностей (2026-07-31)
+### The search-identity system (2026-07-31)
 
-Проект стал мультипользовательским. Подробное описание — `docs/IDENTITIES.md`;
-здесь только сами решения и почему они такие.
+The project became multi-user. The full description is in `docs/IDENTITIES.md`;
+what follows is only the decisions and why they are what they are.
 
-**Пути к конфигам и данным зависят от активной идентичности**, а не фиксированы.
-Реализовано перепривязкой модульных переменных в `common.py` при
-`activate_identity()`. Проверенное условие корректности: ни одно место в проекте
-не читает эти константы на этапе импорта — все ~30 обращений идут как `common.X`
-во время вызова. Поэтому перепривязка не потребовала править места вызова и не
-сломала monkeypatch в тестах.
+**The paths to config and data depend on the active identity** rather than being
+fixed. Implemented by rebinding module-level variables in `common.py` on
+`activate_identity()`. The correctness condition, verified: nowhere in the
+project reads these constants at import time — all ~30 accesses go through
+`common.X` at call time. So rebinding needed no changes at the call sites and
+did not break monkeypatching in the tests.
 
-`CONFIG_DIR` при этом **удалён, а не превращён в алиас**: забытое место вызова
-должно падать с `AttributeError`, а не молча читать чужой файл.
+`CONFIG_DIR` was **deleted rather than turned into an alias**: a forgotten call
+site should fail with `AttributeError` instead of quietly reading somebody
+else's file.
 
-**Полные самодостаточные копии конфигов вместо наследования от общей базы.**
-Ключевое свойство, которое это даёт: *радиус поражения изменения равен префиксу
-изменённого файла*. Правка `kisel_criteria.yaml` физически не может задеть другую
-идентичность.
+**Templates plus a verbatim copy, instead of inheritance from a shared base.**
+The property this buys: *the blast radius of a change equals the prefix of the
+file changed*. An edit to `kisel_criteria.yaml` physically cannot touch another
+identity.
 
-Причина, по которой наследование не подошло, конкретна: граница
-машинерия/личное проходит **внутри отдельных списков**. В
-`hard_wrong_profession_title_patterns` соседствуют универсальные
-GTM/sales-паттерны и личное исключение DevOps; в `hard_dealbreakers` —
-универсальные onsite-фразы и производные от гражданства. Слой оверрайдов
-потребовал бы изобрести семантику «удали элемент X из базового списка» и
-поставить её поверх логики дисквалификаторов — новую непроверенную поверхность
-отказа в самом опасном месте системы.
+The reason inheritance did not fit is specific: the boundary between machinery
+and personal settings runs **inside individual lists**. In
+`hard_wrong_profession_title_patterns`, universal GTM/sales patterns sit
+alongside a personal exclusion of DevOps; in `hard_dealbreakers`, universal
+onsite phrases sit alongside things derived from citizenship. An override layer
+would have required inventing the semantics of "remove element X from the base
+list" and putting them on top of the disqualifier logic — a new, untested
+failure surface at the most dangerous point in the system.
 
-Цена решения принята осознанно: улучшения машинерии не расходятся сами.
-Компенсируется командой `identity.py diff-template` (структурный отчёт,
-никогда не автослияние), баннерами секций `MACHINERY`/`IDENTITY TUNING` в
-конфигах и тестом `test_identity_criteria_structure_matches_template`.
+The price was accepted deliberately: improvements to the machinery do not
+propagate by themselves. It is offset by pinning the template version in
+`identity.yaml`, by `templates.py check/update` (an update is a folder
+replacement, never a text merge), and by the test that fails when a local
+identity falls behind its template.
 
-**Гео-правила и языковые фильтры выводятся, а не копируются.** Они — следствие
-резидентства и языков конкретного человека: «us only» для резидента Грузии
-дисквалификация, для резидента США — плюс. Таблицы вывода в
-`config/derivation/`. Наивная копипаста чужого конфига здесь ломает поиск
-молча, поэтому онбординг устроен вокруг вопросника, а не вокруг «скопируй и
-поправь».
+**Geography rules and language filters are derived, not copied.** They follow
+from a particular person's residency and languages: "us only" is a
+disqualification for a resident of Georgia and a plus for a resident of the US.
+The derivation tables are in `config/derivation/`. Naive copy-paste of somebody
+else's config breaks the search silently here, which is why onboarding is built
+around a questionnaire rather than around "copy this and edit it".
 
-**Данные в `data/<префикс>/`, в корне репозитория, а не внутри папки
-идентичности.** Иначе пришлось бы городить negative-ignore правила внутри
-отслеживаемой директории, которые ломаются при добавлении любого файла. Файл
-`data/<префикс>/.identity` хранит имя владельца папки и ловит ситуацию «папку
-данных перенесли руками».
+**Data lives in `data/<prefix>/` at the repository root, not inside the identity
+folder.** Otherwise negative-ignore rules would be needed inside a tracked
+directory, and those break the moment any file is added. The file
+`data/<prefix>/.identity` records who owns the folder and catches "the data
+folder was moved by hand".
 
-**Тестовая фикстура `ftf` — побайтовая копия конфигурации на момент перехода.**
-Синтетическая «нейтральная» фикстура потребовала бы переписать большинство из
-111 существующих ассертов в том же рефакторинге, который и так двигал каждый
-путь в проекте. Копия позволила использовать существующий тестовый набор как
-страховку: рефакторинг доказанно не изменил поведение (ноль расхождений
-классификаций на 2930 вакансиях).
+**The `ftf` test fixture is a byte-for-byte copy of the configuration at the
+moment of transition.** A synthetic "neutral" fixture would have meant rewriting
+most of the 111 existing assertions during the very refactor that was already
+moving every path in the project. The copy let the existing test suite act as
+insurance: the refactor demonstrably did not change behaviour (zero
+classification differences across 2930 vacancies).
 
-## Отклонённые подходы
+### Layered settings with provenance (2026-08-05)
 
-### Fuzzy-дедупликация заголовков (difflib, порог ~0.92)
-Первая версия `kb.mark_duplicates` группировала вакансии одной компании и
-схлопывала похожие заголовки через `difflib.SequenceMatcher`. На реальных
-данных это дало серьёзные false positives: "Software Engineer - Manchester"
-и "Software Engineer - Newcastle" (одна роль, разные города одной компании)
-или "(Native Danish) Support Consultant" / "(Native Finnish) Support
-Consultant" (разные вакансии под разные языки) fuzzy-совпадали на >90% и
-ошибочно схлопывались в одну запись — то есть от владельца **прятались
-реально разные открытые позиции**. Это хуже, чем изредка показать
-безобидный точный повтор. Заменено на строгое точное совпадение
-нормализованной пары (компания, заголовок). Если в будущем понадобится
-более умная дедупликация — делать её через сравнение (компания, город/
-локация, заголовок без географического токена), а не голый fuzzy-ratio по
-всей строке.
+Overrides used to be hand-written at each place in the code that read them —
+twenty-six such places in `score.py` alone. Two consequences followed, both
+observed: the only way to learn where a value came from was to read the code,
+and two parts of the configuration could contradict each other, with whichever
+ran first winning.
 
-### rapidfuzz / feedparser / beautifulsoup4 как зависимости
-Рассматривались для нечёткого сравнения строк, парсинга RSS и очистки HTML
-соответственно. Отклонены в пользу stdlib (`difflib` в итоге тоже не
-понадобился — см. выше; `xml.etree.ElementTree`; собственный regex-
-стриппер) — минимизация поверхности зависимостей важнее небольшого выигрыша
-в удобстве, особенно для проекта, который должен без проблем `pip install`
-через годы.
+Replaced by one resolver (`tools/settings.py`) with a fixed layer order
+(defaults → template → local), one set of merge rules, and provenance for every
+value. Lists are replaced whole rather than appended to: appending looks
+convenient right up to the first time something must be REMOVED from an
+inherited list. An explicit `null` deletes a key. Frozen keys
+(`config/settings_policy.yaml`) cannot be changed by the local layer, so that a
+file outside git cannot quietly lift a boundary.
 
-### Скрейпинг LinkedIn/Indeed/Glassdoor напрямую
-Осознанно не делается ни в каком виде — ни через requests+BeautifulSoup, ни
-через headless-браузер, ни через обход анти-бота/CAPTCHA. Это нарушение
-условий использования площадок и вне границ того, что делает эта система
-автоматически. См. `docs/SOURCES.md`.
+## Rejected approaches
 
-### Слой оверрайдов вместо полных копий конфигов (2026-07-31)
+### Fuzzy deduplication of titles (difflib, threshold ~0.92)
+The first version of `kb.mark_duplicates` grouped a company's vacancies and
+collapsed similar titles with `difflib.SequenceMatcher`. On real data that
+produced serious false positives: "Software Engineer - Manchester" and "Software
+Engineer - Newcastle" (one role, different cities at one company), or "(Native
+Danish) Support Consultant" / "(Native Finnish) Support Consultant" (separate
+vacancies for separate languages) matched at >90% and were wrongly collapsed
+into one record — that is, **genuinely different open positions were hidden**
+from the owner. That is worse than occasionally showing a harmless exact repeat.
+Replaced by a strict exact match on the normalised (company, title) pair. If
+smarter deduplication is ever needed, do it by comparing (company, city or
+location, title with the geographic token removed) rather than a bare fuzzy
+ratio over the whole string.
 
-Рассматривался как способ автоматически распространять улучшения машинерии на
-все идентичности: общий `criteria.base.yaml` плюс личные переопределения.
+### rapidfuzz / feedparser / beautifulsoup4 as dependencies
+Considered for fuzzy string comparison, RSS parsing and HTML cleaning
+respectively. Rejected in favour of the standard library (`difflib` turned out
+not to be needed either — see above; `xml.etree.ElementTree`; our own regex
+stripper). Minimising the dependency surface matters more than a small gain in
+convenience, especially for a project that should `pip install` without trouble
+years from now.
 
-Отклонён, потому что граница между машинерией и личными настройками проходит
-внутри отдельных списков (см. решение выше). Потребовалось бы изобрести
-директивы вида `__remove:`/`__append:` и написать движок слияния — и всё это
-поверх логики дисквалификаторов, где ошибка означает «человек не увидел
-подходящую вакансию» или «увидел заведомо невозможную».
+### Scraping LinkedIn's main site, Indeed or Glassdoor
+Deliberately not done in any form — not through requests plus BeautifulSoup, not
+through a headless browser, not by circumventing anti-bot protection or
+CAPTCHAs. Those sites answer 403 to an ordinary request, and getting in would
+take impersonation. See `docs/SOURCES.md`. (LinkedIn's guest job-search
+endpoint is a different matter: it answers 200 to an ordinary GET, and
+`tools/fetch_linkedin.py` reads it.)
 
-Решающий аргумент против: при оверрайдах агент, чинящий ложное срабатывание для
-одной идентичности, правил бы общий файл и молча менял дисквалификаторы у всех
-остальных — причём в диффе это было бы не видно, потому что файл с их префиксом
-не менялся. Это ровно тот класс тихих межпользовательских отказов, ради
-предотвращения которого вся система и строилась.
+### An override layer instead of full config copies (2026-07-31)
 
-**Условие пересмотра:** если идентичностей станет больше пяти-шести и ручной
-перенос машинерии через `diff-template` станет заметной рутиной — вернуться к
-вопросу, но только для чисто механических блоков (`structured_location_gate`,
-`role_complexity_signal`) и только в режиме «добавление, никогда не удаление».
+Considered as a way to propagate machinery improvements to every identity
+automatically: a shared `criteria.base.yaml` plus personal overrides.
 
-### Объект-контекст вместо перепривязки модульных переменных (2026-07-31)
+Rejected because the boundary between machinery and personal settings runs
+inside individual lists (see the decision above). It would have required
+inventing directives like `__remove:` and `__append:` and writing a merge
+engine, all on top of the disqualifier logic, where a mistake means "the person
+did not see a suitable vacancy" or "saw an obviously impossible one".
 
-Более «чистая» альтернатива глобальному состоянию: передавать объект с путями
-явным аргументом.
+The decisive argument against: with overrides, an agent fixing a false positive
+for one identity would edit the shared file and silently change the
+disqualifiers for everyone else — and it would not show in the diff, because the
+file carrying their prefix did not change. That is precisely the class of silent
+cross-user failure the whole system was built to prevent.
 
-Отклонён по двум причинам. Во-первых, потребовал бы протащить объект через ~30
-мест вызова и переписать все monkeypatch в тестах — большой риск в
-рефакторинге, который и так двигал каждый путь. Во-вторых, он не решает главную
-проблему: `tests/test_score.py` читает конфиг на уровне модуля, то есть во время
-сбора тестов, когда никакой объект передать ещё некому.
+**When to revisit:** if there are ever more than five or six identities and
+carrying machinery across by hand becomes noticeable drudgery, come back to the
+question — but only for purely mechanical blocks (`structured_location_gate`,
+`role_complexity_signal`) and only in "add, never remove" mode.
 
-Возражение против мутабельного глобального состояния (конкурентность) здесь не
-применимо: инструменты однопоточные и односеансовые, одна активная идентичность
-на процесс — это ровно то ограничение, которое нужно.
+(Partly superseded 2026-08-05: layered settings with a fixed order and frozen
+keys were introduced, but for VALUES rather than for list membership. The
+argument above still holds for the disqualifier lists themselves.)
 
-## Дальнейшее развитие (кандидаты на следующий цикл)
+### A context object instead of rebinding module-level variables (2026-07-31)
 
-- Добавить источник Dice.com (RSS/публичный поиск), если найдётся легальный
-  публичный эндпоинт без обхода защиты.
-- ~~Гейт на "не простую" роль (Principal Scientist/Agentic/R&D)~~ —
-  реализовано 2026-07-30, см. `role_complexity_signal` выше.
-- ~~Жёсткая привязка к региону как dealbreaker~~ — реализовано 2026-07-30,
-  см. `restrictive_region_signal` выше. Список регионов принципиально
-  неполный — расширять по мере того, как встречаются новые формулировки
-  ("remote DACH only" и т.п.), которые список ещё не ловит.
-- Более умная гео-дедупликация (см. "Отклонённые подходы" выше) — если
-  накопится больше данных, стоит сравнивать (компания, заголовок-без-города).
-- Recruiters.json пока не наполняется автоматически — наполнять по мере
-  того, как агент/владелец сталкивается с конкретными рекрутерами.
-- `link_check.py` считает "мёртвым" только 404/410 — сознательно не пытается
-  распознавать "200 OK, но страница гласит 'vacancy closed'" (нужен был бы
-  хрупкий per-site content-sniffing). Если это станет частой проблемой —
-  стоит собрать конкретные примеры и подумать над точечными правилами по
-  доменам, а не общим решением.
+The "cleaner" alternative to global state: pass an object holding the paths as
+an explicit argument.
+
+Rejected for two reasons. First, it would have meant threading the object
+through some 30 call sites and rewriting every monkeypatch in the tests — a
+large risk inside a refactor that was already moving every path. Second, it does
+not solve the main problem: `tests/test_score.py` reads config at module level,
+that is, during test collection, when there is nobody yet to pass an object to.
+
+The objection to mutable global state — concurrency — does not apply here: the
+tools are single-threaded and single-session, and one active identity per
+process is exactly the constraint wanted.
+
+## Further development (candidates for the next cycle)
+
+- Add Dice.com as a source (RSS or public search), if a legitimate public
+  endpoint exists that needs no circumvention.
+- ~~A gate for "not a simple" role (Principal Scientist/Agentic/R&D)~~ — done
+  2026-07-30, see `role_complexity_signal` above.
+- ~~A hard regional tie as a dealbreaker~~ — done 2026-07-30, see
+  `restrictive_region_signal` above. The region list is incomplete in principle;
+  extend it as new wordings turn up ("remote DACH only" and the like) that it
+  does not yet catch.
+- Smarter geographic deduplication (see "Rejected approaches" above) — if enough
+  data accumulates, it is worth comparing (company, title-without-city).
+- `recruiters.json` is not populated automatically yet — fill it in as the agent
+  or the owner runs into particular recruiters.
+- `link_check.py` treats only 404/410 as "dead" and deliberately does not try to
+  detect "200 OK, but the page says 'vacancy closed'" (that would need brittle
+  per-site content sniffing). If it becomes a frequent problem, collect concrete
+  examples and consider narrow per-domain rules rather than a general solution.
