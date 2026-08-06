@@ -1,17 +1,17 @@
 # =============================================================================
-#  НЕОДНОЗНАЧНЫЕ ТОПОНИМЫ — заготовки правил
+#  AMBIGUOUS PLACE NAMES — starting points for rules
 # =============================================================================
-#  Одно название — два разных места на карте. В тексте вакансии это регулярно
-#  приводит к неверным выводам о том, где работа.
+#  One name, two different places on the map. In vacancy text that regularly
+#  leads to wrong conclusions about where the work is.
 #
-#  Правило подставляется в идентичность, если её страна или город совпадает с
-#  одним из значений. Механизм в score.py помечает вакансию на ручную проверку,
-#  только если сработал контекст ОБОИХ значений или НИ ОДНОГО: одно ясное
-#  значение — не повод дёргать человека.
+#  A rule is added to an identity when its country or city matches one of the
+#  values. The mechanism in score.py flags a vacancy for manual review only if
+#  the context of BOTH meanings fired, or NEITHER: one clear meaning is no
+#  reason to bother a person.
 #
-#  Историческая справка: изначально в проекте был захардкожен единственный
-#  случай — Georgia (страна vs штат США) — потому что так сложилось у первого
-#  пользователя. Обобщено, когда стало ясно, что ловушка не уникальна.
+#  Historical note: the project originally hard-coded a single case — Georgia
+#  (the country vs the US state) — because that is how it happened to be for
+#  the first user. Generalised once it became clear the trap is not unique.
 # =============================================================================
 
 schema_version: 1
@@ -20,67 +20,69 @@ places:
   - name: georgia
     trigger_keywords: ["georgia"]
     meaning_a:
-      label: "страна Грузия (Кавказ)"
+      label: "Georgia the country (the Caucasus)"
       context_keywords: ["tbilisi", "batumi", "kutaisi", "caucasus",
                          "country of georgia", "sakartvelo"]
     meaning_b:
-      label: "штат США Georgia (GA)"
+      label: "the US state of Georgia (GA)"
       context_keywords: ["ga,", "georgia, usa", "atlanta", "savannah",
                          "georgia (state)"]
 
   - name: cambridge
     trigger_keywords: ["cambridge"]
     meaning_a:
-      label: "Cambridge, Великобритания"
+      label: "Cambridge, England"
       context_keywords: ["cambridgeshire", "united kingdom", "england", "uk"]
     meaning_b:
-      label: "Cambridge, Массачусетс, США"
+      label: "Cambridge, Massachusetts, USA"
       context_keywords: ["massachusetts", "ma,", "boston", "harvard", "mit"]
 
   - name: washington
     trigger_keywords: ["washington"]
     meaning_a:
-      label: "штат Вашингтон (северо-запад США)"
+      label: "Washington State (the US north-west)"
       context_keywords: ["seattle", "tacoma", "spokane", "wa,", "washington state"]
     meaning_b:
-      label: "Вашингтон, округ Колумбия"
+      label: "Washington, D.C."
       context_keywords: ["dc", "district of columbia", "washington, d.c."]
 
   - name: ontario
     trigger_keywords: ["ontario"]
     meaning_a:
-      label: "провинция Онтарио, Канада"
+      label: "the province of Ontario, Canada"
       context_keywords: ["toronto", "ottawa", "canada", "on,"]
     meaning_b:
-      label: "Онтарио, Калифорния, США"
+      label: "Ontario, California, USA"
       context_keywords: ["california", "ca,", "los angeles", "san bernardino"]
 
   - name: odessa
     trigger_keywords: ["odessa", "odesa"]
     meaning_a:
-      label: "Одесса, Украина"
+      label: "Odesa, Ukraine"
+      # A Ukrainian phrase among English ones on purpose: these are
+      # matched against vacancy TEXT, which is not always in English.
       context_keywords: ["ukraine", "ukrainian", "чорне море", "black sea"]
     meaning_b:
-      label: "Одесса, Техас, США"
+      label: "Odessa, Texas, USA"
       context_keywords: ["texas", "tx,", "midland", "permian"]
 
   - name: birmingham
     trigger_keywords: ["birmingham"]
     meaning_a:
-      label: "Бирмингем, Англия"
+      label: "Birmingham, England"
       context_keywords: ["west midlands", "united kingdom", "england", "uk"]
     meaning_b:
-      label: "Бирмингем, Алабама, США"
+      label: "Birmingham, Alabama, USA"
       context_keywords: ["alabama", "al,", "united states"]
 
   - name: victoria
     trigger_keywords: ["victoria"]
     meaning_a:
-      label: "штат Виктория, Австралия"
+      label: "the state of Victoria, Australia"
       context_keywords: ["melbourne", "australia", "vic,"]
     meaning_b:
-      label: "Виктория, Британская Колумбия, Канада"
+      label: "Victoria, British Columbia, Canada"
       context_keywords: ["british columbia", "bc,", "canada", "vancouver island"]
 
-# Это только частые случаи, а не полный список. Если ваше место не здесь —
-# допишите правило в свою идентичность вручную, формат тот же.
+# These are the frequent cases, not a complete list. If your place is not here,
+# add a rule to your own identity by hand, in the same format.

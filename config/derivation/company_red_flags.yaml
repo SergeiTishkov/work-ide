@@ -1,42 +1,43 @@
 # =============================================================================
-#  КРАСНЫЕ ФЛАГИ РАБОТОДАТЕЛЯ — каталог и вес по умолчанию
+#  EMPLOYER RED FLAGS — the catalogue and the default weights
 # =============================================================================
-#  Красные флаги приходят из отзывов бывших сотрудников свободным текстом
-#  ("late payments", "unpredictable work availability") — их собирает агент
-#  вручную через `tools/kb.py set-company-reputation`. Свободный текст нельзя
-#  оценивать одним весом на всё: «задерживают зарплату» и «шумный опенспейс»
-#  для соискателя не одно и то же.
+#  Red flags come from former employees' reviews as free text
+#  ("late payments", "unpredictable work availability") — the agent gathers
+#  them by hand through `tools/kb.py set-company-reputation`. Free text cannot
+#  be scored with one weight for everything: "they pay late" and "the open-plan
+#  office is noisy" are not the same thing to a candidate.
 #
-#  Здесь каждая категория получает распознавание по фразам и вес ПО УМОЛЧАНИЮ.
-#  Веса общие: они описывают, насколько плоха вещь сама по себе, безотносительно
-#  того, кто ищет работу.
+#  Here every category gets phrase recognition and a DEFAULT weight. The
+#  weights are shared: they describe how bad a thing is in itself, regardless
+#  of who is looking for work.
 #
-#  ПЕРЕОПРЕДЕЛЕНИЕ. Любой вес отсюда перебивается на уровне идентичности или
-#  Малой Конституции — полем `company_red_flag_severity` в профиле. Причём
-#  перебивается В ЛЮБУЮ СТОРОНУ, включая плюс: для одного человека
-#  «непредсказуемая загрузка» — риск остаться без денег, для другого —
-#  ровно то, что нужно, потому что нагрузка низкая. Механика и границы
-#  переопределения: docs/OVERRIDES.md.
+#  OVERRIDING. Any weight here is overridden at identity level by the
+#  `company_red_flag_severity` field in the profile. And it is overridden IN
+#  EITHER DIRECTION, including into a plus: for one person "unpredictable
+#  workload" is the risk of having no money, for another it is exactly what
+#  they want, because the workload is low. The mechanics and the boundaries of
+#  overriding are in docs/OVERRIDES.md.
 #
-#  ФРАЗЫ. Действует общее правило проекта про короткие слова: фраза короче
-#  четырёх символов или совпадающая с обычным словом даст ложные срабатывания.
-#  См. docs/TECH_MATCHING.md.
+#  PHRASES. The project's general rule about short words applies: a phrase
+#  shorter than four characters, or one matching an ordinary word, will produce
+#  false positives. See docs/TECH_MATCHING.md.
 # =============================================================================
 
 schema_version: 1
 last_reviewed: "2026-08-05"
 
-# Вес флага, который не удалось отнести ни к одной категории. Умеренно
-# отрицательный: раз человек счёл нужным это записать, что-то там есть, но
-# гадать о серьёзности мы не вправе.
+# The weight of a flag that could not be placed in any category. Moderately
+# negative: since a person thought it worth recording, there is something
+# there, but we have no right to guess how serious.
 unrecognised_points: -5
 
 categories:
 
   late_payment:
-    display_name: "Задержки и проблемы с выплатами"
-    # Для подрядчика это не нюанс условий, а суть сделки: работа сделана,
-    # деньги не пришли. Поэтому вес самый тяжёлый в каталоге.
+    display_name: "Late or problematic payments"
+    # For a contractor this is not a nuance of the terms but the substance of
+    # the deal: the work is done and the money has not arrived. Hence the
+    # heaviest weight in the catalogue.
     default_points: -14
     phrases:
       - "late payment"
@@ -50,11 +51,10 @@ categories:
       - "salary delay"
 
   unstable_workload:
-    display_name: "Непредсказуемая или нерегулярная загрузка"
-    # Двусмысленная вещь по своей природе: для того, кто живёт на эти деньги,
-    # это риск; для того, у кого доход не зависит от этой работы, — признак
-    # низкой нагрузки. Ровно тот случай, ради которого сделано
-    # переопределение весов.
+    display_name: "Unpredictable or irregular workload"
+    # Ambiguous by nature: for somebody living on that money it is a risk; for
+    # somebody whose income does not depend on this work it is a sign of low
+    # intensity. Precisely the case the weight override was built for.
     default_points: -8
     phrases:
       - "unpredictable work"
@@ -66,7 +66,7 @@ categories:
       - "work availability"
 
   overwork:
-    display_name: "Переработки и выгорание"
+    display_name: "Overtime and burnout"
     default_points: -16
     phrases:
       - "long hours"
@@ -79,7 +79,7 @@ categories:
       - "poor work-life balance"
 
   toxic_management:
-    display_name: "Токсичное руководство"
+    display_name: "Toxic management"
     default_points: -14
     phrases:
       - "toxic management"
@@ -91,7 +91,7 @@ categories:
       - "constant reorg"
 
   instability:
-    display_name: "Нестабильность компании"
+    display_name: "Company instability"
     default_points: -10
     phrases:
       - "layoff"
@@ -101,9 +101,10 @@ categories:
       - "hiring freeze"
 
   process_chaos:
-    display_name: "Хаос в процессах"
-    # Для поиска спокойной легаси-работы это скорее шум, чем беда, — но
-    # решать не каталогу, а идентичности через переопределение.
+    display_name: "Chaotic processes"
+    # For a search after calm legacy work this is noise rather than disaster —
+    # but that is for the identity to decide through an override, not the
+    # catalogue.
     default_points: -6
     phrases:
       - "no processes"

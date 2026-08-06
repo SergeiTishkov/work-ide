@@ -1,52 +1,56 @@
 ---
-description: Добавить ещё один поиск (вторую или последующую идентичность)
+description: Add another search (a second or subsequent identity)
 ---
 
-Человек просит настроить **ещё один** поиск.
+The person is asking to set up **another** search.
 
-**Процедура — `docs/ONBOARDING.md`, раздел «Вторая и последующие идентичности».**
+**The procedure is `docs/ONBOARDING.md`, "Second and subsequent identities".**
 
-## Сначала убедись, что это действительно новая идентичность
+## First make sure this really is a new identity
 
-| Вопрос | Если «да» |
+| Question | If yes |
 |---|---|
-| Это другой человек (другой CV, резидентство, языки)? | Новая идентичность |
-| Тот же человек, но противоположные критерии (неполная занятость против полной ставки)? | Новая идентичность |
-| Просто уточнение текущего поиска (добавить источник, снять фильтр)? | **НЕ** новая — правь существующую |
+| Is this a different person (different CV, residency, languages)? | A new identity |
+| The same person, but with opposite criteria (part-time versus full-time)? | A new identity |
+| Simply a refinement of the current search (add a source, drop a filter)? | **NOT** new — edit the existing one |
 
-Третий случай встречается чаще всего, и путать его дорого: лишняя идентичность
-разделит накопленную базу на две неполные.
+The third case is the commonest, and confusing it is expensive: a superfluous
+identity splits an accumulated base into two incomplete ones.
 
-## Дальше
+## Then
 
-1. Пройди шаги 2–4 обычного онбординга (`/start`): рассказ о себе, префикс,
-   вопросник. Ничего не переиспользуй из существующей идентичности, даже если
-   это тот же человек — цели у двух идентичностей разные по определению.
-2. CV копировать не нужно: укажи путь к уже лежащему файлу.
-3. `python tools/identity.py init-local --identity <новый>` — команда сама
-   проставит `default_identity`. **Это критично**: без него две активные
-   идентичности ломают команды у той, что работала до сих пор.
-4. `python tools/identity.py diff-template --identity <новый>` — что из
-   машинерии не доехало. Сливать только вручную.
-5. Прогон и проверка изоляции: `python tools/kb.py stats --identity <каждая>` —
-   числа обязаны различаться.
-6. Проговори с человеком, какая идентичность теперь по умолчанию и что для
-   второй нужен флаг `--identity`. Запиши это в
-   `local-constitution/ACTIVE_IDENTITIES.md`.
+1. Go through steps 2-4 of ordinary onboarding (`/start`): an account of
+   themselves, a prefix, the questionnaire. Reuse nothing from the existing
+   identity, even for the same person — the two identities' goals differ by
+   definition.
+2. There is no need to copy the CV: point at the file already on disk.
+3. `python tools/templates.py clone <template> <new> "<expansion>"` — or, if the
+   new search resembles an existing one, clone the identity itself (below).
+4. **Tell the person that commands without `--identity` will now refuse.** With
+   one identity the tools pick it silently; with two they stop and name both.
+   That refusal is deliberate, but it does mean the habit of typing
+   `python tools/pipeline.py` with no flags stops working — including for the
+   identity that had been working until now. Check with
+   `python tools/identity.py which`.
+5. `python tools/templates.py check --identity <new>` — has the template moved
+   ahead of the copy.
+6. Run it, and check the isolation: `python tools/kb.py stats --identity <each>`
+   — the numbers must differ.
 
-## Похожий поиск для другой страны — клонируйте
+## A similar search for another country — clone it
 
-Самый частый случай второй идентичности: «то же самое, но по Германии».
+The commonest reason for a second identity: "the same thing, but for Germany".
 
 ```bash
-python tools/identity.py clone --from <исходный> --prefix <новый> --name "<расшифровка>"
+python tools/identity.py clone --from <source> --prefix <new> --name "<expansion>"
 ```
 
-Стек, тип занятости, признаки компании и источники общие; различаются
-гео-правила, языковой фильтр и часовой пояс. Команда печатает список того, что
-обязательно проверить в клоне — пройдите по нему, не пропуская гео-блоки: они
-**выводятся** по `config/derivation/`, а не правятся на глаз. Скопированное
-правило с неверным знаком тихо выбросит половину рынка.
+Stack, employment type, marks of a suitable company and sources are shared; the
+geography rules, language filter and time zone are not. The command prints the
+list of what must be checked in the clone — go through it without skipping the
+geography blocks: they are **derived** from `config/derivation/` rather than
+edited by eye. A copied rule with the sign the wrong way round silently throws
+away half the market.
 
-Подскажите эту возможность сами, если видите, что новый поиск похож на
-существующий — человек о ней не знает.
+Suggest this possibility yourself when you can see the new search resembles an
+existing one — the person does not know about it.

@@ -1,41 +1,41 @@
 # =============================================================================
-#  ВЫВОД ГЕО-ПРАВИЛ ИЗ РЕЗИДЕНТСТВА
+#  DERIVING GEOGRAPHY RULES FROM RESIDENCY
 # =============================================================================
-#  Самая важная таблица проекта, и самая опасная при копипасте.
+#  The project's most important table, and the most dangerous to copy-paste.
 #
-#  Гео-дисквалификаторы — это НЕ предпочтение человека, а СЛЕДСТВИЕ его
-#  резидентства. Одна и та же фраза "US only" для резидента третьей страны —
-#  дисквалификация, а для резидента США — наоборот, плюс. Поэтому копировать
-#  чужой restrictive_region_signal нельзя: он молча выбросит половину рынка
-#  или, наоборот, наполнит выдачу вакансиями, куда человека не возьмут.
+#  Geography disqualifiers are NOT a person's preference but a CONSEQUENCE of
+#  their residency. The same phrase "US only" disqualifies a resident of a
+#  third country and is a plus for a resident of the US. So copying somebody
+#  else's restrictive_region_signal is wrong: it will silently throw away half
+#  the market, or fill the shortlist with vacancies the person cannot take.
 #
-#  Правило генерации (реализовано в identity.py build):
+#  The generation rule:
 #
-#    для каждого региона R:
-#      если человек резидент/имеет разрешение в R:
-#        residency_required_phrases -> acceptable_region_signal   (ПЛЮС)
-#        citizenship_phrases        -> не добавляются в дисквалификаторы
-#      иначе:
-#        residency_required_phrases -> restrictive_region_signal  (ОТСЕВ)
-#        citizenship_phrases        -> hard_dealbreakers          (ОТСЕВ)
-#      если R в целевых регионах И человек НЕ резидент:
-#        company_located_phrases    -> acceptable_region_signal   (небольшой плюс)
+#    for each region R:
+#      if the person is a resident of, or has the right to work in, R:
+#        residency_required_phrases -> acceptable_region_signal   (A PLUS)
+#        citizenship_phrases        -> not added to the disqualifiers
+#      otherwise:
+#        residency_required_phrases -> restrictive_region_signal  (REJECTION)
+#        citizenship_phrases        -> hard_dealbreakers          (REJECTION)
+#      if R is a target market AND the person is NOT a resident:
+#        company_located_phrases    -> acceptable_region_signal   (a small plus)
 #
-#  Различие двух последних наборов принципиально: "компания находится в X" ≠
-#  "нужно резидентство в X". Проект уже обжигался на этом — фраза "EU Remote"
-#  сначала попала в плюсы как "европейская компания", хотя означает требование
-#  резидентства в ЕС.
+#  The distinction between the last two sets is fundamental: "the company is in
+#  X" ≠ "residency in X is required". The project has already been burned on
+#  this — the phrase "EU Remote" first landed among the pluses as a European
+#  company, although it means EU residency is required.
 #
-#  Список регионов заведомо неполон — мир большой. Дополнять по мере
-#  необходимости; неизвестный регион просто не породит правил, и его поймает
-#  ручная проверка по docs/VACANCY_CHECKLIST.md.
+#  The list of regions is knowingly incomplete — the world is large. Extend it
+#  as needed; an unknown region simply produces no rules, and the manual check
+#  in docs/VACANCY_CHECKLIST.md will catch it.
 # =============================================================================
 
 schema_version: 1
 
 regions:
   united_states:
-    display_name: "США"
+    display_name: "United States"
     residency_required_phrases:
       - "us only"
       - "usa only"
@@ -52,7 +52,7 @@ regions:
       - "must be a us citizen"
       - "u.s. person required"
       - "united states person required"
-      - "itar"              # экспортный контроль: де-факто требует US person
+      - "itar"              # export control: in effect requires a US person
       - "security clearance"
     company_located_phrases:
       - "united states"
@@ -60,7 +60,7 @@ regions:
       - "u.s."
 
   canada:
-    display_name: "Канада"
+    display_name: "Canada"
     residency_required_phrases:
       - "canada only"
       - "must be based in canada"
@@ -77,7 +77,7 @@ regions:
       - "montreal"
 
   european_union:
-    display_name: "Европейский союз"
+    display_name: "European Union"
     residency_required_phrases:
       - "eu remote"
       - "remote (eu)"
@@ -101,7 +101,7 @@ regions:
       - "europe"
 
   united_kingdom:
-    display_name: "Великобритания"
+    display_name: "United Kingdom"
     residency_required_phrases:
       - "uk only"
       - "remote (uk)"
@@ -116,7 +116,7 @@ regions:
       - "london"
 
   latam:
-    display_name: "Латинская Америка"
+    display_name: "Latin America"
     residency_required_phrases:
       - "remote latam"
       - "latam only"
@@ -131,7 +131,7 @@ regions:
       - "latin america"
 
   apac:
-    display_name: "Азиатско-Тихоокеанский регион"
+    display_name: "Asia-Pacific"
     residency_required_phrases:
       - "remote apac"
       - "apac only"
@@ -147,7 +147,7 @@ regions:
       - "asia pacific"
 
   israel:
-    display_name: "Израиль"
+    display_name: "Israel"
     residency_required_phrases:
       - "israel only"
       - "must be based in israel"
@@ -159,7 +159,7 @@ regions:
       - "tel aviv"
 
   uae:
-    display_name: "ОАЭ"
+    display_name: "United Arab Emirates"
     residency_required_phrases:
       - "uae only"
       - "must be based in uae"
@@ -171,8 +171,8 @@ regions:
       - "dubai"
       - "abu dhabi"
 
-# Фразы, означающие "нанимаем откуда угодно". Не зависят от резидентства и
-# попадают в worldwide_remote любой идентичности.
+# Phrases meaning "we hire from anywhere". They do not depend on residency and
+# go into every identity's worldwide_remote.
 worldwide_phrases:
   - "remote worldwide"
   - "remote - anywhere"

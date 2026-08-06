@@ -1,26 +1,27 @@
 # =============================================================================
-#  ЗАМОРОЖЕННЫЕ НАСТРОЙКИ — то, что верхние слои менять не могут
+#  FROZEN SETTINGS — what the upper layers cannot change
 # =============================================================================
-#  Слоистые настройки устроены так, что более частный слой перебивает более
-#  общий: идентичность сильнее общей конфигурации, Малая Конституция сильнее
-#  идентичности. Механика — tools/settings.py, объяснение — docs/OVERRIDES.md.
+#  Layered settings work so that a more specific layer beats a more general
+#  one: an identity beats the shared configuration, and a person's own file
+#  beats the template. The mechanics are in tools/settings.py, the explanation
+#  in docs/OVERRIDES.md.
 #
-#  Но приоритет частного над общим — правило для ПРЕДПОЧТЕНИЙ, а не для
-#  границ. Есть вещи, которые существуют именно затем, чтобы их нельзя было
-#  отменить локально: иначе достаточно одной строчки в файле вне гита, чтобы
-#  тихо снять запрет, о котором никто больше не узнает.
+#  But the specific beating the general is a rule about PREFERENCES, not about
+#  boundaries. Some things exist precisely so that they cannot be lifted
+#  locally: otherwise one line in a file outside git would be enough to remove
+#  a prohibition quietly, and nobody else would ever know.
 #
-#  Здесь перечислены такие ключи. Попытка задать любой из них на слое
-#  идентичности или Малой Конституции РОНЯЕТ загрузку с объяснением — не
-#  игнорируется молча. Молчаливое игнорирование было бы хуже всего: человек
-#  думал бы, что настройка работает.
+#  The keys listed here are those. An attempt to set any of them at the
+#  identity or personal layer FAILS THE LOAD with an explanation — it is not
+#  ignored silently. Silent ignoring would be the worst outcome: the person
+#  would believe their setting worked.
 #
-#  Список намеренно короткий. Замораживать стоит только то, отмена чего
-#  является не выбором, а ошибкой или обходом.
+#  The list is deliberately short. Only things whose removal is a mistake or a
+#  workaround rather than a choice are worth freezing.
 #
-#  ФОРМАТ
-#    <точечный ключ>: причина, понятная тому, кто наткнётся на отказ
-#  Ключ замораживает и всё, что под ним: "a.b" закрывает и "a.b.c".
+#  FORMAT
+#    <dotted key>: a reason comprehensible to whoever hits the refusal
+#  A key freezes everything beneath it too: "a.b" also closes "a.b.c".
 # =============================================================================
 
 schema_version: 1
@@ -28,16 +29,16 @@ schema_version: 1
 frozen:
 
   identity.kind: >
-    Признак тестовой фикстуры. Если бы его можно было переопределить локально,
-    фикстура превратилась бы в живую идентичность и начала писать в настоящие
-    reports/ и data/ — ровно тот мусор, ради предотвращения которого сделана
-    страховка в tests/conftest.py.
+    The marker of a test fixture. If it could be overridden locally, the
+    fixture would turn into a live identity and start writing into the real
+    reports/ and data/ — exactly the litter the safety net in
+    tests/conftest.py exists to prevent.
 
   scraping.bypass_bot_protection: >
-    Обход активной антибот-защиты запрещён Большой Конституцией (§5, граница
-    дозволенного) и не является предпочтением пользователя. Ключ заморожен
-    заранее, до того как кому-нибудь придёт в голову его завести.
+    Circumventing active anti-bot protection is forbidden by the constitution
+    (§5, the boundary of what is allowed) and is not a user preference. The
+    key is frozen in advance, before anybody thinks to introduce it.
 
   privacy.allow_personal_data_in_git: >
-    Личные данные не попадают в общий репозиторий. Это не настройка поиска, а
-    обещание, данное человеку: репозиторий можно показать кому угодно.
+    Personal data does not reach the shared repository. That is not a search
+    setting but a promise made to a person: the repository can be shown to

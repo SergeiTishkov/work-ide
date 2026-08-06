@@ -1,23 +1,23 @@
 # =============================================================================
-#  РЕЕСТР ИСТОЧНИКОВ — что подключено, что в очереди, что отклонено и почему
+#  THE SOURCE REGISTRY — what is connected, queued, rejected, and why
 # =============================================================================
-#  Этот файл существует, чтобы работа над источниками не начиналась каждый раз
-#  с нуля. Проверка «а можно ли взять вот этот борд» стоит запроса в сеть и
-#  двадцати минут разбора формата; без записи результата тот же борд будут
-#  проверять снова через месяц.
+#  This file exists so that work on sources does not start from nothing every
+#  time. Checking "can we take this board" costs one network request and
+#  twenty minutes of working out the format; without recording the result, the
+#  same board gets checked again a month later.
 #
-#  Поэтому здесь фиксируются ВСЕ три исхода, а не только успешные:
-#    implemented — подключён, есть фетчер
-#    pending     — годен, но ещё не подключён
-#    rejected    — проверен и не годится, с причиной и кодом ответа
+#  So ALL THREE outcomes are recorded here, not only the successes:
+#    implemented — connected, a fetcher exists
+#    pending     — usable, but not connected yet
+#    rejected    — checked and unusable, with the reason and the response code
 #
-#  Общий для всех идентичностей: доступность источника от профиля поиска не
-#  зависит. А вот ВКЛЮЧЁН ли источник у конкретной идентичности — это уже её
-#  дело, см. <префикс>_sources.yaml.
+#  Shared by every identity: whether a source is reachable does not depend on
+#  the search profile. Whether a particular identity has it ENABLED is that
+#  identity's business, see <prefix>_sources.yaml.
 #
-#  Замеры делаются живыми запросами с честным User-Agent проекта. Дата замера
-#  обязательна: борды меняют эндпоинты чаще, чем хотелось бы (реальный случай
-#  2026-08-04: Himalayas стал отдавать в поле companyName строку "name").
+#  Measurements use live requests with the project's honest User-Agent. The
+#  date is mandatory: boards change endpoints more often than one would like
+#  (a real case, 2026-08-04: Himalayas began returning "name" in companyName).
 # =============================================================================
 
 schema_version: 1
@@ -25,19 +25,19 @@ last_survey: "2026-08-04"
 
 sources:
 
-  # --- Подключены ----------------------------------------------------------
+  # --- Connected -------------------------------------------------------------
 
   - name: weworkremotely
     status: implemented
     kind: rss
-    measured: "242 вакансии за прогон (5 категорийных фидов)"
-    note: "Лучший источник проекта. Есть структурное поле region."
+    measured: "242 vacancies per run (5 category feeds)"
+    note: "The project's best source. It has a structured region field."
 
   - name: remoteok
     status: implemented
     kind: json
-    measured: "~100, только последние"
-    note: "Периодически отдаёт нерелевантный мусор — парсер строго валидирует."
+    measured: "~100, latest only"
+    note: "Periodically returns irrelevant rubbish — the parser validates strictly."
 
   - name: jobicy
     status: implemented
@@ -52,129 +52,129 @@ sources:
   - name: himalayas
     status: implemented
     kind: json
-    measured: "20-100; фид периодически занимает одна компания"
+    measured: "20-100; the feed is periodically taken over by one company"
     note: >
-      2026-08-04: отдаёт companyName: "name" — буквально имя поля вместо
-      значения. Настоящее имя в companySlug, парсер это учитывает.
+      2026-08-04: it returns companyName: "name" — literally the field name
+      instead of the value. The real name is in companySlug; the parser knows.
 
   - name: hn_whoishiring
     status: implemented
     kind: json
     measured: "~22"
-    note: "Заголовки приходят из вольного текста треда и бывают мусорными."
+    note: "Titles come from the thread's free text and are sometimes rubbish."
 
   - name: arbeitnow
     status: implemented
     kind: json
-    measured: "~175, полезный выход ~6%"
-    note: "Преимущественно немецкий рынок, большинство отсекается по языку."
+    measured: "~175, useful yield ~6%"
+    note: "Predominantly the German market; most is cut by language."
 
   - name: ats
     status: implemented
     kind: json
-    measured: "зависит от списка компаний"
+    measured: "depends on the company list"
     providers: [greenhouse, lever, ashby, recruitee]
 
-  # --- В очереди: проверены живыми запросами 2026-08-04 ---------------------
+  # --- Queued: checked with live requests, 2026-08-04 ------------------------
 
   - name: linkedin
     status: implemented
     implemented_at: "2026-08-04"
-    measured_after_wiring: "621 записи за прогон (3 слова × 28 стран × 2 стр.), из них 150 с догруженным описанием"
+    measured_after_wiring: "621 records per run (3 words x 28 countries x 2 pages), 150 with the description fetched"
     kind: html
     endpoint: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
-    measured: "HTTP 200, 30 карточек на страницу, пагинация start=0,25,50 работает"
+    measured: "HTTP 200, 30 cards per page, pagination start=0,25,50 works"
     geo_coverage: [israel, uae, saudi_arabia, singapore, switzerland, germany, netherlands, eu, us]
     note: >
-      Гостевой эндпоинт, отдаётся анониму штатно — тот же, что использует
-      гостевой интерфейс самого LinkedIn. Это НЕ обход защиты: тем же запросом
-      Indeed отвечает 403, Glassdoor 403. Главный рычаг проекта: одним фетчером
-      закрывает все интересующие страны разом, тогда как страновые борды
-      (Bayt, GulfTalent, Drushim) закрыты наглухо.
-      ЦЕНА: недокументированный HTML. Парсер обязан возвращать 0 при смене
-      вёрстки, а не битые записи.
+      The guest endpoint, served to an anonymous request as designed — the same
+      one LinkedIn's own guest interface uses. This is NOT circumventing
+      protection: the same request gets 403 from Indeed and 403 from Glassdoor.
+      The project's main lever: one fetcher covers every country of interest at
+      once, whereas the country boards (Bayt, GulfTalent, Drushim) are shut.
+      THE PRICE: undocumented HTML. The parser must return 0 when the markup
+      changes, not broken records.
 
   - name: devitjobs
     status: implemented
     implemented_at: "2026-08-04"
-    measured_after_wiring: "UK+US 4033 записи — крупнейший источник проекта"
+    measured_after_wiring: "UK+US 4033 records — the project's largest source"
     priority: 2
     kind: json
-    endpoint: "https://devitjobs.uk/api/jobsLight и https://devitjobs.com/api/jobsLight"
-    measured: "UK 2449 записей, US 1590 — крупнейший улов из найденного"
-    note: "Есть annualSalaryFrom/To, expLevel, companyType."
+    endpoint: "https://devitjobs.uk/api/jobsLight and https://devitjobs.com/api/jobsLight"
+    measured: "UK 2449 records, US 1590 — the biggest catch of anything found"
+    note: "It has annualSalaryFrom/To, expLevel, companyType."
 
   - name: jobs_ch
     status: implemented
     implemented_at: "2026-08-04"
-    measured_after_wiring: "336 записей (4 запроса × 5 страниц)"
+    measured_after_wiring: "336 records (4 queries x 5 pages)"
     priority: 2
     kind: json
     endpoint: "https://www.jobs.ch/api/v1/public/search"
-    measured: "HTTP 200, поле documents"
-    note: "Главный швейцарский борд. Швейцария для контрактора реалистичнее США."
+    measured: "HTTP 200, a documents field"
+    note: "The main Swiss board. Switzerland beats the US for a contractor."
 
   - name: mycareersfuture
     status: implemented
     implemented_at: "2026-08-04"
-    measured_after_wiring: "384 записи"
+    measured_after_wiring: "384 records"
     priority: 3
     kind: json
     endpoint: "https://api.mycareersfuture.gov.sg/v2/jobs"
-    measured: "919 по запросу software engineer"
-    note: "Государственный портал Сингапура. Данные чистые и структурные."
+    measured: "919 for the query software engineer"
+    note: "Singapore's government portal. Clean, structured data."
 
   - name: landing_jobs
     status: implemented
     implemented_at: "2026-08-04"
-    measured_after_wiring: "50 записей"
+    measured_after_wiring: "50 records"
     priority: 3
     kind: json
     endpoint: "https://landing.jobs/api/v1/jobs"
     measured: "HTTP 200"
-    note: "ЕС. Есть флаги remote и relocation_paid, вилка зарплаты."
+    note: "The EU. It has remote and relocation_paid flags, and a pay range."
 
   - name: workingnomads
     status: implemented
     implemented_at: "2026-08-04"
-    measured_after_wiring: "28 записей"
+    measured_after_wiring: "28 records"
     priority: 3
     kind: json
     endpoint: "https://www.workingnomads.com/api/exposed_jobs/"
-    measured: "HTTP 200, 28 записей"
+    measured: "HTTP 200, 28 records"
 
   - name: jobspresso
     status: implemented
     implemented_at: "2026-08-04"
-    measured_after_wiring: "в составе rss_boards"
+    measured_after_wiring: "as part of rss_boards"
     priority: 4
     kind: rss
     endpoint: "https://jobspresso.co/?feed=job_feed"
-    measured: "HTTP 200, RSS 93 КБ"
+    measured: "HTTP 200, RSS 93 KB"
 
   - name: berlinstartupjobs
     status: implemented
     implemented_at: "2026-08-04"
-    measured_after_wiring: "в составе rss_boards"
+    measured_after_wiring: "as part of rss_boards"
     priority: 4
     kind: rss
     endpoint: "https://berlinstartupjobs.com/feed/"
-    measured: "HTTP 200, RSS 13 КБ"
+    measured: "HTTP 200, RSS 13 KB"
 
   - name: ats_workable
     status: pending
     priority: 2
     kind: json
     endpoint: "https://apply.workable.com/api/v1/widget/accounts/<account>"
-    measured: "HTTP 200, ключи name/description/jobs"
-    note: "Рычаг по Израилю: там Workable — стандарт де-факто."
+    measured: "HTTP 200, keys name/description/jobs"
+    note: "The lever for Israel: Workable is the de facto standard there."
 
   - name: ats_smartrecruiters
     status: pending
     priority: 3
     kind: json
     endpoint: "https://api.smartrecruiters.com/v1/companies/<company>/postings"
-    measured: "HTTP 200, есть totalFound и пагинация"
+    measured: "HTTP 200, it has totalFound and pagination"
 
 
   - name: 4dayweek
@@ -182,13 +182,13 @@ sources:
     implemented_at: "2026-08-05"
     kind: json
     endpoint: "https://4dayweek.io/api/jobs"
-    measured: "23 182 вакансии на площадке, ~21% engineering"
-    measured_after_wiring: "200 записей за 2 страницы категории engineering"
+    measured: "23,182 vacancies on the board, ~21% engineering"
+    measured_after_wiring: "200 records over 2 pages of the engineering category"
     note: >
-      Единственный источник, который ищет по ОСИ НАГРУЗКИ, а не по стеку.
-      schedule_type приходит структурным полем (4_day_week, compressed_week,
-      9_day_fortnight, flexible_hours) — это доказанный признак режима, а не
-      догадка по тексту.
+      The one source that searches along the INTENSITY AXIS, not the stack.
+      schedule_type arrives as a structured field (4_day_week, compressed_week,
+      9_day_fortnight, flexible_hours) — a proven mark of the working pattern
+      rather than a guess from text.
 
   - name: arc_dev
     status: pending
@@ -196,41 +196,41 @@ sources:
     kind: html_next_data
     endpoint: "https://arc.dev/remote-jobs"
     measured: >
-      HTTP 200, 30 вакансий в __NEXT_DATA__. Поля исключительно уместные для
-      этого поиска: clientTimeZoneRestriction, overlapHours, jobType,
+      HTTP 200, 30 vacancies in __NEXT_DATA__. The fields are exceptionally apt
+      for this search: clientTimeZoneRestriction, overlapHours, jobType,
       minHourlyRate/maxHourlyRate, experienceLevel.
     note: >
-      Маркетплейс контрактной удалённой работы — та же категория, что Proxify и
-      Lemon.io, которые дают непропорционально много в выдаче (3 из 18 при двух
-      компаниях из тысячи в базе). Парсинг встроенного JSON, а не вёрстки, —
-      надёжнее HTML, но всё ещё зависит от чужой структуры.
+      A marketplace for contract remote work — the same category as Proxify and
+      Lemon.io, which yield disproportionately well (3 of 18, from two companies
+      out of a thousand in the base). Parsing embedded JSON rather than markup
+      is safer than HTML, but still depends on somebody else's structure.
 
   - name: gun_io
     status: rejected
     checked: "2026-08-05"
     reason: >
-      HTTP 200, но вакансий на странице нет: биржа показывает их только после
-      регистрации. Парсить нечего.
+      HTTP 200, but the page has no vacancies: the exchange shows them only
+      after registration. There is nothing to parse.
 
-  # --- Отклонены: проверено, чтобы не проверять снова -----------------------
+  # --- Rejected: checked, so as not to check again ---------------------------
 
   - name: eures
     status: rejected
     checked: "2026-08-04"
     reason: >
-      Портал ЕС на SPA, публичного read-API нет. Найденный поиском API
-      предназначен для ЗАГРУЗКИ вакансий национальными службами занятости,
-      а не для чтения.
+      The EU portal is an SPA with no public read API. The API found by
+      searching is for national employment services to UPLOAD vacancies,
+      not for reading them.
 
   - name: arbeitsagentur
     status: rejected
     checked: "2026-08-04"
-    reason: "HTTP 403 на всех версиях эндпоинта (v2, v3, v4), в том числе с их же X-API-Key."
+    reason: "HTTP 403 on every version of the endpoint (v2, v3, v4), including with their own X-API-Key."
 
   - name: bayt
     status: rejected
     checked: "2026-08-04"
-    reason: "HTTP 403. Крупнейший борд MENA, но закрыт. Залив покрывается через LinkedIn."
+    reason: "HTTP 403. The largest MENA board, but closed. The Gulf is covered through LinkedIn."
 
   - name: gulftalent
     status: rejected
@@ -240,12 +240,12 @@ sources:
   - name: drushim
     status: rejected
     checked: "2026-08-04"
-    reason: "HTTP 403. Израиль покрывается через LinkedIn и Workable."
+    reason: "HTTP 403. Israel is covered through LinkedIn and Workable."
 
   - name: nodeflair
     status: rejected
     checked: "2026-08-04"
-    reason: "HTTP 403. Сингапур покрывается через MyCareersFuture."
+    reason: "HTTP 403. Singapore is covered through MyCareersFuture."
 
   - name: glints
     status: rejected
@@ -255,12 +255,12 @@ sources:
   - name: justjoinit
     status: rejected
     checked: "2026-08-04"
-    reason: "HTTP 404, эндпоинты сменились. Польша — не приоритетный рынок."
+    reason: "HTTP 404, the endpoints changed. Poland is not a priority market."
 
   - name: nofluffjobs
     status: rejected
     checked: "2026-08-04"
-    reason: "HTTP 400/405, требует недокументированного тела запроса."
+    reason: "HTTP 400/405, it requires an undocumented request body."
 
   - name: relocate_me
     status: rejected
@@ -270,44 +270,44 @@ sources:
   - name: honeypot
     status: rejected
     checked: "2026-08-04"
-    reason: "ConnectionError, API недоступен."
+    reason: "ConnectionError, the API is unreachable."
 
   - name: otta
     status: rejected
     checked: "2026-08-04"
-    reason: "HTTP 404, публичного API нет."
+    reason: "HTTP 404, there is no public API."
 
   - name: indeed
     status: rejected
     checked: "2026-08-04"
     reason: >
-      HTTP 403 обычному запросу. Пройти можно только маскировкой под браузер —
-      это обход активной защиты, проект такого не делает (CLAUDE.md §5).
+      HTTP 403 to an ordinary request. Getting in would take impersonating a
+      browser — circumventing active protection, which we do not do (CLAUDE.md §5).
 
   - name: glassdoor
     status: rejected
     checked: "2026-08-04"
-    reason: "HTTP 403, официальный API 410 Gone. Данные оттуда собирает агент веб-поиском."
+    reason: "HTTP 403, the official API is 410 Gone. The agent gathers this by web search."
 
-  # --- Требуют бесплатного ключа: последний приоритет -----------------------
+  # --- Need a free key: lowest priority --------------------------------------
 
   - name: adzuna
     status: pending
     priority: 9
     kind: json
     reason_for_low_priority: >
-      Живой, широкое покрытие ЕС, но требует регистрации (app_id + app_key) и
-      отдаёт агрегированную выдачу с дублями других бордов. Ключ — только в
-      переменной окружения, никогда в репозитории (CLAUDE.md §7).
+      Alive, with broad EU coverage, but it needs registration (app_id plus
+      app_key) and returns aggregated results duplicating other boards. A key
+      goes in an environment variable only, never in the repository (CLAUDE.md §7).
 
   - name: jooble
     status: pending
     priority: 9
     kind: json
-    reason_for_low_priority: "То же: нужен ключ, выдача агрегированная."
+    reason_for_low_priority: "The same: a key is needed and the results are aggregated."
 
   - name: careerjet
     status: pending
     priority: 9
     kind: json
-    reason_for_low_priority: "То же: нужен affid."
+    reason_for_low_priority: "The same: an affid is needed."

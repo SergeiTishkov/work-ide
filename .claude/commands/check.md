@@ -1,40 +1,40 @@
 ---
-description: Проверить, что всё в порядке — окружение, идентичности, источники
+description: Check that everything is in order — environment, identities, sources
 ---
 
-Прогони самопроверку и объясни результат человеческим языком.
+Run the self-check and explain the result in plain language.
 
 ```bash
-python tools/identity.py which            # какая идентичность активна и почему
-python tools/identity.py validate         # структура всех идентичностей
-python tools/doctor.py --identity <p>     # окружение, конфиги, доступность источников
-python -m pytest -q                       # тесты
+python tools/identity.py which            # which identity is active, and why
+python tools/identity.py validate         # the structure of every identity
+python tools/doctor.py --identity <p>     # environment, config, source reachability
+python -m pytest -q                       # the tests
 ```
 
-## Как читать результат
+## How to read the result
 
-- **Идентичности нет** — это нормальное состояние свежего клона, а не поломка.
-  Предложи `/start`.
-- **Идентичность не заполнена** — тоже нормальная стадия. В сообщении перечислено,
-  чего не хватает; предложи дозаполнить.
-- **Нет папок `data/` или `reports/`** — норма: инструменты создают их сами при
-  первом прогоне.
-- **Источник недоступен** — предупреждение, а не ошибка. Пайплайн переживает
-  падение любого источника и продолжает с остальными.
-- **Тест упал** — вот это настоящая проблема, разбирайся до конца.
+- **No identity** — the normal state of a fresh clone, not breakage. Offer
+  `/start`.
+- **An identity that is not filled in** — also a normal stage. The message lists
+  what is missing; offer to finish it.
+- **No `data/` or `reports/` folder** — normal: the tools create them on the
+  first run.
+- **A source is unreachable** — a warning, not an error. The pipeline survives
+  any source failing and carries on with the rest.
+- **A test failed** — now that is a real problem; get to the bottom of it.
 
-## Отдельно: чистота реальных папок
+## Separately: the cleanliness of the real folders
 
-После прогона тестов `reports/` и `data/` обязаны остаться в том же составе,
-в каком были. Тесты работают от имени фикстуры `ftf`, и забытая изоляция
-путей оставляет там `ftf_latest.md`, `archive/ftf/` и `data/ftf/`.
+After a test run, `reports/` and `data/` must hold exactly what they held
+before. The tests run under the `ftf` fixture, and forgotten path isolation
+leaves `ftf_latest.md`, `archive/ftf/` and `data/ftf/` behind.
 
-Страховка в `tests/conftest.py` это ловит и убирает сама, но если что-то
-осталось от старых прогонов:
+The safety net in `tests/conftest.py` catches that and clears it itself, but if
+something is left over from old runs:
 
 ```bash
 python tools/clean_fixture_artifacts.py --dry-run
 python tools/clean_fixture_artifacts.py
 ```
 
-Удаляются только следы фикстур — живые идентичности инструмент не трогает.
+Only fixture traces are deleted — the tool does not touch live identities.

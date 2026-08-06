@@ -1,105 +1,116 @@
 ---
-description: Настроить поиск работы с нуля — своя идентичность из шаблона
+description: Set up a job search from nothing — your own identity from a template
 ---
 
-Проведи человека через онбординг поисковой идентичности.
+Take the person through onboarding a search identity.
 
-**Полная процедура — `docs/ONBOARDING.md`. Прочитай её целиком перед началом**,
-здесь только каркас: документ обновляется, эта команда — нет.
+**The full procedure is `docs/ONBOARDING.md`. Read it in full before starting**;
+what follows is only the skeleton, because that document gets updated and this
+command does not.
 
-## Что где лежит (понять до начала)
+## What lives where (understand this first)
 
 ```
-identity-templates/     ТИПЫ поиска. В гите. Ни одного личного факта.
-local-identities/       МОИ поиски. Вне гита. Здесь можно всё.
+identity-templates/     KINDS of search. In git. Not one personal fact.
+local-identities/       MY searches. Outside git. Anything goes here.
 ```
 
-Человек не редактирует шаблон — он **клонирует** его себе и правит копию.
-Количество папок в `local-identities/` и есть количество подборок: отдельного
-реестра активных идентичностей нет, потому что реестр умеет расходиться с
-реальностью, а папки нет.
+A person does not edit a template — they **clone** it and edit the copy. However
+many folders are in `local-identities/` is how many shortlists there are: there
+is no separate registry of active identities, because a registry can drift away
+from reality and folders cannot.
 
-## Порядок
+## The order
 
-1. **Пойми состояние.** `python tools/identity.py which`
-   - идентичность есть и заполнена → онбординг не нужен, спроси, что человек
-     хотел: запустить цикл (`/run`) или добавить ещё один поиск (`/add-identity`);
-   - идентичности нет → продолжай;
-   - несколько без явного выбора → спроси, о какой речь.
+1. **Establish the state.** `python tools/identity.py which`
+   - an identity exists and is filled in → no onboarding needed; ask what the
+     person wanted: to run the cycle (`/run`) or to add another search
+     (`/add-identity`);
+   - no identity → carry on;
+   - several with no explicit choice → ask which one is meant.
 
-2. **Спроси человека о нём самом — это первый вопрос, не последний.** CV файлом,
-   ссылка на LinkedIn или рассказ словами; достаточно любого из трёх. Без этого
-   нельзя собрать ни стек, ни уровень.
+2. **Ask the person about themselves — this is the first question, not the
+   last.** A CV file, a LinkedIn link, or an account in their own words; any one
+   of the three will do. Without it there is no way to assemble a stack or a
+   level.
 
-3. **Покажи шаблоны и помоги выбрать.**
+3. **Show the templates and help them choose.**
    `python tools/templates.py list`
 
-   Если ни один не подходит — `blank`: полный набор файлов с комментариями и
-   без готовых решений.
+   If none fits, use `blank`: a full set of files with comments and no decisions
+   made for them.
 
-   **Скажи вслух, что идентичностей может быть несколько.** Человек об этом не
-   спросит: он просил «настроить поиск работы». Два разных типа работы — две
-   идентичности, потому что критерии у них противоположные, и подмешивание
-   второй цели в настроенные критерии ухудшит обе выдачи незаметно для отчёта.
+   **Say out loud that there can be more than one identity.** The person will
+   not ask: they asked to "set up a job search". Two different kinds of work
+   means two identities, because their criteria are opposites, and blending a
+   second goal into tuned criteria makes both shortlists worse in a way the
+   report does not show.
 
-4. **Предложи 2–3 префикса** с расшифровкой, дай выбрать. Затем:
-
-   ```
-   python tools/templates.py clone <шаблон> <префикс> "<расшифровка латиницей>"
-   ```
-
-   Расшифровка идёт в имя папки, поэтому латиницей.
-
-5. **Заполни вопросник вместе с человеком.** Как вести разговор —
-   `docs/QUESTIONNAIRE.md`. Сначала только `tier: essential` — этого достаточно,
-   чтобы поиск заработал. Остальные задавай ПОСЛЕ первой выдачи: глядя на
-   реальные вакансии человек отвечает точнее, чем в вакууме.
-
-6. **Ответы пиши в ЛИЧНЫЙ слой, а не в копию шаблона.**
+4. **Offer two or three prefixes** with expansions and let them choose. Then:
 
    ```
-   local-identities/<папка>/
-       template/                ← НЕ ТРОГАТЬ: копию заменяет обновление шаблона
-       <префикс>_profile.yaml   ← имя, резидентство, языки, деньги, ссылки на CV
-       <префикс>_criteria.yaml  ← гео-правила, выведенные из резидентства
-       documents/               ← файлы CV под их СОБСТВЕННЫМИ именами
+   python tools/templates.py clone <template> <prefix> "<expansion in Latin script>"
    ```
 
-   Личные файлы содержат **только отличия** от шаблона — остальное приезжает
-   само. Проверить итог и происхождение любого значения:
-   `python tools/settings.py profile <точечный.ключ> --identity <p>`
+   The expansion goes into the folder name, hence Latin script.
 
-7. **Гео-правила и языковые фильтры ВЫВОДИ, а не копируй у соседа.** Таблицы —
-   `config/derivation/`. Для резидента США «US only» — плюс, для всех остальных
-   — дисквалификация. Скопированное чужое правило молча выбросит половину рынка.
+5. **Fill in the questionnaire together with the person.** How to run the
+   conversation is in `docs/QUESTIONNAIRE.md`. Start with `tier: essential`
+   only — that is enough to get the search working. Ask the rest AFTER the first
+   shortlist: looking at real vacancies, a person answers more accurately than
+   in a vacuum.
 
-8. **Проверь готовность.** `python tools/identity.py validate --identity <p>`
-   Структурно целая, но незаполненная идентичность к поиску не допускается:
-   реальный случай — прогон на плейсхолдерах выдал правдоподобный мусор на
-   1734 вакансии.
+6. **Write the answers into the PERSONAL layer, not into the template copy.**
 
-9. **Запусти первый цикл** (`/run`) и разбери выдачу вместе с человеком.
+   ```
+   local-identities/<folder>/
+       template/                ← DO NOT TOUCH: a template update replaces it
+       <prefix>_profile.yaml    ← name, residency, languages, money, CV paths
+       <prefix>_criteria.yaml   ← geography rules derived from residency
+       documents/               ← CV files under their OWN names
+   ```
 
-## Чего не делать
+   The personal files hold **only the differences** from the template;
+   everything else arrives by itself. To check the result and the provenance of
+   any value:
+   `python tools/settings.py profile <dotted.key> --identity <p>`
 
-- Не запускать поиск, пока идентичность не заполнена.
-- Не править файлы внутри `template/` — их сотрёт первое же обновление.
-  Всё своё пишется файлами уровнем выше.
-- Не класть CV и личные данные в `identity-templates/`: это общая папка,
-  она публикуется.
+7. **DERIVE the geography rules and language filters; do not copy a
+   neighbour's.** The tables are in `config/derivation/`. For a US resident "US
+   only" is a plus, for everybody else a disqualification. A copied rule will
+   silently throw away half the market.
 
-## Отделяйте личное сразу, а не в конце
+8. **Check readiness.** `python tools/identity.py validate --identity <p>`
+   A structurally intact but unfilled identity is not allowed to search: a real
+   case — a run on placeholders produced plausible rubbish across 1734
+   vacancies.
 
-По каждому полю один вопрос: **изменится ли это, если тем же поиском
-воспользуется другой человек?**
+9. **Run the first cycle** (`/run`) and go through the shortlist together with
+   the person.
 
-- Да (имя, LinkedIn, CV, страна, стаж, зарплатные ожидания) — личный файл.
-- Нет (уровень, стек, тип занятости, признаки компании) — это шаблон, и если
-  там этого нет, значит либо шаблон неполон, либо выбран не тот шаблон.
+## What not to do
 
-Гео-правила и языковой фильтр — отдельный случай: они **выведены** из личных
-данных и потому тоже в личном слое, хотя сами личными фактами не являются.
+- Do not start a search until the identity is filled in.
+- Do not edit files inside `template/` — the first update will erase them.
+  Everything of your own goes in files one level up.
+- Do not put a CV or personal data into `identity-templates/`: that folder is
+  shared and is published.
 
-Исключение: если поиск привязан к стране по существу («ищу работу именно в
-Германии»), страна перестаёт быть личным фактом и становится характеристикой
-поиска. См. `docs/IDENTITIES.md`.
+## Separate the personal at once, not at the end
+
+For every field, one question: **would this change if another person used the
+same search?**
+
+- Yes (name, LinkedIn, CV, country, years of experience, pay expectations) — the
+  personal file.
+- No (level, stack, employment type, marks of a suitable company) — that is the
+  template, and if it is not there, either the template is incomplete or the
+  wrong template was chosen.
+
+Geography rules and the language filter are a separate case: they are **derived**
+from personal data and therefore also live in the personal layer, although they
+are not personal facts themselves.
+
+The exception: if a search is tied to a country in substance ("I am looking for
+work in Germany specifically"), the country stops being a personal fact and
+becomes a characteristic of the search. See `docs/IDENTITIES.md`.

@@ -1,20 +1,22 @@
 # =============================================================================
-#  КАТАЛОГ ИСТОЧНИКОВ — общая машинерия, одинаковая для всех пользователей
+#  THE SOURCE CATALOGUE — shared machinery, identical for every user
 # =============================================================================
-#  Здесь описано, ЧТО умеет каждый источник: эндпоинт, тип, признак remote-only,
-#  какие параметры принимает и чего от него ждать по качеству данных.
+#  This describes WHAT each source can do: endpoint, kind, whether it is
+#  remote-only, which parameters it accepts, and what to expect of its data
+#  quality.
 #
-#  Здесь НЕТ ничего личного: включён источник или нет и с какими параметрами —
-#  решает идентичность в своём файле `<префикс>_sources.yaml`. Разделение
-#  проведено по границе «факт о мире» / «предпочтение человека»: устаревший URL
-#  — это баг для всех сразу, а отключённый arbeitnow — чей-то осознанный выбор.
+#  There is nothing personal here: whether a source is enabled, and with what
+#  parameters, is the identity's decision in its own `<prefix>_sources.yaml`.
+#  The split follows the boundary between "a fact about the world" and "a
+#  person's preference": a stale URL is a bug for everybody at once, while a
+#  disabled arbeitnow is somebody's deliberate choice.
 #
-#  Идентичность НЕ МОЖЕТ переопределить url/kind/remote_only: это свойства
-#  площадки, а не настройка. Может — enabled и params.
+#  An identity CANNOT override url/kind/remote_only: those are properties of
+#  the board rather than settings. It can override enabled and params.
 #
-#  Как читать поле params_schema: перечислены параметры, которые фетчер
-#  принимает от идентичности, с типом и смыслом. Полное описание для сборки
-#  своей идентичности — в docs/BUILDING_BLOCKS.md.
+#  How to read params_schema: it lists the parameters the fetcher accepts from
+#  an identity, with their type and meaning. The full description for building
+#  your own identity is in docs/BUILDING_BLOCKS.md.
 # =============================================================================
 
 schema_version: 1
@@ -30,147 +32,149 @@ sources:
       - "https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss"
       - "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss"
     params_schema:
-      urls: "список RSS-фидов; по умолчанию все пять категорий"
+      urls: "the list of RSS feeds; all five categories by default"
     yield_notes: >
-      Лучший источник проекта по соотношению сигнал/шум. ~242 вакансии за
-      прогон, только удалённые, англоязычные. Даёт структурное поле region
-      ("Anywhere in the World" / "USA Only") — самый надёжный гео-сигнал среди
-      всех источников. Замер 2026-07-30: одна категория programming даёт 25
-      вакансий, все пять — 242.
+      The project's best source by signal-to-noise. ~242 vacancies per run,
+      remote only, in English. It gives the structured region field
+      ("Anywhere in the World" / "USA Only") — the most dependable geography
+      signal of any source. Measured 2026-07-30: the programming category alone
+      gives 25 vacancies, all five give 242.
     caveats: >
-      Воронку отклика держит у себя: в 71% вакансий "To apply" ведёт обратно на
-      weworkremotely.com. Фетчер извлекает сайт компании из блока
-      "Headquarters/URL", чтобы можно было откликнуться напрямую.
+      It keeps the application funnel to itself: in 71% of vacancies "To apply"
+      leads back to weworkremotely.com. The fetcher extracts the company site
+      from the "Headquarters/URL" block so that you can apply directly.
 
   - name: remoteok
     kind: json_api
     remote_only: true
     url: "https://remoteok.com/api"
     params_schema:
-      url: "эндпоинт API"
-    yield_notes: "~100 последних вакансий за вызов, только удалённые. Глубины по времени нет."
+      url: "the API endpoint"
+    yield_notes: "~100 latest vacancies per call, remote only. No depth in time."
     caveats: >
-      Фид зашумлён: наблюдались новостные заметки вместо вакансий. Парсер строго
-      валидирует обязательные поля (position, company, apply_url) и молча
-      отбрасывает мусор — не считать сырое количество записей числом вакансий.
+      The feed is noisy: news items have been observed instead of vacancies.
+      The parser validates the required fields strictly (position, company,
+      apply_url) and discards rubbish silently — do not read the raw record
+      count as a number of vacancies.
 
   - name: remotive
     kind: json_api
     remote_only: true
     url: "https://remotive.com/api/remote-jobs?limit=200"
     params_schema:
-      url: "эндпоинт API"
+      url: "the API endpoint"
     yield_notes: >
-      ~35 вакансий за вызов. Даёт candidate_required_location — явное структурное
-      гео-ограничение.
-    caveats: "Параметры limit/search/category на практике игнорируются — берём что дают."
+      ~35 vacancies per call. It gives candidate_required_location — an
+      explicit structured geography restriction.
+    caveats: "The limit/search/category parameters are ignored in practice — we take what is given."
 
   - name: jobicy
     kind: json_api
     remote_only: true
     url: "https://jobicy.com/api/v2/remote-jobs?count=100&industry=dev"
     params_schema:
-      url: "эндпоинт API; industry=dev даёт максимальную долю разработки"
+      url: "the API endpoint; industry=dev gives the highest share of development"
     yield_notes: >
-      ~100 вакансий. Отдаёт структурированную зарплату (salaryMin/Max/Currency/
-      Period) и гео (jobGeo) — надёжнее парсинга текста.
-    caveats: "Параметр tag= возвращает пусто, использовать бесполезно."
+      ~100 vacancies. It returns structured salary (salaryMin/Max/Currency/
+      Period) and geography (jobGeo) — more dependable than parsing text.
+    caveats: "The tag= parameter returns nothing; using it is pointless."
 
   - name: himalayas
     kind: json_api
     remote_only: true
     url: "https://himalayas.app/jobs/api?limit=100"
     params_schema:
-      url: "эндпоинт API"
+      url: "the API endpoint"
     yield_notes: >
-      ~20 вакансий за вызов независимо от limit. locationRestrictions — список
-      разрешённых стран (пустой = worldwide), самый явный гео-сигнал из всех.
-    caveats: "Мало вакансий, но бесплатно и без ключа."
+      ~20 vacancies per call regardless of limit. locationRestrictions is a
+      list of permitted countries (empty = worldwide), the most explicit
+      geography signal of any source.
+    caveats: "Few vacancies, but free and keyless."
 
   - name: linkedin
     kind: html_guest_search
     remote_only: false
     params_schema:
-      keywords: "список ключевых слов; каждое умножается на каждую страну"
-      locations: "список стран; по умолчанию — ярусы из profile.target_markets"
-      max_pages: "сколько страниц по 25 карточек брать на пару (по умолчанию 4)"
+      keywords: "a list of keywords; each is multiplied by each country"
+      locations: "a list of countries; by default the tiers from profile.target_markets"
+      max_pages: "how many pages of 25 cards to take per pair (4 by default)"
     yield_notes: >
-      Замер 2026-08-04: 30 карточек на страницу, пагинация start=0,25,50
-      работает. Покрывает разом Израиль, ОАЭ, Саудовскую Аравию, Сингапур,
-      Швейцарию, Германию, Нидерланды — то есть рынки, чьи собственные борды
-      закрыты (Bayt/GulfTalent/Drushim/NodeFlair отвечают 403/404).
+      Measured 2026-08-04: 30 cards per page, pagination start=0,25,50 works.
+      It covers Israel, the UAE, Saudi Arabia, Singapore, Switzerland, Germany
+      and the Netherlands at once — markets whose own boards are closed
+      (Bayt/GulfTalent/Drushim/NodeFlair answer 403/404).
     caveats: >
-      Единственный HTML-источник проекта: гостевая страница не документирована
-      и может измениться. Парсер обязан вернуть 0 и ошибку при смене вёрстки —
-      это проверяется тестом на зафиксированном слепке. В карточке нет текста
-      описания, только заголовок/компания/локация: гейты, читающие описание,
-      по этим вакансиям работают вслепую, поэтому ручной чек-лист для них
-      особенно важен.
+      The project's only HTML source: the guest page is undocumented and can
+      change. The parser must return 0 and an error when the markup changes,
+      which is pinned by a test against a frozen snapshot. A card carries no
+      description text, only title, company and location: the gates that read
+      a description work blind on these vacancies, so the manual checklist
+      matters especially for them.
 
 
   - name: devitjobs
     kind: json_api
     remote_only: false
     params_schema:
-      boards: "список досок: uk и/или us"
-    yield_notes: "Замер 2026-08-04: UK 2447 записей, US 1590. Крупнейший по объёму источник."
+      boards: "the list of boards: uk and/or us"
+    yield_notes: "Measured 2026-08-04: UK 2447 records, US 1590. The largest source by volume."
     caveats: >
-      В ответе НЕТ текста описания — только заголовок, теги и структурные поля.
-      Гейты, читающие описание, по этим записям работают вслепую.
+      The response has NO description text — only the title, tags and
+      structured fields. The gates that read a description work blind here.
 
   - name: jobs_ch
     kind: json_api
     remote_only: false
     params_schema:
-      queries: "поисковые запросы"
-      pages: "страниц на запрос, по 20 записей (площадка игнорирует rows)"
-    yield_notes: "Замер 2026-08-04: 250 записей за 3 запроса по 5 страниц."
-    caveats: "Национальный борд: большинство вакансий локальные и на немецком."
+      queries: "search queries"
+      pages: "pages per query, 20 records each (the board ignores rows)"
+    yield_notes: "Measured 2026-08-04: 250 records from 3 queries of 5 pages."
+    caveats: "A national board: most vacancies are local and in German."
 
   - name: mycareersfuture
     kind: json_api
     remote_only: false
     params_schema:
-      queries: "поисковые запросы"
-      pages: "страниц на запрос по 100 записей"
-    yield_notes: "Замер 2026-08-04: 384 записи. Государственный портал Сингапура."
-    caveats: "Национальный портал: удалёнка определяется текстом, а не флагом."
+      queries: "search queries"
+      pages: "pages per query, 100 records each"
+    yield_notes: "Measured 2026-08-04: 384 records. Singapore's government portal."
+    caveats: "A national portal: remoteness comes from the text rather than a flag."
 
   - name: landing_jobs
     kind: json_api
     remote_only: false
-    yield_notes: "Замер 2026-08-04: 50 записей. Есть флаг remote и вилка зарплаты."
-    caveats: "Часть вакансий публикуется анонимно — компания достаётся из URL."
+    yield_notes: "Measured 2026-08-04: 50 records. It has a remote flag and a pay range."
+    caveats: "Some vacancies are posted anonymously — the company is recovered from the URL."
 
   - name: workingnomads
     kind: json_api
     remote_only: true
-    yield_notes: "Замер 2026-08-04: 28 записей. Курируемая подборка."
+    yield_notes: "Measured 2026-08-04: 28 records. A curated selection."
 
   - name: rss_boards
     kind: rss
     remote_only: false
     params_schema:
-      boards: "jobspresso и/или berlinstartupjobs"
-    yield_notes: "Замер 2026-08-04: 22 записи суммарно."
-    caveats: "Записи без распознанной компании отбрасываются — их нечем дедуплицировать."
+      boards: "jobspresso and/or berlinstartupjobs"
+    yield_notes: "Measured 2026-08-04: 22 records in total."
+    caveats: "Records with no recognised company are discarded — there is nothing to deduplicate them by."
 
 
   - name: 4dayweek
     kind: json_api
     remote_only: false
     params_schema:
-      categories: "категории площадки, для разработки — engineering"
-      pages: "страниц по 100 записей на категорию"
+      categories: "the board's categories; for development, engineering"
+      pages: "pages of 100 records per category"
     yield_notes: >
-      Замер 2026-08-05: 23 182 вакансии на площадке, ~21% engineering.
-      Единственный источник проекта, который ищет по ОСИ НАГРУЗКИ, а не по
-      стеку: поле schedule_type приходит структурным (4_day_week,
+      Measured 2026-08-05: 23,182 vacancies on the board, ~21% engineering.
+      The project's only source that searches along the INTENSITY AXIS rather
+      than the stack: the schedule_type field arrives structured (4_day_week,
       compressed_week, 9_day_fortnight, flexible_hours…).
     caveats: >
-      В списочном ответе нет текста описания — гейты, читающие описание,
-      работают по заголовку и тегам. Зато режим работы приходит доказанным,
-      а не угаданным из текста.
+      The list response has no description text — the gates that read one work
+      from the title and tags. In exchange, the working pattern arrives proven
+      rather than guessed from text.
 
 
   - name: ats
@@ -178,18 +182,19 @@ sources:
     remote_only: false
     params_schema:
       targets: >
-        список компаний вида {company, provider, token}; по умолчанию берётся из
-        <префикс>_ats_targets.yaml
+        a list of companies of the form {company, provider, token}; by default
+        taken from <prefix>_ats_targets.yaml
     yield_notes: >
-      Вакансии напрямую от работодателей через официальные публичные API их ATS
-      (Greenhouse / Lever / Ashby / Recruitee) — те самые, на которых работают
-      виджеты вакансий на сайтах компаний. Без чужой воронки отклика, без
-      подписок, без посредника. Замер: Stripe 546 вакансий, Cloudflare 284,
+      Vacancies straight from employers through the official public APIs of
+      their ATS (Greenhouse / Lever / Ashby / Recruitee) — the very ones the
+      vacancy widgets on company sites run off. No third party's application
+      funnel, no subscriptions, no intermediary. Measured: Stripe 546
       GitLab 185, Notion 111.
     caveats: >
-      Главный рычаг качества — СПИСОК КОМПАНИЙ, а не сам источник. Технологические
-      компании из стартового списка не дают .NET-вакансий; под конкретный профиль
-      список нужно наполнять релевантными работодателями.
+      The main lever on quality is the COMPANY LIST, not the source itself.
+      The technology companies in the starting list yield no .NET vacancies;
+      for a particular profile the list has to be filled with relevant
+      employers.
 
   - name: hn_whoishiring
     kind: hn_algolia
@@ -197,37 +202,38 @@ sources:
     url: "http://hn.algolia.com/api/v1/search"
     params_schema:
       keywords: >
-        список ключевых слов для поиска по треду; ПО УМОЛЧАНИЮ берётся из
-        profile.tech_stack.core активной идентичности. Каждое слово = один
-        HTTP-запрос к Algolia, поэтому список короткий (бюджет стоимости).
-      hits_per_keyword: "сколько комментариев запрашивать на слово (по умолчанию 50)"
+        a list of keywords to search the thread with; BY DEFAULT taken from
+        the active identity's profile.tech_stack.core. Each word is one HTTP
+        request to Algolia, so the list is short (a cost budget).
+      hits_per_keyword: "how many comments to request per word (50 by default)"
     yield_notes: >
-      Легаси/enterprise вакансии часто попадают именно сюда, а не на джоб-борды.
-      Иногда здесь встречаются "тихие" вакансии без конкуренции.
-    caveats: "Формат вольный, много шума, компания и локация парсятся эвристически."
+      Legacy and enterprise vacancies often land here rather than on the job
+      boards. Sometimes there are quiet, uncontested vacancies here.
+    caveats: "Free-form and noisy; company and location are parsed heuristically."
 
   - name: arbeitnow
     kind: json_api
     remote_only: false
     url: "https://www.arbeitnow.com/api/job-board-api"
     params_schema:
-      url: "эндпоинт API"
-    yield_notes: "~175 вакансий за вызов."
+      url: "the API endpoint"
+    yield_notes: "~175 vacancies per call."
     caveats: >
-      ВНИМАНИЕ: по факту это преимущественно НЕМЕЦКИЙ рынок труда. Замер
-      2026-07-30: давал 68% всей базы при ~6% полезного выхода — подавляющее
-      большинство вакансий немецкоязычные ("m/w/d", "Deutschkenntnisse") и
-      отсеиваются языковым фильтром, remote среди них меньшинство. Полезен
-      только тем, кто читает по-немецки или готов терпеть низкий выход.
+      NOTE: in practice this is predominantly the GERMAN labour market.
+      Measured 2026-07-30: it gave 68% of the whole base at about 6% useful
+      yield — the overwhelming majority are German-language ("m/w/d",
+      "Deutschkenntnisse") and are cut by the language filter, and remote is a
+      minority among them. Useful only to somebody who reads German or is
+      willing to tolerate a low yield.
 
   - name: manual
     kind: manual_ingest
     remote_only: false
     params_schema: {}
     yield_notes: >
-      Не автоматический источник. Через tools/ingest_manual.py агент заносит
-      находки, полученные обычным веб-поиском — прежде всего с LinkedIn, Indeed,
-      Dice и карьерных страниц компаний.
+      Not an automatic source. Through tools/ingest_manual.py the agent enters
+      finds obtained by ordinary web search — above all from Indeed, Dice and
+      companies' careers pages.
     caveats: >
-      Единственный легальный способ использовать площадки, которые нельзя читать
-      программно (403 за анти-бот защитой). См. docs/SOURCES.md.
+      The one legitimate way to use sites that cannot be read programmatically
+      (403 behind anti-bot protection). See docs/SOURCES.md.

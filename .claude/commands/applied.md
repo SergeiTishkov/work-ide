@@ -1,28 +1,29 @@
 ---
-description: Отметить отклик на вакансию и его результат
+description: Record an application to a vacancy, and its outcome
 ---
 
-Запиши в базу знаний, что человек откликнулся на вакансию, или чем дело
-кончилось.
+Record in the knowledge base that the person applied to a vacancy, or how it
+turned out.
 
 ```bash
-python tools/kb.py list --identity <p> --limit 30      # найти нужный id
+python tools/kb.py list --identity <p> --limit 30      # find the id
 python tools/kb.py set-status --identity <p> --id <id> \
-    --status applied --notes "что именно отправил, когда"
+    --status applied --notes "what exactly was sent, and when"
 ```
 
-Статусы: `new`, `applied`, `interviewing`, `offer`, `rejected`, `not_relevant`.
+Statuses: `new`, `applied`, `interviewing`, `offer`, `rejected`,
+`not_relevant`.
 
-## Зачем это нужно
+## Why this matters
 
-Отклики — единственный источник обратной связи о том, работает ли поиск. Без
-них система знает, какие вакансии **похожи** на нужные, но не знает, какие из
-них дают ответ.
+Applications are the only source of feedback on whether the search is working.
+Without them the system knows which vacancies **look like** the right ones, but
+not which of them get an answer.
 
-Поэтому не ограничивайся статусом: если пришёл отказ или, наоборот, ответили
-быстро — спроси, что человек об этом думает, и запиши вывод в
-`data/<p>/knowledge/<p>_insights.md`. «На вакансии с явной вилкой отвечают
-чаще» — знание, которое стоит дороже одной записи в базе.
+So do not stop at the status: if a rejection came, or conversely somebody
+replied quickly, ask what the person makes of it and write the conclusion into
+`data/<p>/knowledge/<p>_insights.md`. "Vacancies that quote a range reply more
+often" is knowledge worth more than one record in a database.
 
-Если выяснилось, что вакансия вообще не подходила — это баг фильтра. Почини
-`<p>_criteria.yaml`, а не просто пометь `not_relevant`.
+If it turns out the vacancy was never suitable at all, that is a bug in the
+filter. Fix `<p>_criteria.yaml` rather than simply marking it `not_relevant`.

@@ -1,28 +1,28 @@
 # =============================================================================
-#  СЛОВАРЬ ТЕХНОЛОГИЙ — что вообще бывает в вакансиях
+#  THE TECHNOLOGY VOCABULARY — what turns up in vacancies at all
 # =============================================================================
-#  Используется отчётом, чтобы показать строкой, какой стек ждут на проекте.
-#  Это ГЛОБАЛЬНОЕ требование: список технологий полезен любому пользователю
-#  проекта независимо от того, что он ищет, поэтому словарь общий и лежит в
-#  config/, а не в идентичности.
+#  Used by the report, to show in one line which stack a project expects.
+#  This is a GLOBAL requirement: a list of technologies is useful to any user
+#  of the project whatever they are looking for, so the vocabulary is shared
+#  and lives in config/ rather than in an identity.
 #
-#  Важно: словарь описывает МИР, а не человека. Здесь есть технологии, которых
-#  никто из пользователей не знает — и это правильно: увидеть в отчёте
-#  незнакомый стек не менее полезно, чем знакомый.
+#  Note: the vocabulary describes THE WORLD, not a person. It holds
+#  technologies none of the users knows — and rightly so: seeing an unfamiliar
+#  stack in the report is no less useful than a familiar one.
 #
-#  ФОРМАТ
-#    <Каноническое имя>: [форма, форма, …]
-#  Каноническое имя попадает в отчёт, формы — то, чем технологию называют в
-#  тексте вакансии. Поиск идёт подстрокой по нормализованному тексту.
+#  FORMAT
+#    <Canonical name>: [form, form, …]
+#  The canonical name reaches the report; the forms are what the technology is
+#  called in vacancy text. Matching is by substring over normalised text.
 #
-#  ПРАВИЛО, КУПЛЕННОЕ ОПЫТОМ: никаких коротких общих слов.
-#  На этом проекте уже ловились: "LESS" внутри "no less than", "eor" внутри
-#  "theoretical", "Multiplier" внутри "productivity multiplier", "ssis" внутри
-#  "ai-assisted" (1057 ложных срабатываний), "ssas" внутри португальского
-#  "nossas", "java" внутри "javascript". Поэтому:
-#    * формы короче 4 символов пишутся с уточнением (".net core", а не ".net");
-#    * акронимы — полностью ("sql server integration services", а не "ssis");
-#    * названия-омонимы получают суффикс (".js", " framework", " language").
+#  A RULE BOUGHT WITH EXPERIENCE: no short generic words.
+#  Already caught in this project: "LESS" inside "no less than", "eor" inside
+#  "theoretical", "Multiplier" inside "productivity multiplier", "ssis" inside
+#  "ai-assisted" (1057 false matches), "ssas" inside the Portuguese "nossas",
+#  "java" inside "javascript". Hence:
+#    * forms shorter than 4 characters take a qualifier (".net core", not ".net");
+#    * acronyms in full ("sql server integration services", not "ssis");
+#    * homonymous names take a suffix (".js", " framework", " language").
 # =============================================================================
 
 schema_version: 1
@@ -72,7 +72,7 @@ technologies:
   "Webpack": ["webpack"]
   "Vite": ["vite build", "vite.js"]
 
-  # --- Другие языки ---------------------------------------------------------
+  # --- Other languages -------------------------------------------------------
   "Java": ["java se", "java ee", "core java", "java 8", "java 11", "java 17", "java 21"]
   "Spring": ["spring boot", "spring framework"]
   "Kotlin": ["kotlin"]
@@ -96,7 +96,7 @@ technologies:
   "Perl": ["perl"]
   "PL/SQL": ["pl/sql"]
 
-  # --- Базы данных ----------------------------------------------------------
+  # --- Databases -------------------------------------------------------------
   "PostgreSQL": ["postgresql", "postgres"]
   "MySQL": ["mysql"]
   "Oracle": ["oracle database", "oracle db", "oracle forms"]
@@ -108,7 +108,7 @@ technologies:
   "Snowflake": ["snowflake"]
   "ClickHouse": ["clickhouse"]
 
-  # --- Инфраструктура -------------------------------------------------------
+  # --- Infrastructure --------------------------------------------------------
   "AWS": ["amazon web services", "aws "]
   "GCP": ["google cloud", "gcp "]
   "Docker": ["docker"]
@@ -125,7 +125,7 @@ technologies:
   "SOAP": ["soap"]
   "Microservices": ["microservices", "micro-services"]
 
-  # --- Данные и аналитика ---------------------------------------------------
+  # --- Data and analytics ----------------------------------------------------
   "Spark": ["apache spark", "pyspark"]
   "Databricks": ["databricks"]
   "Airflow": ["apache airflow"]
@@ -133,7 +133,7 @@ technologies:
   "Power BI": ["power bi", "powerbi"]
   "Tableau": ["tableau"]
 
-  # --- CMS и платформы ------------------------------------------------------
+  # --- CMS and platforms -----------------------------------------------------
   "WordPress": ["wordpress"]
   "Drupal": ["drupal"]
   "Shopify": ["shopify"]
@@ -143,9 +143,9 @@ technologies:
   "Umbraco": ["umbraco"]
   "Sitecore": ["sitecore"]
 
-  # --- Технологии из реального опыта, которых не было в первой редакции -----
-  # Добавлены после чтения CV 2026-08-05: они встречаются в вакансиях того же
-  # профиля, и без них строка технологий в отчёте выглядела беднее, чем есть.
+  # --- Technologies from real experience, absent from the first draft --------
+  # Added after reading the CV on 2026-08-05: they occur in vacancies of the
+  # same profile, and without them the technology line in the report looked
   "DevExpress": ["devexpress"]
   "RxJS": ["rxjs"]
   "NgRx": ["ngrx"]
@@ -171,35 +171,36 @@ technologies:
   "Confluence/Jira": ["jira", "confluence"]
 
 # =============================================================================
-#  ТЕХНОЛОГИИ, КОТОРЫЕ НЕЛЬЗЯ ИСКАТЬ ПОДСТРОКОЙ
+#  TECHNOLOGIES THAT CANNOT BE MATCHED BY SUBSTRING
 # =============================================================================
-#  Обычная запись выше — "каноническое имя: [формы]", и поиск идёт подстрокой.
-#  Для части технологий этого недостаточно: их написание либо встречается
-#  внутри посторонних слов, либо, наоборот, само содержит другое название.
+#  An ordinary entry above is "canonical name: [forms]", matched by substring.
+#  For some technologies that is not enough: their spelling either occurs
+#  inside unrelated words or itself contains another name.
 #
-#  ".NET" — канонический пример и самый дорогой баг в истории проекта.
-#  Подробный разбор: docs/TECH_MATCHING.md. Коротко:
-#    * подстрока ".net" есть в любом почтовом домене и в любой ссылке;
-#    * поэтому в keywords её класть нельзя;
-#    * но без неё заголовок "Senior .NET Backend Developer" не совпадает НИ
-#      С ОДНИМ ключом, потому что все они длиннее (".NET Core", "ASP.NET");
-#    * замер 2026-08-05: 754 вакансии с .NET в заголовке, отклонены ВСЕ,
-#      из них 325 — с формулировкой "не .NET/JS роль".
+#  ".NET" is the canonical example and the most expensive bug in the project's
+#  history. The full account is in docs/TECH_MATCHING.md. In short:
+#    * the substring ".net" is in every mail domain and every link;
+#    * so it cannot go into keywords;
+#    * but without it the title "Senior .NET Backend Developer" matches NOT ONE
+#      key, because every key is longer (".NET Core", "ASP.NET");
+#    * measured 2026-08-05: 754 vacancies with .NET in the title, ALL rejected,
+#      325 of them with the wording "not a .NET/JS role".
 #
-#  Решение из двух частей, и обе обязательны:
-#    1. почта и ссылки вырезаются из текста ДО поиска (tools/textclean.py);
-#    2. технология ищется регуляркой, а не подстрокой.
+#  A two-part solution, and both parts are mandatory:
+#    1. email addresses and links are stripped from the text BEFORE matching
+#       (tools/textclean.py);
+#    2. the technology is matched by regex rather than by substring.
 #
-#  ФОРМАТ
-#    <каноническое имя>:
-#      pattern: регулярка по нормализованному (нижний регистр) тексту
-#      redundant_if: [имена], при наличии которых совпадение не засчитывается
+#  FORMAT
+#    <canonical name>:
+#      pattern: a regex over normalised (lowercase) text
+#      redundant_if: [names] whose presence cancels the match
 #
-#  redundant_if обязателен там, где название вложено в другое: ".NET" есть
-#  внутри "ASP.NET", и без оговорки одна платформа считалась бы дважды.
+#  redundant_if is mandatory where one name is nested inside another: ".NET" is
+#  inside "ASP.NET", and without the caveat one platform would count twice.
 #
-#  Идентичность НЕ повторяет эти регулярки. Она называет технологию
-#  каноническим именем в своём tech_stack, а как её найти — знает этот файл.
+#  An identity does NOT repeat these regexes. It names the technology by its
+#  canonical name in its tech_stack, and this file knows how to find it.
 # =============================================================================
 
 matching_patterns:
@@ -225,16 +226,16 @@ matching_patterns:
 
   "C++":
     substring_unsafe: true
-    # "c++" не имеет границы слова справа: \b после "+" не срабатывает,
-    # поэтому подстрока "c++" ловится в "c++/cli" и подобном корректно, а
-    # регулярка нужна, чтобы не поймать "abc++".
+    # "c++" has no word boundary on the right: \b after "+" does not fire, so
+    # the substring "c++" is caught correctly inside "c++/cli" and the like,
+    # and the regex is needed to avoid catching "abc++".
     patterns:
       - '(?<![\w+])c\+\+'
 
   "Go":
     substring_unsafe: true
-    # "go" — слишком короткое и слишком частое слово ("go to", "ongoing").
-    # Только в явно языковых оборотах.
+    # "go" is too short and too common a word ("go to", "ongoing"). Only in
+    # explicitly language-related turns of phrase.
     patterns:
       - '\bgolang\b'
       - '\bgo developer\b'

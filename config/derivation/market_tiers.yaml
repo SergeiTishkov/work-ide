@@ -1,37 +1,38 @@
 # =============================================================================
-#  ЯРУСЫ РЫНКОВ ТРУДА — где искать удалённую работу и где не стоит
+#  LABOUR MARKET TIERS — where to look for remote work, and where not to
 # =============================================================================
-#  Таблица общая для всех идентичностей: она описывает объективное положение
-#  дел на рынке, а не предпочтения конкретного человека. Какие ярусы включены
-#  и с какими исключениями — это уже выбор идентичности
-#  (<префикс>_profile.yaml -> target_markets).
+#  The table is shared by every identity: it describes the objective state of
+#  the market rather than one person's preferences. Which tiers are enabled,
+#  and with what exceptions, is the identity's choice
+#  (<prefix>_profile.yaml -> target_markets).
 #
-#  ГЛАВНОЕ РАЗЛИЧЕНИЕ, ради которого таблица и существует: страны-ИМПОРТЁРЫ
-#  разработки против стран-ЭКСПОРТЁРОВ.
+#  THE CENTRAL DISTINCTION the table exists for: countries that IMPORT
+#  development work versus countries that EXPORT it.
 #
-#    Импортёр  — разработчиков не хватает, их нанимают снаружи. Ставки выше,
-#                условия лучше, к удалённому контрактору относятся как к
-#                дефицитному специалисту.
-#    Экспортёр — разработчиков в избытке, страна сама поставляет их наружу.
-#                Локальные вакансии там конкурируют по цене вниз, и удалённая
-#                работа на такой рынок означает худшие ставки при той же
-#                нагрузке.
+#    Importer — developers are scarce and are hired from outside. Rates are
+#               higher, terms are better, and a remote contractor is treated as
+#               a scarce specialist.
+#    Exporter — developers are plentiful and the country supplies them outward.
+#               Local vacancies there compete downwards on price, and remote
+#               work for such a market means worse rates for the same
+#               workload.
 #
-#  Это не оценка людей или стран, а описание направления потока работы. Для
-#  человека, ищущего удалённую работу за пределами своей страны, направление
-#  потока — самый сильный предиктор ставки.
+#  This is not a judgement of people or countries but a description of which
+#  way the work flows. For somebody looking for remote work outside their own
+#  country, the direction of flow is the strongest predictor of the rate.
 #
-#  Ярусы используются (проверено грепом 2026-08-05, а не по памяти):
-#    * фетчером LinkedIn — как список локаций для запросов (markets.py);
-#    * скорингом — вакансия, чья локация попадает в целевой рынок, НЕ считается
-#      гео-ограничением (score._target_market_of).
+#  The tiers are used (verified by grep on 2026-08-05, not from memory):
+#    * by the LinkedIn fetcher, as the list of locations to query (markets.py);
+#    * by scoring — a vacancy whose location falls in a target market does NOT
+#      count as a geography restriction (score._target_market_of).
 #
-#  До 2026-08-05 в этой шапке значился ещё один потребитель, которого в коде
-#  не было: скоринг ярусы не читал вовсе. Из 3281 европейской вакансии в
-#  выдачу попадала ОДНА, потому что гейт локации отбрасывал Германию и
-#  Британию как «привязано к стране», хотя таблица относила их к первому
-#  приоритету. Описанная, но не существующая связь — самый долгоживущий вид
-#  ошибки: тесты зелёные, документация убедительная. См. docs/OVERRIDES.md.
+#  Until 2026-08-05 this header listed one more consumer that did not exist in
+#  the code: scoring did not read the tiers at all. Of 3281 European vacancies,
+#  ONE reached the shortlist, because the location gate discarded Germany and
+#  Britain as "tied to a country" although the table placed them in the first
+#  tier. A documented link that does not exist is the longest-lived kind of
+#  bug: the tests are green and the documentation is convincing. See
+#  docs/OVERRIDES.md.
 # =============================================================================
 
 schema_version: 1
@@ -41,14 +42,14 @@ tiers:
 
   importer_prime:
     description: >
-      Выраженный дефицит разработчиков, высокие ставки, развитая практика
-      найма контракторов из-за рубежа. Первый приоритет для поиска.
+      A pronounced shortage of developers, high rates, and an established
+      practice of hiring contractors from abroad. First priority for a search.
     countries:
       - name: "United States"
-        note: "Самый большой рынок и потолок ставок. Часто требуют резидентство — фильтруется скорингом."
+        note: "The biggest market and the ceiling on rates. Residency is often required — filtered by scoring."
       - name: "Canada"
       - name: "Switzerland"
-        note: "Высочайшие ставки в Европе. Для контрактора из третьей страны реалистичнее США."
+        note: "The highest rates in Europe. More realistic than the US for a contractor from a third country."
       - name: "Germany"
       - name: "Netherlands"
       - name: "United Kingdom"
@@ -59,51 +60,51 @@ tiers:
       - name: "Finland"
       - name: "Israel"
         note: >
-          Высокая плотность технологических компаний при нехватке инженеров;
-          распространён найм контракторов. Многие используют Workable и
-          Greenhouse — доступны напрямую через ATS.
+          A high density of technology companies against a shortage of
+          engineers; hiring contractors is widespread. Many use Workable and
+          Greenhouse, reachable directly through their ATS.
       - name: "United Arab Emirates"
-        note: "Дубай и Абу-Даби: быстро растущий технологический сектор, ноль подоходного налога."
+        note: "Dubai and Abu Dhabi: a fast-growing technology sector, zero income tax."
       - name: "Saudi Arabia"
-        note: "Крупные государственные программы цифровизации, спрос выше локального предложения."
+        note: "Large state digitisation programmes; demand exceeds local supply."
       - name: "Singapore"
-        note: "Хаб региона. Есть государственный портал MyCareersFuture с открытым API."
+        note: "The region's hub. The government portal MyCareersFuture has an open API."
       - name: "Australia"
 
   importer_ok:
     description: >
-      Второй приоритет: более низкий потолок ставок, языковой барьер или
-      меньшая практика удалённого найма из-за рубежа. Сюда же попадают рынки,
-      ценные не ставкой, а другими причинами — например, возможностью
-      переезда домой.
+      Second priority: a lower ceiling on rates, a language barrier, or less
+      practice of remote hiring from abroad. Markets valuable for reasons other
+      than the rate also land here — the possibility of moving home, for
+      instance.
     countries:
       - name: "Austria"
       - name: "Belgium"
       - name: "France"
-        note: "Часто требуется французский — отсекается языковым фильтром."
+        note: "French is often required — cut by the language filter."
       - name: "Spain"
       - name: "Italy"
       - name: "Japan"
-        note: "Языковой барьер; англоязычные позиции есть, но их меньшинство."
+        note: "A language barrier; English-language positions exist but are a minority."
       - name: "South Korea"
       - name: "New Zealand"
       - name: "Luxembourg"
       - name: "Iceland"
       - name: "Belarus"
         note: >
-          Родной рынок для русскоязычного кандидата: сюда возможен переезд, а не
-          только удалённая работа. Ставки ниже западных, поэтому ярус второй, а
-          не первый — но исключать нельзя, вакансия отсюда может оказаться
-          интересной по причинам, которых нет в цифрах.
+          The home market for a Russian-speaking candidate: moving there is
+          possible, not only remote work. Rates are below western ones, hence
+          the second tier rather than the first — but it must not be excluded:
+          a vacancy from here may be interesting for reasons the numbers do not
       - name: "Russia"
-        note: "Русскоязычный рынок, изредка встречаются интересные позиции."
+        note: "A Russian-speaking market; interesting positions turn up occasionally."
 
   exporter_avoid:
     description: >
-      Нетто-экспортёры разработки: страна сама поставляет инженеров наружу.
-      Локальные вакансии конкурируют по цене вниз. Исключены из поиска
-      осознанно — не по качеству специалистов, а по направлению потока работы
-      и, как следствие, по ставкам и условиям.
+      Net exporters of development work: the country supplies engineers
+      outward. Local vacancies compete downwards on price. Excluded from the
+      search deliberately — not on the quality of the specialists but on the
+      direction the work flows and, in consequence, on rates and terms.
     countries:
       - name: "India"
       - name: "Pakistan"
@@ -114,10 +115,10 @@ tiers:
 
   excluded_practical:
     description: >
-      Исключены по практическим причинам, не по рынку: невозможность или
-      сложность получить оплату.
+      Excluded for practical rather than market reasons: getting paid is
+      impossible or difficult.
     countries:
       - name: "Ukraine"
         note: >
-          Трансграничные платежи белорусским и российским контракторам
-          затруднены, ставки в последние годы низкие.
+          Cross-border payments to contractors there are difficult, and rates
+          have been low in recent years.
