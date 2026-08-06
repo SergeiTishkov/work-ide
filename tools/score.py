@@ -784,13 +784,12 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
             points = 4  # known to be remote, unclear about hiring abroad
             location_unknown = True
         else:
-            # Подтверждено человеком явно (2026-07-30): "мне нужны ТОЛЬКО
-            # РЕМОУТ позиции" - ни одного сигнала о remote вообще (ни от
-            # источника, ни в тексте) - dealbreaker, а не "неизвестно, но
-            # пусть будет". Реальный найденный случай: вакансия Rangeview
-            # (явно ONSITE, город "El Segundo, CA") не содержала слова
-            # "remote" вообще нигде и получила needs_manual_review вместо
-            # отказа.
+            # Confirmed explicitly 2026-07-30: only remote positions are
+            # wanted. No remote signal at all — neither from the source nor
+            # in the text — is a dealbreaker rather than "unknown, let it
+            # through". Found in practice: a Rangeview vacancy, plainly
+            # onsite in El Segundo, CA, contained the word "remote" nowhere
+            # and was flagged for manual review instead of rejected.
             dealbreakers.append("location: not confirmed as a remote position (no remote signal found anywhere)")
 
     places_ambiguous, place_detail = _score_ambiguous_places(text, criteria)
@@ -798,12 +797,11 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         breakdown["ambiguous_place_hits"] = place_detail
 
     breakdown["points"] = points
-    # needs_review как таковой (неоднозначный топоним всегда важно проверить
-    # руками; общая неопределённость локации возвращается отдельно и
-    # фильтруется на уровне score_vacancy() по итоговой классификации — иначе
-    # на реальных данных флаг срабатывает почти на всём (большинство вакансий
-    # просто не пишут явно "worldwide" или "US only") и раздел отчёта
-    # становится бесполезным.
+    # An ambiguous place name is always worth a human glance. General location
+    # uncertainty is returned separately and filtered in score_vacancy() by
+    # final classification: on real data that flag fires on almost everything
+    # — most vacancies simply never write "worldwide" or "US only" — and the
+    # review section of the report would become useless.
     needs_review = places_ambiguous or tz_needs_review
     return points, breakdown, dealbreakers, needs_review, location_unknown
 
@@ -812,9 +810,9 @@ def _score_stack_fit(text: str, criteria: dict, profile: dict):
     cfg = criteria["stack_fit"]
     text, noise_markers = _strip_stack_noise_sections(text, criteria)
     core_hits = _matches(text, profile["tech_stack"].get("core", []))
-    # Технологии, чьё название невозможно записать безопасной подстрокой —
-    # см. _matches_patterns. Без этого ".NET Developer" в заголовке давал
-    # ровно ноль баллов за стек.
+    # Technologies whose name cannot be written as a safe substring — see
+    # _matches_patterns. Without this, ".NET Developer" in a title scored
+    # exactly zero for stack fit.
     core_hits += _matches_patterns(
         text, _pattern_specs_for(profile["tech_stack"].get("core", [])), core_hits)
     strong_hits = _matches(text, profile["tech_stack"]["strong"])
@@ -825,13 +823,12 @@ def _score_stack_fit(text: str, criteria: dict, profile: dict):
         + len(familiar_hits) * cfg["points_per_familiar_keyword"]
     )
     points = min(raw, cfg["cap"])
-    # Глубина совпадения важнее широты перечня. Замер 2026-08-05: вакансия на
-    # чистом C#/ASP.NET набирала 7 баллов за стек, а объявление кадрового
-    # агентства, перечислившее TypeScript, JavaScript, React, HTML и CSS, —
-    # 14. Формула "балл за каждое совпадение" систематически поднимает наверх
-    # тех, кто перечисляет технологии списком, над теми, у кого стек ровно
-    # тот, который нужен. Поэтому без единого core-совпадения стек не может
-    # набрать больше, чем даёт настоящее попадание в ядро.
+    # Depth of match beats breadth of list. Measured 2026-08-05: a posting in
+    # pure C#/ASP.NET earned 7 stack points, while an agency advert listing
+    # TypeScript, JavaScript, React, HTML and CSS earned 14. A point per match
+    # systematically lifts those who enumerate technologies above those whose
+    # stack is exactly the one wanted. So without a single core match, stack
+    # fit cannot exceed what one real core match is worth.
     cap_no_core = cfg.get("cap_when_no_core")
     if cap_no_core is not None and not core_hits:
         points = min(points, cap_no_core)
@@ -847,20 +844,20 @@ def _score_stack_fit(text: str, criteria: dict, profile: dict):
 
 
 def _score_role_complexity(text: str, title: str, criteria: dict):
-    """Гейт "это не простая работа", отдельный от legacy_enterprise_signal
-    (подтверждено человеком явно 2026-07-30 на примерах "Principal Machine
-    Learning Scientist" и "Staff Software Engineer, Agentic Platform" —
-    легаси/enterprise-слова в описании компании не значат, что сама РОЛЬ
-    простая)."""
+    """The "this is not simple work" gate, deliberately separate from the
+    legacy/enterprise signal.
+
+    Confirmed 2026-07-30 on "Principal Machine Learning Scientist" and
+    "Staff Software Engineer, Agentic Platform": legacy and enterprise words
+    in a company description say nothing about whether the ROLE is simple."""
     cfg = criteria["role_complexity_signal"]
     title_norm = common.normalize_for_matching(title)
     title_hits = [p for p in cfg["title_red_flag_patterns"] if re.search(p, title_norm, re.IGNORECASE)]
     description_hits = _matches(text, cfg["description_red_flag_keywords"])
-    # Реальный найденный случай (2026-07-30, через ручной чек-лист): "Staff
-    # Software Engineer (AI CICD)" @ Chainguard упоминал "agentic AI
-    # foundation" один раз - недостаточно для порога threshold_hits=2 у
-    # расплывчатых слов, но "agentic"/"llm systems"/"genai" сами по себе
-    # однозначны - одного упоминания достаточно.
+    # Found 2026-07-30 by the manual checklist: "Staff Software Engineer (AI
+    # CICD)" @ Chainguard mentioned "agentic AI foundation" once — below the
+    # threshold of two for vague words, but "agentic", "llm systems" and
+    # "genai" are unambiguous on their own, so one mention is enough.
     strong_hits = _matches(text, cfg.get("description_red_flag_keywords_strong_single_hit", []))
     gate_triggered = bool(title_hits) or bool(strong_hits) or len(description_hits) >= cfg["threshold_hits"]
     return gate_triggered, {
@@ -872,19 +869,20 @@ def _score_role_complexity(text: str, title: str, criteria: dict):
 
 
 def _check_stack_relevance(text: str, core_hits: list, strong_hits: list, criteria: dict):
-    """Гейт релевантности стека — ПОЛНЫЙ ОТСЕВ (dealbreaker), а не просто
-    низкий score, если не пройден (подтверждено человеком явно, 2026-07-30:
-    "не дотнет/js + нет указания что компания tech agnostic" -> 0% шанс).
+    """The stack relevance gate — a full rejection, not merely a low score.
 
-    core/strong совпадение достаточно само по себе. Java/Scala САМИ ПО СЕБЕ
-    не считаются (владелец на Java web-роль не годится), но Java/Scala +
-    контекст дата-пайплайнов (Spark/Databricks/ETL) — приемлемый вариант,
-    подтверждено человеком явно (реальный опыт, предыдущего места работы).
-    Explicit "tech agnostic" заявление компании снимает это требование
-    целиком."""
+    Confirmed explicitly 2026-07-30: a role outside the profile's stack,
+    with no sign that the company is tech agnostic, is a zero-percent chance.
+
+    A core or strong match suffices on its own. Java and Scala BY THEMSELVES
+    do not count — this profile is not a fit for a Java web role — but
+    Java or Scala PLUS a data-pipeline context (Spark, Databricks, ETL) is an
+    acceptable variant, confirmed explicitly against real experience from a
+    previous job. An explicit tech agnostic statement from the company lifts
+    the requirement entirely."""
     cfg = criteria["stack_fit"]
-    # Тот же срез "стекового спама", что и в _score_stack_fit: иначе гейт
-    # релевантности проходил бы по перечню технологий из рекламного блока.
+    # The same stack-spam cut as in _score_stack_fit: otherwise the relevance
+    # gate would pass on the technology list from an advertising block.
     text, _ = _strip_stack_noise_sections(text, criteria)
     tech_agnostic_hits = _matches(
         text, criteria["role_relevance_signal"]["tech_agnostic_override_keywords"]
@@ -893,9 +891,9 @@ def _check_stack_relevance(text: str, core_hits: list, strong_hits: list, criter
     data_pipeline_context_hits = _matches(text, cfg["data_pipeline_context_keywords"])
     data_pipeline_relevant = bool(data_pipeline_language_hits) and bool(data_pipeline_context_hits)
 
-    # Нужен настоящий язык/фреймворк, а не только инфраструктурное слово
-    # (Docker/Azure/HTML/CSS есть почти в любой вакансии — по ним нельзя
-    # судить, что роль подходит .NET/JS-разработчику).
+    # A real language or framework is required, not just an infrastructure
+    # word. Docker, Azure, HTML and CSS appear in almost every posting and
+    # say nothing about whether the role suits this profile.
     primary_language_hits = _matches(text, cfg.get("primary_language_keywords", []))
     primary_language_hits += _matches_patterns(
         text, _pattern_specs_for(cfg.get("primary_language_keywords", [])),
@@ -910,18 +908,20 @@ def _check_stack_relevance(text: str, core_hits: list, strong_hits: list, criter
 
 
 def _check_title_stack(title: str, criteria: dict, profile: dict):
-    """Заголовок называет технологию, которой у человека нет — полный отсев.
+    """The title names a technology the person does not have — full rejection.
 
-    Реальная протечка 2026-08-04, замеченная человеком в готовой выдаче:
-    "Senior Ruby on Rails Developer", "Senior Fullstack Developer (Python)",
-    "Senior Vue Developer". Гейт релевантности искал знакомый язык по ВСЕМУ
-    тексту, а в Rails-вакансии среди смежных навыков перечислены HTML, CSS и
-    JavaScript. Совпадение формально есть, роль — совсем про другое.
+    A leak the owner spotted in a finished shortlist on 2026-08-04: "Senior
+    Ruby on Rails Developer", "Senior Fullstack Developer (Python)", "Senior
+    Vue Developer". The relevance gate searched the WHOLE text for a familiar
+    language, and a Rails posting lists HTML, CSS and JavaScript among
+    adjacent skills. The match is technically there; the role is about
+    something else entirely.
 
-    Роль определяет заголовок. Поэтому: если он называет хотя бы одну
-    роль-образующую технологию и НИ ОДНА из названных не входит в core/strong
-    — вакансия отсекается. Familiar-уровень намеренно не считается: это
-    «трогал пару раз за карьеру», на такую роль человека не возьмут.
+    The title defines the role. So: if it names at least one role-defining
+    technology and NONE of those named is in core or strong, the vacancy is
+    rejected. The familiar tier deliberately does not count — that means
+    "touched it twice in a career", and nobody is hired for such a role on
+    that basis.
     """
     cfg = criteria.get("title_stack_gate")
     if not cfg:
@@ -936,10 +936,10 @@ def _check_title_stack(title: str, criteria: dict, profile: dict):
     stack = profile.get("tech_stack") or {}
     known = {common.normalize_for_matching(k)
              for k in (stack.get("core") or []) + (stack.get("strong") or [])}
-    # Сравнение ТОЧНОЕ, а не по вхождению подстроки. Реальный баг 2026-08-05:
-    # "java" считалась знакомой, потому что является подстрокой "javascript"
-    # из strong-уровня, и "Java Engineer" снова проходил гейт. Тот же класс
-    # ошибки, что ".NET" внутри "VB.NET" и "LESS" внутри "no less than".
+    # An EXACT comparison, not a substring test. Bug found 2026-08-05: "java"
+    # counted as known because it is a substring of "javascript" in the strong
+    # tier, and "Java Engineer" cleared the gate again. The same class of
+    # error as ".NET" inside "VB.NET" and "LESS" inside "no less than".
     mine = [tech for tech in named if common.normalize_for_matching(tech) in known]
 
     return (not mine), {
@@ -949,37 +949,40 @@ def _check_title_stack(title: str, criteria: dict, profile: dict):
 
 
 def _score_role_relevance(text: str, title: str, criteria: dict):
-    """Гейт "это вообще роль разработчика ПО" — ПОЛНЫЙ ОТСЕВ (dealbreaker).
-    Подтверждено человеком явно (2026-07-30) на реальных находках: "CFO
-    Controller", "Product Manager, Mapping and Weather Visualization" — не
-    роли разработчика, независимо от legacy/enterprise-слов в описании
-    компании. Срабатывает по заголовку вакансии; developer_role_override_
-    patterns (например, "Engineer"/"Developer" в заголовке) снимает гейт,
-    как и явное "tech agnostic" заявление где угодно в тексте."""
+    """The "is this a software developer role at all" gate — a full rejection.
+
+    Confirmed 2026-07-30 on real finds: "CFO Controller" and "Product
+    Manager, Mapping and Weather Visualization" are not developer roles,
+    whatever legacy or enterprise words appear in the company description.
+
+    It fires on the title. A developer-role override pattern in the title
+    ("Engineer", "Developer") lifts the gate, as does an explicit tech
+    agnostic statement anywhere in the text."""
     cfg = criteria["role_relevance_signal"]
     title_norm = common.normalize_for_matching(title)
 
-    # Если заголовок неинформативен, смотрим ещё и первую строку описания.
+    # When the title is uninformative, the first line of the description is
+    # examined as well.
     #
-    # Реальная находка 2026-08-04: запись с Hacker News приехала с заголовком
-    # "YC 19" и компанией "Ashby" — парсер треда разобрал строку
-    # "Ashby | YC 19 | REMOTE | Hiring Engineering Leaders | $200k-$275k"
-    # по разделителям и взял не тот кусок. Гейт профессии смотрит ЗАГОЛОВОК,
-    # а в заголовке "YC 19" нет ни одной профессии — вакансия менеджерская
-    # (Engineering Leaders), но прошла как обычная и заняла место в выдаче.
+    # Found 2026-08-04: a Hacker News record arrived with the title "YC 19"
+    # and company "Ashby" — the thread parser split "Ashby | YC 19 | REMOTE |
+    # Hiring Engineering Leaders | $200k-$275k" on separators and took the
+    # wrong piece. The profession gate reads the TITLE, and "YC 19" contains
+    # no profession at all, so a management role sailed through as an
+    # ordinary one and took a place in the shortlist.
     #
-    # Расширяем область поиска ТОЛЬКО когда в заголовке нет ни одного слова,
-    # означающего роль разработчика: у нормальной вакансии заголовок
-    # информативен, и первая строка описания (обычно рассказ о компании) в
-    # проверку не попадает — иначе слово "manager" из корпоративного блёрба
-    # начало бы выбрасывать нормальные вакансии.
+    # The search widens ONLY when the title holds no developer-role word.
+    # A normal vacancy has an informative title, and its first description
+    # line — usually a paragraph about the company — stays out of the check;
+    # otherwise the word "manager" in a corporate blurb would start throwing
+    # good vacancies away.
     developer_override_hits = [
         p for p in cfg["developer_role_override_patterns"] if re.search(p, title_norm, re.IGNORECASE)
     ]
     search_area = title_norm
     uninformative_title = not developer_override_hits
     if uninformative_title:
-        # _vacancy_text уже схлопнул переносы, поэтому берём просто начало.
+        # _vacancy_text has already collapsed line breaks, so take the head.
         search_area = f"{title_norm} {(text or '')[:300]}"
 
     wrong_profession_hits = [
@@ -1004,46 +1007,50 @@ def _score_role_relevance(text: str, title: str, criteria: dict):
 
 
 def _score_language_fit(text: str, criteria: dict):
-    """Гейт знания языков — ПОЛНЫЙ ОТСЕВ (dealbreaker). Подтверждено
-    человеком явно (2026-07-30): владелец говорит только на русском и
-    английском (см. profile.yaml → owner.languages). Реальная находка:
-    "Web-Administration / Webmaster TYPO3" требовал "sehr gute
-    Deutschkenntnisse". Дополнительно: многие вакансии с немецких бордов
-    целиком написаны по-немецки без явной англоязычной фразы про язык —
-    эвристика по частым немецким словам/разметке "m/w/d" ловит и такие."""
+    """The language gate — a full rejection.
+
+    Which languages disqualify a vacancy is derived from the languages the
+    person speaks (owner.languages in the profile), never copied from another
+    identity. A real find: "Web-Administration / Webmaster TYPO3" required
+    "sehr gute Deutschkenntnisse".
+
+    Many postings from German boards are written entirely in German without
+    any English sentence about language, so a heuristic over frequent German
+    words and the "(m/w/d)" marker catches those too."""
     cfg = criteria["language_requirement_signal"]
     explicit_hits = _matches(text, cfg["explicit_requirement_keywords"])
     german_market_hits = _matches(text, cfg["german_market_indicator_keywords"])
-    # Гендерная разметка "(m/w/d)"/"(f/m/d)" однозначна сама по себе: она
-    # существует только в немецкоязычных объявлениях (требование AGG). Порог
-    # в 3 совпадения для неё избыточен — реальные вакансии Hygraph и
-    # Boardwise (2026-07-31) содержали ровно один такой маркер и проходили.
+    # The gender marker "(m/w/d)" / "(f/m/d)" is unambiguous on its own: it
+    # exists only in German-language postings, where anti-discrimination law
+    # requires it. A threshold of three matches is excessive for it — the
+    # Hygraph and Boardwise vacancies of 2026-07-31 carried exactly one such
+    # marker each and passed.
     german_strong_hits = _matches(text, cfg.get("german_market_strong_single_markers", []))
     german_market_flagged = (
         len(german_market_hits) >= cfg["german_market_indicator_threshold"]
         or bool(german_strong_hits)
     )
 
-    # Тот же приём, что и для немецкого, но для любого языка. Реальные
-    # находки 2026-07-31 (ручной чек-лист): объявление Work and Study Travel
-    # целиком на испанском, Base.com — целиком на польском; обе прошли, потому
-    # что эвристика существовала ровно для одного языка. Немецкий блок выше
-    # оставлен отдельно: на нём откалиброваны тесты и порог.
+    # The same technique as for German, generalised to any language. Found
+    # 2026-07-31 by the manual checklist: a Work and Study Travel posting
+    # entirely in Spanish and a Base.com posting entirely in Polish, both of
+    # which passed because the heuristic existed for exactly one language.
+    # The German block above stays separate: its threshold and tests are
+    # calibrated on it.
     foreign_language_hits = {}
     for entry in cfg.get("foreign_language_posting_indicators", []):
         hits = _matches(text, entry.get("markers", []))
         if len(hits) >= entry.get("threshold", 3):
             foreign_language_hits[entry["language"]] = hits
 
-    # Письменность надёжнее списка слов. Объявление на иврите, арабском,
-    # китайском или греческом нечитаемо для того, кто знает только латиницу и
-    # кириллицу, — и выяснять это перечислением частых слов бессмысленно:
-    # алфавит виден сразу и целиком.
+    # Script is a more reliable signal than a word list. A posting in Hebrew,
+    # Arabic, Chinese or Greek is unreadable to someone who knows only Latin
+    # and Cyrillic, and establishing that by enumerating frequent words is
+    # pointless: the alphabet is visible at once and in full.
     #
-    # Реальная находка 2026-08-05 (чтение выдачи глазами): вакансия
-    # "מפתח/ת C#/.NET — מערכות תוכנה-חומרה" стояла в выдаче на 13-м месте.
-    # Списки слов существовали для пяти европейских языков, и ни один из них
-    # не мог поймать другую письменность в принципе.
+    # Found 2026-08-05 by reading the shortlist with human eyes: a Hebrew
+    # vacancy sat thirteenth. Word lists existed for five European languages,
+    # and none of them could catch a different script even in principle.
     script_detail = _check_unreadable_script(text, cfg)
 
     gate_triggered = (bool(explicit_hits) or german_market_flagged
@@ -1058,9 +1065,9 @@ def _score_language_fit(text: str, criteria: dict):
     }
 
 
-# Диапазоны кодов письменностей, которые встречаются в объявлениях о работе.
-# Латиница и кириллица сюда не входят: их читает владелец любой идентичности,
-# где английский или русский указан в языках.
+# Code ranges for scripts that actually turn up in job ads. Latin and
+# Cyrillic are absent by design: they are readable to the owner of any
+# identity that lists English or Russian among its languages.
 _SCRIPT_RANGES = (
     ("hebrew", 0x0590, 0x05FF),
     ("arabic", 0x0600, 0x06FF),
@@ -1074,11 +1081,11 @@ _SCRIPT_RANGES = (
 
 
 def _check_unreadable_script(text: str, cfg: dict):
-    """Доля текста в письменности, которой человек не читает.
+    """How much of the text is in a script the person cannot read.
 
-    Порог долевой, а не абсолютный: одно-два слова на иврите может содержать
-    и англоязычная вакансия израильской компании (название, адрес). Целиком
-    написанное объявление даёт долю в десятки процентов.
+    The threshold is a share rather than a count: an English posting from an
+    Israeli company may well contain a word or two of Hebrew — its own name,
+    an address. A posting written entirely in it runs to tens of percent.
     """
     readable = set(cfg.get("readable_scripts") or ["latin", "cyrillic"])
     threshold = cfg.get("unreadable_script_threshold", 0.15)
@@ -1107,21 +1114,21 @@ def _check_unreadable_script(text: str, cfg: dict):
 
 
 def _check_industry_dealbreaker(text: str, criteria: dict):
-    """Отрасль, в которую человек не идёт принципиально — полный отсев.
+    """An industry the person will not work in on principle — full rejection.
 
-    Порог обязателен: вакансия обычной компании может упомянуть крипто среди
-    клиентов или интеграций, и одного слова недостаточно. Два и больше —
-    это уже про саму компанию.
+    The threshold is not optional: an ordinary company's posting may mention
+    crypto among its clients or integrations, and one word is not enough.
+    Two or more is about the company itself.
     """
     cfg = criteria.get("industry_dealbreaker_gate")
     if not cfg:
         return False, {}
-    # Тот же срез "стекового спама", что и в оценке стека. Реальный случай
-    # 2026-08-04: гейт отсёк все вакансии Lemon.io, потому что их рекламный
-    # абзац "NOT YOUR TECH STACK?" перечисляет и Blockchain, и Ethereum, и
-    # Solana. Компания к крипте отношения не имеет — это перечень стеков,
-    # под которые они подбирают проекты. Ложный отказ прячет живые вакансии,
-    # что хуже, чем лишняя вакансия в выдаче.
+    # The same stack-spam cut as in stack scoring. Found 2026-08-04: this gate
+    # rejected every Lemon.io vacancy because their "NOT YOUR TECH STACK?"
+    # advertising paragraph lists Blockchain, Ethereum and Solana. The company
+    # has nothing to do with crypto — that is a list of stacks they match
+    # projects against. A false rejection hides live vacancies, which is worse
+    # than one extra vacancy in the shortlist.
     text, _ = _strip_stack_noise_sections(text, criteria)
     hits = _matches(text, cfg.get("keywords", []))
     threshold = cfg.get("threshold_hits", 2)
@@ -1133,17 +1140,17 @@ def _check_industry_dealbreaker(text: str, criteria: dict):
 
 
 def _check_mobile_role(text: str, title: str, criteria: dict):
-    """Мобильная разработка за нейтральным заголовком — полный отсев.
+    """Mobile development behind a neutral title — full rejection.
 
-    Тот же класс, что и `_check_infrastructure_role`: заголовок говорит
-    "Lead Full-stack Developer", а продукт — приложение на React Native и
-    Expo, и вся работа состоит в нём. Гейт заголовка такое не видит.
+    The same class as `_check_infrastructure_role`: the title says "Lead
+    Full-stack Developer" while the product is a React Native app and all the
+    work happens inside it. A title gate cannot see that.
 
-    Порог обязателен: обычная веб-вакансия может упомянуть мобильное
-    приложение среди прочих продуктов компании. Срез рекламных блоков —
-    тоже: перечни стеков кадровых агентств содержат и React Native, и
-    Flutter, из-за чего без него под гейт попадали "Senior Vue Developer" и
-    "Senior Graphic Designer" от Lemon.io.
+    The threshold is not optional: an ordinary web posting may mention a
+    mobile app among the company's other products. Nor is the advertising
+    cut: agency stack lists contain React Native and Flutter, and without it
+    "Senior Vue Developer" and "Senior Graphic Designer" from Lemon.io fell
+    under this gate.
     """
     cfg = criteria.get("mobile_role_gate")
     if not cfg:
@@ -1161,24 +1168,24 @@ def _check_mobile_role(text: str, title: str, criteria: dict):
 
 
 def _check_ai_training_crowdwork(text: str, criteria: dict):
-    """Краудворк по обучению ИИ, замаскированный под инженерную вакансию.
+    """AI-training crowdwork wearing an engineering title.
 
-    Отдельный жанр, появившийся на бордах в 2024–2026 годах: площадка
-    набирает разработчиков не строить софт, а порождать обучающие данные —
-    писать эталонные решения, размечать, оценивать ответы модели, собирать
-    RL-окружения. Формально это «Senior Software Engineer», по сути —
-    сдельная подработка без проекта, команды и продукта.
+    A distinct genre that appeared on job boards between 2024 and 2026: a
+    platform hires developers not to build software but to produce training
+    data — write reference solutions, annotate, rate model answers, assemble
+    RL environments. Formally it is a "Senior Software Engineer"; in
+    substance it is piecework with no project, no team and no product.
 
-    Такие объявления систематически побеждают в скоринге, и не случайно:
-    они перечисляют все языки сразу («JavaScript, Python, Go, C++, Ruby»),
-    честно пишут «no set schedules» (читается как низкая нагрузка) и почти
-    всегда указывают почасовую ставку. Замер 2026-08-05: четыре из девяти
-    верхних позиций выдачи, включая первую.
+    Such postings win at scoring systematically, and not by accident: they
+    list every language at once ("JavaScript, Python, Go, C++, Ruby"), write
+    "no set schedules" quite honestly (which reads as low intensity), and
+    almost always quote an hourly rate. Measured 2026-08-05: four of the top
+    nine positions in the shortlist, including the first.
 
-    Гейт, а не штраф: работа со сдельной оплатой за задачу — не то, что
-    ищет человек с постоянным местом, и никакая сумма баллов этого не
-    компенсирует. Маркеры намеренно длинные: короткие («ai», «training»)
-    поймали бы половину рынка.
+    A gate rather than a penalty: paid-per-task work is not what someone
+    looking for a permanent position wants, and no number of points
+    compensates for that. The markers are deliberately long — short ones
+    ("ai", "training") would catch half the market.
     """
     cfg = criteria.get("ai_training_crowdwork_gate")
     if not cfg:
@@ -1241,7 +1248,7 @@ def _extract_amounts(text: str):
         elif suffix and ("hour" in suffix or "hr" in suffix):
             results.append((None, value, None))
         elif value < 500:
-            # маленькое число без суффикса - скорее всего почасовая ставка
+            # a small number with no suffix is most likely an hourly rate
             results.append((None, value, None))
         else:
             results.append((value, None, None))
@@ -1249,7 +1256,7 @@ def _extract_amounts(text: str):
 
 
 def _score_external_salary_estimate(vacancy: dict, criteria: dict, profile: dict):
-    """Оценка вручную найденной (Glassdoor и т.п.) вилки, когда сама
+    """Scoring a manually found salary range (Glassdoor and similar) when the
     вакансия зарплату не указывает. Подтверждено человеком явно
     (2026-07-30): "если ЗП не указана, но из сторонних источников понятен
     примерный рендж — маленький плюс". Заполняется через
@@ -1285,11 +1292,11 @@ def _score_external_salary_estimate(vacancy: dict, criteria: dict, profile: dict
 def _score_compensation(text: str, vacancy: dict, criteria: dict, profile: dict):
     cfg = criteria["compensation_signal"]
     target = profile["goal"]["target_compensation"]
-    # ВАЖНО: "явно указана" определяется по РАСПОЗНАННЫМ суммам, а не по
-    # факту наличия знака доллара в тексте. Иначе "$11M выплачено инженерам"
-    # считалось бы указанной зарплатой, хотя _extract_amounts эту сумму
-    # (справедливо) отбрасывает — и вакансия получала бы полный балл за
-    # "прозрачную компенсацию" при пустом списке сумм.
+    # IMPORTANT: "explicitly stated" is decided by the amounts that were
+    # PARSED, not by the presence of a dollar sign. Otherwise "$11M paid out
+    # to engineers" would count as a stated salary even though _extract_amounts
+    # rightly discards it — and the vacancy would collect full marks for
+    # "transparent compensation" with an empty list of amounts.
     amounts = _extract_amounts(text)
     has_explicit = bool(vacancy.get("salary_raw")) or bool(amounts)
     if not has_explicit:
@@ -1303,13 +1310,14 @@ def _score_compensation(text: str, vacancy: dict, criteria: dict, profile: dict)
     hourlies = [h for a, h, mo in amounts if h is not None]
     monthlies = [mo for a, h, mo in amounts if mo is not None]
 
-    # Незаполненный диапазон просто не участвует в сравнении.
+    # An unfilled range simply sits out the comparison.
     #
-    # Раньше здесь стояло target["annual_parttime_usd"] без оговорок, и профиль
-    # с зарплатой в другой форме ронял ВЕСЬ прогон KeyError-ом посреди скоринга.
-    # Найдено эмуляцией онбординга 2026-08-05: агент, записывающий ответ «5-8
-    # тысяч в месяц», естественно пишет monthly_min/monthly_target. Форма
-    # описана в шаблоне профиля; отсутствие ключа — не повод падать.
+    # This used to read target["annual_parttime_usd"] unguarded, and a profile
+    # describing pay in another shape killed the WHOLE run with a KeyError
+    # mid-scoring. Found by emulating onboarding on 2026-08-05: an agent
+    # writing down "five to eight thousand a month" naturally writes
+    # monthly_min/monthly_target. The expected shape is documented in the
+    # profile template; a missing key is no reason to fall over.
     def _range(name):
         value = target.get(name)
         if isinstance(value, (list, tuple)) and len(value) == 2:
@@ -1359,7 +1367,7 @@ _RED_FLAG_CATALOGUE_CACHE = {}
 
 
 def red_flag_catalogue() -> dict:
-    """Общий каталог красных флагов (config/derivation/company_red_flags.yaml)."""
+    """The shared red-flag catalogue (config/derivation/company_red_flags.yaml)."""
     if "data" not in _RED_FLAG_CATALOGUE_CACHE:
         path = common.ROOT / "config" / "derivation" / "company_red_flags.yaml"
         _RED_FLAG_CATALOGUE_CACHE["data"] = common.load_yaml(path) if path.exists() else {}
@@ -1367,7 +1375,7 @@ def red_flag_catalogue() -> dict:
 
 
 def classify_red_flag(flag: str):
-    """Категория свободнотекстового флага, либо None."""
+    """The category of a free-text flag, or None."""
     text = common.normalize_for_matching(flag)
     for name, spec in (red_flag_catalogue().get("categories") or {}).items():
         if any(common.normalize_for_matching(p) in text for p in spec.get("phrases") or []):
@@ -1376,24 +1384,24 @@ def classify_red_flag(flag: str):
 
 
 def _score_red_flags(flags: list, profile: dict):
-    """Сумма весов красных флагов с учётом переопределений.
+    """Total weight of a company's red flags, with overrides applied.
 
-    Порядок приоритета — от общего к частному, побеждает частное:
-      1. вес по умолчанию из общего каталога;
-      2. `company_red_flag_severity` из профиля идентичности;
-      3. то же поле, но со значением `local` — тогда веса приходят из Малой
-         Конституции и в общий репозиторий не попадают.
+    Priority runs from general to specific, and the specific wins:
+      1. the default weight from the shared catalogue;
+      2. `company_red_flag_severity` from the identity profile;
+      3. the same field in the local layer, which lives outside git.
 
-    Переопределение работает В ЛЮБУЮ СТОРОНУ. Положительное значение —
-    законный случай, а не ошибка: «непредсказуемая загрузка» бывает ровно
-    тем, что человек ищет. Клампа на неположительные значения здесь
-    сознательно нет.
+    An override works IN EITHER DIRECTION. A positive value is a legitimate
+    case rather than a typo: "unpredictable work availability" reads as a
+    threat to someone living on the income and as a promise to someone who
+    wants to be left alone. There is deliberately no clamp to non-positive
+    values here.
     """
     catalogue = red_flag_catalogue()
     categories = catalogue.get("categories") or {}
     overrides = (profile or {}).get("company_red_flag_severity")
-    # Незаполненный сентинел `local` доезжает сюда строкой — это не словарь
-    # весов, а признак того, что Малая Конституция ничего не сказала.
+    # An unfilled local sentinel arrives here as a string. That is not a
+    # dictionary of weights but a sign that the local layer said nothing.
     if not isinstance(overrides, dict):
         overrides = {}
 
@@ -1417,22 +1425,22 @@ def _score_red_flags(flags: list, profile: dict):
 
 
 def _score_company_reputation(vacancy: dict, criteria: dict, profile: dict = None):
-    """Репутация работодателя по внешним источникам (Glassdoor и т.п.),
-    собранная агентом вручную и хранящаяся на уровне компании.
+    """Employer reputation from external sources (Glassdoor and similar),
+    gathered by the agent by hand and stored at company level.
 
-    Возвращает (points, breakdown, needs_review). Для этого проекта
-    work-life balance весит больше общего рейтинга: компания может иметь
-    хороший общий балл за счёт зарплат и карьеры, но выжимать людей — а
-    нужно ровно обратное."""
+    Returns (points, breakdown, needs_review). Work-life balance weighs more
+    than the overall rating here: a company can score well overall on the
+    strength of pay and career growth while grinding people down, and this
+    search wants exactly the opposite."""
     cfg = criteria.get("company_reputation_signal")
     rep = vacancy.get("_company_reputation")
     if not cfg or not rep:
         return (cfg or {}).get("no_data_points", 0), {"has_data": False}, False
 
-    # «Проверяли — не нашли» баллов не даёт и не отнимает: отсутствие отзывов
-    # о небольшой компании ничего не говорит о том, как в ней работается.
-    # Но в отчёт это состояние обязано попасть отдельной строкой, иначе оно
-    # снова сольётся с «не проверяли» — а это разные вещи (reputation.py).
+    # "Checked and found nothing" neither adds nor removes points: the absence
+    # of reviews about a small company says nothing about what working there
+    # is like. But it must reach the report as its own state, or it merges
+    # back into "not checked" — and those differ (see reputation.py).
     if rep.get("verdict") == "insufficient_sources":
         return (cfg.get("no_data_points", 0), {
             "has_data": False,
