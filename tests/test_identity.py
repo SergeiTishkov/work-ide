@@ -1,10 +1,10 @@
 """
-Тесты системы поисковых идентичностей.
+Tests for the search-identity system.
 
-Эти тесты защищают главное свойство мультипользовательской архитектуры: агент,
-работающий по идентичности A, не может случайно задеть идентичность B. Отказ
-здесь тихий и дорогой (испорченная выдача, которую никто не заметит), поэтому
-проверок много и они дотошные.
+These tests protect the central property of the multi-user architecture: an
+agent working under identity A cannot accidentally touch identity B. Failure
+here is quiet and expensive — a spoiled shortlist nobody notices — so the
+checks are many and pedantic.
 """
 import os
 
@@ -14,32 +14,33 @@ import common
 import identity
 
 
-# --- Формат префикса -------------------------------------------------------
+# --- Prefix format ---------------------------------------------------------
 
 @pytest.mark.parametrize("prefix", ["kisel", "ftf", "abc", "a1b2c3", "jvst"])
 def test_valid_prefixes_accepted(prefix):
-    assert identity.PREFIX_RE.match(prefix), f"{prefix} должен считаться валидным"
+    assert identity.PREFIX_RE.match(prefix), f"{prefix} should be accepted"
 
 
 @pytest.mark.parametrize("prefix", [
-    "ab",           # слишком короткий
-    "abcdefg",      # слишком длинный
-    "KISEL",         # заглавные: на Windows ФС регистронезависима, путаница гарантирована
-    "1abc",         # начинается с цифры
-    "ka-lm",        # дефис
-    "ka lm",        # пробел
-    "ка",           # кириллица: префикс обязан быть латиницей
+    "ab",           # too short
+    "abcdefg",      # too long
+    "KISEL",        # uppercase: the Windows FS is case-insensitive, so confusion
+                    # is guaranteed
+    "1abc",         # starts with a digit
+    "ka-lm",        # hyphen
+    "ka lm",        # space
+    "ка",           # Cyrillic: a prefix must be Latin script
     "",
 ])
 def test_invalid_prefixes_rejected(prefix):
-    assert not identity.PREFIX_RE.match(prefix), f"{prefix} не должен считаться валидным"
+    assert not identity.PREFIX_RE.match(prefix), f"{prefix} should be rejected"
 
 
-# --- Реестр ---------------------------------------------------------------
+# --- Registry --------------------------------------------------------------
 
 def test_template_dir_is_not_an_identity():
-    # Папки с "_" в начале — заготовки, а не идентичности. Иначе агент попытался
-    # бы искать работу по шаблону.
+    # Folders starting with "_" are scaffolding, not identities. Otherwise the
+    # agent would try to search for work using a template.
     assert identity.TEMPLATE_DIR_NAME not in identity.list_identities(
         include_fixtures=True)
 
@@ -50,24 +51,24 @@ def test_fixture_hidden_from_normal_listing():
 
 
 def test_identity_file_path_uses_prefix():
-    """Имя ПАПКИ длинное и объясняющее, имена ФАЙЛОВ — короткие.
+    """The FOLDER name is long and explanatory; the FILE names are short.
 
-    Разделение намеренное: папку видишь редко и хочешь понять по имени, что
-    это за поиск; имена файлов встречаются в каждой команде и в выводе grep,
-    и длинное имя там только мешает.
+    The split is deliberate: a folder is seen rarely and you want its name to
+    tell you what the search was; file names appear in every command and in
+    grep output, where a long name only gets in the way.
     """
     path = identity.identity_file("kisel", "criteria.yaml")
     assert path.name == "kisel_criteria.yaml"
     assert path.parent.name == "kisel-keep-it-simple-easy-legacy"
 
 
-# --- Валидация ------------------------------------------------------------
+# --- Validation ------------------------------------------------------------
 
 def test_existing_identities_are_valid():
-    """Все идентичности в репозитории обязаны быть структурно целыми."""
+    """Every identity present must be structurally intact."""
     results = identity.validate_all()
     broken = {p: probs for p, probs in results.items() if probs}
-    assert not broken, f"есть невалидные идентичности: {broken}"
+    assert not broken, f"invalid identities present: {broken}"
 
 
 def test_validate_rejects_unknown_prefix():
@@ -83,7 +84,7 @@ def test_validate_rejects_bad_prefix_format():
 
 
 def test_validate_catches_unprefixed_file(tmp_path, monkeypatch):
-    """Файл без префикса внутри идентичности — нарушение главного правила."""
+    """An unprefixed file inside an identity breaks the central rule."""
     identities_dir = tmp_path / "identities"
     (identities_dir / "abcd").mkdir(parents=True)
     monkeypatch.setattr(common, "IDENTITIES_DIR", identities_dir)
@@ -91,15 +92,15 @@ def test_validate_catches_unprefixed_file(tmp_path, monkeypatch):
     d = identities_dir / "abcd"
     for name in identity.REQUIRED_FILES:
         (d / f"abcd_{name}").write_text("{}", encoding="utf-8")
-    (d / "notes.md").write_text("файл без префикса", encoding="utf-8")
+    (d / "notes.md").write_text("a file with no prefix", encoding="utf-8")
 
     problems = identity.validate("abcd")
     assert any("notes.md" in p and "abcd_" in p for p in problems)
 
 
 def test_validate_catches_foreign_prefix_leak(tmp_path, monkeypatch):
-    """Самая вероятная ошибка при создании идентичности — копипаста чужих файлов
-    с недоправленными путями внутри."""
+    """The likeliest mistake when creating an identity is copy-pasting somebody
+    else's files with the paths inside only half corrected."""
     identities_dir = tmp_path / "identities"
     for prefix in ("abcd", "efgh"):
         d = identities_dir / prefix
@@ -108,9 +109,9 @@ def test_validate_catches_foreign_prefix_leak(tmp_path, monkeypatch):
             (d / f"{prefix}_{name}").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(common, "IDENTITIES_DIR", identities_dir)
 
-    # В файл abcd попала ссылка на файл efgh — типичная копипаста
+    # A reference to an efgh file ended up in an abcd file — classic copy-paste
     (identities_dir / "abcd" / "abcd_identity.md").write_text(
-        "смотри также efgh_criteria.yaml", encoding="utf-8"
+        "see also efgh_criteria.yaml", encoding="utf-8"
     )
 
     problems = identity.validate("abcd")
@@ -131,7 +132,7 @@ def test_validate_catches_missing_required_file(tmp_path, monkeypatch):
     assert any("abcd_criteria.yaml" in p for p in problems)
 
 
-# --- Разрешение активной идентичности --------------------------------------
+# --- Resolving the active identity -----------------------------------------
 
 def test_cli_value_wins_over_everything(monkeypatch):
     monkeypatch.setenv("WORK_IDE_IDENTITY", "fromenv")
@@ -155,19 +156,19 @@ def test_default_identity_used(monkeypatch, tmp_path):
     assert identity.resolve_identity() == "chosen"
 
 
-# Тест «единственная запись в active.yaml выбирается молча» удалён
-# 2026-08-05: списка активных идентичностей больше не существует. Его
-# заменил реестр, которым невозможно соврать, — сами папки в
-# local-identities/. Соответствующее поведение проверяет
-# test_a_single_identity_is_chosen_without_asking ниже.
+# The test "a single entry in active.yaml is chosen silently" was removed
+# 2026-08-05: there is no list of active identities any more. It was replaced
+# by a registry that cannot lie — the folders in local-identities/ themselves.
+# The equivalent behaviour is covered by
+# test_a_single_identity_is_chosen_without_asking below.
 
 
 def test_several_identities_without_a_choice_refuses(monkeypatch, tmp_path):
-    """Молчаливый выбор 'не той' идентичности — ровно тот отказ, ради которого
-    вся система и построена. Лучше отказать и спросить.
+    """Silently choosing the wrong identity is precisely the failure this whole
+    system was built to prevent. Better to refuse and ask.
 
-    Источник истины — ПАПКИ в local-identities/, а не файл-реестр: реестр
-    умеет расходиться с диском, папки нет.
+    The source of truth is the FOLDERS in local-identities/, not a registry
+    file: a registry can drift away from the disk, folders cannot.
     """
     monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "nonexistent")
@@ -179,7 +180,7 @@ def test_several_identities_without_a_choice_refuses(monkeypatch, tmp_path):
 
 
 def test_a_single_identity_is_chosen_without_asking(monkeypatch, tmp_path):
-    """Одна папка — вопроса нет: неоднозначности не существует."""
+    """One folder, no question: there is no ambiguity to resolve."""
     monkeypatch.delenv("WORK_IDE_IDENTITY", raising=False)
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "nonexistent")
     monkeypatch.setattr(identity, "list_identities", lambda *a, **k: ["only"])
@@ -196,19 +197,20 @@ def test_no_identity_at_all_refuses_with_onboarding_hint(monkeypatch, tmp_path):
         identity.resolve_identity()
     message = str(exc.value)
     assert "ONBOARDING" in message.upper()
-    # Новичку нужно не «укажите --identity», а «вот шаблоны, вот как клонировать».
+    # A newcomer needs "here are the templates, here is how to clone one",
+    # not "pass --identity".
     assert "templates.py clone" in message
     assert "blank" in message
 
 
-# --- Активация ------------------------------------------------------------
+# --- Activation ------------------------------------------------------------
 
 def test_fixture_refused_without_explicit_flag():
-    """Реальный поиск по тестовой фикстуре должен быть невозможен."""
+    """A real search against the test fixture must be impossible."""
     with pytest.raises(identity.InvalidIdentityError) as exc:
-        common.activate_identity("ftf")  # без allow_fixture
+        common.activate_identity("ftf")  # without allow_fixture
     assert "fixture" in str(exc.value).lower()
-    # conftest активировал ftf на уровне модуля — восстанавливаем состояние
+    # conftest activated ftf at module level — restore that state
     common.activate_identity("ftf", allow_fixture=True)
 
 
@@ -220,10 +222,11 @@ def test_activation_binds_all_paths(tmp_path):
         assert common.DATA_DIR == tmp_path / "ftf"
         assert common.VACANCIES_PATH.name == "ftf_vacancies.json"
         assert common.STATE_PATH.name == "ftf_state.json"
-        # Отчёты живут отдельно от накопленных данных: общая папка reports/,
-        # архив внутри неё разложен по идентичностям. При изолированном прогоне
-        # (передан data_root) вся раскладка уезжает внутрь него — иначе тест
-        # писал бы отчёты в настоящую папку репозитория поверх живой подборки.
+        # Reports live separately from accumulated data: a shared reports/
+        # folder, with the archive inside it split per identity. On an isolated
+        # run (data_root passed) the whole layout moves inside it — otherwise
+        # the test would write reports into the real repository folder, over a
+        # live shortlist.
         assert common.REPORTS_DIR == tmp_path / "reports"
         assert common.REPORTS_ARCHIVE_DIR == tmp_path / "reports" / "archive" / "ftf"
         assert common.USER_AGENT and "WorkIdeJobResearchBot" in common.USER_AGENT
@@ -236,8 +239,8 @@ def test_identity_config_resolves_to_prefixed_file():
 
 
 def test_data_marker_detects_foreign_data_dir(tmp_path):
-    """Папку данных переименовали руками — внутри чужая база. Ошибка тихая и
-    дорогая, проверка дешёвая."""
+    """The data folder was renamed by hand and holds somebody else's database.
+    The mistake is quiet and expensive; the check is cheap."""
     common.activate_identity("ftf", allow_fixture=True, data_root=tmp_path)
     try:
         common.ensure_dirs()
@@ -251,10 +254,10 @@ def test_data_marker_detects_foreign_data_dir(tmp_path):
         common.activate_identity("ftf", allow_fixture=True)
 
 
-# --- Отказ без идентичности -------------------------------------------------
+# --- Refusal without an identity -------------------------------------------
 
 def test_data_access_refused_without_identity():
-    """Правило №0 обязано быть в коде, а не только в документации."""
+    """Rule zero has to live in the code, not only in the documentation."""
     import kb
 
     common.deactivate_identity()
@@ -281,16 +284,17 @@ def test_no_identity_error_message_is_actionable():
         common.activate_identity("ftf", allow_fixture=True)
 
 
-# --- Создание идентичности из шаблона --------------------------------------
+# --- Creating an identity from the template --------------------------------
 #
-# Раньше это была процедура из шести ручных `copy` с переименованием каждого
-# файла. Именно на ней проект обжёгся: в фикстуру ftf попал файл, ссылавшийся
-# на kisel_. Эти тесты защищают автоматизацию, которая ту ошибку исключает.
+# This used to be a six-step procedure of manual `copy` commands, each renaming
+# a file. That is exactly where the project got burned: a file referencing
+# kisel_ ended up inside the ftf fixture. These tests protect the automation
+# that makes the mistake impossible.
 
 @pytest.fixture
 def sandbox_identities(tmp_path, monkeypatch):
-    """Отдельная папка identities/ с копией шаблона — чтобы тесты создания
-    не оставляли мусор в настоящем репозитории."""
+    """A separate identities/ folder holding a copy of the template, so that
+    creation tests leave no litter in the real repository."""
     import shutil
 
     sandbox = tmp_path / "local-identities"
@@ -310,13 +314,14 @@ def test_scaffold_creates_all_required_files_with_prefix(sandbox_identities):
     names = {p.name for p in created}
     assert created[0].parent.name == "newp-new-product-search"
     for required in identity.REQUIRED_FILES:
-        assert f"newp_{required}" in names, f"нет обязательного файла {required}"
+        assert f"newp_{required}" in names, f"required file {required} is missing"
     assert all(p.name.startswith("newp_") for p in created)
 
 
 def test_scaffolded_identity_passes_validation(sandbox_identities):
     identity.scaffold_identity("newp", "New Product Search")
-    assert identity.validate("newp") == [], "заготовка обязана быть структурно корректной сразу"
+    assert identity.validate("newp") == [], \
+        "scaffolding must be structurally correct straight away"
 
 
 def test_scaffold_substitutes_template_placeholders(sandbox_identities):
@@ -324,19 +329,20 @@ def test_scaffold_substitutes_template_placeholders(sandbox_identities):
     for path in (sandbox_identities / "newp-new-product-search").iterdir():
         text = path.read_text(encoding="utf-8")
         assert f"{identity.TEMPLATE_PREFIX}_" not in text, \
-            f"в {path.name} остался префикс шаблона"
+            f"the template prefix is still in {path.name}"
         assert identity.TEMPLATE_PREFIX_PLACEHOLDER not in text, (
-            f"в {path.name} остался плейсхолдер префикса — агент пойдёт по битому пути"
+            f"the prefix placeholder is still in {path.name} — the agent would "
+            "follow a broken path"
         )
 
 
 def test_scaffold_refuses_to_overwrite_existing_identity(sandbox_identities):
     identity.scaffold_identity("newp", "New Product Search")
-    # Тот же префикс, другая расшифровка — всё равно отказ: префикс обязан
-    # быть уникальным, иначе непонятно, какая из двух папок "та самая".
+    # Same prefix, different expansion — still refused: a prefix has to be
+    # unique, or there is no telling which of two folders is "the" one.
     with pytest.raises(identity.InvalidIdentityError) as exc:
         identity.scaffold_identity("newp", "Totally Different Search")
-    assert "уже существует" in str(exc.value)
+    assert "already exists" in str(exc.value)
 
 
 @pytest.mark.parametrize("bad", ["ab", "KISEL", "1abc", "ka-lm", "blank"])
@@ -346,8 +352,8 @@ def test_scaffold_refuses_bad_prefix(sandbox_identities, bad):
 
 
 def test_scaffold_does_not_touch_the_local_constitution(sandbox_identities, tmp_path, monkeypatch):
-    # Какие идентичности активны — осознанное решение человека, живущее вне
-    # гита. Создание заготовки не должно активировать её молча.
+    # Which identities are active is a person's deliberate decision, living
+    # outside git. Creating scaffolding must not activate it silently.
     lc = tmp_path / "lc"
     lc.mkdir()
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
@@ -356,21 +362,23 @@ def test_scaffold_does_not_touch_the_local_constitution(sandbox_identities, tmp_
     assert identity.active_identities() == []
 
 
-# --- Имя папки: префикс + расшифровка --------------------------------------
+# --- Folder name: prefix plus expansion ------------------------------------
 #
-# Два уровня именования намеренно разные. Папку видишь редко, и по одному
-# `kisel` невозможно вспомнить, что это был за поиск — поэтому расшифровка
-# прямо в имени папки. Файлы внутри, наоборот, короткие: их имена встречаются
-# в каждой команде, в выводе grep и в путях внутри отчётов.
+# The two levels of naming are deliberately different. A folder is seen rarely,
+# and `kisel` alone gives no way to remember what that search was — hence the
+# expansion right in the folder name. The files inside are the opposite:
+# short, because their names appear in every command, in grep output and in
+# paths inside reports.
 
 @pytest.mark.parametrize("folder,expected", [
     ("kisel-keep-it-simple-easy-legacy", "kisel"),
     ("jvst-java-startup-onsite", "jvst"),
     ("ftf-frozen-test-fixture", "ftf"),
-    ("abcd", "abcd"),                     # без расшифровки — распознаётся, но validate ругнётся
-    ("blank-start-from-scratch", "blank"),   # пустой шаблон — тоже валидное имя
-    ("Kisel-Keep-It", None),              # заглавные
-    ("kisel_keep_it", None),              # подчёркивания — это разделитель ФАЙЛОВ, не папок
+    ("abcd", "abcd"),                        # no expansion: recognised, but
+                                             # validate() will complain
+    ("blank-start-from-scratch", "blank"),   # the empty template is a valid name too
+    ("Kisel-Keep-It", None),                 # uppercase
+    ("kisel_keep_it", None),                 # underscores separate FILES, not folders
 ])
 def test_folder_prefix_extraction(folder, expected):
     assert identity.folder_prefix(folder) == expected
@@ -378,7 +386,7 @@ def test_folder_prefix_extraction(folder, expected):
 
 @pytest.mark.parametrize("full_name,expected", [
     ("Keep It Simple, Easy, Legacy", "kisel-keep-it-simple-easy-legacy"),
-    ("KISEL — Keep It Simple", "kisel-keep-it-simple"),   # префикс не задваивается
+    ("KISEL — Keep It Simple", "kisel-keep-it-simple"),   # the prefix is not doubled
     ("Java  Startup / onsite", "kisel-java-startup-onsite"),
 ])
 def test_folder_name_generated_from_a_spoken_phrase(full_name, expected):
@@ -398,8 +406,8 @@ def test_folder_without_description_is_reported(tmp_path, monkeypatch):
 
 
 def test_two_folders_with_the_same_prefix_are_refused(tmp_path, monkeypatch):
-    """Неразрешимая неоднозначность: какая из двух папок «та самая» — определить
-    нечем, а тихий выбор одной даст перемешанные данные."""
+    """An unresolvable ambiguity: nothing can say which of the two folders is
+    "the" one, and silently picking either mixes the two sets of data."""
     identities_dir = tmp_path / "identities"
     (identities_dir / "abcd-first-search").mkdir(parents=True)
     (identities_dir / "abcd-second-search").mkdir(parents=True)
@@ -411,27 +419,27 @@ def test_two_folders_with_the_same_prefix_are_refused(tmp_path, monkeypatch):
 
 
 def test_files_keep_the_short_prefix_not_the_long_folder_name(sandbox_identities):
-    """Ключевое свойство разделения: длинное имя остаётся у папки и только."""
+    """The key property of the split: the long name stays on the folder alone."""
     created = identity.scaffold_identity("newp", "New Product Search")
     assert created[0].parent.name == "newp-new-product-search"
     for path in created:
         assert path.name.startswith("newp_"), (
-            f"{path.name} — имя файла обязано быть коротким, с одним префиксом"
+            f"{path.name} — a file name must be short, carrying just the prefix"
         )
         assert "new-product-search" not in path.name
 
 
-# --- Готовность идентичности: заполнена, а не просто существует -------------
+# --- Identity readiness: filled in, not merely existing --------------------
 #
-# Реальная находка 2026-08-04 на прогоне свежего клона: `identity.py new` плюс
-# `pipeline.py` отработали и записали отчёт на 1734 вакансии — с плейсхолдером
-# в заголовке и скорингом по пустому стеку. Правило №0 проверяло существование
-# идентичности, но не её заполненность.
+# Found for real on a fresh-clone run, 2026-08-04: `identity.py new` plus
+# `pipeline.py` ran to completion and wrote a report covering 1734 vacancies —
+# with a placeholder in the title and scoring against an empty stack. Rule zero
+# checked that an identity existed, but not that it was filled in.
 
 def test_fresh_scaffold_is_not_ready(sandbox_identities):
     identity.scaffold_identity("newp", "New Product Search")
     problems = identity.readiness_problems("newp")
-    assert problems, "заготовка из шаблона не может считаться готовой к поиску"
+    assert problems, "template scaffolding cannot count as ready to search"
     assert any("tech_stack.core" in p for p in problems)
 
 
@@ -440,79 +448,80 @@ def test_activation_refuses_an_unfilled_identity(sandbox_identities, monkeypatch
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "lc")
     with pytest.raises(identity.IdentityNotReadyError) as exc:
         common.activate_identity("newp", data_root=tmp_path / "data")
-    assert "не заполнена" in str(exc.value)
+    assert "not filled in" in str(exc.value)
     assert "ONBOARDING" in str(exc.value)
 
 
 def test_placeholders_are_looked_for_in_values_not_comments(sandbox_identities):
-    """Первая версия проверки читала файл целиком и объявляла заполненную
-    идентичность незаполненной: угловые скобки сплошь и рядом встречаются в
-    комментариях как часть документации («<token> подставьте сюда»)."""
+    """The first version of this check read the whole file and declared a
+    filled-in identity unfilled: angle brackets appear constantly in comments
+    as part of the documentation ("put <token> here")."""
     identity.scaffold_identity("newp", "New Product Search")
     d = sandbox_identities / "newp-new-product-search"
     (d / "newp_ats_targets.yaml").write_text(
-        "# укажите здесь <token> с карьерной страницы\ntargets: []\n", encoding="utf-8"
+        "# put the <token> from the careers page here\ntargets: []\n",
+        encoding="utf-8"
     )
     problems = identity.readiness_problems("newp")
     assert not any("newp_ats_targets.yaml" in p for p in problems), (
-        "плейсхолдер в комментарии — это документация, а не незаполненное поле"
+        "a placeholder in a comment is documentation, not an unfilled field"
     )
 
 
 def test_shipped_identity_is_complete_except_for_personal_data():
-    """Идентичность из репозитория обязана быть заполнена ЦЕЛИКОМ — кроме
-    личных полей, которых в общем репозитории быть и не должно.
+    """A shipped identity must be filled in COMPLETELY — apart from the personal
+    fields, which have no business being in a shared repository at all.
 
-    Проверку поймал прогон свежего клона 2026-08-04: там kisel закономерно
-    оказалась «не готова», потому что оверлей с личными данными лежит вне
-    гита. Это правильное поведение, а не поломка — новый человек обязан
-    подставить свои. Но всё остальное (стек, критерии, источники) должно быть
-    готово к работе сразу, иначе гейт настроен слишком строго и заблокирует
-    нормальный сценарий.
+    A fresh-clone run on 2026-08-04 exercised this: kisel came out "not ready",
+    quite correctly, because the overlay holding personal data lives outside
+    git. That is right behaviour rather than breakage — a new person has to
+    supply their own. But everything else (stack, criteria, sources) must be
+    ready to run immediately, or the gate is tuned too strictly and blocks the
+    normal path.
     """
     problems = identity.readiness_problems("kisel")
     non_personal = [p for p in problems
                     if not p.startswith(identity.LOCAL_FIELDS_MISSING_PREFIX)]
     assert non_personal == [], (
-        "в общей части идентичности не должно остаться незаполненного: "
+        "nothing in the shared part of an identity should be left unfilled: "
         f"{non_personal}"
     )
 
 
-# --- Оверлей личных данных из Малой Конституции -----------------------------
+# --- The personal-data overlay from the Local Constitution -----------------
 
 def test_local_sentinel_is_resolved_from_the_local_constitution(tmp_path, monkeypatch):
     lc = tmp_path / "lc"
     (lc / "personal" / "abcd").mkdir(parents=True)
     (lc / "personal" / "abcd" / "abcd_owner.yaml").write_text(
-        "owner:\n  name: Настоящее Имя\n  languages: [English]\n", encoding="utf-8"
+        "owner:\n  name: Real Name\n  languages: [English]\n", encoding="utf-8"
     )
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
 
     profile = {"owner": {"name": "local", "languages": "local", "role": "Developer"}}
     merged, missing = common.resolve_local_fields("abcd", profile)
 
-    assert merged["owner"]["name"] == "Настоящее Имя"
+    assert merged["owner"]["name"] == "Real Name"
     assert merged["owner"]["languages"] == ["English"]
-    assert merged["owner"]["role"] == "Developer", "не-личные поля не трогаются"
+    assert merged["owner"]["role"] == "Developer", "non-personal fields are untouched"
     assert missing == []
-    assert profile["owner"]["name"] == "local", "исходный профиль не мутируется"
+    assert profile["owner"]["name"] == "local", "the source profile is not mutated"
 
 
 def test_missing_local_value_is_reported_not_silently_empty(tmp_path, monkeypatch):
-    """Молча подставить пустоту — худший вариант: скоринг отработает на пустых
-    языках и выдаст правдоподобный мусор."""
+    """Silently substituting emptiness is the worst option: scoring would run
+    against empty languages and produce plausible rubbish."""
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", tmp_path / "empty")
     merged, missing = common.resolve_local_fields("abcd", {"owner": {"name": "local"}})
     assert missing == ["owner.name"]
 
 
-# --- init-local: разворачивание Малой Конституции ---------------------------
+# --- init-local: setting up the Local Constitution -------------------------
 
 def test_init_local_creates_the_folder_and_registers_the_identity(tmp_path, monkeypatch):
     lc = tmp_path / "lc"
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
-    identity.init_local_constitution("abcd", note="тестовый поиск")
+    identity.init_local_constitution("abcd", note="test search")
 
     cfg = identity.load_local_constitution()
     prefixes = [e["prefix"] for e in cfg["active_identities"]]
@@ -521,15 +530,16 @@ def test_init_local_creates_the_folder_and_registers_the_identity(tmp_path, monk
 
 
 def test_init_local_does_not_rewrite_an_unchanged_file(tmp_path, monkeypatch):
-    """active.yaml пишет человек, и он полон комментариев — YAML-дампер их
-    стирает. Реальный случай при разработке команды 2026-08-04: безобидный
-    повторный запуск снёс всю документацию внутри файла."""
+    """active.yaml is written by a person and is full of comments, which a YAML
+    dumper erases. It happened while the command was being built, 2026-08-04:
+    a harmless repeat run wiped every line of documentation inside the file."""
     lc = tmp_path / "lc"
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
     identity.init_local_constitution("abcd")
 
     path = identity.local_constitution_path()
-    handwritten = "# мой комментарий, который нельзя терять\n" + path.read_text(encoding="utf-8")
+    handwritten = ("# my comment, which must not be lost\n"
+                   + path.read_text(encoding="utf-8"))
     path.write_text(handwritten, encoding="utf-8")
 
     identity.init_local_constitution("abcd")
@@ -537,12 +547,13 @@ def test_init_local_does_not_rewrite_an_unchanged_file(tmp_path, monkeypatch):
 
 
 def test_init_local_sets_default_identity_when_a_second_one_appears(tmp_path, monkeypatch):
-    """Без default_identity вторая идентичность ломает команды ПЕРВОЙ —
-    той, что работала до сих пор."""
+    """Without default_identity, a second identity breaks the FIRST one's
+    commands — the ones that had been working until now."""
     lc = tmp_path / "lc"
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
     identity.init_local_constitution("abcd")
-    assert identity.default_identity() is None, "с одной идентичностью дефолт не нужен"
+    assert identity.default_identity() is None, \
+        "with one identity no default is needed"
 
     identity.init_local_constitution("efgh")
     assert identity.default_identity() == "abcd"
@@ -552,13 +563,13 @@ def test_init_local_backs_up_before_rewriting(tmp_path, monkeypatch):
     lc = tmp_path / "lc"
     monkeypatch.setattr(common, "LOCAL_CONSTITUTION_DIR", lc)
     identity.init_local_constitution("abcd")
-    identity.init_local_constitution("efgh")   # эта запись требует перезаписи
+    identity.init_local_constitution("efgh")   # this entry forces a rewrite
     assert (lc / "active.yaml.bak").exists()
 
 
 def test_init_local_writes_an_owner_skeleton_for_the_local_fields(tmp_path, monkeypatch, sandbox_identities):
-    """Полезнее отдать человеку файл с нужными ему полями, чем отправить его
-    собирать структуру по спецификации."""
+    """Handing a person a file with the fields THEY need is more useful than
+    sending them off to build the structure from a specification."""
     identity.scaffold_identity("newp", "New Product Search")
     profile_path = identity.identity_file("newp", "profile.yaml")
     profile_path.write_text(
@@ -572,7 +583,7 @@ def test_init_local_writes_an_owner_skeleton_for_the_local_fields(tmp_path, monk
     skeleton = common.personal_dir("newp") / "newp_owner.yaml"
     text = skeleton.read_text(encoding="utf-8")
     assert "owner:" in text and "name:" in text and "location:" in text
-    assert "ВНЕ ГИТА" in text
+    assert "OUTSIDE GIT" in text
 
 
 def test_owner_skeleton_never_overwrites_a_filled_file(tmp_path, monkeypatch, sandbox_identities):
@@ -581,16 +592,17 @@ def test_owner_skeleton_never_overwrites_a_filled_file(tmp_path, monkeypatch, sa
     identity.init_local_constitution("newp")
 
     skeleton = common.personal_dir("newp") / "newp_owner.yaml"
-    skeleton.write_text("owner:\n  name: Уже заполнено\n", encoding="utf-8")
+    skeleton.write_text("owner:\n  name: Already filled in\n", encoding="utf-8")
     identity.init_local_constitution("newp")
-    assert "Уже заполнено" in skeleton.read_text(encoding="utf-8")
+    assert "Already filled in" in skeleton.read_text(encoding="utf-8")
 
 
-# --- Клонирование идентичности ----------------------------------------------
+# --- Cloning an identity ---------------------------------------------------
 #
-# Частый случай: один и тот же поиск для разных стран. Стек, тип занятости и
-# признаки компании общие, различаются гео-правила, языки и часовой пояс.
-# Собирать вторую идентичность с нуля — переотвечать на 50 вопросов ради трёх.
+# A common case: the same search aimed at different countries. Stack,
+# employment type and the marks of a suitable company are shared; the
+# geography rules, languages and time zone are not. Building the second
+# identity from scratch means answering fifty questions again to change three.
 
 def test_clone_copies_every_file_under_the_new_prefix(sandbox_identities):
     identity.scaffold_identity("srcp", "Source Search")
@@ -603,11 +615,11 @@ def test_clone_copies_every_file_under_the_new_prefix(sandbox_identities):
 
 
 def test_clone_rewrites_internal_references_to_the_source(sandbox_identities):
-    """Иначе клон нарушил бы правило «файлы одной идентичности не ссылаются на
-    другую» и был бы отвергнут валидатором."""
+    """Otherwise the clone would break the rule that one identity's files never
+    reference another, and the validator would reject it."""
     identity.scaffold_identity("srcp", "Source Search")
     identity.identity_file("srcp", "identity.md").write_text(
-        "# srcp\nсмотри srcp_criteria.yaml\n", encoding="utf-8"
+        "# srcp\nsee srcp_criteria.yaml\n", encoding="utf-8"
     )
     identity.clone_identity("srcp", "dstp", "Cloned Search")
 
@@ -622,7 +634,7 @@ def test_clone_refuses_a_taken_prefix(sandbox_identities):
     identity.scaffold_identity("dstp", "Other Search")
     with pytest.raises(identity.InvalidIdentityError) as exc:
         identity.clone_identity("srcp", "dstp", "Cloned Search")
-    assert "занят" in str(exc.value)
+    assert "already taken" in str(exc.value)
 
 
 def test_clone_refuses_an_unknown_source(sandbox_identities):
@@ -631,8 +643,9 @@ def test_clone_refuses_an_unknown_source(sandbox_identities):
 
 
 def test_clone_refuses_the_frozen_fixture():
-    """Фикстура откалибрована под тесты, а не под живой поиск — клон от неё
-    унаследовал бы калибровочные значения и молча искал бы не то."""
+    """The fixture is calibrated for the tests rather than for a live search — a
+    clone of it would inherit the calibration values and quietly search for the
+    wrong thing."""
     with pytest.raises(identity.InvalidIdentityError) as exc:
         identity.clone_identity("ftf", "dstp", "Cloned Search")
     assert "fixture" in str(exc.value)

@@ -1,22 +1,23 @@
 """
-Общие утилиты для всех скриптов Work IDE.
+Shared utilities for every Work IDE script.
 
-Никакой бизнес-логики поиска/скоринга здесь нет — только "скучная" инфраструктура:
-пути, чтение/запись JSON и YAML, безопасная запись файлов, нормализация текста,
-хэширование id.
+No search or scoring logic lives here — only the boring infrastructure: paths,
+reading and writing JSON and YAML, safe file writes, text normalisation, id
+hashing.
 
-КЛЮЧЕВОЕ: пути к конфигам и данным ЗАВИСЯТ ОТ АКТИВНОЙ ИДЕНТИЧНОСТИ и до вызова
-`activate_identity()` равны None. Это сделано намеренно: система обслуживает
-разных людей, и попытка прочитать/записать данные без явно выбранной идентичности
-— ошибка, а не повод взять "какие-нибудь" пути (Большая Конституция, правило №0).
+THE KEY POINT: the paths to configuration and data DEPEND ON THE ACTIVE
+IDENTITY, and are None until `activate_identity()` is called. That is
+deliberate: the system serves different people, and trying to read or write
+data without an explicitly chosen identity is an error rather than a reason to
+pick "some" paths (constitution, rule zero).
 
-Почему перепривязка модульных переменных, а не объект-контекст: ни одно место в
-проекте не читает эти константы на этапе импорта — все обращения идут как
-`common.X` во время вызова. Поэтому перепривязка не требует править ~30 мест
-вызова и не ломает monkeypatch в тестах. Процесс однопоточный и односеансовый:
-одна активная идентичность на запуск — это ровно то ограничение, которое нужно.
+Why module-level variables are rebound instead of a context object: nowhere in
+the project reads these constants at import time — every access goes through
+`common.X` at call time. So rebinding needs no edits at ~30 call sites and does
+not break monkeypatching in tests. The process is single-threaded and
+single-session: one active identity per run is exactly the constraint wanted.
 
-Совместимо с Python 3.9 (стандартная библиотека + requests + PyYAML).
+Compatible with Python 3.9 (standard library plus requests and PyYAML).
 """
 from __future__ import annotations
 
@@ -32,79 +33,82 @@ from typing import Any, Callable, List, Optional
 
 try:
     import yaml
-except ImportError:  # pragma: no cover — проверяется отдельным тестом
-    # Первое, что видит человек на свежем клоне, если забыл поставить
-    # зависимости, — это сообщение. Раньше здесь был голый traceback
-    # `ModuleNotFoundError: yaml`: проект, который умеет по-человечески
-    # объяснять любой свой отказ, спотыкался ровно на первом шаге.
+except ImportError:  # pragma: no cover — covered by a dedicated test
+    # This message is the first thing a person sees on a fresh clone if they
+    # forgot to install the dependencies. It used to be a bare
+    # `ModuleNotFoundError: yaml` traceback: a project that explains every
+    # one of its refusals in plain words stumbled at the very first step.
     sys.stderr.write(
-        "\n  Не установлены зависимости проекта (не найден модуль PyYAML).\n\n"
-        "  Установите их:\n"
+        "\n  The project dependencies are not installed (PyYAML not found).\n\n"
+        "  Install them:\n"
         "      python -m venv .venv\n"
         "      # Windows:       .venv\\Scripts\\activate\n"
         "      # macOS / Linux: source .venv/bin/activate\n"
         "      python -m pip install -r requirements.txt\n\n"
-        "  Затем повторите команду. Зависимостей всего три, ключи API не нужны.\n\n"
+        "  Then run the command again. There are only three dependencies, and\n"
+        "  no API keys are needed.\n\n"
     )
     raise SystemExit(1)
 
-# --- Вывод в консоль ------------------------------------------------------
-# На Windows консоль по умолчанию отдана системной кодовой странице (здесь
-# cp1251). Русский текст она берёт, а французский — уже нет: инструмент падал
-# UnicodeEncodeError на выводе "Crédit Agricole CIB" ПОСЛЕ того, как успешно
-# сохранил данные. То есть работа сделана, а человек видит трейсбек и думает,
-# что ничего не записалось.
+# --- Console output -------------------------------------------------------
+# On Windows the console defaults to the system code page. It will take some
+# scripts and not others: the tool died with UnicodeEncodeError while printing
+# "Crédit Agricole CIB" AFTER it had successfully saved the data. The work was
+# done, and the person saw a traceback and concluded nothing had been written.
 #
-# Названия компаний приходят из внешнего мира и содержат что угодно, поэтому
-# вывод переводится в UTF-8 с заменой непредставимых символов. Замена, а не
-# отказ: сообщение с парой знаков вопроса полезнее отсутствующего.
+# Company names arrive from the outside world and contain anything at all, so
+# output is switched to UTF-8 with unrepresentable characters replaced.
+# Replaced rather than refused: a message with a couple of question marks in
+# it is more useful than no message.
 for _stream_name in ("stdout", "stderr"):
     _stream = getattr(sys, _stream_name, None)
     if _stream is not None and hasattr(_stream, "reconfigure"):
         try:
             _stream.reconfigure(encoding="utf-8", errors="replace")
-        except (ValueError, OSError):  # перенаправленный или закрытый поток
+        except (ValueError, OSError):  # a redirected or closed stream
             pass
 
 
-# --- Пути уровня репозитория (не зависят от идентичности) ----------------
+# --- Repository-level paths (independent of any identity) -----------------
 
 ROOT = Path(__file__).resolve().parent.parent
-SHARED_CONFIG_DIR = ROOT / "config"  # только общая машинерия, ничего личного
+SHARED_CONFIG_DIR = ROOT / "config"  # shared machinery only, nothing personal
 
-# Шаблоны идентичностей — в гите, общие для всех, без единого личного факта.
-# Из них КЛОНИРУЮТ, ими не пользуются напрямую.
+# Identity templates — in git, shared by everyone, not one personal fact among
+# them. They are CLONED FROM, never used directly.
 TEMPLATES_DIR = ROOT / "identity-templates"
 
-# Рабочие идентичности — вне гита. Их количество и есть количество подборок,
-# которые делает система: отдельного реестра активных идентичностей нет и не
-# должно быть, потому что реестр умеет расходиться с реальностью, а папки нет.
+# Working identities — outside git. How many there are is how many shortlists
+# the system produces: there is no separate registry of active identities, and
+# there must not be, because a registry can drift away from reality and
+# folders cannot.
 IDENTITIES_DIR = Path(
     os.environ.get("WORK_IDE_IDENTITIES") or (ROOT / "local-identities")
 )
 
-# Замороженные фикстуры лежат рядом с тем, что их использует. Они находятся
-# при обходе так же, как рабочие идентичности, но клонировать их нельзя и
-# в списке шаблонов их нет.
+# Frozen fixtures live next to what uses them. They are discovered by the same
+# scan as working identities, but they cannot be cloned and do not appear in
+# the template list.
 FIXTURES_DIR = ROOT / "tests" / "fixtures"
 
-# Оба переопределяются переменными окружения — нужно для тестов и для случая,
-# когда данные лежат вне репозитория (например на другом диске).
+# Both are overridable by environment variable — needed for tests, and for the
+# case where data lives outside the repository (on another drive, say).
 DATA_ROOT = Path(os.environ.get("WORK_IDE_DATA_ROOT") or (ROOT / "data"))
 
-# Отчёты намеренно живут ОТДЕЛЬНО от накопленных данных, в корне репозитория.
-# Причина простая и практическая: отчёт — единственный файл, который человек
-# открывает руками, и искать его в data/<префикс>/reports/ неудобно. Здесь же
-# рядом лежат свежие подборки всех идентичностей сразу.
+# Reports deliberately live SEPARATELY from accumulated data, at the repository
+# root. The reason is simple and practical: the report is the one file a person
+# opens by hand, and hunting for it under data/<prefix>/reports/ is a nuisance.
+# Here the latest shortlist of every identity sits side by side.
 REPORTS_ROOT = Path(os.environ.get("WORK_IDE_REPORTS_ROOT") or (ROOT / "reports"))
 LOCAL_CONSTITUTION_DIR = Path(
     os.environ.get("WORK_IDE_LOCAL_CONSTITUTION") or (ROOT / "local-constitution")
 )
 
-# --- Пути уровня идентичности (None до активации) ------------------------
-# ВНИМАНИЕ: `CONFIG_DIR` здесь намеренно отсутствует. Раньше он указывал на
-# общий config/; если бы мы оставили его как алиас, забытое место вызова тихо
-# читало бы чужой файл. Теперь такое место падает с AttributeError — громко.
+# --- Identity-level paths (None until activation) -------------------------
+# NOTE: `CONFIG_DIR` is deliberately absent. It used to point at the shared
+# config/; had it been kept as an alias, a forgotten call site would quietly
+# read somebody else's file. Now such a site fails with AttributeError —
+# loudly.
 
 ACTIVE_IDENTITY: Optional[str] = None
 IDENTITY_DIR: Optional[Path] = None
@@ -124,60 +128,61 @@ INSIGHTS_PATH: Optional[Path] = None
 
 USER_AGENT: Optional[str] = None
 
-DEFAULT_TIMEOUT = 15  # настоящая константа, от идентичности не зависит
+DEFAULT_TIMEOUT = 15  # a genuine constant, independent of any identity
 
 _IDENTITY_HOOKS: List[Callable[[], None]] = []
 
 
 class NoActiveIdentityError(RuntimeError):
-    """Попытка работать с данными без активной идентичности."""
+    """An attempt to work with data with no active identity."""
 
 
 class IdentityDataMismatchError(RuntimeError):
-    """Папка данных принадлежит другой идентичности."""
+    """The data folder belongs to a different identity."""
 
 
 def register_identity_hook(fn: Callable[[], None]) -> None:
-    """Регистрирует callback, вызываемый при каждой активации идентичности.
+    """Registers a callback invoked on every identity activation.
 
-    Нужен модулям, которые кэшируют производные от конфига значения: кэш,
-    переживший смену идентичности, — это межидентичностная утечка.
+    Needed by modules that cache values derived from configuration: a cache
+    surviving an identity switch is a leak between identities.
     """
     if fn not in _IDENTITY_HOOKS:
         _IDENTITY_HOOKS.append(fn)
 
 
 def require_identity() -> None:
-    """Страж правила №0. Вызывается перед любым доступом к конфигам и данным."""
+    """The guard for rule zero. Called before any access to config or data."""
     if ACTIVE_IDENTITY is None:
         raise NoActiveIdentityError(
-            "Нет активной поисковой идентичности — работа с данными запрещена "
-            "(Большая Конституция, правило №0).\n"
-            "  Укажите её: --identity <префикс>, либо задайте в "
-            f"{LOCAL_CONSTITUTION_DIR / 'active.yaml'}.\n"
-            "  Если идентичности ещё нет — проведите онбординг по docs/ONBOARDING.md."
+            "No active search identity — working with data is not allowed "
+            "(constitution, rule zero).\n"
+            "  Name one: --identity <prefix>.\n"
+            "  If no identity exists yet, run onboarding per docs/ONBOARDING.md."
         )
 
 
 def activate_identity(prefix: str, *, allow_fixture: bool = False,
                       data_root: Optional[Path] = None,
                       reports_root: Optional[Path] = None) -> None:
-    """Активирует идентичность: проверяет её и перепривязывает все пути.
+    """Activates an identity: validates it and rebinds every path.
 
-    allow_fixture — тестовые идентичности (kind: fixture) намеренно нельзя
-    активировать в обычной работе, чтобы никто не искал вакансии по фикстуре.
+    allow_fixture — test identities (kind: fixture) deliberately cannot be
+    activated during normal work, so that nobody searches for jobs against a
+    fixture.
 
-    reports_root по умолчанию — общая папка `reports/` в корне репозитория.
-    ВАЖНО: если передан data_root (изолированный прогон, тесты), отчёты уезжают
-    внутрь него. Иначе тест, изолировавший данные, всё равно писал бы отчёты в
-    настоящую папку репозитория и затирал живую подборку человека.
+    reports_root defaults to the shared `reports/` folder at the repository
+    root. IMPORTANT: when data_root is passed (an isolated run, tests), reports
+    move inside it. Otherwise a test that isolated its data would still write
+    reports into the real repository folder and overwrite a person's live
+    shortlist.
     """
-    import identity as identity_mod  # локальный импорт: identity.py импортирует common
+    import identity as identity_mod  # local import: identity.py imports common
 
     problems = identity_mod.validate(prefix)
     if problems:
         raise identity_mod.InvalidIdentityError(
-            f"Идентичность '{prefix}' не прошла проверку:\n"
+            f"Identity '{prefix}' did not pass validation:\n"
             + "\n".join(f"  - {p}" for p in problems)
         )
 
@@ -186,28 +191,30 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
     kind = (raw_profile.get("identity") or {}).get("kind")
     if kind == "fixture" and not allow_fixture:
         raise identity_mod.InvalidIdentityError(
-            f"'{prefix}' — тестовая фикстура (kind: fixture), реальный поиск по ней "
-            "запрещён. Она существует только для того, чтобы тесты не зависели от "
-            "того, какую идентичность вы держите активной."
+            f"'{prefix}' is a test fixture (kind: fixture); a real search against "
+            "it is not allowed. It exists purely so that the tests do not depend "
+            "on which identity you happen to keep active."
         )
 
     profile, _ = resolve_local_fields(prefix, raw_profile)
 
-    # Заготовка — это ещё не идентичность. Реальная находка 2026-08-04 на
-    # прогоне свежего клона: `identity.py new` + `pipeline.py` отработали и
-    # записали отчёт на 1734 вакансии — с плейсхолдером в заголовке и скорингом
-    # по пустому стеку. Правило №0 проверяло, что идентичность СУЩЕСТВУЕТ, но
-    # не что она ЗАПОЛНЕНА, и человек получал правдоподобный мусор. Это ровно
-    # тот тихий неверный результат, ради предотвращения которого построена вся
-    # архитектура, поэтому проверка живёт в активации, а не в отдельной команде.
+    # Scaffolding is not yet an identity. Found for real on a fresh-clone run,
+    # 2026-08-04: `identity.py new` plus `pipeline.py` ran to completion and
+    # wrote a report covering 1734 vacancies — with a placeholder in the title
+    # and scoring against an empty stack. Rule zero checked that an identity
+    # EXISTED but not that it was FILLED IN, and the person got plausible
+    # rubbish. That is exactly the quiet wrong answer this whole architecture
+    # exists to prevent, so the check lives in activation rather than in a
+    # separate command.
     if kind != "fixture":
         gaps = identity_mod.readiness_problems(prefix)
         if gaps:
             raise identity_mod.IdentityNotReadyError(
-                f"Идентичность '{prefix}' ещё не заполнена — поиск по ней дал бы "
-                "правдоподобный, но бессмысленный результат.\n"
+                f"Identity '{prefix}' is not filled in yet — searching with it "
+                "would produce a plausible but meaningless result.\n"
                 + "\n".join(f"  - {g}" for g in gaps)
-                + "\n  Как заполнить: docs/ONBOARDING.md (вопросник -> профиль -> критерии)."
+                + "\n  How to fill it in: docs/ONBOARDING.md "
+                  "(questionnaire -> profile -> criteria)."
             )
 
     global ACTIVE_IDENTITY, IDENTITY_DIR, FILE_PREFIX
@@ -224,13 +231,14 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
     KNOWLEDGE_DIR = DATA_DIR / "knowledge"
     RAW_DIR = DATA_DIR / "raw"
 
-    # REPORTS_DIR — общая для всех идентичностей: там лежат свежие подборки
-    # каждой, различаясь префиксом в имени (kisel_latest.md, jvst_latest.md).
-    # Архив, наоборот, разложен по идентичностям: reports/archive/<префикс>/,
-    # и внутри имена файлов — просто даты. Правило единого префикса действует
-    # там, где файлы РАЗНЫХ идентичностей лежат в одной папке; когда папка сама
-    # принадлежит одной идентичности, префикс в каждом имени избыточен.
-    # Отчёт всё равно опознаёт себя первой строкой: "# Work IDE [kisel] — …".
+    # REPORTS_DIR is shared by every identity: the latest shortlist of each sits
+    # there, distinguished by the prefix in its name (kisel_latest.md,
+    # jvst_latest.md). The archive, by contrast, is split per identity —
+    # reports/archive/<prefix>/ — and inside it file names are just dates. The
+    # single-prefix rule applies where files of DIFFERENT identities share a
+    # folder; when the folder itself belongs to one identity, a prefix on every
+    # name is redundant. The report identifies itself on its first line anyway:
+    # "# Work IDE [kisel] — …".
     if reports_root is not None:
         reports_base = Path(reports_root)
     elif data_root is not None:
@@ -253,7 +261,7 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
 
 
 def deactivate_identity() -> None:
-    """Сбрасывает активную идентичность. Нужно тестам, проверяющим отказ."""
+    """Clears the active identity. Needed by tests that check the refusal."""
     global ACTIVE_IDENTITY, IDENTITY_DIR, FILE_PREFIX
     global DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, REPORTS_ARCHIVE_DIR, STATE_PATH
     global VACANCIES_PATH, COMPANIES_PATH, RECRUITERS_PATH, INSIGHTS_PATH, USER_AGENT
@@ -270,25 +278,27 @@ LOCAL_SENTINEL = "local"
 
 
 def personal_dir(prefix: str) -> Path:
-    """Папка личных файлов идентичности в Малой Конституции (вне гита)."""
+    """An identity's personal-files folder in the Local Constitution
+    (outside git)."""
     return LOCAL_CONSTITUTION_DIR / "personal" / prefix
 
 
 def load_local_overlay(prefix: str) -> dict:
-    """Личная часть профиля: то, что не должно попасть в общий репозиторий.
+    """The personal part of a profile: what must not reach the shared repository.
 
-    Отсутствие файла — не ошибка сама по себе: профиль может вообще не
-    использовать сентинел `local`. Ошибкой это становится только если профиль
-    на него ссылается, и тогда об этом скажет resolve_local_fields().
+    A missing file is not an error in itself: a profile may not use the `local`
+    sentinel at all. It becomes an error only if the profile does reference it,
+    and then resolve_local_fields() says so.
     """
     overlay = {}
     path = personal_dir(prefix) / f"{prefix}_owner.yaml"
     if path.exists():
         overlay = load_yaml(path) or {}
 
-    # Контакт исторически лежит в отдельном файле — он появился раньше общего
-    # оверлея. Оставляем как есть: раскладка Малой Конституции описана в
-    # docs/LOCAL_CONSTITUTION.md, и ломать её ради единообразия незачем.
+    # The contact has historically lived in its own file — it predates the
+    # general overlay. Left as it is: the Local Constitution's layout is
+    # documented in docs/LOCAL_CONSTITUTION.md, and breaking it for the sake of
+    # uniformity would buy nothing.
     contact_path = personal_dir(prefix) / f"{prefix}_contact.yaml"
     if contact_path.exists():
         contact_cfg = load_yaml(contact_path) or {}
@@ -300,7 +310,7 @@ def load_local_overlay(prefix: str) -> dict:
 
 
 def _walk_local_sentinels(node, path=""):
-    """Все пути до значений, равных `local`, в виде 'owner.name'."""
+    """Every path to a value equal to `local`, as 'owner.name'."""
     if isinstance(node, dict):
         for key, value in node.items():
             child = f"{path}.{key}" if path else str(key)
@@ -329,21 +339,21 @@ def _plant(data: dict, dotted: str, value) -> None:
 
 
 def resolve_local_fields(prefix: str, profile: dict):
-    """Подмешивает личные данные из Малой Конституции в профиль идентичности.
+    """Merges personal data from the Local Constitution into an identity profile.
 
-    ЗАЧЕМ. Идентичность лежит в общем репозитории и описывает ПОИСК: стек,
-    формат работы, признаки подходящей компании. Имя человека, его LinkedIn,
-    резидентство, CV и зарплатные ожидания к описанию поиска не относятся и в
-    общий репозиторий попадать не должны — иначе каждый, кто склонирует проект,
-    получит личное дело автора.
+    WHY. An identity describes a SEARCH: stack, working arrangement, the marks
+    of a suitable company. A person's name, their LinkedIn, residency, CV and
+    pay expectations are no part of describing a search and must not reach the
+    shared repository — otherwise everyone who clones the project gets the
+    author's personal file.
 
-    Механизм не новый: сентинел `local` уже использовался для контакта в
-    User-Agent. Здесь он обобщён на любое поле профиля — в файле идентичности
-    стоит `local`, реальное значение лежит в
-    `local-constitution/personal/<префикс>/<префикс>_owner.yaml`.
+    The mechanism is not new: the `local` sentinel was already used for the
+    User-Agent contact. Here it is generalised to any profile field — the
+    identity file holds `local`, and the real value lives in
+    `local-constitution/personal/<prefix>/<prefix>_owner.yaml`.
 
-    Возвращает (профиль_с_подставленными_значениями, список_незаполненного).
-    Профиль не мутируется: у вызывающего может быть своя копия.
+    Returns (profile_with_values_substituted, list_of_what_is_missing). The
+    profile is not mutated: the caller may have their own copy.
     """
     import copy
 
@@ -362,19 +372,21 @@ def resolve_local_fields(prefix: str, profile: dict):
 
 
 def load_profile(prefix: Optional[str] = None) -> dict:
-    """Профиль активной идентичности с подмешанными личными данными.
+    """The active identity's profile with personal data merged in.
 
-    Единственная точка чтения профиля — иначе часть кода видела бы сентинел
-    `local` вместо настоящего значения и молча считала бы его строкой.
+    The single place a profile is read — otherwise some code would see the
+    `local` sentinel instead of the real value and quietly treat it as a
+    string.
     """
     import identity as identity_mod
 
     if prefix is None:
         require_identity()
         prefix = ACTIVE_IDENTITY
-    # Профиль СОБИРАЕТСЯ ИЗ СЛОЁВ: копия шаблона даёт тип поиска, личный файл
-    # рядом — обстоятельства человека. Читать один файл нельзя: в шаблоне нет
-    # резидентства, а в личном файле нет стека.
+    # A profile is ASSEMBLED FROM LAYERS: the template copy supplies the kind of
+    # search, the personal file beside it supplies the person's circumstances.
+    # Reading a single file will not do: the template has no residency, and the
+    # personal file has no stack.
     import settings
 
     raw, _ = settings.resolve("profile", prefix)
@@ -383,15 +395,16 @@ def load_profile(prefix: Optional[str] = None) -> dict:
 
 
 def _build_user_agent(prefix: str, profile: dict) -> str:
-    """Честный User-Agent с контактом — инженерное обязательство проекта
-    (см. Большую Конституцию, раздел про вежливость к чужим серверам).
+    """An honest User-Agent carrying a contact — an engineering commitment of
+    the project (see the constitution, on politeness towards other people's
+    servers).
 
-    Контакт приходит уже разрешённым (см. resolve_local_fields): в файле
-    идентичности стоит `local`, значение лежит в Малой Конституции.
+    The contact arrives already resolved (see resolve_local_fields): the
+    identity file holds `local`, the value lives in the Local Constitution.
     """
     contact = ((profile.get("contact") or {}).get("user_agent_contact") or "").strip()
     if contact == LOCAL_SENTINEL:
-        contact = ""  # оверлея нет — работаем без контакта, doctor предупредит
+        contact = ""  # no overlay — run without a contact; doctor will warn
 
     if contact:
         return (
@@ -405,15 +418,16 @@ def _build_user_agent(prefix: str, profile: dict) -> str:
 
 
 def identity_config(name: str) -> Path:
-    """Путь к документу идентичности для чтения целиком.
+    """Path to an identity document, for reading it whole.
 
-    Документ может лежать в двух местах: личный файл в корне папки или копия
-    шаблона в `template/`. Возвращается личный, если он есть, иначе шаблонный.
+    A document may sit in two places: the personal file at the folder root, or
+    the template copy in `template/`. The personal one is returned if present,
+    otherwise the template one.
 
-    Для документов, которые СОБИРАЮТСЯ ИЗ СЛОЁВ (профиль, критерии), этого
-    недостаточно — там нужен settings.resolve(): личный файл содержит только
-    отличия. Здесь путь нужен тем, кто читает документ целиком и без слоёв —
-    например источники и ATS-цели.
+    For documents ASSEMBLED FROM LAYERS (profile, criteria) that is not enough
+    — those need settings.resolve(), because the personal file holds only
+    differences. This path is for callers who read a document whole and
+    unlayered: sources and ATS targets, for instance.
     """
     require_identity()
     own = IDENTITY_DIR / f"{FILE_PREFIX}{name}"
@@ -424,20 +438,21 @@ def identity_config(name: str) -> Path:
 
 
 def shared_config(name: str) -> Path:
-    """'sources.catalog.yaml' -> config/sources.catalog.yaml (общая машинерия)."""
+    """'sources.catalog.yaml' -> config/sources.catalog.yaml (shared machinery)."""
     return SHARED_CONFIG_DIR / name
 
 
 def load_sources() -> list:
-    """Единая точка чтения конфигурации источников для всего проекта.
+    """The single place the whole project reads source configuration from.
 
-    Сливает общий каталог источников (эндпоинты, тип, remote_only, документация —
-    одинаковы для всех) с настройками активной идентичности (какие источники
-    включены и с какими параметрами). Идентичность не может переопределить
-    эндпоинт: устаревший URL — это баг для всех, а не чья-то настройка.
+    Merges the shared source catalogue (endpoints, kind, remote_only,
+    documentation — identical for everyone) with the active identity's
+    settings (which sources are enabled, and with what parameters). An identity
+    cannot override an endpoint: a stale URL is a bug for everybody rather than
+    somebody's preference.
 
-    Если каталога ещё нет, файл идентичности читается как самодостаточный —
-    это состояние переходного периода, см. docs/BUILDING_BLOCKS.md.
+    If the catalogue does not exist yet, the identity file is read as
+    self-contained — a transitional state, see docs/BUILDING_BLOCKS.md.
     """
     require_identity()
     identity_cfg = load_yaml(identity_config("sources.yaml")) or {}
@@ -458,10 +473,10 @@ def load_sources() -> list:
         base = catalog_by_name.get(name)
         if base is None:
             raise ValueError(
-                f"Идентичность '{ACTIVE_IDENTITY}' ссылается на неизвестный источник "
-                f"'{name}'. Известные: {', '.join(sorted(catalog_by_name))}. "
-                f"Опечатка в {identity_config('sources.yaml').name} или источник "
-                "нужно добавить в config/sources.catalog.yaml."
+                f"Identity '{ACTIVE_IDENTITY}' references the unknown source "
+                f"'{name}'. Known sources: {', '.join(sorted(catalog_by_name))}. "
+                f"Either a typo in {identity_config('sources.yaml').name}, or the "
+                "source needs adding to config/sources.catalog.yaml."
             )
         merged.append({**base, **entry})
     return merged
@@ -475,20 +490,20 @@ def ensure_dirs() -> None:
 
 
 def _ensure_identity_marker() -> None:
-    """Кладёт data/<prefix>/.identity и сверяет его при каждом запуске.
+    """Writes data/<prefix>/.identity and checks it on every run.
 
-    Защита от сценария "папку данных переименовали/перенесли руками": пути
-    выглядят правильно, а внутри чужая база. Ошибка тихая и дорогая, проверка
-    дешёвая.
+    Protection against "the data folder was renamed or moved by hand": the
+    paths look right and somebody else's database sits inside. The mistake is
+    quiet and expensive; the check is cheap.
     """
     marker = DATA_DIR / ".identity"
     if marker.exists():
         recorded = marker.read_text(encoding="utf-8").strip()
         if recorded and recorded != ACTIVE_IDENTITY:
             raise IdentityDataMismatchError(
-                f"Папка данных {DATA_DIR} принадлежит идентичности '{recorded}', "
-                f"а активна '{ACTIVE_IDENTITY}'. Данные не тронуты. "
-                "Разберитесь вручную, прежде чем продолжать."
+                f"The data folder {DATA_DIR} belongs to identity '{recorded}', "
+                f"but '{ACTIVE_IDENTITY}' is active. Nothing was touched. "
+                "Sort this out by hand before continuing."
             )
     else:
         marker.write_text(f"{ACTIVE_IDENTITY}\n", encoding="utf-8")
@@ -502,12 +517,12 @@ def load_yaml(path: Path) -> dict:
 
 
 def write_yaml(path: Path, data: dict) -> None:
-    """Запись YAML, читаемого человеком.
+    """Writes human-readable YAML.
 
-    Используется только для файлов, которые генерирует сам проект (например
-    `local-constitution/active.yaml`). Конфиги идентичностей правит человек —
-    их перезапись стёрла бы комментарии, а комментарии там несут половину
-    смысла.
+    Used only for files the project generates itself (`local-constitution/
+    active.yaml`, for one). Identity configs are edited by a person — rewriting
+    them would erase the comments, and there the comments carry half the
+    meaning.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -525,8 +540,8 @@ def load_json(path: Path, default: Any = None) -> Any:
 
 
 def save_json_atomic(path: Path, data: Any) -> None:
-    """Пишет JSON атомарно (через временный файл + rename), чтобы падение
-    посреди записи никогда не оставило базу знаний в битом состоянии."""
+    """Writes JSON atomically (temporary file plus rename), so that a crash
+    mid-write can never leave the knowledge base in a broken state."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
@@ -542,7 +557,7 @@ def append_jsonl(path: Path, records: list) -> None:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-# --- Текст ---------------------------------------------------------------
+# --- Text ----------------------------------------------------------------
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _MULTI_WS_RE = re.compile(r"[ \t\r\f\v]+")
@@ -553,9 +568,9 @@ _BLOCK_BREAK_RE = re.compile(
 
 
 def strip_html(raw: Optional[str]) -> str:
-    """Грубый, но надёжный (без внешних зависимостей вроде bs4/lxml) конвертер
-    HTML -> читаемый текст. Для целей keyword-скоринга и отчётов точность
-    важнее, чем идеальный рендеринг."""
+    """A crude but dependable HTML -> readable text converter, with no external
+    dependency such as bs4 or lxml. For keyword scoring and reports,
+    reliability matters more than perfect rendering."""
     if not raw:
         return ""
     text = _BLOCK_BREAK_RE.sub("\n", raw)
@@ -571,8 +586,8 @@ def strip_html(raw: Optional[str]) -> str:
 
 
 def normalize_for_matching(text: Optional[str]) -> str:
-    """Нормализация для поиска ключевых слов: нижний регистр, unicode NFKC,
-    схлопнутые пробелы. Не убирает пунктуацию (важно для "c#", "asp.net")."""
+    """Normalisation for keyword matching: lowercase, unicode NFKC, collapsed
+    whitespace. Punctuation is kept — it matters for "c#" and "asp.net"."""
     if not text:
         return ""
     text = unicodedata.normalize("NFKC", text)

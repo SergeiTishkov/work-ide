@@ -1,48 +1,48 @@
 """
-Шаблоны идентичностей: клонирование, версии, обновление.
+Identity templates: cloning, versions, updates.
 
-ПОЧЕМУ ШАБЛОН, А НЕ ИДЕНТИЧНОСТЬ В ГИТЕ
----------------------------------------
-Раньше идентичности лежали в гите и были одновременно и общим достоянием, и
-чьей-то личной настройкой. Из-за этого в общий репозиторий попадали
-резидентство, зарплатные ожидания и прочие обстоятельства конкретного
-человека, а разделять их приходилось третьим слоем (Малой Конституцией) с
-сентинелом `local` — механизмом, на котором легко ошибиться слоем.
+WHY A TEMPLATE RATHER THAN AN IDENTITY IN GIT
+---------------------------------------------
+Identities used to live in git and were two things at once: shared property and
+somebody's personal configuration. Residency, pay expectations and other
+circumstances of a particular person ended up in the shared repository, and
+separating them took a third layer (the Local Constitution) with a `local`
+sentinel — a mechanism where picking the wrong layer was easy.
 
-Теперь разделение проходит по границе гита:
+The split now follows the git boundary:
 
-    identity-templates/<папка>/   ТИП поиска, в гите, ни одного личного факта
-    local-identities/<папка>/     МОЙ поиск, вне гита, здесь можно всё
+    identity-templates/<folder>/   the KIND of search, in git, no personal facts
+    local-identities/<folder>/     MY search, outside git, anything goes
 
-ПОЧЕМУ КОПИЯ ШАБЛОНА ЛЕЖИТ ВНУТРИ ЛОКАЛЬНОЙ ИДЕНТИЧНОСТИ
---------------------------------------------------------
-Ключевое решение, и оно избавляет от слияния текстов вообще.
+WHY THE TEMPLATE COPY LIVES INSIDE THE LOCAL IDENTITY
+-----------------------------------------------------
+This is the key decision, and it removes text merging altogether.
 
-При клонировании файлы шаблона кладутся в `<локальная>/template/` дословно, и
-редактировать их нельзя. Свои изменения человек пишет в отдельные файлы
-уровнем выше — они накладываются поверх (см. settings.py).
+At clone time the template's files are placed in `<local>/template/` verbatim,
+and they are never edited. Personal changes go into separate files one level up
+and are layered on top (see settings.py).
 
-Из этого следует:
+Three consequences follow:
 
-  * `git pull` не меняет поведение. Шаблон в репозитории обновился — копия
-    внутри идентичности осталась прежней, выдача не поехала. Молчаливый дрейф
-    конфигурации невозможен по устройству, а не по дисциплине.
+  * `git pull` cannot change behaviour. The template in the repository moved on;
+    the copy inside the identity did not, so the shortlist did not shift. Silent
+    configuration drift is impossible by construction rather than by discipline.
 
-  * обновление — это ЗАМЕНА ПАПКИ, а не слияние. Личные правки лежат отдельно
-    и при замене не страдают. Никакого трёхстороннего merge, никаких решений
-    "этот файл перезаписать, а этот подправить" — то есть ни одного места,
-    где агент мог бы тихо потерять чужую настройку.
+  * an update is a FOLDER REPLACEMENT, not a merge. Personal edits sit elsewhere
+    and are untouched by the operation. No three-way merge, no decisions of the
+    "overwrite this file but patch that one" kind — that is, no place where an
+    agent could quietly lose somebody's setting.
 
-  * конфликт вычисляется точно: пересечение ключей, которые человек
-    переопределил, с ключами, изменившимися между версиями. Это список, а не
-    суждение.
+  * a conflict is computed exactly: the intersection of the keys a person
+    overrode with the keys that changed between versions. A list, not a
+    judgement call.
 
-ВЕРСИИ
-------
-Версия шаблона — число в `template.yaml`. `CHANGELOG.md` рядом объясняет
-человеку, что изменилось, новыми версиями вверх. Сравнение версий — сравнение
-чисел, а не разбор markdown: разбор прозы для принятия решения о запуске был
-бы ровно той неявностью, которой здесь стараются избегать.
+VERSIONS
+--------
+A template's version is a number in `template.yaml`. The `CHANGELOG.md` beside
+it explains to a person what changed, newest first. Comparing versions means
+comparing numbers rather than parsing markdown: parsing prose to decide whether
+to run would be exactly the kind of implicitness this project avoids.
 """
 from __future__ import annotations
 
@@ -66,11 +66,11 @@ class TemplateError(Exception):
 
 
 # --------------------------------------------------------------------------
-#  Шаблоны
+#  Templates
 # --------------------------------------------------------------------------
 
 def template_folders() -> dict:
-    """{имя шаблона: папка}. Имя шаблона — префикс из имени папки."""
+    """{template name: folder}. The name is the prefix of the folder name."""
     import identity as identity_mod
 
     found = {}
@@ -88,10 +88,10 @@ def template_folders() -> dict:
 def template_dir(name: str) -> Path:
     folder = template_folders().get(name)
     if folder is None:
-        known = ", ".join(sorted(template_folders())) or "ни одного"
+        known = ", ".join(sorted(template_folders())) or "none"
         raise TemplateError(
-            f"Шаблон '{name}' не найден. Доступны: {known}.\n"
-            f"  Список: python tools/templates.py list"
+            f"Template '{name}' not found. Available: {known}.\n"
+            f"  List them: python tools/templates.py list"
         )
     return folder
 
@@ -100,7 +100,8 @@ def template_manifest(name: str) -> dict:
     path = template_dir(name) / TEMPLATE_MANIFEST
     if not path.exists():
         raise TemplateError(
-            f"У шаблона '{name}' нет {TEMPLATE_MANIFEST} — версию сравнить не с чем."
+            f"Template '{name}' has no {TEMPLATE_MANIFEST} — nothing to compare "
+            f"a version against."
         )
     return common.load_yaml(path) or {}
 
@@ -110,7 +111,7 @@ def template_version(name: str) -> int:
 
 
 # --------------------------------------------------------------------------
-#  Локальные идентичности
+#  Local identities
 # --------------------------------------------------------------------------
 
 def local_manifest_path(prefix: str) -> Path:
@@ -125,7 +126,7 @@ def local_manifest(prefix: str) -> dict:
 
 
 def pinned_version(prefix: str) -> Optional[int]:
-    """Версия шаблона, на которой стоит локальная идентичность."""
+    """The template version this local identity is pinned to."""
     value = local_manifest(prefix).get("template_version")
     return int(value) if value is not None else None
 
@@ -135,7 +136,7 @@ def template_of(prefix: str) -> Optional[str]:
 
 
 def update_available(prefix: str) -> Optional[dict]:
-    """{template, from, to, entries} если шаблон ушёл вперёд, иначе None."""
+    """{template, from, to, entries} if the template moved ahead, else None."""
     name = template_of(prefix)
     if not name or name not in template_folders():
         return None
@@ -152,12 +153,12 @@ def update_available(prefix: str) -> Optional[dict]:
 
 
 def changelog_entries(name: str, after: int = 0) -> List[dict]:
-    """Разделы CHANGELOG.md шаблона новее указанной версии.
+    """Sections of a template's CHANGELOG.md newer than the given version.
 
-    Разбор нужен только для того, чтобы ПОКАЗАТЬ человеку, что изменилось.
-    Решение о наличии обновления принимается по числу в манифесте, поэтому
-    сломанный или отстающий changelog не может привести к неверному запуску —
-    в худшем случае человек увидит меньше пояснений.
+    Parsing is needed only to SHOW a person what changed. Whether an update
+    exists at all is decided by the number in the manifest, so a broken or
+    lagging changelog cannot cause a wrong run — at worst the person sees fewer
+    explanations.
     """
     path = template_dir(name) / CHANGELOG
     if not path.exists():
@@ -178,28 +179,28 @@ def changelog_entries(name: str, after: int = 0) -> List[dict]:
 
 
 # --------------------------------------------------------------------------
-#  Клонирование и обновление
+#  Cloning and updating
 # --------------------------------------------------------------------------
 
 def _template_payload(name: str) -> List[Path]:
-    """Файлы шаблона, которые копируются в локальную идентичность."""
+    """The template files that get copied into a local identity."""
     skip = {TEMPLATE_MANIFEST}
     return [p for p in sorted(template_dir(name).iterdir())
             if p.is_file() and p.name not in skip]
 
 
 def clone(name: str, prefix: str, full_name: str) -> Path:
-    """Создаёт локальную идентичность из шаблона. Возвращает её папку."""
+    """Creates a local identity from a template. Returns its folder."""
     import identity as identity_mod
 
     if prefix in identity_mod.identity_folders():
         raise TemplateError(
-            f"Идентичность с префиксом '{prefix}' уже есть: "
+            f"An identity with prefix '{prefix}' already exists: "
             f"{identity_mod.identity_dir(prefix)}"
         )
     if not identity_mod.PREFIX_RE.match(prefix):
         raise TemplateError(
-            f"неверный формат префикса '{prefix}'. {identity_mod.PREFIX_RULE_TEXT}")
+            f"malformed prefix '{prefix}'. {identity_mod.PREFIX_RULE_TEXT}")
 
     version = template_version(name)
     target = common.IDENTITIES_DIR / identity_mod.folder_name_for(prefix, full_name)
@@ -208,8 +209,8 @@ def clone(name: str, prefix: str, full_name: str) -> Path:
 
     template_prefix = name
     for src in _template_payload(name):
-        # Имена файлов приводятся к префиксу новой идентичности: всё остальное
-        # в проекте ищет файлы по шаблону "<префикс>_<документ>".
+        # File names are rewritten to the new identity's prefix: everything else
+        # in the project looks for files matching "<prefix>_<document>".
         stem = src.name
         if stem.startswith(f"{template_prefix}_"):
             stem = f"{prefix}_{stem[len(template_prefix) + 1:]}"
@@ -223,25 +224,26 @@ def clone(name: str, prefix: str, full_name: str) -> Path:
     })
 
     (target / CHANGELOG).write_text(
-        f"# Журнал изменений идентичности «{full_name}»\n\n"
-        "Новые записи добавляются СВЕРХУ. Локальные изменения всегда идут\n"
-        "первым разделом: они по определению новее любой версии шаблона.\n\n"
-        "## Локальные изменения\n\n"
-        "_Пока нет._\n\n"
-        f"## Создана из шаблона {name} v{version}\n\n"
-        f"Копия шаблона лежит в `{TEMPLATE_COPY_DIR}/` и не редактируется.\n"
-        "Свои настройки пишите файлами рядом — они накладываются поверх.\n",
+        f"# Change log for identity «{full_name}»\n\n"
+        "New entries go on TOP. Local changes always come first: by definition\n"
+        "they are newer than any template version.\n\n"
+        "## Local changes\n\n"
+        "_None yet._\n\n"
+        f"## Created from template {name} v{version}\n\n"
+        f"The template copy lives in `{TEMPLATE_COPY_DIR}/` and is never edited.\n"
+        "Put your own settings in files beside it — they are layered on top.\n",
         encoding="utf-8",
     )
     return target
 
 
 def apply_update(prefix: str) -> dict:
-    """Ставит локальную идентичность на текущую версию шаблона.
+    """Moves a local identity onto the template's current version.
 
-    Это ЗАМЕНА папки `template/`, а не слияние: личные настройки лежат
-    отдельными файлами и не участвуют в операции вообще. Поэтому здесь нет и
-    не может быть решения "что перезаписать, а что подправить".
+    This REPLACES the `template/` folder rather than merging into it: personal
+    settings live in separate files and take no part in the operation at all.
+    So there is not, and cannot be, a decision here about "what to overwrite
+    and what to patch".
     """
     import identity as identity_mod
 
@@ -269,9 +271,9 @@ def apply_update(prefix: str) -> dict:
     changelog = target / CHANGELOG
     if changelog.exists():
         text = changelog.read_text(encoding="utf-8")
-        note = (f"## Обновлено до {name} v{info['to']}\n\n"
+        note = (f"## Updated to {name} v{info['to']}\n\n"
                 + "\n".join(f"- {e['title']}" for e in info["entries"]) + "\n\n")
-        marker = "## Локальные изменения"
+        marker = "## Local changes"
         if marker in text:
             head, _, tail = text.partition(marker)
             end = tail.find("\n## ")
@@ -286,12 +288,12 @@ def apply_update(prefix: str) -> dict:
 
 
 def overridden_keys_changed(prefix: str, info: dict) -> List[str]:
-    """Ключи, которые человек переопределил И которые изменил шаблон.
+    """Keys the person overrode AND the template changed.
 
-    Именно это и есть весь «конфликт» при обновлении — точный список, а не
-    предмет для размышления. Переопределение продолжает действовать (оно
-    сильнее), поэтому список информационный: человек решает, не устарела ли
-    его правка.
+    That intersection is the whole "conflict" of an update — an exact list
+    rather than something to think about. The override keeps winning (it is the
+    stronger layer), so the list is informational: the person decides whether
+    their edit has gone stale.
     """
     import settings
 
@@ -310,21 +312,21 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Шаблоны идентичностей: список, клонирование, обновление"
+        description="Identity templates: list, clone, update"
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("list", help="Показать доступные шаблоны")
+    sub.add_parser("list", help="Show the available templates")
 
-    p_clone = sub.add_parser("clone", help="Создать свою идентичность из шаблона")
-    p_clone.add_argument("template", help="Имя шаблона (см. list)")
-    p_clone.add_argument("prefix", help="Префикс новой идентичности")
-    p_clone.add_argument("name", help="Расшифровка латиницей, для имени папки")
+    p_clone = sub.add_parser("clone", help="Create your own identity from a template")
+    p_clone.add_argument("template", help="Template name (see list)")
+    p_clone.add_argument("prefix", help="Prefix for the new identity")
+    p_clone.add_argument("name", help="Latin-script expansion, used for the folder name")
 
-    p_check = sub.add_parser("check", help="Не ушёл ли шаблон вперёд")
+    p_check = sub.add_parser("check", help="Has the template moved ahead")
     p_check.add_argument("--identity", required=True)
 
-    p_update = sub.add_parser("update", help="Поставить на текущую версию шаблона")
+    p_update = sub.add_parser("update", help="Move onto the template's current version")
     p_update.add_argument("--identity", required=True)
 
     args = parser.parse_args()
@@ -332,26 +334,26 @@ def main() -> None:
     if args.cmd == "list":
         found = template_folders()
         if not found:
-            print(f"Шаблонов нет: {common.TEMPLATES_DIR} пуста.")
+            print(f"No templates: {common.TEMPLATES_DIR} is empty.")
             return
-        print(f"Шаблоны в {common.TEMPLATES_DIR}:\n")
+        print(f"Templates in {common.TEMPLATES_DIR}:\n")
         for name in sorted(found):
             manifest = template_manifest(name)
             summary = " ".join(str(manifest.get("summary") or "").split())
             print(f"  {name:<8} v{manifest.get('version', 1)}  {summary}")
             fits = " ".join(str(manifest.get("suitable_for") or "").split())
             if fits:
-                print(f"           кому: {fits}")
-        print("\n  Клонировать: python tools/templates.py clone <шаблон> <префикс> <расшифровка>")
+                print(f"           for whom: {fits}")
+        print("\n  Clone one: python tools/templates.py clone <template> <prefix> <expansion>")
         return
 
     if args.cmd == "clone":
         target = clone(args.template, args.prefix, args.name)
-        print(f"Создана идентичность '{args.prefix}': {target}")
-        print(f"  Копия шаблона:   {target / TEMPLATE_COPY_DIR}  (не редактировать)")
-        print(f"  Ваши настройки:  {target / (args.prefix + '_profile.yaml')}")
-        print(f"  Личные файлы:    {target / DOCUMENTS_DIR}")
-        print("\n  Дальше — docs/ONBOARDING.md: заполнить профиль вместе с агентом.")
+        print(f"Created identity '{args.prefix}': {target}")
+        print(f"  Template copy:   {target / TEMPLATE_COPY_DIR}  (do not edit)")
+        print(f"  Your settings:   {target / (args.prefix + '_profile.yaml')}")
+        print(f"  Personal files:  {target / DOCUMENTS_DIR}")
+        print("\n  Next — docs/ONBOARDING.md: fill in the profile together with the agent.")
         return
 
     info = update_available(args.identity)
@@ -359,26 +361,27 @@ def main() -> None:
         if not info:
             pinned = pinned_version(args.identity)
             name = template_of(args.identity)
-            print(f"Обновлений нет: '{args.identity}' стоит на {name} v{pinned}."
-                  if name else f"'{args.identity}' не создана из шаблона — обновлять нечего.")
+            print(f"No updates: '{args.identity}' is on {name} v{pinned}."
+                  if name else
+                  f"'{args.identity}' was not created from a template — nothing to update.")
             return
-        print(f"Шаблон '{info['template']}' ушёл вперёд: v{info['from']} -> v{info['to']}\n")
+        print(f"Template '{info['template']}' moved ahead: v{info['from']} -> v{info['to']}\n")
         for entry in info["entries"]:
             print(f"  {entry['title']}")
             for line in entry["lines"][:4]:
                 print(f"      {line}")
-        print(f"\n  Обновить: python tools/templates.py update --identity {args.identity}")
+        print(f"\n  Update: python tools/templates.py update --identity {args.identity}")
         return
 
     if args.cmd == "update":
         if not info:
-            print("Обновлений нет.")
+            print("No updates.")
             return
         result = apply_update(args.identity)
-        print(f"Обновлено: v{result['from']} -> v{result['to']}")
+        print(f"Updated: v{result['from']} -> v{result['to']}")
         if result.get("conflicts"):
-            print("\n  Ваши переопределения продолжают действовать (они сильнее шаблона).")
-            print("  Проверьте, не устарели ли они после обновления:")
+            print("\n  Your overrides keep applying (they are stronger than the template).")
+            print("  Check whether they have gone stale after the update:")
             for key in result["conflicts"][:20]:
                 print(f"    - {key}")
 

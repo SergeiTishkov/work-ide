@@ -618,13 +618,14 @@ def clone_identity(source: str, prefix: str, full_name: str) -> List[Path]:
             "calibrated for the tests rather than for a live search"
         )
     if not PREFIX_RE.match(prefix):
-        raise InvalidIdentityError(f"неверный формат префикса '{prefix}'. {PREFIX_RULE_TEXT}")
+        raise InvalidIdentityError(
+            f"malformed prefix '{prefix}'. {PREFIX_RULE_TEXT}")
     if prefix in identity_folders():
-        raise InvalidIdentityError(f"префикс '{prefix}' уже занят")
+        raise InvalidIdentityError(f"prefix '{prefix}' is already taken")
 
     target = common.IDENTITIES_DIR / folder_name_for(prefix, full_name)
     if target.exists():
-        raise InvalidIdentityError(f"папка {target} уже существует")
+        raise InvalidIdentityError(f"folder {target} already exists")
 
     target.mkdir(parents=True)
     created: List[Path] = []
@@ -645,35 +646,36 @@ def cmd_clone(args) -> None:
         common.eprint(str(exc))
         sys.exit(1)
 
-    print(f"Идентичность '{args.prefix}' склонирована из '{args.source}': "
+    print(f"Identity '{args.prefix}' cloned from '{args.source}': "
           f"{identity_dir(args.prefix)}")
     for path in created:
         print(f"  + {path.name}")
 
     problems = validate(args.prefix)
     if problems:
-        print("\n[FAIL] структурная проверка не прошла:")
+        print("\n[FAIL] the structural check did not pass:")
         for p in problems:
             print(f"       - {p}")
         sys.exit(1)
-    print("\n[ OK ] структура корректна (префиксы, обязательные файлы, чужие ссылки)")
+    print("\n[ OK ] structure is sound (prefixes, required files, foreign references)")
 
     print(
-        "\nЭто ПОЛНАЯ КОПИЯ — сейчас она ищет ровно то же, что и оригинал.\n"
-        "Проверьте и поправьте то, что должно отличаться:\n"
+        "\nThis is a FULL COPY — right now it searches for exactly what the original does.\n"
+        "Review and change whatever should differ:\n"
         f"  1. {args.prefix}_profile.yaml -> identity.display_name, abbreviation,\n"
         "     scoring_philosophy, target_regions;\n"
-        f"  2. {args.prefix}_criteria.yaml -> гео-блоки (restrictive_region_signal,\n"
-        "     acceptable_region_signal, hard_dealbreakers, timezone_gate,\n"
-        "     ambiguous_place_names) и языковой фильтр;\n"
-        f"  3. {args.prefix}_identity.md -> чем этот поиск отличается от исходного;\n"
-        f"  4. {args.prefix}_questionnaire.yaml -> ответы, которые изменились.\n"
-        "\nГео-правила ВЫВОДЯТСЯ по таблицам config/derivation/, а не правятся\n"
-        "на глаз: для резидента США фраза 'US only' — плюс, для нерезидента —\n"
-        "полная дисквалификация. Скопированное правило с неверным знаком тихо\n"
-        "выбросит половину рынка.\n"
-        f"\nДанные не копируются: у '{args.prefix}' своя пустая база.\n"
-        f"Активировать: python tools/identity.py init-local --identity {args.prefix}"
+        f"  2. {args.prefix}_criteria.yaml -> the geography blocks\n"
+        "     (restrictive_region_signal, acceptable_region_signal,\n"
+        "     hard_dealbreakers, timezone_gate, ambiguous_place_names) and the\n"
+        "     language filter;\n"
+        f"  3. {args.prefix}_identity.md -> how this search differs from the original;\n"
+        f"  4. {args.prefix}_questionnaire.yaml -> the answers that changed.\n"
+        "\nGeography rules are DERIVED from the tables in config/derivation/,\n"
+        "not edited by eye: for a US resident 'US only' is a plus, for a\n"
+        "non-resident it is total disqualification. A copied rule with the sign\n"
+        "the wrong way round silently throws away half the market.\n"
+        f"\nData is not copied: '{args.prefix}' starts with an empty database.\n"
+        f"Activate it: python tools/identity.py init-local --identity {args.prefix}"
     )
 
 
@@ -685,68 +687,75 @@ def cmd_new(args) -> None:
         common.eprint(str(exc))
         sys.exit(1)
 
-    print(f"Создана идентичность '{prefix}': {identity_dir(prefix)}")
+    print(f"Created identity '{prefix}': {identity_dir(prefix)}")
     for path in created:
         print(f"  + {path.name}")
 
     problems = validate(prefix)
     if problems:
-        print("\n[FAIL] структурная проверка не прошла:")
+        print("\n[FAIL] the structural check did not pass:")
         for p in problems:
             print(f"       - {p}")
         sys.exit(1)
-    print("\n[ OK ] структура корректна (префиксы, обязательные файлы, чужие ссылки)")
+    print("\n[ OK ] structure is sound (prefixes, required files, foreign references)")
 
     print(
-        "\nЭто ЗАГОТОВКА, а не готовая идентичность: в файлах стоят плейсхолдеры.\n"
-        "Дальше по docs/ONBOARDING.md:\n"
-        f"  1. заполнить {prefix}_questionnaire.yaml вместе с человеком "
+        "\nThis is SCAFFOLDING, not a finished identity: the files hold placeholders.\n"
+        "Next, per docs/ONBOARDING.md:\n"
+        f"  1. fill in {prefix}_questionnaire.yaml together with the person "
         "(docs/QUESTIONNAIRE.md);\n"
-        f"  2. по ответам заполнить {prefix}_profile.yaml и {prefix}_criteria.yaml;\n"
-        "     гео-правила и языковые фильтры ВЫВОДЯТСЯ из резидентства и языков\n"
-        "     человека по таблицам config/derivation/, а не копируются у соседа;\n"
-        "  3. зарегистрировать идентичность в local-constitution/active.yaml."
+        f"  2. use those answers to fill in {prefix}_profile.yaml and "
+        f"{prefix}_criteria.yaml;\n"
+        "     geography rules and language filters are DERIVED from the person's\n"
+        "     residency and languages via the tables in config/derivation/ — they\n"
+        "     are never copied from a neighbouring identity;\n"
+        "  3. register the identity in local-constitution/active.yaml."
     )
 
-    # Ловушка, которую иначе обнаруживают только по сломавшимся командам:
-    # пока активна одна идентичность, инструменты берут её молча. Как только
-    # активных становится две, а default_identity не задан, КАЖДЫЙ вызов без
-    # --identity начинает падать — включая те, что годами работали у первой
-    # идентичности.
+    # A trap otherwise discovered only through commands that stopped working:
+    # while exactly one identity is active, tools pick it silently. The moment
+    # a second one appears without a default_identity, EVERY call without
+    # --identity starts failing — including the ones that worked for the first
+    # identity for months.
     already_active = active_identities()
     if already_active and prefix not in already_active:
         current_default = default_identity()
         print(
-            f"\nВНИМАНИЕ: на этой машине уже активны: {', '.join(already_active)}.\n"
-            f"Как только вы добавите '{prefix}' в active.yaml, активных станет "
-            f"{len(already_active) + 1}."
+            f"\nNOTE: these are already active on this machine: "
+            f"{', '.join(already_active)}.\n"
+            f"Once you add '{prefix}' to active.yaml there will be "
+            f"{len(already_active) + 1} of them."
         )
         if not current_default:
             print(
-                "  default_identity сейчас НЕ задан. С двумя активными идентичностями\n"
-                "  он становится обязательным: иначе любая команда без --identity\n"
-                "  начнёт отказываться работать — в том числе для уже настроенной\n"
-                f"  идентичности '{already_active[0]}'.\n"
-                "  Задайте default_identity одновременно с добавлением записи."
+                "  default_identity is currently NOT set. With two active identities\n"
+                "  it becomes mandatory: without it every command that omits\n"
+                "  --identity starts refusing to run — including for the already\n"
+                f"  configured identity '{already_active[0]}'.\n"
+                "  Set default_identity at the same time as you add the entry."
             )
         else:
             print(
-                f"  default_identity задан ('{current_default}') — команды без --identity\n"
-                f"  продолжат работать с ним. Для '{prefix}' указывайте флаг явно."
+                f"  default_identity is set ('{current_default}') — commands without\n"
+                f"  --identity keep using it. For '{prefix}', pass the flag explicitly."
             )
 
 
 def init_local_constitution(prefix: Optional[str] = None, note: str = "") -> List[str]:
-    """Разворачивает Малую Конституцию и регистрирует в ней идентичность.
+    """Sets up the Local Constitution and registers an identity in it.
 
-    Раньше это была инструкция «скопируйте docs/templates/local-constitution
-    через xcopy, затем отредактируйте active.yaml руками» — то есть команда,
-    работающая только на Windows, плюс ручное редактирование YAML в том самом
-    месте, где ошибка тише всего: `default_identity` обязателен при двух
-    активных идентичностях, и без него ломаются команды ПЕРВОЙ из них.
+    THE RETIRED LAYER. Identities now live in `local-identities/`, and this
+    folder is kept for machines that were set up before the change. New
+    installations do not need it (docs/LOCAL_CONSTITUTION.md).
 
-    Идемпотентна: существующие файлы не перезаписываются, повторная
-    регистрация того же префикса ничего не портит.
+    This used to be the instruction "copy docs/templates/local-constitution
+    with xcopy, then edit active.yaml by hand" — a command that only worked
+    on Windows, plus hand-editing YAML at the exact spot where a mistake is
+    quietest: `default_identity` is mandatory once two identities are active,
+    and without it the commands of the FIRST one break.
+
+    Idempotent: existing files are not overwritten, and registering the same
+    prefix twice damages nothing.
     """
     import shutil
 
@@ -756,14 +765,14 @@ def init_local_constitution(prefix: Optional[str] = None, note: str = "") -> Lis
 
     if not lc.exists():
         lc.mkdir(parents=True)
-        actions.append(f"создана папка {lc}")
+        actions.append(f"created folder {lc}")
 
     if template.is_dir():
         for src in sorted(template.rglob("*")):
             if src.is_dir() or src.name == ".gitkeep":
                 continue
-            # active.example.yaml — образец, а не рабочий файл; настоящий
-            # active.yaml собирается ниже из реальных данных.
+            # active.example.yaml is a sample, not a working file; the real
+            # active.yaml is assembled below from actual data.
             if src.name == "active.example.yaml":
                 continue
             dest = lc / src.relative_to(template)
@@ -771,13 +780,13 @@ def init_local_constitution(prefix: Optional[str] = None, note: str = "") -> Lis
                 continue
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
-            actions.append(f"скопирован {dest.relative_to(lc)}")
+            actions.append(f"copied {dest.relative_to(lc)}")
 
     if prefix:
         personal = common.personal_dir(prefix)
         if not personal.exists():
             personal.mkdir(parents=True)
-            actions.append(f"создана папка личных файлов {personal}")
+            actions.append(f"created personal-files folder {personal}")
         actions.extend(_write_owner_skeleton(prefix))
         actions.extend(_register_identity_locally(prefix, note))
 
@@ -785,12 +794,12 @@ def init_local_constitution(prefix: Optional[str] = None, note: str = "") -> Lis
 
 
 def _write_owner_skeleton(prefix: str) -> List[str]:
-    """Создаёт заготовку `<p>_owner.yaml` ровно под те поля, которые данная
-    идентичность помечает сентинелом `local`.
+    """Scaffolds `<p>_owner.yaml` for exactly the fields this identity marks
+    with the `local` sentinel.
 
-    Список полей не универсален: у каждой идентичности он свой. Гораздо
-    полезнее отдать человеку файл, где перечислено именно то, что нужно ему,
-    чем отправить его читать спецификацию и собирать структуру руками.
+    The field list is not universal: every identity has its own. Handing a
+    person a file listing precisely what THEY need is far more useful than
+    sending them off to read a specification and build the structure by hand.
     """
     path = common.personal_dir(prefix) / f"{prefix}_owner.yaml"
     if path.exists():
@@ -805,14 +814,14 @@ def _write_owner_skeleton(prefix: str) -> List[str]:
         return []
 
     lines = [
-        f"# Личная часть профиля идентичности `{prefix}`. ВНЕ ГИТА.",
+        f"# The personal part of identity `{prefix}`'s profile. OUTSIDE GIT.",
         "#",
-        "# Здесь лежит то, что относится к КОНКРЕТНОМУ ЧЕЛОВЕКУ, а не к типу",
-        "# поиска: имя, резидентство, языки, CV, зарплатные ожидания. В общем",
-        "# репозитории на этих местах стоит `local`.",
+        "# This holds what belongs to a PARTICULAR PERSON rather than to a kind",
+        "# of search: name, residency, languages, CV, pay expectations. In the",
+        "# shared repository those places hold `local`.",
         "#",
-        "# Заполните значения ниже — пути совпадают с путями в профиле.",
-        "# Спецификация: docs/LOCAL_CONSTITUTION.md",
+        "# Fill in the values below — the paths match those in the profile.",
+        "# Specification: docs/LOCAL_CONSTITUTION.md",
         "",
         "schema_version: 1",
         "",
@@ -832,15 +841,15 @@ def _write_owner_skeleton(prefix: str) -> List[str]:
                 lines.append(f"{pad}{key}:")
                 render(value, indent + 1)
             else:
-                lines.append(f"{pad}{key}:      # заполните")
+                lines.append(f"{pad}{key}:      # fill this in")
 
     render(tree)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return [f"создана заготовка {path.name} ({len(fields)} полей для заполнения)"]
+    return [f"scaffolded {path.name} ({len(fields)} fields to fill in)"]
 
 
 def _register_identity_locally(prefix: str, note: str = "") -> List[str]:
-    """Дописывает идентичность в active.yaml, сохраняя уже записанное."""
+    """Appends an identity to active.yaml, preserving what is already there."""
     import datetime
 
     actions: List[str] = []
@@ -853,15 +862,16 @@ def _register_identity_locally(prefix: str, note: str = "") -> List[str]:
     )
     needs_default = len(entries) > 1 and not cfg.get("default_identity")
 
-    # НИЧЕГО НЕ МЕНЯЕТСЯ — ничего и не пишем. Это не микрооптимизация: файл
-    # написан человеком и полон комментариев, а перезапись через YAML-дампер
-    # их стирает. Реальный случай при разработке этой команды 2026-08-04:
-    # безобидный повторный запуск снёс всю документацию внутри active.yaml.
+    # NOTHING CHANGES — so nothing is written. This is not a micro-optimisation:
+    # the file was written by a person and is full of comments, and rewriting it
+    # through a YAML dumper erases them. It actually happened while this command
+    # was being built, 2026-08-04: a harmless repeat run wiped every line of
+    # documentation inside active.yaml.
     if already_registered and not needs_default:
-        return [f"'{prefix}' уже зарегистрирована в active.yaml — файл не тронут"]
+        return [f"'{prefix}' is already registered in active.yaml — file untouched"]
 
     if already_registered:
-        actions.append(f"'{prefix}' уже зарегистрирована в active.yaml")
+        actions.append(f"'{prefix}' is already registered in active.yaml")
     else:
         entries.append({
             "prefix": prefix,
@@ -871,34 +881,34 @@ def _register_identity_locally(prefix: str, note: str = "") -> List[str]:
             "note": note or "",
         })
         cfg["active_identities"] = entries
-        actions.append(f"'{prefix}' добавлена в active.yaml")
+        actions.append(f"'{prefix}' added to active.yaml")
 
     cfg.setdefault("schema_version", 1)
 
-    # Ключевой момент, ради которого команда и существует. Пока идентичность
-    # одна, инструменты берут её молча. В тот момент, когда появляется вторая
-    # без default_identity, отказывать начинают команды ПЕРВОЙ — той, что
-    # работала месяцами. Проставляем дефолт ровно тогда, когда он становится
-    # обязательным.
+    # The key moment this command exists for. While there is one identity, tools
+    # pick it silently. The instant a second appears without a default_identity,
+    # it is the FIRST one's commands that start refusing — the one that had been
+    # working for months. So the default is set exactly when it becomes
+    # mandatory.
     if len(cfg["active_identities"]) > 1 and not cfg.get("default_identity"):
         first = cfg["active_identities"][0]
         cfg["default_identity"] = first.get("prefix") if isinstance(first, dict) else first
         actions.append(
-            f"задан default_identity: {cfg['default_identity']} "
-            "(обязателен при двух и более активных — иначе команды без --identity "
-            "перестают работать у ранее настроенной идентичности)"
+            f"set default_identity: {cfg['default_identity']} "
+            "(mandatory with two or more active identities — otherwise commands "
+            "without --identity stop working for the previously configured one)"
         )
 
-    # Файл переписывается только когда без этого не обойтись, и тогда рядом
-    # остаётся копия: человеческие комментарии из него пережить перезапись не
-    # могут, а терять чужой текст молча нельзя.
+    # The file is rewritten only when there is no way round it, and then a copy
+    # is left beside it: a person's comments cannot survive the rewrite, and
+    # losing somebody else's text silently is not acceptable.
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         backup = path.with_suffix(".yaml.bak")
         backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
         actions.append(
-            f"прежняя версия сохранена в {backup.name} "
-            "(перезапись стирает комментарии — сверьтесь и удалите копию)"
+            f"previous version saved as {backup.name} "
+            "(the rewrite erases comments — compare, then delete the copy)"
         )
     common.write_yaml(path, cfg)
     return actions
@@ -906,24 +916,24 @@ def _register_identity_locally(prefix: str, note: str = "") -> List[str]:
 
 def cmd_init_local(args) -> None:
     actions = init_local_constitution(args.identity, note=args.note or "")
-    print(f"Малая Конституция: {common.LOCAL_CONSTITUTION_DIR}")
+    print(f"Local Constitution: {common.LOCAL_CONSTITUTION_DIR}")
     for a in actions:
         print(f"  + {a}")
     if not actions:
-        print("  (всё уже на месте — ничего менять не пришлось)")
+        print("  (everything was already in place — nothing needed changing)")
     print(
-        "\nЧто дальше:\n"
-        "  - положите CV в personal/<префикс>/ (под его собственным именем);\n"
-        "  - личные поля профиля (имя, резидентство, языки, зарплата) — в\n"
-        "    personal/<префикс>/<префикс>_owner.yaml, см. docs/LOCAL_CONSTITUTION.md;\n"
-        "  - папка в гит не попадает и попасть не должна."
+        "\nWhat next:\n"
+        "  - put your CV in personal/<prefix>/ (under its own name);\n"
+        "  - the personal profile fields (name, residency, languages, pay) go in\n"
+        "    personal/<prefix>/<prefix>_owner.yaml, see docs/LOCAL_CONSTITUTION.md;\n"
+        "  - the folder is not in git and must never get there."
     )
 
 
 def cmd_validate(args) -> None:
     targets = [args.identity] if args.identity else list_identities(include_fixtures=True)
     if not targets:
-        print("Нечего проверять: идентичностей нет.")
+        print("Nothing to check: there are no identities.")
         return
     total_problems = 0
     for prefix in targets:
@@ -936,91 +946,98 @@ def cmd_validate(args) -> None:
         else:
             print(f"[ OK ] {prefix}")
     if total_problems:
-        print(f"\nПроблем: {total_problems}")
+        print(f"\nProblems: {total_problems}")
         sys.exit(1)
-    print("\nВсе идентичности в порядке.")
+    print("\nEvery identity is sound.")
 
 
 TEMPLATE_DIR_NAME = "blank-start-from-scratch"
 TEMPLATE_PREFIX = "blank"
 
-# Плейсхолдер префикса внутри файлов шаблона.
-TEMPLATE_PREFIX_PLACEHOLDER = "<префикс>"
+# The prefix placeholder inside template files.
+TEMPLATE_PREFIX_PLACEHOLDER = "<prefix>"
 
 
 def folder_name_for(prefix: str, full_name: str) -> str:
     """('kisel', 'Keep It Simple, Easy, Legacy') -> 'kisel-keep-it-simple-easy-legacy'.
 
-    Расшифровку человек диктует как обычную фразу; приводить её к виду имени
-    папки — работа инструмента, а не человека.
+    A person dictates the expansion as an ordinary phrase; turning it into a
+    folder name is the tool's job, not theirs.
     """
     slug = re.sub(r"[^a-z0-9]+", "-", full_name.strip().lower()).strip("-")
     if not slug:
         raise InvalidIdentityError(
-            "расшифровка пуста или состоит только из символов, непригодных для имени папки"
+            "the expansion is empty, or consists only of characters unusable in "
+            "a folder name"
         )
-    # Расшифровка часто начинается с самого префикса ("KISEL — Keep It Simple"),
-    # и тогда он не должен задваиваться в имени папки.
+    # An expansion often starts with the prefix itself ("KISEL — Keep It
+    # Simple"), and then it must not appear twice in the folder name.
     if slug == prefix or slug.startswith(f"{prefix}-"):
         slug = slug[len(prefix):].lstrip("-")
     folder = f"{prefix}-{slug}" if slug else prefix
     if folder_prefix(folder) != prefix:
         raise InvalidIdentityError(
-            f"из расшифровки '{full_name}' получилось некорректное имя папки '{folder}'. "
-            f"{FOLDER_RULE_TEXT}"
+            f"expansion '{full_name}' produced the malformed folder name "
+            f"'{folder}'. {FOLDER_RULE_TEXT}"
         )
     return folder
 
 
 def scaffold_identity(prefix: str, full_name: str) -> List[Path]:
-    """Создаёт папку идентичности из шаблона. Возвращает созданные файлы.
+    """Creates an identity folder from the template. Returns the files created.
 
-    Почему это код, а не список команд в документации. Раньше `ONBOARDING.md`
-    предлагал шесть `copy` с переименованием каждого файла вручную. Именно на
-    этом шаге проект уже обжигался: при создании фикстуры `ftf` в неё попал
-    файл, ссылающийся на `kisel_` — ровно та копипаста, от которой защищает
-    правило префиксов. Ручная процедура из шести шагов, выполняемая по памяти,
-    рано или поздно даёт такую ошибку; функция — нет.
+    Why this is code rather than a list of commands in the documentation.
+    `ONBOARDING.md` used to offer six `copy` invocations, each renaming a file
+    by hand. The project has already been burned at exactly this step: while
+    the `ftf` fixture was being created, a file referencing `kisel_` ended up
+    inside it — precisely the copy-paste the prefix rule protects against. A
+    six-step manual procedure performed from memory produces that mistake
+    sooner or later; a function does not.
 
-    Малую Конституцию функция НЕ трогает: "какие идентичности активны на этой
-    машине" — отдельное осознанное решение человека, и оно живёт вне гита.
+    It does NOT touch the Local Constitution: "which identities are active on
+    this machine" is a separate, deliberate decision by a person, and it lives
+    outside git.
     """
     if not PREFIX_RE.match(prefix):
-        raise InvalidIdentityError(f"неверный формат префикса '{prefix}'. {PREFIX_RULE_TEXT}")
+        raise InvalidIdentityError(
+            f"malformed prefix '{prefix}'. {PREFIX_RULE_TEXT}")
     if prefix == TEMPLATE_PREFIX:
         raise InvalidIdentityError(
-            f"'{TEMPLATE_PREFIX}' — префикс шаблона, его нельзя использовать для идентичности"
+            f"'{TEMPLATE_PREFIX}' is the template's prefix and cannot be used "
+            "for an identity"
         )
 
     existing = identity_folders().get(prefix)
     if existing is not None:
         raise InvalidIdentityError(
-            f"папка {existing} уже существует (префикс '{prefix}' занят). Идентичность "
-            "не перезаписывается: если нужно начать заново, человек должен удалить папку сам"
+            f"folder {existing} already exists (prefix '{prefix}' is taken). An "
+            "identity is never overwritten: to start over, the person deletes the "
+            "folder themselves"
         )
 
     target = common.IDENTITIES_DIR / folder_name_for(prefix, full_name)
     if target.exists():
-        raise InvalidIdentityError(f"папка {target} уже существует")
+        raise InvalidIdentityError(f"folder {target} already exists")
 
     template = common.TEMPLATES_DIR / TEMPLATE_DIR_NAME
     if not template.is_dir():
-        raise InvalidIdentityError(f"нет папки шаблона: {template}")
+        raise InvalidIdentityError(f"no template folder: {template}")
 
     sources = sorted(p for p in template.iterdir() if p.is_file())
     if not sources:
-        raise InvalidIdentityError(f"папка шаблона пуста: {template}")
+        raise InvalidIdentityError(f"the template folder is empty: {template}")
 
     target.mkdir(parents=True)
     created: List[Path] = []
     for src in sources:
         if not src.name.startswith(f"{TEMPLATE_PREFIX}_"):
-            continue  # README шаблона и прочее в идентичность не копируем
+            continue  # the template README and the like are not copied across
         new_name = f"{prefix}_{src.name[len(TEMPLATE_PREFIX) + 1:]}"
         text = src.read_text(encoding="utf-8")
-        # Подставляем префикс и в имена файлов, и в тексте: ссылки вида
-        # "<префикс>_criteria.yaml" внутри документации идентичности должны
-        # сразу указывать на реальные файлы, иначе агент пойдёт по битым путям.
+        # The prefix is substituted into file names AND into the text:
+        # references like "<prefix>_criteria.yaml" inside an identity's own
+        # documentation must point at real files straight away, or the agent
+        # will follow broken paths.
         text = text.replace(f"{TEMPLATE_PREFIX}_", f"{prefix}_")
         text = text.replace(TEMPLATE_PREFIX_PLACEHOLDER, prefix)
         dest = target / new_name
@@ -1030,11 +1047,11 @@ def scaffold_identity(prefix: str, full_name: str) -> List[Path]:
 
 
 def _flatten_keys(data, prefix: str = "") -> set:
-    """Множество путей до всех ключей вложенного словаря: 'a.b.c'.
+    """The set of paths to every key of a nested dict: 'a.b.c'.
 
-    Сравниваем именно СТРУКТУРУ, а не значения: значения у каждой идентичности
-    свои и обязаны различаться, а вот отсутствующий ключ означает, что до
-    идентичности не доехало улучшение машинерии.
+    What is compared is STRUCTURE, not values: values are each identity's own
+    and are supposed to differ, whereas a missing key means an improvement to
+    the machinery never reached that identity.
     """
     keys = set()
     if isinstance(data, dict):
@@ -1046,19 +1063,24 @@ def _flatten_keys(data, prefix: str = "") -> set:
 
 
 def diff_template(prefix: str, config_name: str = "criteria.yaml") -> dict:
-    """Структурное сравнение конфига идентичности с шаблоном.
+    """Structural comparison of an identity's config against the template.
 
-    Только отчёт, никогда не автослияние: решение, нужен ли идентичности новый
-    блок машинерии, принимает человек — иначе тихая правка может изменить
-    поведение чужого поиска.
+    A report, never an automatic merge: whether an identity needs a new block
+    of machinery is a person's decision — a silent edit could otherwise change
+    how somebody else's search behaves.
+
+    The template is looked up in TEMPLATES_DIR. It used to be looked up in
+    IDENTITIES_DIR, which was where templates lived before the split; after
+    the move that path pointed at local-identities/, so the command reported
+    "no template" for every identity. Found 2026-08-06.
     """
-    template_path = common.IDENTITIES_DIR / TEMPLATE_DIR_NAME / f"{TEMPLATE_PREFIX}_{config_name}"
+    template_path = common.TEMPLATES_DIR / TEMPLATE_DIR_NAME / f"{TEMPLATE_PREFIX}_{config_name}"
     identity_path = identity_file(prefix, config_name)
 
     if not template_path.exists():
-        raise IdentityError(f"нет шаблона: {template_path}")
+        raise IdentityError(f"no template file: {template_path}")
     if not identity_path.exists():
-        raise IdentityError(f"нет файла идентичности: {identity_path}")
+        raise IdentityError(f"no identity file: {identity_path}")
 
     template_data = common.load_yaml(template_path) or {}
     identity_data = common.load_yaml(identity_path) or {}
@@ -1068,8 +1090,8 @@ def diff_template(prefix: str, config_name: str = "criteria.yaml") -> dict:
 
     return {
         "config": config_name,
-        "missing": sorted(template_keys - identity_keys),   # не доехало из шаблона
-        "extra": sorted(identity_keys - template_keys),     # личные расширения
+        "missing": sorted(template_keys - identity_keys),   # never reached the identity
+        "extra": sorted(identity_keys - template_keys),     # personal extensions
         "template_schema_version": template_data.get("schema_version"),
         "identity_schema_version": identity_data.get("schema_version"),
     }
@@ -1086,24 +1108,26 @@ def cmd_diff_template(args) -> None:
 
         print(f"\n=== {describe(prefix)} — {result['config']} ===")
         if result["missing"]:
-            print("  Есть в шаблоне, нет у идентичности "
-                  "(вероятно, не доехало улучшение машинерии):")
+            print("  In the template, absent from the identity "
+                  "(an improvement to the machinery probably never arrived):")
             for key in result["missing"]:
                 print(f"    - {key}")
         if result["extra"]:
-            print("  Есть у идентичности, нет в шаблоне (личные расширения — это нормально):")
+            print("  In the identity, absent from the template "
+                  "(personal extensions — perfectly normal):")
             for key in result["extra"][:15]:
                 print(f"    + {key}")
             if len(result["extra"]) > 15:
-                print(f"    ... ещё {len(result['extra']) - 15}")
+                print(f"    ... and {len(result['extra']) - 15} more")
         if not result["missing"] and not result["extra"]:
-            print("  Структура совпадает с шаблоном.")
+            print("  The structure matches the template.")
 
-    print("\nЭто отчёт, а не автослияние: что именно перенести — решает человек.")
+    print("\nA report, not an automatic merge: what to carry over is a "
+          "person's decision.")
 
 
 def cmd_which(args) -> None:
-    """Показывает, какая идентичность была бы выбрана прямо сейчас и почему."""
+    """Shows which identity would be chosen right now, and why."""
     try:
         prefix = resolve_identity(args.identity)
     except IdentityError as exc:
@@ -1111,69 +1135,74 @@ def cmd_which(args) -> None:
         sys.exit(1)
 
     if args.identity:
-        reason = "явно указана через --identity"
+        reason = "named explicitly via --identity"
     elif os.environ.get("WORK_IDE_IDENTITY"):
-        reason = "переменная окружения WORK_IDE_IDENTITY"
+        reason = "the WORK_IDE_IDENTITY environment variable"
     elif default_identity():
-        reason = f"default_identity в {local_constitution_path()}"
+        reason = f"default_identity in {local_constitution_path()}"
     else:
-        reason = "единственная активная в Малой Конституции"
-    print(f"{describe(prefix)}\n  причина: {reason}")
+        reason = "the only identity present"
+    print(f"{describe(prefix)}\n  reason: {reason}")
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Управление поисковыми идентичностями")
+    p = argparse.ArgumentParser(description="Manage search identities")
     sub = p.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("list", help="Показать все идентичности репозитория").set_defaults(func=cmd_list)
+    sub.add_parser("list", help="Show every identity present").set_defaults(func=cmd_list)
 
     p_new = sub.add_parser(
         "new",
-        help="Создать заготовку идентичности из шаблона (первую или очередную)",
+        help="Scaffold an identity from the template (the first one or another)",
     )
-    p_new.add_argument("--prefix", required=True, help="Префикс: 3-6 строчных латинских символов")
+    p_new.add_argument("--prefix", required=True,
+                       help="Prefix: 3-6 lowercase Latin characters")
     p_new.add_argument(
         "--name", required=True,
-        help='Расшифровка префикса обычной фразой, например "Keep It Simple, Easy, Legacy". '
-             "Станет частью имени папки: identities/<префикс>-<расшифровка>",
+        help='The prefix expanded as an ordinary phrase, e.g. "Keep It Simple, '
+             'Easy, Legacy". It becomes part of the folder name: '
+             "local-identities/<prefix>-<expansion>",
     )
     p_new.set_defaults(func=cmd_new)
 
     p_clone = sub.add_parser(
         "clone",
-        help="Скопировать существующую идентичность под новым префиксом",
+        help="Copy an existing identity under a new prefix",
     )
     p_clone.add_argument("--from", dest="source", required=True,
-                         help="Префикс идентичности-источника")
-    p_clone.add_argument("--prefix", required=True, help="Префикс новой идентичности")
+                         help="Prefix of the source identity")
+    p_clone.add_argument("--prefix", required=True, help="Prefix of the new identity")
     p_clone.add_argument("--name", required=True,
-                         help='Расшифровка фразой, например "KISEL for Germany"')
+                         help='Expansion as a phrase, e.g. "KISEL for Germany"')
     p_clone.set_defaults(func=cmd_clone)
 
     p_init = sub.add_parser(
         "init-local",
-        help="Развернуть Малую Конституцию и зарегистрировать в ней идентичность",
+        help="Set up the Local Constitution and register an identity in it",
     )
     p_init.add_argument("--identity", default=None,
-                        help="Префикс, который нужно активировать на этой машине")
-    p_init.add_argument("--note", default=None, help="Зачем вам эта идентичность")
+                        help="Prefix to activate on this machine")
+    p_init.add_argument("--note", default=None, help="What you want this identity for")
     p_init.set_defaults(func=cmd_init_local)
 
-    p_val = sub.add_parser("validate", help="Проверить структуру идентичности (или всех)")
+    p_val = sub.add_parser("validate",
+                           help="Check one identity's structure (or all of them)")
     p_val.add_argument("--identity", default=None)
     p_val.set_defaults(func=cmd_validate)
 
-    p_which = sub.add_parser("which", help="Какая идентичность будет выбрана и почему")
+    p_which = sub.add_parser("which",
+                             help="Which identity would be chosen, and why")
     p_which.add_argument("--identity", default=None)
     p_which.set_defaults(func=cmd_which)
 
     p_diff = sub.add_parser(
         "diff-template",
-        help="Сравнить структуру конфига идентичности с шаблоном (отчёт, не слияние)",
+        help="Compare an identity's config structure with the template "
+             "(a report, not a merge)",
     )
     p_diff.add_argument("--identity", default=None)
     p_diff.add_argument("--config", default="criteria.yaml",
-                        help="Какой файл сравнивать (по умолчанию criteria.yaml)")
+                        help="Which file to compare (criteria.yaml by default)")
     p_diff.set_defaults(func=cmd_diff_template)
 
     return p

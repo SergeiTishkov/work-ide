@@ -1,55 +1,54 @@
 """
-Слоистые настройки: детерминированное наложение и происхождение значений.
+Layered settings: deterministic merging, with provenance for every value.
 
-ЗАДАЧА
-------
-Вопрос владельца 2026-08-05: в обычном приложении настройки собирают из
-нескольких слоёв, накладывая один на другой в фиксированном порядке. Здесь
-слоёв тоже три — Большая Конституция, идентичность, Малая Конституция, — но
-наложения как механизма не было: каждое переопределение писалось руками в том
-месте кода, которое его читает. Двадцать шесть разных мест в одном score.py.
+THE PROBLEM
+-----------
+In an ordinary application, settings are assembled from several layers applied
+in a fixed order. This project has layers too, but no mechanism applied them:
+every override was hand-written at the place in the code that read it — twenty-
+six such places in score.py alone.
 
-Отсюда два следствия, оба наблюдались на практике:
-  * узнать, откуда взялось значение, можно только чтением кода;
-  * две части конфигурации могут противоречить друг другу, и побеждает та,
-    что срабатывает раньше (реальные случаи — в docs/OVERRIDES.md).
+Two consequences followed, both observed in practice:
+  * the only way to learn where a value came from was to read the code;
+  * two parts of the configuration could contradict each other, and whichever
+    ran first won (real cases are recorded in docs/OVERRIDES.md).
 
-ЧТО ЗДЕСЬ ЕСТЬ
---------------
-Один порядок слоёв, одно правило слияния и происхождение КАЖДОГО значения:
+WHAT THIS IS
+------------
+One layer order, one merge rule, and provenance for EVERY value:
 
-    defaults   config/defaults/<документ>.yaml            общее для всех
-    template   <локальная>/template/<префикс>_<док>.yaml   тип поиска (копия шаблона)
-    local      <локальная>/<префикс>_<док>.yaml            мои настройки
+    defaults   config/defaults/<document>.yaml          shared by everyone
+    template   <identity>/template/<prefix>_<doc>.yaml  the type of search
+    local      <identity>/<prefix>_<doc>.yaml           my own settings
 
-Побеждает более поздний слой. Порядок фиксирован и не зависит от того, кто
-вызывает — в этом вся суть детерминизма.
+The later layer wins. The order is fixed and does not depend on the caller —
+that is the whole of the determinism.
 
-ПРАВИЛА СЛИЯНИЯ (выбраны сознательно, каждое закрывает известную ловушку)
-------------------------------------------------------------------------
-1. Словари сливаются вглубь. Слой может изменить один порог, не переписывая
-   соседние.
+MERGE RULES (each chosen deliberately, each closing a known trap)
+-----------------------------------------------------------------
+1. Dictionaries merge deeply. A layer can change one threshold without
+   rewriting its neighbours.
 
-2. Списки ЗАМЕНЯЮТСЯ целиком, а не дополняются. Дополнение выглядит удобным
-   ровно до первого случая, когда из унаследованного списка нужно что-то
-   УБРАТЬ, — и тогда оказывается, что синтаксиса для этого нет. Замена
-   многословнее, но обратима.
+2. Lists are REPLACED whole rather than appended to. Appending looks convenient
+   right up to the first time something must be REMOVED from an inherited list
+   — and then it turns out there is no syntax for that. Replacement is more
+   verbose and reversible.
 
-3. Явный `null` удаляет ключ. Единственный способ сказать «у меня этого нет»,
-   когда нижний слой это задал.
+3. An explicit `null` deletes a key. The only way to say "I do not have this"
+   when a lower layer provided it.
 
-4. Замороженные ключи (config/settings_policy.yaml) ЛОКАЛЬНЫЙ слой менять НЕ
-   может — попытка это сделать роняет загрузку с объяснением. Слоистость без
-   такого исключения означала бы, что личный файл может отключить, например,
-   запрет на обход антибот-защиты. Приоритет частного над общим — правило для
-   ПРЕДПОЧТЕНИЙ, а не для границ.
+4. Frozen keys (config/settings_policy.yaml) cannot be changed by the local
+   layer; the attempt fails loudly with an explanation. Layering without that
+   exception would mean a file outside git could quietly lift, say, the ban on
+   circumventing bot protection. Specific-beats-general is a rule about
+   PREFERENCES, not about boundaries.
 
-ЧЕГО ЗДЕСЬ НЕТ И НЕ БУДЕТ
--------------------------
-Слияния текстовых инструкций. CLAUDE.md, docs/ и <префикс>_identity.md
-читает агент, а не этот модуль; проза не сливается. Способ сделать
-детерминированной ЕЁ — другой: переносить решения из прозы в данные, чтобы
-они попадали сюда. См. docs/OVERRIDES.md, раздел про два вида настроек.
+WHAT IS NOT HERE, AND WILL NOT BE
+---------------------------------
+Merging of prose. CLAUDE.md, docs/ and an identity's narrative are read by the
+agent rather than by this module, and prose does not merge. The way to make
+THAT deterministic is different: move decisions out of prose into data so they
+end up here. See docs/OVERRIDES.md, the section on two kinds of settings.
 """
 from __future__ import annotations
 
@@ -67,7 +66,7 @@ DELETED = object()
 
 
 class FrozenSettingError(Exception):
-    """Верхний слой попытался изменить ключ, который менять нельзя."""
+    """An upper layer tried to change a key that must not change."""
 
 
 # --------------------------------------------------------------------------
@@ -75,24 +74,24 @@ class FrozenSettingError(Exception):
 # --------------------------------------------------------------------------
 
 def layer_paths(document: str, prefix: str) -> List[Tuple[str, Path]]:
-    """[(имя слоя, путь)] в порядке наложения. Отсутствующие файлы включены —
-    их отсутствие тоже факт, который полезно видеть в explain."""
+    """[(layer name, path)] in application order. Missing files are included:
+    their absence is a fact worth seeing in `explain` too."""
     import identity as identity_mod
 
     folder = identity_mod.identity_dir(prefix)
     return [
-        # Общее для всех пользователей проекта.
+        # Shared by everyone who uses the project.
         ("defaults", common.ROOT / "config" / "defaults" / f"{document}.yaml"),
-        # Дословная копия шаблона, снятая при клонировании. Не редактируется:
-        # её целиком заменяет обновление шаблона (templates.apply_update).
+        # The verbatim template copy taken at clone time. Never edited: a
+        # template update replaces it whole (templates.apply_update).
         ("template", folder / "template" / f"{prefix}_{document}.yaml"),
-        # Мои настройки. Именно сюда пишет человек и агент.
+        # My settings. This is where the person and the agent write.
         ("local", folder / f"{prefix}_{document}.yaml"),
     ]
 
 
 def local_override_keys(prefix: str, documents=("profile", "criteria")) -> set:
-    """Ключи, заданные лично, поверх шаблона. Нужны при обновлении шаблона."""
+    """Keys set personally, on top of the template. Needed when it updates."""
     keys = set()
     for document in documents:
         for layer, path in layer_paths(document, prefix):
@@ -102,7 +101,7 @@ def local_override_keys(prefix: str, documents=("profile", "criteria")) -> set:
 
 
 def frozen_keys() -> Dict[str, str]:
-    """{точечный ключ: причина заморозки} из общей политики."""
+    """{dotted key: reason it is frozen} from the shared policy."""
     path = common.ROOT / "config" / "settings_policy.yaml"
     data = common.load_yaml(path) if path.exists() else {}
     return {k: str(v) for k, v in ((data or {}).get("frozen") or {}).items()}
@@ -113,7 +112,7 @@ def frozen_keys() -> Dict[str, str]:
 # --------------------------------------------------------------------------
 
 def _flatten(node, path: str = "") -> Dict[str, object]:
-    """Словарь -> {точечный ключ: значение}. Списки — листья (правило 2)."""
+    """A dict -> {dotted key: value}. Lists are leaves (rule 2)."""
     flat = {}
     if isinstance(node, dict):
         for key, value in node.items():
@@ -130,19 +129,19 @@ def _flatten(node, path: str = "") -> Dict[str, object]:
 def _merge_into(target: dict, source: dict) -> None:
     for key, value in (source or {}).items():
         if value is None:
-            target.pop(key, None)          # правило 3: null удаляет
+            target.pop(key, None)          # rule 3: null deletes
         elif isinstance(value, dict) and isinstance(target.get(key), dict):
             _merge_into(target[key], value)
         else:
-            target[key] = copy.deepcopy(value)   # правило 2: список заменяется
+            target[key] = copy.deepcopy(value)   # rule 2: a list is replaced
 
 
 def resolve(document: str, prefix: str) -> Tuple[dict, Dict[str, str]]:
-    """(итоговые настройки, {точечный ключ: слой, который дал значение}).
+    """(resolved settings, {dotted key: the layer that supplied it}).
 
-    Происхождение возвращается всегда, а не по запросу: вопрос «откуда взялось
-    это число» задаётся ровно тогда, когда что-то уже пошло не так, и в этот
-    момент поднимать отдельный инструмент поздно.
+    Provenance is returned always rather than on request: the question "where
+    did this number come from" is asked exactly when something has already
+    gone wrong, and reaching for a separate tool at that moment is too late.
     """
     frozen = frozen_keys()
     merged: dict = {}
@@ -153,19 +152,20 @@ def resolve(document: str, prefix: str) -> Tuple[dict, Dict[str, str]]:
         if not data:
             continue
 
-        # Заморозка защищает от файлов ВНЕ ГИТА: смысл её в том, чтобы
-        # ненаблюдаемый файл не мог тихо снять границу. Общая конфигурация,
-        # копия шаблона и тестовые фикстуры лежат в репозитории и проходят
-        # ревью наравне с кодом — фикстура, например, обязана объявить себя
-        # фикстурой, иначе её нечем отличить от живой идентичности.
+        # Freezing protects against files OUTSIDE GIT: the point is that an
+        # unobserved file cannot quietly lift a boundary. Shared configuration,
+        # the template copy and test fixtures live in the repository and are
+        # reviewed like code — a fixture, for instance, must declare itself a
+        # fixture or nothing can tell it from a live identity.
         if layer == "local":
-            # Запрещено ПЕРЕОПРЕДЕЛЯТЬ, а не объявлять. Если ни один слой ниже
-            # ключ не задавал, это первое объявление, и запрещать его нечем и
-            # незачем: идентичность, у которой нет копии шаблона, обязана
-            # объявить свой вид сама, иначе фикстуру нечем отличить от живой.
+            # What is forbidden is OVERRIDING, not declaring. If no lower layer
+            # set the key, this is a first declaration, and there is neither a
+            # way nor a reason to forbid it: an identity with no template copy
+            # must declare its own kind, or a fixture cannot be told from a
+            # live identity.
             #
-            # Именно эта разница и делает заморозку правилом об override, а не
-            # запретом на упоминание ключа.
+            # That distinction is what makes freezing a rule about overrides
+            # rather than a ban on mentioning a key.
             already = _flatten(merged)
             for key, value in _flatten(data).items():
                 for frozen_key, reason in frozen.items():
@@ -184,14 +184,15 @@ def resolve(document: str, prefix: str) -> Tuple[dict, Dict[str, str]]:
         for key in _flatten(data):
             provenance[key] = layer
 
-    # Ключи, удалённые через null, в итоге отсутствуют — убираем и из карты.
+    # Keys deleted via null are absent from the result, so drop them from the
+    # provenance map too.
     final = _flatten(merged)
     provenance = {k: v for k, v in provenance.items() if k in final}
     return merged, provenance
 
 
 def explain(document: str, prefix: str, dotted_key: str) -> List[dict]:
-    """Значение ключа на каждом слое: что предлагал, что победило."""
+    """A key's value at every layer: what each offered, and what won."""
     chain = []
     for layer, path in layer_paths(document, prefix):
         data = common.load_yaml(path) if path.exists() else {}
@@ -207,12 +208,12 @@ def explain(document: str, prefix: str, dotted_key: str) -> List[dict]:
 
 
 def conflicts(document: str, prefix: str) -> List[dict]:
-    """Ключи, которые задают несколько слоёв.
+    """Keys set by more than one layer.
 
-    Это не ошибки — переопределение и есть смысл слоёв. Но каждое из них
-    должно быть намеренным, поэтому их полезно видеть списком: молчаливое
-    переопределение и есть тот способ, которым две части конфигурации
-    начинают противоречить друг другу.
+    These are not errors — overriding is the whole point of layers. But each
+    one should be deliberate, so seeing them listed is useful: a silent
+    override is exactly how two parts of a configuration start contradicting
+    each other.
     """
     per_layer = {}
     for layer, path in layer_paths(document, prefix):
@@ -236,55 +237,55 @@ def main() -> None:
     import identity as identity_mod
 
     parser = argparse.ArgumentParser(
-        description="Слоистые настройки: что чем переопределено и откуда взялось"
+        description="Layered settings: what overrides what, and where it came from"
     )
     identity_mod.add_identity_arg(parser)
     parser.add_argument("document", help="criteria | profile | sources | ...")
-    parser.add_argument("key", nargs="?", help="Точечный ключ для explain")
+    parser.add_argument("key", nargs="?", help="Dotted key to explain")
     parser.add_argument("--conflicts", action="store_true",
-                        help="Показать все ключи, заданные более чем одним слоем")
+                        help="Show every key set by more than one layer")
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
     prefix = common.ACTIVE_IDENTITY
 
     if args.key:
-        print(f"Ключ: {args.key}  (документ: {args.document})\n")
+        print(f"Key: {args.key}  (document: {args.document})\n")
         winner = None
         for step in explain(args.document, prefix, args.key):
             mark = "  " if not step["has_key"] else "->"
-            state = ("нет файла" if not step["exists"]
-                     else "не задан" if not step["has_key"]
+            state = ("no file" if not step["exists"]
+                     else "not set" if not step["has_key"]
                      else repr(step["value"]))
             print(f" {mark} {step['layer']:<9} {state}")
             print(f"      {step['path']}")
             if step["has_key"]:
                 winner = step
         print()
-        print("Победило:", f"{winner['layer']} -> {winner['value']!r}" if winner
-              else "ничего — ключ не задан ни на одном слое")
+        print("Winner:", f"{winner['layer']} -> {winner['value']!r}" if winner
+              else "nothing — the key is set by no layer at all")
         return
 
     if args.conflicts:
         found = conflicts(args.document, prefix)
         if not found:
-            print("Переопределений нет: каждый ключ задан ровно одним слоем.")
+            print("No overrides: every key is set by exactly one layer.")
             return
-        print(f"Ключей, заданных более чем одним слоем: {len(found)}\n")
+        print(f"Keys set by more than one layer: {len(found)}\n")
         for item in found:
             chain = " -> ".join(f"{layer}={value!r}" for layer, value in item["setters"])
             print(f"  {item['key']}")
-            print(f"      {chain}   (побеждает {item['winner']})")
+            print(f"      {chain}   (winner: {item['winner']})")
         return
 
     merged, provenance = resolve(args.document, prefix)
     counts = {}
     for layer in provenance.values():
         counts[layer] = counts.get(layer, 0) + 1
-    print(f"Документ '{args.document}', идентичность '{prefix}'")
-    print(f"  ключей всего: {len(provenance)}")
+    print(f"Document '{args.document}', identity '{prefix}'")
+    print(f"  keys in total: {len(provenance)}")
     for layer in LAYER_ORDER:
-        print(f"  из слоя {layer:<9} {counts.get(layer, 0)}")
-    print("\nОткуда взялось конкретное значение:")
+        print(f"  from layer {layer:<9} {counts.get(layer, 0)}")
+    print("\nWhere a particular value came from:")
     print(f"  python tools/settings.py {args.document} <точечный.ключ>")
 
 
