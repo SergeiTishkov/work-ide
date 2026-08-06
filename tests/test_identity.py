@@ -635,4 +635,4 @@ def test_clone_refuses_the_frozen_fixture():
     унаследовал бы калибровочные значения и молча искал бы не то."""
     with pytest.raises(identity.InvalidIdentityError) as exc:
         identity.clone_identity("ftf", "dstp", "Cloned Search")
-    assert "фикстура" in str(exc.value)
+    assert "fixture" in str(exc.value)

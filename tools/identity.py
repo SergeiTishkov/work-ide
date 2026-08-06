@@ -414,8 +414,11 @@ def local_constitution_path() -> Path:
 
 
 def load_local_constitution() -> dict:
-    """Читает local-constitution/active.yaml. Отсутствие файла — не ошибка:
-    это нормальное состояние машины, где онбординг ещё не проводили."""
+    """Reads the legacy local-constitution/active.yaml, if one still exists.
+
+    Its absence is not an error: that is the normal state of a machine where
+    onboarding has not been run, and of every machine created after the layer
+    was retired (docs/LOCAL_CONSTITUTION.md)."""
     path = local_constitution_path()
     if not path.exists():
         return {}
@@ -437,22 +440,22 @@ def default_identity() -> Optional[str]:
     return (load_local_constitution() or {}).get("default_identity")
 
 
-# --- Разрешение активной идентичности -------------------------------------
+# --- Resolving the active identity ----------------------------------------
 
 def resolve_identity(cli_value: Optional[str] = None) -> str:
-    """Строгий приоритет, без встроенных дефолтов:
+    """A strict order of precedence, with no built-in default:
 
-      1. --identity <префикс>            (явное намерение всегда побеждает)
-      2. WORK_IDE_IDENTITY            (подпроцессы, CI, тесты)
-      3. единственная папка в local-identities/
-      4. отказ
+      1. --identity <prefix>     (an explicit intent always wins)
+      2. WORK_IDE_IDENTITY       (subprocesses, CI, tests)
+      3. the only folder in local-identities/
+      4. refusal
 
-    Отдельного реестра активных идентичностей нет намеренно: файл со списком
-    умеет расходиться с тем, что лежит на диске, а папки — нет.
+    There is deliberately no registry of active identities: a file listing
+    them can drift away from what is on disk, and folders cannot.
 
-    Никогда не угадывает при нескольких активных без дефолта: молчаливый выбор
-    "не той" идентичности — ровно тот отказ, ради предотвращения которого вся
-    эта система и построена.
+    It never guesses when several exist and none is chosen: silently picking
+    the wrong identity is precisely the failure this whole system exists to
+    prevent.
     """
     if cli_value:
         return cli_value
@@ -461,8 +464,8 @@ def resolve_identity(cli_value: Optional[str] = None) -> str:
     if env_value:
         return env_value
 
-    # Малая Конституция ещё может существовать у тех, кто не мигрировал:
-    # если в ней явно назван дефолт, он уважается.
+    # The retired local-constitution layer may still exist for anyone who has
+    # not migrated; if it names a default explicitly, that is respected.
     default = default_identity()
     if default:
         return default
@@ -479,56 +482,56 @@ def resolve_identity(cli_value: Optional[str] = None) -> str:
 def _no_identity_message() -> str:
     import templates as templates_mod
 
-    known = ", ".join(sorted(templates_mod.template_folders())) or "(шаблонов нет)"
+    known = ", ".join(sorted(templates_mod.template_folders())) or "(none)"
     return (
-        "Нет ни одного настроенного поиска — работать без него запрещено "
-        "(Большая Конституция, правило №0).\n"
-        f"  Поиски ожидаются здесь: {common.IDENTITIES_DIR}\n"
-        f"  Готовые шаблоны: {known}\n"
+        "No search is set up — working without one is not allowed "
+        "(constitution, rule zero).\n"
+        f"  Searches are expected here: {common.IDENTITIES_DIR}\n"
+        f"  Available templates: {known}\n"
         "\n"
-        "  Как начать (подробно — docs/ONBOARDING.md):\n"
+        "  How to start (in full: docs/ONBOARDING.md):\n"
         "    1. python tools/templates.py list\n"
-        "    2. python tools/templates.py clone <шаблон> <префикс> \"<расшифровка>\"\n"
-        "    3. заполнить личный слой вместе с агентом\n"
+        "    2. python tools/templates.py clone <template> <prefix> \"<expansion>\"\n"
+        "    3. fill in the personal layer together with the agent\n"
         "\n"
-        "  Ни один шаблон не подходит — берите blank: полный набор файлов с\n"
-        "  комментариями и без готовых решений."
+        "  If no template fits, take blank: a full set of files with comments\n"
+        "  and no decisions made for you."
     )
 
 
 def _ambiguous_identity_message(active: List[str]) -> str:
     lines = "\n".join(f"    - {describe(p)}" for p in active)
     return (
-        "Активных идентичностей несколько, а default_identity не задан — "
-        "угадывать нельзя.\n"
+        "Several identities exist and none was chosen — guessing is not "
+        "allowed.\n"
         f"{lines}\n"
-        "  Укажите явно: --identity <префикс>, либо задайте default_identity "
-        f"в {local_constitution_path()}"
+        "  Name one explicitly: --identity <prefix>"
     )
 
 
 def activate(cli_value: Optional[str] = None, *, allow_fixture: bool = False) -> str:
-    """Разрешает и активирует идентичность. Возвращает префикс."""
+    """Resolves and activates an identity. Returns its prefix."""
     prefix = resolve_identity(cli_value)
     common.activate_identity(prefix, allow_fixture=allow_fixture)
     return prefix
 
 
 def banner(prefix: Optional[str] = None) -> str:
-    """Строка, которую каждый инструмент печатает первой. Активная идентичность
-    никогда не должна быть невидимой."""
+    """The line every tool prints first. The active identity must never be
+    invisible."""
     prefix = prefix or common.ACTIVE_IDENTITY
     return f"[identity: {describe(prefix)}]"
 
 
 def standalone_main(fetch_fn, source_name: str) -> None:
-    """Точка входа для standalone-запуска фетчера: `python tools/fetch_x.py`.
+    """Entry point for running a fetcher on its own: `python tools/fetch_x.py`.
 
-    Фетчеры полезно уметь дёргать поодиночке при отладке источника, но они
-    читают User-Agent и (некоторые) стек из активной идентичности — поэтому
-    активировать её нужно и здесь.
+    Being able to run a fetcher alone is useful when debugging a source, but
+    fetchers read the User-Agent — and some of them the stack — from the
+    active identity, so it has to be activated here too.
     """
-    parser = argparse.ArgumentParser(description=f"Одиночный запуск источника {source_name}")
+    parser = argparse.ArgumentParser(
+        description=f"Run the {source_name} source on its own")
     add_identity_arg(parser)
     args = parser.parse_args()
     activate_or_exit(args.identity)
@@ -538,19 +541,19 @@ def standalone_main(fetch_fn, source_name: str) -> None:
 
 
 def add_identity_arg(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    """Добавляет --identity. Один вызов вместо копипасты в каждом инструменте."""
+    """Adds --identity. One call instead of copy-paste in every tool."""
     parser.add_argument(
         "--identity", default=None,
-        help="Префикс поисковой идентичности (по умолчанию — из Малой Конституции)",
+        help="Search identity prefix (defaults to the only one present)",
     )
     return parser
 
 
 def activate_or_exit(cli_value: Optional[str] = None, *, quiet: bool = False) -> str:
-    """Активирует идентичность или завершает процесс с понятным объяснением.
+    """Activates an identity, or exits with a comprehensible explanation.
 
-    Стандартная точка входа для всех CLI-инструментов: отказ без идентичности
-    должен быть громким и с инструкцией, а не трассировкой стека.
+    The standard entry point for every CLI tool: a refusal for want of an
+    identity should be loud and instructive, not a stack trace.
     """
     try:
         prefix = activate(cli_value)
@@ -567,50 +570,52 @@ def activate_or_exit(cli_value: Optional[str] = None, *, quiet: bool = False) ->
 def cmd_list(_args) -> None:
     identities = list_identities(include_fixtures=True)
     if not identities:
-        print("В репозитории нет ни одной идентичности.")
+        print("No identities are set up.")
         return
     active = set(active_identities())
     default = default_identity()
-    print(f"Идентичности в {common.IDENTITIES_DIR}:")
+    print(f"Identities in {common.IDENTITIES_DIR}:")
     for prefix in identities:
         kind = _read_kind(prefix) or "?"
         marks = []
         if prefix in active:
-            marks.append("активна")
+            marks.append("active")
         if prefix == default:
-            marks.append("по умолчанию")
+            marks.append("default")
         mark_str = f"  [{', '.join(marks)}]" if marks else ""
         print(f"  {prefix:<8} kind={kind:<14} {describe(prefix)}{mark_str}")
 
 
 def clone_identity(source: str, prefix: str, full_name: str) -> List[Path]:
-    """Копирует существующую идентичность под новым префиксом.
+    """Copies an existing identity under a new prefix.
 
-    ЗАЧЕМ. Самый частый случай — один и тот же поиск, привязанный к разным
-    странам: «то же самое, но для Германии» и «то же самое, но для Канады».
-    Стек, тип занятости, признаки подходящей компании у них общие, а
-    гео-правила, языковой фильтр и часовой пояс — разные. Собирать вторую
-    идентичность с нуля значит переотвечать на 50 вопросов ради изменения трёх.
+    Why. The commonest case is the same search tied to different countries:
+    "the same thing but for Germany", "the same but for Canada". Stack,
+    employment type and the signs of a suitable company are shared; geography
+    rules, the language filter and the time zone are not. Building the second
+    identity from scratch means answering fifty questions again to change
+    three.
 
-    Отличие от `new`: `new` даёт пустую заготовку, `clone` — заполненную копию,
-    в которой нужно поправить только то, что действительно отличается.
+    The difference from `new`: `new` produces empty scaffolding, `clone`
+    produces a filled copy in which only the genuinely different parts need
+    changing.
 
-    Все внутренние ссылки на префикс-источник переписываются на новый — иначе
-    клон нарушил бы правило «файлы одной идентичности не ссылаются на другую»
-    и был бы отвергнут валидатором.
+    Every internal reference to the source prefix is rewritten to the new one;
+    otherwise the clone would break the rule that one identity's files never
+    reference another, and the validator would reject it.
     """
     if source == prefix:
-        raise InvalidIdentityError("исходный и новый префиксы совпадают")
+        raise InvalidIdentityError("source and new prefix are the same")
     src_dir = identity_folders().get(source)
     if src_dir is None:
         raise UnknownIdentityError(
-            f"идентичность '{source}' не найдена. Доступные: "
-            + (", ".join(list_identities(include_fixtures=True)) or "нет ни одной")
+            f"identity '{source}' not found. Available: "
+            + (", ".join(list_identities(include_fixtures=True)) or "none")
         )
     if _read_kind(source) == "fixture":
         raise InvalidIdentityError(
-            f"'{source}' — замороженная тестовая фикстура, клонировать её нельзя: "
-            "она откалибрована под тесты, а не под живой поиск"
+            f"'{source}' is a frozen test fixture and cannot be cloned: it is "
+            "calibrated for the tests rather than for a live search"
         )
     if not PREFIX_RE.match(prefix):
         raise InvalidIdentityError(f"неверный формат префикса '{prefix}'. {PREFIX_RULE_TEXT}")
