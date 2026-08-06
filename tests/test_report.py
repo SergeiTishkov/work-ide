@@ -130,3 +130,47 @@ def test_hiring_country_handles_common_platform_spellings():
                           ("Dubai, Dubai, United Arab Emirates", "United Arab Emirates"),
                           ("Remote, Israel", "Israel")]:
         assert report.hiring_country({"location_raw": raw})[0] == expected, raw
+
+
+def test_reputation_has_three_states_not_two():
+    """Просьба владельца 2026-08-06. «Не проверялась» читалось как «данных
+    нет», а означало «мы даже не пытались». Первое — свойство компании,
+    второе — дефект процесса, и человеку важно, какое из двух он видит."""
+    found = report._fmt_reputation(
+        {"has_data": True, "overall_rating": 4.2, "work_life_balance": 4.4,
+         "source": "Glassdoor", "retrieval": "web_search"}, "hot_lead")
+    assert "4.2" in found and "4.4" in found
+
+    checked_empty = report._fmt_reputation(
+        {"has_data": False, "verdict": "insufficient_sources",
+         "checked_at": "2026-08-06T10:00:00+00:00", "searched": "Glassdoor, Indeed"},
+        "hot_lead")
+    assert "недостаточно источников" in checked_empty
+    assert "2026-08-06" in checked_empty
+    assert "Glassdoor, Indeed" in checked_empty
+
+    gap = report._fmt_reputation({"has_data": False}, "hot_lead")
+    assert "❗" in gap, "пробел в голове выдачи обязан быть заметен"
+
+    tail = report._fmt_reputation({"has_data": False}, "long_shot")
+    assert "❗" not in tail, "в хвосте проверка не делается по замыслу — это не пробел"
+
+
+def test_reputation_coverage_block_names_what_is_left():
+    """Невыполненная работа обязана быть видна в отчёте, а не в чьей-то
+    памяти: замер 2026-08-06 показал 55 компаний в голове выдачи и ноль
+    проверок, и отчёт об этом молчал."""
+    vacancies = {
+        "a": {"company": "Известная", "computed": {"classification": "hot_lead"}},
+        "b": {"company": "Незнакомая", "computed": {"classification": "worth_a_look"}},
+    }
+    companies = {
+        "известная": {"name": "Известная",
+                      "reputation": {"overall_rating": 4.0,
+                                     "checked_at": "2026-08-06T10:00:00+00:00"}},
+        "незнакомая": {"name": "Незнакомая"},
+    }
+    block = report._reputation_coverage_block(vacancies, companies)
+    assert "не проверено: 1" in block
+    assert "Незнакомая" in block
+    assert "Известная" not in block.split("Осталось проверить")[-1]

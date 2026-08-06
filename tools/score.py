@@ -1414,6 +1414,18 @@ def _score_company_reputation(vacancy: dict, criteria: dict, profile: dict = Non
     if not cfg or not rep:
         return (cfg or {}).get("no_data_points", 0), {"has_data": False}, False
 
+    # «Проверяли — не нашли» баллов не даёт и не отнимает: отсутствие отзывов
+    # о небольшой компании ничего не говорит о том, как в ней работается.
+    # Но в отчёт это состояние обязано попасть отдельной строкой, иначе оно
+    # снова сольётся с «не проверяли» — а это разные вещи (reputation.py).
+    if rep.get("verdict") == "insufficient_sources":
+        return (cfg.get("no_data_points", 0), {
+            "has_data": False,
+            "verdict": "insufficient_sources",
+            "checked_at": rep.get("checked_at"),
+            "searched": rep.get("searched"),
+        }, False)
+
     points = 0
     detail = {
         "has_data": True,

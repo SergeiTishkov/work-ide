@@ -41,6 +41,7 @@ import fetch_remotive  # noqa: E402
 import fetch_wwr  # noqa: E402
 import kb  # noqa: E402
 import company_intel  # noqa: E402
+import reputation  # noqa: E402
 import link_check  # noqa: E402
 import normalize  # noqa: E402
 import report  # noqa: E402
@@ -184,6 +185,16 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
             state["last_company_intel"] = {"error": f"{type(exc).__name__}: {exc}"}
         # Пересчёт после обогащения: возраст компании участвует в score.
         rescore_all(vacancies, criteria, profile, companies)
+
+    # Репутация компаний головы выдачи — отдельный учёт, потому что собрать её
+    # скриптом нельзя (площадки отвечают 403), а знать, что она не собрана,
+    # система обязана. Список того, что осталось проверить, кладётся в state и
+    # печатается в отчёте: невыполненная работа должна быть видна, а не жить в
+    # чьей-то памяти. Подробно — tools/reputation.py.
+    state["reputation_coverage"] = reputation.coverage(vacancies, companies)
+    state["reputation_worklist"] = [
+        item["company"] for item in reputation.worklist(vacancies, companies)
+    ]
 
     kb.save_vacancies(vacancies)
     kb.save_companies(companies)

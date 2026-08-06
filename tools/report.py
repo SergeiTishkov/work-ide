@@ -60,14 +60,32 @@ def _fmt_salary_info(vacancy: dict, comp_bd: dict) -> str:
     return "не указана _(источник: нет данных — ни в вакансии, ни найдено вручную)_"
 
 
-def _fmt_reputation(rep_bd: dict) -> str:
+def _fmt_reputation(rep_bd: dict, classification: str = "") -> str:
     """Строка про репутацию работодателя. Как и с зарплатой, всегда явно
     показываем источник и отличаем "нет данных" от "плохо"."""
+    # Три состояния, а не два. Различие введено по прямой просьбе владельца
+    # 2026-08-06 и закрывает настоящую двусмысленность: «не проверялась»
+    # читалось как «данных нет», а означало «мы даже не пытались». Первое —
+    # свойство компании, второе — дефект процесса, и человеку важно, какое
+    # из двух он видит.
+    if rep_bd.get("verdict") == "insufficient_sources":
+        when = (rep_bd.get("checked_at") or "")[:10]
+        where = rep_bd.get("searched") or "Glassdoor, Indeed, Trustpilot, веб-поиск"
+        return (f"проверялась{' ' + when if when else ''}, не определена — "
+                f"недостаточно источников _(искали: {where}; обычно так у "
+                "небольших и малоизвестных компаний)_")
+
     if not rep_bd.get("has_data"):
-        return (
-            "не проверялась _(нет данных — проверить через "
-            "`tools/kb.py set-company-reputation`)_"
-        )
+        import reputation
+
+        if classification in reputation.REQUIRED_CLASSES:
+            return (
+                "❗ ещё не проверялась _(это пробел в процессе, а не свойство "
+                "компании: `python tools/reputation.py worklist`)_"
+            )
+        # В хвосте выдачи проверка не делается сознательно — см. reputation.py.
+        return ("не проверялась _(хвост выдачи: проверяются компании уровня "
+                "worth_a_look и выше)_")
     parts = []
     if rep_bd.get("overall_rating") is not None:
         parts.append(f"общий {rep_bd['overall_rating']}/5")
@@ -265,7 +283,8 @@ def _fmt_vacancy_line(v: dict) -> str:
     techs = expected_technologies(v)
     if techs:
         lines.append(f"  - 🧰 технологии: {', '.join(techs)}")
-    lines.append(f"  - ⭐ репутация: {_fmt_reputation(bd.get('company_reputation_signal', {}))}")
+    lines.append("  - ⭐ репутация: " + _fmt_reputation(
+        bd.get("company_reputation_signal", {}), c.get("classification", "")))
     country, country_source = hiring_country(v)
     if country:
         suffix = "" if country_source == "офис найма" else f" _({country_source})_"
@@ -407,6 +426,55 @@ def _source_usefulness(vacancies: dict) -> str:
     return chr(10).join(lines)
 
 
+def _reputation_coverage_block(vacancies: dict, companies: dict) -> str:
+    """Сколько компаний головы выдачи проверено — и кто остался.
+
+    Раздел существует потому, что невыполненная работа обязана быть видна.
+    Замер 2026-08-06: в hot_lead и worth_a_look было 55 компаний, репутация
+    была известна у нуля, и отчёт про это молчал — писал у каждой «не
+    проверялась», что читается как свойство компании, а не как пробел.
+    """
+    import reputation
+
+    stats = reputation.coverage(vacancies, companies)
+    if not stats["companies"]:
+        return "_В выдаче пока нет компаний уровня hot_lead / worth_a_look._"
+
+    lines = [
+        f"Компаний в голове выдачи (hot_lead + worth_a_look): **{stats['companies']}**",
+        "",
+        f"- репутация найдена: **{stats['found']}**",
+        f"- проверено, достоверных отзывов нет: **{stats['insufficient']}** "
+        "_(обычно небольшие и малоизвестные компании)_",
+        f"- **не проверено: {stats['unchecked']}**",
+    ]
+    if stats["unchecked"]:
+        todo = reputation.worklist(vacancies, companies, limit=12)
+        lines += [
+            "",
+            "> ⚠ Непроверенные компании — это пробел в процессе, а не свойство "
+            "компаний. Пока проверка не сделана, отчёт не может отличить "
+            "«отзывов нет» от «мы не смотрели», а для решения это разные вещи.",
+            "",
+            "Осталось проверить:",
+            "",
+        ] + [f"- {item['classification']}: {item['company']}" for item in todo]
+        if stats["unchecked"] > len(todo):
+            lines.append(f"- _…и ещё {stats['unchecked'] - len(todo)}_")
+        lines += [
+            "",
+            "```bash",
+            "python tools/reputation.py worklist          # полный список",
+            "python tools/kb.py set-company-reputation \\",
+            "    --company \"<имя>\" --rating 4.2 --wlb 4.4 --source Glassdoor",
+            "python tools/reputation.py mark-insufficient --company \"<имя>\"",
+            "```",
+        ]
+    else:
+        lines += ["", "Пробелов нет: у каждой компании головы выдачи есть результат проверки."]
+    return "\n".join(lines)
+
+
 def build_report_markdown(vacancies: dict, companies: dict, state: dict,
                           criteria: Optional[dict] = None) -> str:
     import score
@@ -515,6 +583,10 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         "веб-поиск и, если нужно, обновить запись через `tools/kb.py`.",
         "",
         _section("needs_manual_review", review_items),
+        "## ⭐ Проверка репутации компаний",
+        "",
+        _reputation_coverage_block(vacancies, companies),
+        "",
         "## 📊 Статистика по классам",
         "",
         "\n".join(f"- {cls}: {n}" for cls, n in sorted(class_counts.items(), key=lambda kv: -kv[1])) or "_нет данных_",

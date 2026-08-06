@@ -107,6 +107,37 @@ def check_sources_reachable() -> None:
             _report(f"источник '{src['name']}' доступен", False, str(exc), critical=False)
 
 
+def check_reputation_coverage() -> None:
+    """Сколько компаний головы выдачи не имеет результата проверки репутации.
+
+    Не критично для запуска — это про полноту накопленного знания, а не про
+    работоспособность окружения. Но видеть цифру полезно: 2026-08-06 в голове
+    выдачи было 55 компаний и ноль проверок, и заметить это можно было только
+    прочитав отчёт целиком.
+    """
+    import kb
+    import reputation
+
+    try:
+        vacancies = kb.load_vacancies()
+        companies = kb.load_companies()
+    except Exception as exc:  # noqa: BLE001 — база может быть ещё не собрана
+        print(f"  [ SKIP ] репутация компаний: база не читается ({type(exc).__name__})")
+        return
+
+    stats = reputation.coverage(vacancies, companies)
+    if not stats["companies"]:
+        print("  [ SKIP ] репутация компаний: в выдаче пока некого проверять")
+        return
+    mark = "OK  " if not stats["unchecked"] else "WARN"
+    print(f"  [ {mark} ] репутация компаний головы выдачи: "
+          f"найдена {stats['found']}, источников мало {stats['insufficient']}, "
+          f"НЕ ПРОВЕРЕНО {stats['unchecked']} из {stats['companies']}")
+    if stats["unchecked"]:
+        print("           закрыть: python tools/reputation.py worklist "
+              f"--identity {common.ACTIVE_IDENTITY}")
+
+
 def main() -> None:
     import identity as identity_mod
 
@@ -128,6 +159,7 @@ def main() -> None:
     check_packages()
     check_configs()
     check_data_writable()
+    check_reputation_coverage()
     print()
     print("--- Проверка доступности источников (не критично для работы) ---")
     check_sources_reachable()

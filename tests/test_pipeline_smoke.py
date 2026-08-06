@@ -249,3 +249,29 @@ def test_company_enrichment_runs_for_the_shortlist(isolated_data_dir, monkeypatc
         "обогащаем только видимую часть выдачи: остальные компании всё равно "
         "отсеяны, а внешний API не заслуживает сотен запросов впустую"
     )
+
+
+def test_pipeline_records_the_reputation_gap_in_state(tmp_path, monkeypatch):
+    """Связь «выдача → проверка репутации» обязана быть в коде, а не в
+    инструкции. До 2026-08-06 обогащение вызывалось только при СБОРЕ вакансий,
+    а выдача меняется ещё и при каждой правке фильтров — и приходившие в неё
+    компании никто никогда не проверял."""
+    import reputation
+
+    vacancies = {
+        "a": {"company": "Новая", "computed": {"classification": "hot_lead"}},
+    }
+    companies = {"новая": {"name": "Новая"}}
+
+    todo = reputation.worklist(vacancies, companies)
+    assert [item["company"] for item in todo] == ["Новая"]
+
+    stats = reputation.coverage(vacancies, companies)
+    assert stats == {"companies": 1, "found": 0, "insufficient": 0, "unchecked": 1}
+
+    assert reputation.mark_insufficient(companies, "Новая", "Glassdoor")
+    assert reputation.coverage(vacancies, companies)["insufficient"] == 1
+    assert reputation.worklist(vacancies, companies) == [], (
+        "после записи результата компания обязана уйти из списка работ — "
+        "иначе каждый прогон заново ищет отзывы о конторе, которых нет"
+    )
