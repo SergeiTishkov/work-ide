@@ -62,6 +62,27 @@ CATALOGUES = {
             "Long shot (низкий приоритет, но не исключено)",
         "National markets — strong vacancies tied to a country":
             "Национальные рынки — сильные вакансии, привязанные к стране",
+        "Work arrangement not confirmed — check by hand":
+            "Формат работы не подтверждён — проверить руками",
+        "Nobody ever called these remote — neither the employer nor the "
+        "board. That is not the same as knowing they are onsite, so they are "
+        "not thrown away, and their score is NOT reduced: a 70 here is the "
+        "same 70 it would have been above. What is missing is the "
+        "confirmation, not the quality.":
+            "Удалёнными их не назвал никто — ни работодатель, ни площадка. "
+            "Это не то же самое, что знать, что они в офисе, поэтому они не "
+            "выброшены, и оценка им НЕ снижена: 70 здесь — те же самые 70, "
+            "что были бы выше. Не хватает подтверждения, а не качества.",
+        "The reason this class exists: LinkedIn's guest search ignores its "
+        "own remote filter, measured 2026-08-11 — the same vacancy comes back "
+        "under 'on-site', 'remote' and 'hybrid' alike. Where an employer does "
+        "say 'hybrid' or 'on-site', the vacancy is rejected outright and is "
+        "not here.":
+            "Откуда взялся этот класс: гостевой поиск LinkedIn игнорирует "
+            "собственный фильтр удалёнки — замерено 11.08.2026, одна и та же "
+            "вакансия возвращается и под «on-site», и под «remote», и под "
+            "«hybrid». Там, где работодатель сам пишет «гибрид» или «в "
+            "офисе», вакансия отклоняется совсем и сюда не попадает.",
         "Needs a manual check by the agent or the owner":
             "Требуют ручной проверки агентом/владельцем",
         "Company reputation checks": "Проверка репутации компаний",

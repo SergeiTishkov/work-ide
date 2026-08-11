@@ -580,10 +580,17 @@ def test_remote_only_source_is_trusted_without_remote_word():
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert r["classification"] != "rejected"
-    assert not any("not confirmed as a remote position" in d for d in r["dealbreakers"])
+    assert score.REMOTE_UNCONFIRMED not in r["dealbreakers"]
 
 
 def test_non_remote_only_source_still_needs_remote_signal():
+    """Nobody said this was remote — so it does not go into the shortlist.
+
+    Revised 2026-08-11: it is no longer REJECTED for that, it goes into a class
+    of its own with its score intact. The objection is about what we know, not
+    about the job, and CLAUDE.md §5 forbids refusing on a guess. See
+    `unconfirmed_remote_policy` in the criteria for the per-identity choice.
+    """
     v = make_vacancy(
         source="arbeitnow",
         remote=None,
@@ -591,8 +598,9 @@ def test_non_remote_only_source_still_needs_remote_signal():
         description_text="C# ASP.NET SQL Server developer role.",
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    assert r["classification"] == "rejected"
-    assert any("not confirmed as a remote position" in d for d in r["dealbreakers"])
+    assert r["classification"] == "remote_unconfirmed"
+    assert r["dealbreakers"] == [score.REMOTE_UNCONFIRMED]
+    assert r["score"] > 0, "the score is deliberately not reduced for uncertainty"
 
 
 def test_infrastructure_only_stack_is_not_enough():
@@ -761,7 +769,10 @@ def test_eor_bare_keyword_does_not_false_match_inside_common_words():
     r = score.score_vacancy(v, CRITERIA, PROFILE)
     assert "eor_or_contractor_hits" not in r["score_breakdown"]["remote_location_fit"]
     assert r["classification"] == "rejected"
-    assert any("not confirmed as a remote position" in d for d in r["dealbreakers"])
+    # Rejected on the board's own location field, "Hybrid, Munich" — which is
+    # a stronger reason than the one this test used to rely on, and survives
+    # the 2026-08-11 change that turned "nobody said" into its own class.
+    assert any("location field" in d for d in r["dealbreakers"]), r["dealbreakers"]
 
 
 def test_role_complexity_gate_triggers_on_single_agentic_mention_in_description():

@@ -225,6 +225,47 @@ def _matches(text: str, keywords: list) -> list:
     return found
 
 
+def _check_location_field_arrangement(vacancy: dict, rl: dict) -> Optional[str]:
+    """The work arrangement as the BOARD's own structured location field states it.
+
+    Separate from the description patterns for one reason: this field is short
+    and functional, so "hybrid" in it can only mean commuting. The same word in
+    a description is ambiguous — "hybrid cloud", "hybrid architecture", 58
+    vacancies in the base use it that way — which is why the description needs
+    patterns with a neighbouring word and this field does not.
+
+    Measured 2026-08-11 over 13605 vacancies: 272 name an arrangement here, and
+    every distinct value is unambiguous — "Hybrid" (210), "In-Office" (48),
+    "Luzern / hybrid", "🇩🇪 Munich (hybrid)", "ONSITE: Houston, TX".
+
+    Except three, which is what `unless_also` is for: "Hybrid or Remote",
+    "Dallas, TX (Remote US or Hybrid)" and "Distributed; Hybrid" all offer
+    remote as an option. Rejecting those would be the exact false negative the
+    owner warned against when this rule was written.
+    """
+    cfg = rl.get("location_field_arrangement") or {}
+
+    # A declared arrangement outranks everything below. Nothing sets this
+    # automatically to anything but "remote" — the on-site/hybrid badge is not
+    # served to anonymous requests — so a non-remote value here is always
+    # something a PERSON read and entered by hand, through kb.py. That is the
+    # division of labour CLAUDE.md §5 describes, and it is the only way what
+    # the owner sees on the page can reach the scoring at all.
+    declared = (vacancy.get("workplace_type") or "").strip().lower()
+    if declared and declared != "remote":
+        return f"entered by hand: the employer states \"{declared}\""
+
+    field = common.normalize_for_matching(vacancy.get("location_raw"))
+    if not field:
+        return None
+    hit = next((k for k in cfg.get("not_remote") or [] if k in field), None)
+    if not hit:
+        return None
+    if any(k in field for k in cfg.get("unless_also") or []):
+        return None
+    return f"the board's location field says \"{hit}\""
+
+
 def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = None):
     """Checks the STRUCTURED location field, which boards return separately
     from the description text. Returns (is_restricted, detail).
@@ -305,6 +346,11 @@ def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = No
     # above, absolute_residency_phrases, and hard_dealbreakers.
     return False, {"verdict": "country_named", "value": loc_raw}
 
+
+# "Nobody ever said this was remote." Kept as a constant because the
+# classification has to recognise it exactly: it is the one objection that
+# does not mean the vacancy is unsuitable, only that we do not know.
+REMOTE_UNCONFIRMED = "location: the employer never states this is remote"
 
 _AVOIDED_MARKETS_CACHE = {}
 
@@ -654,6 +700,20 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     needs_review = False
 
     hard_hits = _matches(text, rl["hard_dealbreakers"]["keywords"])
+    # Patterns, not only substrings. A requirement is written a dozen ways —
+    # "must be a US Citizen", "Must be US Citizen", "U.S. Citizen or Green
+    # Card holder" — and a literal list catches whichever variants somebody
+    # happened to see. Measured 2026-08-11: the substring list held "must be
+    # a us citizen" and missed BOTH "must be a U.S. Citizen" (the dots) and
+    # "Must be US Citizen" (no article). Five vacancies with a hard
+    # citizenship requirement were sitting in the shortlist, two of them in
+    # the top five. Punctuation cannot be normalised away globally: it is
+    # what makes "c#" and "asp.net" matchable at all.
+    hard_hits += _matches_patterns(
+        text, rl["hard_dealbreakers"].get("patterns"), hard_hits)
+    arrangement = _check_location_field_arrangement(vacancy, rl)
+    if arrangement:
+        hard_hits.append(arrangement)
     if hard_hits:
         dealbreakers.extend(f"location: {h}" for h in hard_hits)
 
@@ -780,17 +840,29 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         # description — a pure false negative that cut dozens of live
         # candidates.
         from_remote_only_source = vacancy.get("source") in _remote_only_sources()
-        if vacancy.get("remote") is True or remote_word_hits or from_remote_only_source:
-            points = 4  # known to be remote, unclear about hiring abroad
-            location_unknown = True
-        else:
-            # Confirmed explicitly 2026-07-30: only remote positions are
-            # wanted. No remote signal at all — neither from the source nor
-            # in the text — is a dealbreaker rather than "unknown, let it
-            # through". Found in practice: a Rangeview vacancy, plainly
-            # onsite in El Segundo, CA, contained the word "remote" nowhere
-            # and was flagged for manual review instead of rejected.
-            dealbreakers.append("location: not confirmed as a remote position (no remote signal found anywhere)")
+        # The employer's own structured declaration, where a source provides
+        # one. schema.org marks a genuinely remote posting TELECOMMUTE; the
+        # absence of it means the employer said nothing, NOT that the job is
+        # onsite. See fetch_linkedin.workplace_type.
+        declared_remote = vacancy.get("workplace_type") == "remote"
+        points = 4  # remote-ish, unclear about hiring abroad
+        location_unknown = True
+        if not (declared_remote or vacancy.get("remote") is True
+                or remote_word_hits or from_remote_only_source):
+            # Nobody ever said this was remote — not the employer, not the
+            # source. That is a statement about our knowledge, not about the
+            # job, so it is NOT scored down: the points above stand and the
+            # uncertainty is carried by the classification instead.
+            #
+            # Revised 2026-08-11 at the owner's direction, after LinkedIn was
+            # caught claiming every vacancy was remote (see below). It used to
+            # be a flat rejection, which was right while the flag could be
+            # trusted and wrong once it could not: 109 vacancies with a full
+            # description that simply never mentions the arrangement would
+            # have vanished on an inference rather than on anybody's words.
+            # What the employer DOES say — "hybrid", "on-site" — still
+            # disqualifies through hard_dealbreakers, as before.
+            dealbreakers.append(REMOTE_UNCONFIRMED)
 
     places_ambiguous, place_detail = _score_ambiguous_places(text, criteria)
     if place_detail:
@@ -1166,6 +1238,29 @@ def _check_mobile_role(text: str, title: str, criteria: dict):
         "hits": hits,
         "threshold": threshold,
     }
+
+
+def _check_talent_pipeline(text: str, criteria: dict):
+    """An advertisement with no vacancy behind it.
+
+    An employer collecting CVs against roles that may open later. Formally it
+    is a vacancy; in substance there is nothing to apply to, and no date by
+    which there will be.
+
+    It scores well for a reason that is worth naming: such a posting is
+    assembled from what candidates want to read, so it matches a profile more
+    tidily than a real vacancy does. Found 2026-08-11 — "Senior .NET Developer"
+    @ Mariner Innovations led the shortlist at 50 with stack, remote and legacy
+    enterprise all matching.
+
+    A gate rather than a penalty, on the same reasoning as the crowdwork gate:
+    the chance is not low, it is undefined, and points cannot express that.
+    """
+    cfg = criteria.get("talent_pipeline_gate")
+    if not cfg:
+        return False, {}
+    hits = _matches(text, cfg.get("keywords", []))
+    return bool(hits), {"gate_triggered": bool(hits), "hits": hits}
 
 
 def _check_ai_training_crowdwork(text: str, criteria: dict):
@@ -1747,6 +1842,15 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
             f"({', '.join(mobile_bd['hits'][:4])})"
         )
 
+    pipeline_ad, pipeline_bd = _check_talent_pipeline(text, criteria)
+    if pipeline_bd:
+        role_relevance_bd["talent_pipeline_gate"] = pipeline_bd
+    if pipeline_ad:
+        dealbreakers.append(
+            "no actual opening: a talent-pipeline advertisement "
+            f"({', '.join(pipeline_bd['hits'][:3])})"
+        )
+
     crowdwork, crowdwork_bd = _check_ai_training_crowdwork(text, criteria)
     if crowdwork_bd:
         role_relevance_bd["ai_training_crowdwork_gate"] = crowdwork_bd
@@ -1808,8 +1912,29 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     country_only = bool(dealbreakers) and all(
         d.startswith("location: source restricts hiring to") for d in dealbreakers
     )
+
+    # A vacancy nobody ever called remote. Same shape as the class above, and
+    # for the same reason — the objection is about our knowledge rather than
+    # about the job — but it is a per-identity choice, because it is only an
+    # objection at all for somebody who cannot commute. An identity looking
+    # for onsite work sets "accept" and never sees the class.
+    #
+    # policy: "manual_check" (own class, own section, the person decides) |
+    #         "reject" (as before 2026-08-11) | "accept" (ignore entirely)
+    policy = (criteria.get("remote_location_fit") or {}).get(
+        "unconfirmed_remote_policy", "manual_check")
+    if policy == "accept":
+        dealbreakers = [d for d in dealbreakers if d != REMOTE_UNCONFIRMED]
+    unconfirmed_only = bool(dealbreakers) and all(
+        d == REMOTE_UNCONFIRMED for d in dealbreakers)
+
     if country_only:
         classification = "national_market"
+    elif unconfirmed_only and policy == "manual_check":
+        # The score is deliberately NOT reduced — a 70 here is the same 70 it
+        # would have been in hot_lead. Only the certainty differs, and that is
+        # what the separate section communicates.
+        classification = "remote_unconfirmed"
     elif dealbreakers:
         classification = "rejected"
     elif complexity_gate:

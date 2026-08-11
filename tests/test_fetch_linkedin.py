@@ -72,7 +72,12 @@ def test_snapshot_parses_into_complete_records():
     assert "?" not in first["url"], "tracking parameters must not reach the id"
     assert first["location_raw"] == "Hadera, Haifa District, Israel"
     assert first["posted_at"] == "2026-08-01"
-    assert first["remote"] is True, "the query always carries the remote filter"
+    # NOT True. Measured 2026-08-11: the guest search ignores f_WT entirely —
+    # the same job id comes back under "on-site", "remote" and "hybrid" alike —
+    # so claiming remoteness from the query was a fabrication, and it was
+    # clearing the remote gate for every LinkedIn vacancy in the base.
+    assert first["remote"] is None, "a card says nothing about the arrangement"
+    assert first["workplace_type"] is None, "only the vacancy page can say"
 
 
 def test_html_entities_are_decoded():

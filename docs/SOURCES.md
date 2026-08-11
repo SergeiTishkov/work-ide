@@ -34,6 +34,34 @@ UAE, Saudi Arabia, Singapore, Switzerland, Germany and the Netherlands — marke
 whose own boards (Bayt, GulfTalent, Drushim, NodeFlair, Glints) answer 403/404,
 so there is simply no alternative.
 
+### What its guest endpoint does NOT give you
+
+Measured 2026-08-11, after the owner opened the top three vacancies in his own
+shortlist and found them badged Hybrid, On-site and On-site-and-closed.
+
+**The `f_WT` workplace-type filter does nothing.** The query carried `f_WT=2`
+("Remote") and the fetcher recorded `remote: True` on that basis. The same job
+id comes back under `f_WT=1` (on-site), `f_WT=2` (remote) and `f_WT=3`
+(hybrid), and the result sets for remote and on-site were identical. It was not
+a weak signal — it was a fabrication, and it was clearing the remote gate for
+100% of the LinkedIn vacancies in the base.
+
+**The workplace-type badge is not readable at all.** Checked three ways: absent
+from the search results, from the guest `jobPosting` fragment, and from the
+page HTML. It renders only for a logged-in session. Going there would mean
+authenticating in order to scrape, which is over the line in CLAUDE.md §5, so
+the project does not — and a person who reads the badge themselves enters it by
+hand instead (`workplace_type` on the record).
+
+**What the vacancy page DOES give**, all three in the same request that fetches
+the description, and all three previously thrown away:
+
+| Field | Where | Note |
+|---|---|---|
+| `jobLocationType` | schema.org JSON-LD | `TELECOMMUTE` where the employer declares remote, absent otherwise. Absence means silence, NOT onsite — 27 of 28 head vacancies had nothing here |
+| `baseSalary` | schema.org JSON-LD | A salary stated in the vacancy is the highest of the three levels of trust; every LinkedIn record was storing `None` |
+| "no longer accepting applications" | page HTML | Present for a closed posting, absent for open ones. Of 260 vacancies in view, **36 were already closed** |
+
 The price is the project's only HTML parser that depends on somebody else's
 markup. Hence two obligations: the parser returns **zero and an explicit error**
 when the markup changes (pinned by a test against a snapshot), and the cards are

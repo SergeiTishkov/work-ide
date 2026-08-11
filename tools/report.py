@@ -546,6 +546,10 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     # apply is the person's decision rather than the system's. The top of them
     # by score is shown, grouped by country.
     national = by_class("national_market")[:NATIONAL_MARKET_LIMIT]
+    # Vacancies whose only objection is that nobody ever said they were
+    # remote. Their own section, their own decision — and their score
+    # untouched, at the owner's explicit direction (2026-08-11).
+    unconfirmed = by_class("remote_unconfirmed")[:NATIONAL_MARKET_LIMIT]
     # Only vacancies whose fate is still undecided need manual review.
     #
     # An actual complaint from the owner, 2026-08-05: this section contained
@@ -621,6 +625,22 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         f"{class_counts.get('national_market', 0)}.",
         "",
         _section("national_market", national),
+        f"## 🏢 {t('Work arrangement not confirmed — check by hand')}",
+        "",
+        t("Nobody ever called these remote — neither the employer nor the "
+        "board. That is not the same as knowing they are onsite, so they are "
+        "not thrown away, and their score is NOT reduced: a 70 here is the "
+        "same 70 it would have been above. What is missing is the "
+        "confirmation, not the quality.") + " " +
+        t("The reason this class exists: LinkedIn's guest search ignores its "
+        "own remote filter, measured 2026-08-11 — the same vacancy comes back "
+        "under 'on-site', 'remote' and 'hybrid' alike. Where an employer does "
+        "say 'hybrid' or 'on-site', the vacancy is rejected outright and is "
+        "not here.") + " " +
+        f"{t('Showing')} {len(unconfirmed)} {t('best of')} "
+        f"{class_counts.get('remote_unconfirmed', 0)}.",
+        "",
+        _section("remote_unconfirmed", unconfirmed),
         f"## 🔎 {t('Needs a manual check by the agent or the owner')}",
         "",
         t("These are vacancies the automation is unsure about — most often ") +

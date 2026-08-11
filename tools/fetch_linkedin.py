@@ -33,6 +33,7 @@ rubbish that quietly poisons the database. Hence, here:
 from __future__ import annotations
 
 import html
+import json
 import re
 import sys
 import time
@@ -103,7 +104,27 @@ def _card_to_common_schema(card_html: str, location_query: str) -> Optional[dict
         # The queried country is stored separately: it is more dependable than
         # free text on the card, and the report needs it to show which market
         "location_raw": location or location_query,
-        "remote": True,          # the query always carries the f_WT=2 filter
+        # NOT True. This used to be hardcoded, on the reasoning that the query
+        # carries LinkedIn's f_WT=2 ("Remote") filter.
+        #
+        # Measured 2026-08-11, after the owner opened the top vacancy in the
+        # shortlist and found it badged "Hybrid": THE GUEST SEARCH IGNORES
+        # f_WT ENTIRELY. The same job id comes back under f_WT=1 (on-site),
+        # f_WT=2 (remote) and f_WT=3 (hybrid), and the result sets for
+        # "remote" and "on-site" were identical. So the flag was not a weak
+        # signal, it was a fabrication — and it was clearing the "not
+        # confirmed as remote" gate for every LinkedIn vacancy in the base.
+        #
+        # None means "nobody said". The vacancy page can still say TELECOMMUTE
+        # (see fetch_page_facts), and the description can still say "remote".
+        "remote": None,
+        # Filled in from the vacancy page when there is one to fill in;
+        # "remote" only where the employer declares it. The on-site/hybrid
+        # badge a logged-in person sees is NOT served to an anonymous request
+        # — checked three ways on 2026-08-11: absent from the search results,
+        # from the guest jobPosting fragment, and from the page HTML. Reading
+        # it would take a logged-in session, which is over the line in §5.
+        "workplace_type": None,
         "tags": [f"market:{location_query}"],
         "description_text": "",  # a card has none; only the vacancy page does
         "posted_at": _first(_DATE_RE, card_html) or None,
@@ -134,25 +155,91 @@ def _looks_like_dev_role(title: str) -> bool:
     return bool(_DEV_TITLE_RE.search(title or ""))
 
 
-def _fetch_description(url: str, timeout: int) -> str:
-    """The full vacancy text from its posting page.
+_LD_JSON_RE = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
+
+# LinkedIn renders this for a posting that has stopped taking applications.
+# Verified 2026-08-11 on three vacancies the owner labelled by hand: present
+# for the closed one (Jobstronaut), absent for both open ones. Two independent
+# spellings, because one of them is a CSS class and classes get renamed.
+_CLOSED_RE = re.compile(r"no longer accepting applications|closed-job", re.I)
+
+
+def _salary_from_ld(node: dict) -> Optional[str]:
+    """schema.org baseSalary as a line a person can read.
+
+    Free: it arrives in the same response as the description. Worth taking —
+    a salary stated in the vacancy itself is the highest of the three levels
+    of trust (CLAUDE.md §5), and every LinkedIn vacancy was storing None.
+    """
+    base = node.get("baseSalary")
+    if not isinstance(base, dict):
+        return None
+    value = base.get("value")
+    if not isinstance(value, dict):
+        return None
+    low = value.get("minValue") or value.get("value")
+    if low is None:
+        return None
+    high = value.get("maxValue")
+    amount = f"{low}-{high}" if high and high != low else f"{low}"
+    return " ".join(str(part) for part in
+                    (base.get("currency"), amount, value.get("unitText")) if part)
+
+
+def fetch_page_facts(url: str, timeout: int) -> dict:
+    """Everything the vacancy page states, in ONE request.
 
     The page is served to an anonymous ordinary GET, just like the search page.
-    An empty string means "it did not work": not a failure of the run, the
-    vacancy simply keeps its title-only score.
+
+    Three of these four facts were being thrown away until 2026-08-11, and all
+    three came free with a request the pipeline was already making:
+
+    * `workplace_type` — "remote" only where schema.org says TELECOMMUTE. The
+      absence of it means the employer declared nothing, NOT that the job is
+      onsite; the on-site/hybrid badge is not served to anonymous requests at
+      all. Do not infer from silence here — the scoring has its own class for
+      "nobody said".
+    * `salary_raw` — see _salary_from_ld.
+    * `closed` — a posting that no longer accepts applications. The owner found
+      one leading the shortlist at 65.
+
+    Never raises. Everything empty means "it did not work": not a failure of
+    the run, the vacancy simply keeps what it already had.
     """
     import requests
 
+    facts = {"description": "", "workplace_type": None,
+             "salary_raw": None, "closed": False}
     try:
         resp = requests.get(url, headers={"User-Agent": common.USER_AGENT}, timeout=timeout)
         resp.raise_for_status()
     except Exception:  # noqa: BLE001
-        return ""
+        return facts
 
-    match = _DESCRIPTION_RE.search(resp.text) or _DESCRIPTION_FALLBACK_RE.search(resp.text)
-    if not match:
-        return ""
-    return " ".join(_clean(match.group(1)).split())
+    body = resp.text
+    facts["closed"] = bool(_CLOSED_RE.search(body))
+
+    match = _DESCRIPTION_RE.search(body) or _DESCRIPTION_FALLBACK_RE.search(body)
+    if match:
+        facts["description"] = " ".join(_clean(match.group(1)).split())
+
+    for block in _LD_JSON_RE.findall(body):
+        try:
+            node = json.loads(block)
+        except Exception:  # noqa: BLE001 — one malformed block must not matter
+            continue
+        if not isinstance(node, dict) or node.get("@type") != "JobPosting":
+            continue
+        if node.get("jobLocationType") == "TELECOMMUTE":
+            facts["workplace_type"] = "remote"
+        facts["salary_raw"] = facts["salary_raw"] or _salary_from_ld(node)
+    return facts
+
+
+def _fetch_description(url: str, timeout: int) -> str:
+    """The full vacancy text. Kept as the narrow entry point for callers that
+    want nothing else; the work happens in fetch_page_facts."""
+    return fetch_page_facts(url, timeout)["description"]
 
 
 def fetch(keywords: Optional[List[str]] = None,

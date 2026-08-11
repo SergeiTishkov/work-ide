@@ -41,6 +41,7 @@ import fetch_remotive  # noqa: E402
 import fetch_wwr  # noqa: E402
 import kb  # noqa: E402
 import company_intel  # noqa: E402
+import enrich_descriptions  # noqa: E402
 import reputation  # noqa: E402
 import link_check  # noqa: E402
 import normalize  # noqa: E402
@@ -157,6 +158,24 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
     link_stats = link_check.check_links(vacancies)
     state["last_link_check"] = link_stats
     companies = kb.build_companies_from_vacancies(vacancies, prev_companies)
+
+    # Fetching descriptions for shortlist vacancies that arrived without one.
+    #
+    # LinkedIn returns cards, and a card has no description. Measured
+    # 2026-08-11: 1023 such cards in the base, 251 of them in the head of the
+    # shortlist — every gate that reads text was deciding those blind.
+    #
+    # This runs AFTER scoring on purpose: which cards reached the shortlist is a
+    # far better signal for spending a request than guessing from a title, and
+    # it is a signal the fetcher does not have. Details in
+    # tools/enrich_descriptions.py.
+    try:
+        state["last_description_enrich"] = enrich_descriptions.enrich(vacancies)
+    except Exception as exc:  # noqa: BLE001 — a description must not kill the cycle
+        state["last_description_enrich"] = {"error": f"{type(exc).__name__}: {exc}"}
+    else:
+        # Rescore: the gates now have text they did not have.
+        rescore_all(vacancies, criteria, profile, prev_companies)
 
     # Enriching shortlist companies with Wikidata facts (year founded, size).
     #

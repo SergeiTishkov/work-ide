@@ -7,7 +7,7 @@
 # memory has broken in this project before.
 
 name: kisel
-version: 2
+version: 6
 summary: >
   Calm, low-intensity legacy remote work for a .NET/JS developer.
   It looks for dull, predictable, well-documented work with little competition:

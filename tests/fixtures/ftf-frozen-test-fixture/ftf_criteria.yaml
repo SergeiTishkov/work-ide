@@ -36,6 +36,43 @@
 # explicitly: "I will take guaranteed dull, easy work for less money over
 
 remote_location_fit:
+  # The board's own structured location field — see
+  # _check_location_field_arrangement in tools/score.py for the measurement.
+  # Short and functional, so a word here is never about technology.
+  location_field_arrangement:
+    not_remote:
+      - "hybrid"
+      - "on-site"
+      - "onsite"
+      - "on site"
+      - "in-office"
+      - "in office"
+    # …unless the same field also offers remote. Three real values in the base
+    # do: "Hybrid or Remote", "Dallas, TX (Remote US or Hybrid)",
+    # "Distributed; Hybrid".
+    unless_also:
+      - "remote"
+      - "distributed"
+      - "anywhere"
+
+  # What to do with a vacancy nobody ever called remote — not the employer,
+  # not the board. Until 2026-08-11 this was a flat rejection, which was right
+  # while a source's remote flag could be trusted. It cannot: LinkedIn's guest
+  # search ignores its own f_WT filter entirely (the same job comes back under
+  # "on-site", "remote" and "hybrid" alike), so silence became the normal case
+  # rather than the suspicious one — 109 vacancies with a full description that
+  # simply never mentions the arrangement.
+  #
+  # A rejection on silence is a refusal by guesswork, which CLAUDE.md §5
+  # forbids. So: its own class, its own section of the report, the score left
+  # untouched, and the person decides. What the employer DOES say — "hybrid",
+  # "on-site" — still disqualifies through hard_dealbreakers above.
+  #
+  # manual_check — own class and section (the owner's choice, 2026-08-11)
+  # reject       — the behaviour before that date
+  # accept       — for an identity that does not mind commuting
+  unconfirmed_remote_policy: manual_check
+
   worldwide_remote:
     points: 6
     # The main signal for a contractor from a third country: the company is
@@ -209,11 +246,85 @@ remote_location_fit:
     points: -12
   hard_dealbreakers:
     points: -1000  # in effect removes the vacancy from the "hot" categories
+    # Written as regexes because a work-authorization requirement has no single
+    # spelling. Measured 2026-08-11 over 13605 vacancies: 32 say "U.S. Citizen"
+    # with the dots, 6 say "US Citizen" without them, 43 refuse sponsorship, 31
+    # demand existing authorization. The substring list caught none of those
+    # forms, and five of them were in the head of the shortlist — "Dotnet Senior
+    # Engineer" @ Tata Consultancy Services stood second at 69 while its own text
+    # said the person hired must be a U.S. Citizen or Green Card holder.
+    #
+    # Every pattern below requires the REQUIRING context ("must be", "required",
+    # "only"). A vacancy that merely mentions citizenship in an equal-opportunity
+    # footer is not refusing anybody, and must not be thrown away for it.
+    patterns:
+      - name: "must be a US citizen"
+        pattern: "must be (a |an )?(u\\.?s\\.?|united states) citizen"
+      - name: "US citizenship required"
+        pattern: "(u\\.?s\\.?|american|united states) citizenship (is )?(a )?(required|mandatory|must)"
+      - name: "US citizens only"
+        pattern: "(u\\.?s\\.?|united states) citizens? (only|or green card|and green card|/ *green card)"
+      - name: "green card or citizenship required"
+        pattern: "(must be|required to be|only) [^.]{0,40}(green card holder|permanent resident)"
+      - name: "no visa sponsorship"
+        pattern: "(cannot|can not|unable to|do not|does not|will not|no) (currently )?(provide|offer|sponsor)[^.]{0,30}(sponsor|visa|h-?1b)"
+      - name: "existing work authorization required"
+        pattern: "must (be|already be) (legally )?(authoriz|authoris)ed to work"
+      - name: "security clearance required"
+        pattern: "(must (have|possess|hold|be able to obtain)|require[sd]?) [^.]{0,40}security clearance"
+    # "Hybrid" as an arrangement, never as a technology. The distinction is the
+    # whole difficulty, and it was measured rather than assumed on 2026-08-11:
+    # across the base, 58 vacancies use "hybrid cloud", "hybrid architecture",
+    # "hybrid deployment"; among the 21 in the shortlist that mention hybrid at
+    # all, 20 mean commuting. So the word alone cannot be a keyword — every
+    # pattern below requires a neighbouring word that only makes sense about a
+    # place of work.
+    #
+    # The real forms they take, quoted from the postings themselves:
+    #   "Senior C#/.NET Engineer  Location: London (Hybrid)"
+    #   "Work Arrangement: Hybrid (3 Days/week)"
+    #   "Hybrid working - 3 days per week, London"
+    #   "you can work both from home and from the office (hybrid)"
+    #   "we've adopted a hybrid approach, with teams in the office four days a week"
+      - name: "hybrid work arrangement"
+        pattern: "hybrid (work|working|workplace|schedule|arrangement|setup|policy|office|onsite|on-site)"
+      # Hybrid inside brackets with something else in there too. The narrow
+      # "(hybrid)" rule missed a real title in the shortlist:
+      #   "Backend Developer (C# - SSIS) - (hybrid, 36-40k)"  scored 38
+      # Two negative guards, both measured. Technology words, because
+      # "(hybrid cloud)" is not a commute; and "remote", because one real
+      # posting says "(hybrid and options for remote work)" — which offers
+      # remote rather than refusing it. 61 matches across the base, every one
+      # about a place of work.
+      - name: "hybrid named in brackets"
+        pattern: "\\((?![^)]*\\b(cloud|architecture|deployment|app|apps|mobile|encryption|search|model|integration|remote)\\b)[^)]{0,40}\\bhybrid\\b[^)]{0,40}\\)"
+      - name: "listed as hybrid"
+        pattern: "\\((\\s*hybrid\\s*|\\s*on-?site\\s*)\\)"
+      - name: "work arrangement stated as hybrid"
+        pattern: "(work (arrangement|setting|model|policy|type)|location|job type|setup)\\s*[:\\-]\\s*hybrid"
+      - name: "hybrid with days named"
+        pattern: "hybrid[^.]{0,40}\\b(\\d+|one|two|three|four|five)\\s*(\\+)?\\s*days?"
+      - name: "days per week in the office"
+        pattern: "\\b(\\d+|one|two|three|four|five)\\s*(\\+)?\\s*days?[^.]{0,25}\\b(in|at|from)\\s+(the\\s+)?office"
+      - name: "office days per week"
+        pattern: "\\b(in|at|from)\\s+(the\\s+)?office[^.]{0,25}\\b(\\d+|one|two|three|four|five)\\s*(\\+)?\\s*days?"
     keywords:
       - "must relocate"
       - "on-site required"
       - "in-office"
       - "hybrid required"
+      # Added 2026-08-11 with tests/test_score_checklist_2026_08_11.py — see
+      # there for the vacancy behind each one.
+      - "client site"
+      - "at client end"
+      - "at the client end"
+      - "client premises"
+      - "driving license"
+      - "driving licence"
+      - "in person in"
+      - "in-person interview"
+      - "onsite interview"
+      - "on-site interview"
       - "hybrid position"
       - "hybrid role"
       - "hybrid working model"
@@ -971,6 +1082,36 @@ language_requirement_signal:
     - "fluent dutch"
     - "dutch required"
     - "native dutch speaker"
+    # Added 2026-08-11: these five languages were missing from
+    # config/derivation/languages.yaml entirely.
+    - "fluent arabic"
+    - "arabic required"
+    - "arabic language required"
+    - "native arabic"
+    - "arabic speaker"
+    - "arabic and english"
+    - "communication in arabic"
+    - "good command of arabic"
+    - "fluent hebrew"
+    - "hebrew required"
+    - "native hebrew"
+    - "hebrew speaker"
+    - "hebrew and english"
+    - "fluent swedish"
+    - "swedish required"
+    - "swedish language required"
+    - "native swedish"
+    - "swedish speaker"
+    - "flytande svenska"
+    - "goda kunskaper i svenska"
+    - "fluent turkish"
+    - "turkish required"
+    - "native turkish"
+    - "turkish speaker"
+    - "fluent portuguese"
+    - "portuguese required"
+    - "native portuguese"
+    - "portuguese speaker"
   # Many vacancies from German job boards (arbeitnow in particular) are written
   # entirely in German, with no explicit English "German required" phrase — the
   # very fact that the description is in German already means the working
@@ -1433,6 +1574,22 @@ classification_thresholds:
   long_shot: 10
   # below long_shot -> low_priority
   # a hard dealbreaker keyword -> status "rejected" regardless of points
+
+talent_pipeline_gate:
+  # An advertisement with no vacancy behind it. Added 2026-08-11 together with
+  # tests/test_score_checklist_2026_08_11.py; the reasoning is in the kisel
+  # template, the vacancy that exposed it is named in the test.
+  keywords:
+    - "talent pipeline"
+    - "talent pool"
+    - "talent community"
+    - "future opportunities"
+    - "upcoming roles"
+    - "as new opportunities arise"
+    - "always looking to connect"
+    - "join our talent"
+    - "no specific opening"
+    - "speculative application"
 
 ai_training_crowdwork_gate:
   # A genre that appeared on the boards in 2024-2026: a platform hires

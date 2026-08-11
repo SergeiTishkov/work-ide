@@ -118,6 +118,64 @@ languages:
       - "bedrijf"
     market_indicator_threshold: 3
 
+  # Added 2026-08-11 after the manual checklist. These languages were missing
+  # from the table entirely, so a requirement for them produced no rule for
+  # anybody. Measured across a base of 13605 vacancies: Arabic 7, Swedish 7,
+  # Hebrew 2, Portuguese 2, Turkish 1 — two of them sitting in the head of a
+  # shortlist, including a hot_lead at 51.
+  #
+  # Only requirement_phrases are given, deliberately: the "this whole posting is
+  # written in language X" heuristic needs frequent-word lists, and for
+  # non-Latin scripts the script check in unreadable_script_gate already covers
+  # it more cheaply and more exactly.
+  arabic:
+    display_name: "Arabic"
+    requirement_phrases:
+      - "fluent arabic"
+      - "arabic required"
+      - "arabic language required"
+      - "native arabic"
+      - "arabic speaker"
+      - "arabic and english"
+      - "communication in arabic"
+      - "good command of arabic"
+
+  hebrew:
+    display_name: "Hebrew"
+    requirement_phrases:
+      - "fluent hebrew"
+      - "hebrew required"
+      - "native hebrew"
+      - "hebrew speaker"
+      - "hebrew and english"
+
+  swedish:
+    display_name: "Swedish"
+    requirement_phrases:
+      - "fluent swedish"
+      - "swedish required"
+      - "swedish language required"
+      - "native swedish"
+      - "swedish speaker"
+      - "flytande svenska"
+      - "goda kunskaper i svenska"
+
+  turkish:
+    display_name: "Turkish"
+    requirement_phrases:
+      - "fluent turkish"
+      - "turkish required"
+      - "native turkish"
+      - "turkish speaker"
+
+  portuguese:
+    display_name: "Portuguese"
+    requirement_phrases:
+      - "fluent portuguese"
+      - "portuguese required"
+      - "native portuguese"
+      - "portuguese speaker"
+
   english:
     display_name: "English"
     requirement_phrases:
