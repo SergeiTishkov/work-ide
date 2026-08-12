@@ -62,6 +62,13 @@ CATALOGUES = {
             "Long shot (низкий приоритет, но не исключено)",
         "National markets — strong vacancies tied to a country":
             "Национальные рынки — сильные вакансии, привязанные к стране",
+        "apply directly": "подать напрямую",
+        "the company hires through": "компания нанимает через",
+        "this vacancy is not on the board — possibly placed through an agency":
+            "этой вакансии на доске нет — возможно, размещена через агентство",
+        "address given in the vacancy": "адрес, указанный в вакансии",
+        "no direct way to apply found — only through the board":
+            "прямого способа подать заявку не нашлось — только через площадку",
         "Work arrangement not confirmed — check by hand":
             "Формат работы не подтверждён — проверить руками",
         "Nobody ever called these remote — neither the employer nor the "

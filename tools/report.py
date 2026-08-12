@@ -263,6 +263,32 @@ def hiring_country(vacancy: dict):
     return None, None
 
 
+def _fmt_apply_channels(v: dict) -> list:
+    """Where to apply without going through the board.
+
+    Only looked up for the top of the shortlist (tools/apply_channels.py), so
+    most vacancies have nothing here — and that is different from "we looked
+    and found nothing", which the owner asked to be told about explicitly.
+    """
+    found = v.get("apply_channels")
+    if not found:
+        return []
+    lines = []
+    if found.get("direct_apply_url"):
+        lines.append(f"  - 📨 {t('apply directly')}: {found['direct_apply_url']}")
+    elif found.get("board_url"):
+        lines.append(
+            f"  - 📨 {t('the company hires through')} "
+            f"{found.get('board_provider') or '?'}: {found['board_url']} "
+            f"_({t('this vacancy is not on the board — possibly placed through an agency')})_")
+    if found.get("emails"):
+        lines.append(f"  - ✉️ {t('address given in the vacancy')}: "
+                     + ", ".join(found["emails"]))
+    if not lines:
+        lines.append(f"  - 📨 _{t('no direct way to apply found — only through the board')}_")
+    return lines
+
+
 def _fmt_vacancy_line(v: dict) -> str:
     c = v.get("computed", {})
     score = c.get("score", 0)
@@ -307,6 +333,7 @@ def _fmt_vacancy_line(v: dict) -> str:
     company_url = v.get("company_url")
     if company_url:
         lines.append(f"  - 🏢 {t('company site (apply directly)')}: {company_url}")
+    lines.extend(_fmt_apply_channels(v))
     techs = expected_technologies(v)
     if techs:
         lines.append(f"  - 🧰 {t('technologies')}: {', '.join(techs)}")

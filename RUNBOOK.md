@@ -56,6 +56,15 @@ This is the one command mandatory on every run. It:
 - checks the links (`tools/link_check.py`) and removes from the report any
   vacancy with a confirmed broken link (404/410) — see the "🔗 Link check"
   section of the report;
+- fetches the vacancy page for anything in the shortlist that arrived without a
+  description (`tools/enrich_descriptions.py`), which also picks up the stated
+  salary, whether the posting still accepts applications, and whether the
+  employer declares the role remote;
+- looks for somewhere to apply that is not the board
+  (`tools/apply_channels.py`) — the exact vacancy on the employer's own
+  applicant-tracking system, their board, or an address they wrote into the
+  posting. Only for the top of the shortlist, and "nothing found" is recorded
+  as a fact with a date rather than left silent;
 - updates `data/<p>/knowledge/*.json` and generates `reports/<p>_latest.md`,
   filing a dated copy in `reports/archive/<p>/<date>.md`. The folders are
   created automatically if absent.

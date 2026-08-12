@@ -41,6 +41,7 @@ import fetch_remotive  # noqa: E402
 import fetch_wwr  # noqa: E402
 import kb  # noqa: E402
 import company_intel  # noqa: E402
+import apply_channels  # noqa: E402
 import enrich_descriptions  # noqa: E402
 import reputation  # noqa: E402
 import link_check  # noqa: E402
@@ -176,6 +177,17 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
     else:
         # Rescore: the gates now have text they did not have.
         rescore_all(vacancies, criteria, profile, prev_companies)
+
+    # Where a person can apply without going through the board. Last of the
+    # enrichment steps and deliberately so: it needs the FINAL classification,
+    # since it only spends requests on the top of the shortlist. See
+    # tools/apply_channels.py — including why a board answering 200 is not a
+    # board.
+    try:
+        state["last_apply_channels"] = apply_channels.collect(
+            vacancies, criteria["classification_thresholds"]["hot_lead"])
+    except Exception as exc:  # noqa: BLE001 — a channel must not kill the cycle
+        state["last_apply_channels"] = {"error": f"{type(exc).__name__}: {exc}"}
 
     # Enriching shortlist companies with Wikidata facts (year founded, size).
     #
