@@ -352,6 +352,102 @@ def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = No
 # does not mean the vacancy is unsuitable, only that we do not know.
 REMOTE_UNCONFIRMED = "location: the employer never states this is remote"
 
+# Can a contractor sitting where this person sits actually take the work?
+#
+# A SEPARATE AXIS FROM THE SCORE, and the separation is the point. A vacancy
+# can fit the stack perfectly, pay well and be genuinely remote, and still be
+# unreachable because "remote" meant "remote within Canada". Points cannot
+# express that: a high score with no eligibility is worse than a middling score
+# with it, because the first cannot be acted on at all.
+#
+#     "$100/hour — Remote — US"   is worth LESS than
+#     "$70/hour — Remote Worldwide — Contractor"
+#
+# ELIGIBILITY_CONFIRMED  the employer names this person's country among the
+#                        places they hire
+# ELIGIBILITY_LIKELY     explicitly worldwide, or an international-contractor
+#                        arrangement, with nothing contradicting it
+# ELIGIBILITY_UNKNOWN    remote, but the employer said nothing about where from
+# ELIGIBILITY_NO         restricted to somewhere this person is not
+ELIGIBILITY_CONFIRMED = "confirmed"
+ELIGIBILITY_LIKELY = "likely"
+ELIGIBILITY_UNKNOWN = "unknown"
+ELIGIBILITY_NO = "no"
+
+# Best first. Used for ordering and for "at least this good" comparisons.
+ELIGIBILITY_ORDER = (ELIGIBILITY_CONFIRMED, ELIGIBILITY_LIKELY,
+                     ELIGIBILITY_UNKNOWN, ELIGIBILITY_NO)
+
+
+def _owner_country(profile: dict) -> str:
+    return ((profile or {}).get("owner") or {}).get("location", {}).get("country") or ""
+
+
+def _names_owner_country_as_a_hiring_place(text: str, criteria: dict,
+                                           profile: dict) -> Optional[str]:
+    """Does the employer name THIS person's country as somewhere they hire?
+
+    The country name alone proves nothing, and for this project's first owner
+    it proves less than nothing: "Georgia" is a US state as well as a country,
+    and "Atlanta, Georgia" is not an offer to hire in Tbilisi. So a match needs
+    the country name close to a phrase about WHERE THEY HIRE — "we hire in",
+    "accepted countries", "contractors located in".
+
+    Returns the phrase that matched, or None.
+    """
+    country = common.normalize_for_matching(_owner_country(profile))
+    if not country or country not in text:
+        return None
+    cfg = (criteria.get("remote_location_fit") or {}).get("residency_eligibility") or {}
+    window = int(cfg.get("context_window_chars") or 120)
+    phrases = [common.normalize_for_matching(p)
+               for p in cfg.get("hiring_context_phrases") or []]
+    if not phrases:
+        return None
+    for match in re.finditer(re.escape(country), text):
+        around = text[max(0, match.start() - window): match.end() + window]
+        for phrase in phrases:
+            if phrase and phrase in around:
+                return phrase
+    return None
+
+
+def _residency_eligibility(rl_bd: dict, dealbreakers: list, vacancy: dict,
+                           criteria: dict, profile: dict):
+    """(verdict, human-readable reason).
+
+    Derived from what the location gate already extracted rather than by
+    matching the text again: every signal used here is in `rl_bd`, and a second
+    independent implementation of "is this worldwide" is exactly how two parts
+    of a configuration end up disagreeing (docs/OVERRIDES.md).
+    """
+    location_objections = [d for d in dealbreakers if d.startswith("location:")]
+    blocking = [d for d in location_objections if d != REMOTE_UNCONFIRMED]
+    if blocking:
+        return ELIGIBILITY_NO, blocking[0][len("location: "):]
+
+    text = _vacancy_text(vacancy)
+    named = _names_owner_country_as_a_hiring_place(text, criteria, profile)
+    if named:
+        return (ELIGIBILITY_CONFIRMED,
+                f"the posting names {_owner_country(profile)} where it says "
+                f"'{named}'")
+
+    worldwide = rl_bd.get("worldwide_remote_hits") or []
+    if worldwide:
+        return ELIGIBILITY_LIKELY, f"says {', '.join(worldwide[:2])}"
+
+    contractor = rl_bd.get("eor_or_contractor_hits") or []
+    if contractor:
+        return (ELIGIBILITY_LIKELY,
+                f"an international contractor arrangement "
+                f"({', '.join(contractor[:2])})")
+
+    if REMOTE_UNCONFIRMED in dealbreakers:
+        return ELIGIBILITY_UNKNOWN, "nobody said this was remote at all"
+    return ELIGIBILITY_UNKNOWN, "remote, but the employer never said from where"
+
+
 _AVOIDED_MARKETS_CACHE = {}
 
 
@@ -730,6 +826,19 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         "freelance",
     ]
     eor_hits = _matches(text, eor_keywords)
+    # A NAMED employer-of-record platform, as opposed to the generic words.
+    # The difference matters in exactly one place — the override below — and it
+    # matters a lot. "Deel" or "Employer of Record" is evidence that a company
+    # is set up to engage somebody across a border. "freelance" is a word that
+    # appears in postings which are nonetheless tied to one continent.
+    #
+    # Measured 2026-08-12: "Backend Developer (.NET/Azure)" @ NTT DATA led the
+    # WORLDWIDE shortlist at 76 while its own text read "Location Preference:
+    # 100% remote in LATAM working EST Time Zone" — the region tie cancelled by
+    # the word "freelance" elsewhere in the description. It was the only
+    # vacancy in the whole shortlist resting on that override, so tightening it
+    # cost nothing and fixed the top of the file that matters most.
+    eor_platform_hits = _matches(text, list(profile.get("eor_platforms_signal") or []))
     region_hits = _matches(text, rl["acceptable_region_signal"]["keywords"])
 
     # A hard tie to a specific region (LATAM/APAC/UK-only/US-only/…) is a
@@ -746,7 +855,18 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         breakdown["absolute_residency_hits"] = absolute_hits
 
     restrictive_hits = _matches(text, rl["restrictive_region_signal"]["keywords"])
-    if restrictive_hits and not (worldwide_hits or eor_hits):
+    # Patterns as well as literals, for the same reason hard_dealbreakers grew
+    # them: a region tie has too many spellings to list. Measured 2026-08-12 —
+    # the list held "remote latam" and missed "100% remote in LATAM", one
+    # preposition away, which was leading the worldwide shortlist at 76.
+    #
+    # Deliberately HERE rather than in hard_dealbreakers: a region phrase is
+    # still outranked by an explicit worldwide or contractor signal a few lines
+    # below, and a posting that says "worldwide, and we already have people in
+    # LATAM" must survive.
+    restrictive_hits += _matches_patterns(
+        text, rl["restrictive_region_signal"].get("patterns"), restrictive_hits)
+    if restrictive_hits and not (worldwide_hits or eor_platform_hits):
         dealbreakers.extend(f"location: restricted to '{h}'" for h in restrictive_hits)
         breakdown["restrictive_region_hits"] = restrictive_hits
 
@@ -830,7 +950,27 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         breakdown["acceptable_region_hits"] = region_hits
 
     location_unknown = False
-    if not (worldwide_hits or eor_hits or region_hits or restrictive_hits):
+    # NOTE: region_hits is deliberately NOT in this exemption, unlike
+    # worldwide_hits/eor_hits/restrictive_hits. Found 2026-09-01 by the manual
+    # checklist (docs/VACANCY_CHECKLIST.md), independently in three separate
+    # batches: dozens of vacancies for companies physically IN Israel/UAE
+    # (abra, WalkMe, Bagira, Mobisoft, Elspec, Deloitte Israel, SQLink, ARAN,
+    # Mobile Group, Yael Korentec, Hays/Dubai, TAT/Argyll Scott UAE...) had NO
+    # remote confirmation anywhere in the text — plainly onsite office roles —
+    # yet sailed straight into hot_lead/worth_a_look/long_shot. The cause:
+    # acceptable_region_signal keywords are bare place names ("israel", "tel
+    # aviv", "uae", "dubai", "abu dhabi") that match just as often in a street
+    # address as in a claim of international remote hiring, but their mere
+    # presence used to exempt the vacancy from the remote-confirmation check
+    # entirely, on top of granting it a bonus. worldwide_hits/eor_hits are
+    # actual signals of remote/international intent and stay exempted;
+    # restrictive_hits already implies the text is discussing hiring
+    # geography at all. A bare mention of a target country's name implies
+    # neither. The bonus itself (above) is untouched — a genuinely remote
+    # Israel/UAE role still gets it; an unconfirmed one now correctly lands in
+    # `remote_unconfirmed` instead of the confident tiers, same as any other
+    # vacancy nobody ever called remote.
+    if not (worldwide_hits or eor_hits or restrictive_hits):
         remote_word_hits = _matches(text, rl["remote_synonym_keywords"])
         # A board that publishes ONLY remote roles (WWR, RemoteOK, Remotive,
         # Jobicy, Himalayas — see remote_only in the sources catalogue) is
@@ -845,7 +985,9 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         # absence of it means the employer said nothing, NOT that the job is
         # onsite. See fetch_linkedin.workplace_type.
         declared_remote = vacancy.get("workplace_type") == "remote"
-        points = 4  # remote-ish, unclear about hiring abroad
+        # max(), not an overwrite: a region_hits bonus already computed above
+        # (e.g. 16 for Israel/UAE) must survive even when this branch runs.
+        points = max(points, 4)  # remote-ish, unclear about hiring abroad
         location_unknown = True
         if not (declared_remote or vacancy.get("remote") is True
                 or remote_word_hits or from_remote_only_source):
@@ -1974,10 +2116,18 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "raw_total_before_clamp": raw_total,
     }
 
+    eligibility, eligibility_reason = _residency_eligibility(
+        rl_bd, dealbreakers, vacancy, criteria, profile)
+
     return {
         "score": total,
         "score_breakdown": breakdown,
         "classification": classification,
         "dealbreakers": dealbreakers,
         "needs_manual_review": needs_review,
+        # Can a contractor sitting where this person sits actually take the
+        # work? A separate axis from the score, deliberately — see
+        # _residency_eligibility.
+        "residency_eligibility": eligibility,
+        "residency_eligibility_reason": eligibility_reason,
     }

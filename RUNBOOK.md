@@ -65,9 +65,17 @@ This is the one command mandatory on every run. It:
   applicant-tracking system, their board, or an address they wrote into the
   posting. Only for the top of the shortlist, and "nothing found" is recorded
   as a fact with a date rather than left silent;
-- updates `data/<p>/knowledge/*.json` and generates `reports/<p>_latest.md`,
-  filing a dated copy in `reports/archive/<p>/<date>.md`. The folders are
-  created automatically if absent.
+- updates `data/<p>/knowledge/*.json` and generates the shortlist —
+  `reports/<p>_latest.md`, plus one file per market if the identity configured
+  any (`<p>_reports.yaml`; see `tools/segments.py`). Every file gets a dated
+  copy in `reports/archive/<p>/`. The folders are created automatically if
+  absent.
+
+  Each vacancy also carries an eligibility verdict — CONFIRMED, LIKELY, NOT
+  STATED, NO — answering whether somebody contracting from this person's
+  country could actually take the work. It orders every section ahead of the
+  score, deliberately: a well-paid role that cannot be taken is worth less than
+  a modest one that can.
 
 ## Step 1.5 — the manual candidate checklist (MANDATORY, never skipped)
 

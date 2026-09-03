@@ -1,0 +1,62 @@
+# Which shortlists this search produces, one file each.
+#
+# The order is the order they are worth reading, and it is not the order of
+# nominal pay. This search is run by a contractor working from outside every
+# market below, so a vacancy that pays well and cannot be taken is worth less
+# than one that pays adequately and can:
+#
+#   "$100/hour — Remote — US"  is worth LESS than
+#   "$70/hour — Remote Worldwide — Contractor"
+#
+# Hence `worldwide` first. It is not the leftovers; it is the only group where
+# geography is not an obstacle to start with, and on 2026-08-12 it was the
+# largest group in the shortlist after Singapore — 211 vacancies.
+#
+# Then the markets that pay well and hire across borders often enough to be
+# worth their own file. The rest of the world keeps one file between them, and
+# one file holds everything so that nothing is ever only visible through a
+# filter.
+#
+# Lists are REPLACED rather than merged when a layer overrides them (see
+# docs/OVERRIDES.md), so a local copy of this file must name every segment it
+# wants, not only the ones it is changing.
+
+segments:
+  # Geography is not in the way at all. Read this one first.
+  - slug: worldwide
+    name: "Worldwide — no country tie"
+    groups: [worldwide]
+
+  - slug: uk
+    name: "United Kingdom"
+    groups: [united_kingdom]
+
+  - slug: eu
+    name: "European Union and EEA"
+    groups: [european_union]
+
+  - slug: canada
+    name: "Canada"
+    groups: [canada]
+
+  - slug: usa
+    name: "United States"
+    groups: [united_states]
+
+  - slug: anz
+    name: "Australia and New Zealand"
+    groups: [australia_new_zealand]
+
+  # Everything the segments above did not claim — Singapore, the Gulf, Israel,
+  # Switzerland, and every country not in the catalogue at all. Computed, not
+  # listed: add a segment above and this one shrinks by itself.
+  - slug: rest
+    name: "Rest of the world"
+    rest: true
+
+  # The whole shortlist, undivided. Also written to kisel_latest.md, because
+  # that is the path RUNBOOK.md, the archive and habit all point at.
+  - slug: full
+    name: "Everything together"
+    everything: true
+    default: true

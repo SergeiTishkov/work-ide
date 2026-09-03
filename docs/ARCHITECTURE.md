@@ -242,6 +242,67 @@ inherited list. An explicit `null` deletes a key. Frozen keys
 (`config/settings_policy.yaml`) cannot be changed by the local layer, so that a
 file outside git cannot quietly lift a boundary.
 
+### One identity, several shortlists (2026-08-12)
+
+A search identity now produces a report PER MARKET rather than one file: which
+groups get their own file is configuration (`<prefix>_reports.yaml`), which
+countries form a group is shared geography
+(`config/derivation/market_groups.yaml`), and the machinery is
+`tools/segments.py`.
+
+**Why not one file sorted better.** It was sorted by score already. The
+complaint that produced this was that a single list mixes a Singapore agency
+posting with a UK contract at four times the rate, and a person reads one list
+at a time to decide where to spend an evening. Sorting cannot express "I want
+to look only at the UK tonight".
+
+**Why not one file per country.** Because half of them would hold two lines.
+The EU and EEA are one group for the same reason a person treats them as one:
+a contract with a Dutch or an Irish company reaches the same kind of employer
+at the same kind of rate.
+
+**Why `rest` is computed rather than listed.** A catch-all maintained by hand
+drifts, and the drift is invisible — the vacancy is simply in no file at all.
+`rest` is everything no other segment claimed, so adding a market shrinks it by
+itself. There is a test asserting that every vacancy reaches at least one file.
+
+**Why `<prefix>_latest.md` still exists and still means everything.** It is
+what RUNBOOK.md, the archive and a person's habit all point at. One segment
+carries `default: true` and is additionally written there.
+
+**The cost.** Eight files instead of one, and a person who opens only the UK
+file could miss the worldwide one. Paid for by a banner in every file naming
+the shortlist and linking to the others.
+
+### Eligibility as a second axis, not more points (2026-08-12)
+
+Every vacancy now carries a verdict alongside its score: CONFIRMED, LIKELY, NOT
+STATED or NO — can a contractor sitting where this person sits actually take
+the work? It is shown on its own line and it orders every section ahead of the
+score.
+
+**Why not a scoring component.** Because points average away exactly the
+distinction that matters:
+
+    "$100/hour — Remote — US"   is worth LESS than
+    "$70/hour — Remote Worldwide — Contractor"
+
+to somebody who cannot take the first. A high score with no eligibility cannot
+be acted on at all, and as points the two would trade off against each other.
+
+**Why it is derived rather than matched again.** Every signal it uses is
+already in `score_breakdown.remote_location_fit`. A second independent
+implementation of "is this worldwide" is precisely how two halves of a
+configuration end up disagreeing without a test noticing — the project's most
+expensive class of mistake (docs/OVERRIDES.md).
+
+**What it immediately found**, none of it hypothetical: "remote-first company"
+was being counted as proof of worldwide hiring; work authorization demanded as
+a noun ("Must have authorization to work in the UK") went unmatched and sat in
+hot_lead at 64; "100% remote in LATAM" led the worldwide shortlist at 76,
+because the region tie was cancelled by the word "freelance" elsewhere in the
+description.
+
 ## Rejected approaches
 
 ### The Local Constitution: a third layer, retired (2026-08-06)

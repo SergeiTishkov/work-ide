@@ -106,6 +106,7 @@ texts. Your own file holds only the differences.
 | The weight of a company red flag | `config/derivation/company_red_flags.yaml` | `company_red_flag_severity` in the profile | **yes** |
 | A market preference | — | `personal_market_bonus` | yes |
 | A technology preference | — | `personal_tech_bonus` | yes |
+| Which shortlists an identity produces | `config/defaults/reports.yaml` (one undivided file) | `<prefix>_reports.yaml` — market groups from `config/derivation/market_groups.yaml` | — |
 | Target markets of the search | `config/derivation/market_tiers.yaml` | `target_markets.tiers` plus `extra_locations` | — |
 | Geography rules | `config/derivation/regions.yaml` | `<p>_criteria.yaml` | — |
 | How technologies are written | `config/tech_vocabulary.yaml` | — (global by design) | — |

@@ -6,6 +6,99 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V9 — the word "freelance" no longer cancels a continent, 2026-08-12
+
+V8 taught the filters to see "100% remote in LATAM". The vacancy stayed at the
+top of the worldwide shortlist anyway: a region tie is outranked by evidence
+that a company can engage somebody across a border, and the word "freelance"
+elsewhere in the description was counting as that evidence.
+
+It is not evidence. A NAMED employer-of-record platform — Deel, Oyster,
+"Employer of Record" — is; a posting can say "freelance" and still be tied to
+one continent, which this one was: "100% remote in LATAM working EST Time Zone,
+1-Year Assignment".
+
+Measured before changing: exactly one vacancy in the entire shortlist rested on
+that override, and it was this one. The generic words keep their scoring role;
+they simply no longer overrule a continent.
+
+## V8 — a region tie written with a preposition, 2026-08-12
+
+Found by reading the shortlist V7 had just produced. The vacancy leading the
+**worldwide** file at 76 was NTT DATA's "100% remote in LATAM".
+
+The keyword list held "remote latam". The posting said "remote **in** LATAM".
+One preposition, and the vacancy went from unreachable to top of the list that
+is supposed to hold only the roles where geography is not in the way.
+
+Region ties are now matched by pattern as well as by literal — 57 postings in
+the base use the "in" form, across LATAM, EMEA, APAC, North America and the
+Middle East. Deliberately alongside the region keywords rather than in
+`hard_dealbreakers`, so that an explicit worldwide offer still outranks them: a
+company saying "work from anywhere, and we already have contractors in LATAM"
+is not restricting anybody, and there is a test for it.
+
+## V7 — one search, several shortlists; and eligibility as its own axis, 2026-08-12
+
+Two changes, and they answer the same complaint: a single list sorted by score
+mixes a Singapore agency posting with a UK contract at four times the rate, and
+puts a well-paid job that cannot be taken above a modest one that can.
+
+**Several shortlists, one per market.** `kisel_reports.yaml` — a new file,
+layered like every other setting — says which market groups get a file of their
+own. This search now produces eight:
+
+    kisel_worldwide_latest.md   geography is not in the way at all
+    kisel_uk_latest.md
+    kisel_eu_latest.md          the EU and EEA as one group, not 30 files
+    kisel_canada_latest.md
+    kisel_usa_latest.md
+    kisel_anz_latest.md         Australia and New Zealand
+    kisel_rest_latest.md        everything the others did not claim
+    kisel_full_latest.md        all of it, also written to kisel_latest.md
+
+Worldwide is first on purpose. It is not the leftovers: it is the only group
+where being outside every market above is not an obstacle to begin with.
+
+Which countries form a group is shared geography
+(`config/derivation/market_groups.yaml`); which groups deserve a file is this
+search's judgement, and lives here. `rest` is computed from what the other
+segments claimed rather than listed, so adding a market can never quietly
+orphan another one.
+
+**Eligibility as a separate axis, not more points.** Every vacancy now carries
+a verdict: can a contractor sitting where this person sits actually take the
+work? CONFIRMED (the employer names this country among where they hire), LIKELY
+(worldwide, or an international contractor arrangement), NOT STATED (remote,
+but from where?), NO (restricted somewhere else). It is shown on its own line
+and it now orders every section ahead of the score, because:
+
+    "$100/hour — Remote — US"  is worth LESS than
+    "$70/hour — Remote Worldwide — Contractor"
+
+to somebody who cannot take the first. The score is still shown; only the
+order changed.
+
+**Three things the same work found and fixed:**
+
+* "remote-first company" was counted as proof of WORLDWIDE hiring. It describes
+  how a company organises itself, not who it can engage. Removed — measured
+  first: 16 vacancies rested on it alone, all Canonical, all already rejected.
+* Work authorization demanded as a NOUN went unmatched. Yesterday's patterns
+  wanted the verb; every real posting used the other form. "Must have
+  authorization to work in the UK without sponsorship" was sitting in hot_lead
+  at 64. 43 postings in the base use it.
+* "Remote within the United States" and its family matched nothing. 31 in the
+  base; each happened to be caught by something else, which is luck, not a rule.
+
+**Does this affect your local settings?** Only if you had overridden
+`remote_location_fit`. If you keep your own `kisel_reports.yaml`, remember that
+lists are replaced rather than merged: name every segment you want.
+
+**What you will notice.** Eight files instead of one, each saying which
+shortlist it is and linking to the others — and within each, the vacancies you
+could actually take are at the top.
+
 ## V6 — hybrid named in brackets, 2026-08-11
 
 Caught by re-running the manual checklist over the head V5 had just rebuilt.

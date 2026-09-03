@@ -102,7 +102,12 @@ python tools/pipeline.py           # the search cycle
 yet, and the system will not search on behalf of "somebody". The refusal
 explains what to do next.
 
-The result is `reports/<prefix>_latest.md`. The `reports/` folder sits at the
+The result is `reports/<prefix>_latest.md` — and, if the identity asks for it,
+one file per market beside it (`<prefix>_uk_latest.md`,
+`<prefix>_worldwide_latest.md`, …). A person reads one shortlist at a time and
+decides where to spend an evening; splitting them is configuration, not code,
+and an identity that says nothing gets the single file it always got. See
+`tools/segments.py`. The `reports/` folder sits at the
 repository root: the report is opened by hand, and hunting for it in a tree of
 accumulated data is a nuisance. It is not in git and not in a fresh clone — the
 tools create it themselves on the first run.
@@ -175,6 +180,8 @@ local-identities/      OUTSIDE GIT: YOUR searches. Anything goes here.
 
 reports/               OUTSIDE GIT: finished shortlists, created automatically
   <prefix>_latest.md     each identity's latest shortlist — this is what to open
+  <prefix>_<market>_latest.md   the same shortlist split by market, when the
+                         identity asks for it (worldwide, uk, eu, canada, …)
   archive/<prefix>/      history: 2026-07-31.md, 2026-08-01.md, …
 
 data/<prefix>/         OUTSIDE GIT: the accumulated base, raw dumps, state
@@ -196,6 +203,7 @@ texts — your own settings sit elsewhere and cannot be lost.
 | Document | About |
 |---|---|
 | [CLAUDE.md](CLAUDE.md) | The project's constitution. Read this first |
+| [AGENTS.md](AGENTS.md) | Pointer to CLAUDE.md and RUNBOOK.md, for agent tools that only look for AGENTS.md |
 | [docs/IDENTITIES.md](docs/IDENTITIES.md) | The identity architecture. Read this second |
 | [docs/ONBOARDING.md](docs/ONBOARDING.md) | How to create your own identity |
 | [docs/QUESTIONNAIRE.md](docs/QUESTIONNAIRE.md) | How to run the interview |

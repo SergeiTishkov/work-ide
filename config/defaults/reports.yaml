@@ -1,0 +1,26 @@
+# How an identity's shortlist is split into report files. Shared defaults.
+#
+# The default is ONE file, exactly as it was before splitting existed: an
+# identity that has said nothing about markets gets the report it always got.
+# Splitting is a decision about a particular search, so it belongs in
+# <prefix>_reports.yaml (see docs/OVERRIDES.md for the layering).
+#
+# A segment is one file, written to reports/<prefix>_<slug>_latest.md, with a
+# dated copy under reports/archive/<prefix>/. It is one of three kinds:
+#
+#   groups: [...]   the named market groups from
+#                   config/derivation/market_groups.yaml
+#   rest: true      everything no other segment claimed. Computed rather than
+#                   listed, so adding a segment can never silently leave a
+#                   market out of every file
+#   everything: true  the whole shortlist
+#
+# `default: true` additionally writes the file to reports/<prefix>_latest.md —
+# the path RUNBOOK.md and a person's habit both point at. Exactly one segment
+# should carry it.
+
+segments:
+  - slug: ""
+    name: "Everything"
+    everything: true
+    default: true

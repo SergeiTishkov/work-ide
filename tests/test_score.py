@@ -86,6 +86,53 @@ def test_acceptable_region_uae_recognized():
     assert r_uae["score_breakdown"]["remote_location_fit"]["points"] > 0
 
 
+def test_acceptable_region_alone_does_not_confirm_remote():
+    # Real bug found 2026-09-01 by the manual checklist (docs/VACANCY_CHECKLIST.md),
+    # independently in three separate agent passes over the same run: dozens of
+    # vacancies for companies physically IN Israel/UAE (abra, WalkMe, Bagira,
+    # Mobisoft, Deloitte Israel, SQLink, ARAN, Yael Korentec, Hays/Dubai...) had
+    # NO remote confirmation anywhere in the text -- plainly onsite office
+    # roles -- yet reached hot_lead/worth_a_look/long_shot. Cause: a bare
+    # mention of "israel"/"tel aviv"/"uae"/"dubai" (the acceptable_region_signal
+    # keywords) used to exempt the vacancy from the remote-confirmation check
+    # entirely, on top of granting it a bonus. A place name in a street address
+    # is not a claim of international remote hiring.
+    v = make_vacancy(
+        remote=None,
+        location_raw="Tel Aviv, Israel",
+        description_text=(
+            "C# .NET SQL Server developer role. This is a full-time position "
+            "located in our Tel Aviv, Israel office."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert score.REMOTE_UNCONFIRMED in r["dealbreakers"]
+    assert r["classification"] not in ("hot_lead", "worth_a_look", "long_shot")
+    # The acceptable-region bonus itself must survive: once a person DOES
+    # confirm this is remote (see the companion test below), Israel/UAE should
+    # still score better than an unknown location, exactly as before.
+    assert "israel" in r["score_breakdown"]["remote_location_fit"]["acceptable_region_hits"]
+    assert r["score_breakdown"]["remote_location_fit"]["points"] > 0
+
+
+def test_acceptable_region_with_remote_confirmation_is_not_downgraded():
+    # The companion case: when the text (or the source) DOES confirm remote,
+    # an Israel/UAE-based vacancy must behave exactly as it did before the fix
+    # above -- no REMOTE_UNCONFIRMED, full acceptable-region bonus.
+    v = make_vacancy(
+        remote=None,
+        location_raw="Tel Aviv, Israel",
+        description_text=(
+            "C# .NET SQL Server role, based in Israel, fully remote position."
+        ),
+    )
+    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert score.REMOTE_UNCONFIRMED not in r["dealbreakers"]
+    assert "israel" in r["score_breakdown"]["remote_location_fit"]["acceptable_region_hits"]
+    assert r["score_breakdown"]["remote_location_fit"]["points"] == \
+        CRITERIA["remote_location_fit"]["acceptable_region_signal"]["points"]
+
+
 def test_remote_europe_is_restrictive_not_acceptable():
     # A mistake in the first version, fixed 2026-07-30: "EU Remote"/"remote
     # Europe" in a real vacancy means residency IN the EU is required — that is

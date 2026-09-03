@@ -62,6 +62,15 @@ CATALOGUES = {
             "Long shot (низкий приоритет, но не исключено)",
         "National markets — strong vacancies tied to a country":
             "Национальные рынки — сильные вакансии, привязанные к стране",
+        "eligibility: confirmed": "допуск подтверждён работодателем",
+        "eligibility: likely": "допуск вероятен",
+        "eligibility: not stated": "про допуск ничего не сказано",
+        "eligibility: no": "допуск исключён",
+        "Markets inside": "Рынки внутри",
+        "This shortlist": "Эта выборка",
+        "vacancies": "вакансий",
+        "Other shortlists from this search":
+            "Другие выборки этого поиска",
         "apply directly": "подать напрямую",
         "the company hires through": "компания нанимает через",
         "this vacancy is not on the board — possibly placed through an agency":

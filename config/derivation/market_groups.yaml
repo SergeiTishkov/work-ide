@@ -1,0 +1,101 @@
+# Market groups — which countries belong together for the purpose of SPLITTING
+# THE REPORT, shared by every identity.
+#
+# This table says nothing about whether a market is good. It is a grouping, not
+# a ranking: which groups an identity wants a separate shortlist for is that
+# identity's decision, and it lives in <prefix>_reports.yaml.
+#
+# Why groups at all. A person reads one shortlist at a time and decides where
+# to spend an evening. "Everything, sorted by score" mixes a Singapore agency
+# posting with a UK contract at four times the rate, and the reader has to do
+# the sorting the machine could have done. Asked for by the owner 2026-08-12.
+#
+# The keys are matched against the hiring country as the report resolves it
+# (report.hiring_country) — the employer's own country, not the board's label.
+
+groups:
+  # Not a place. The vacancies whose employer named no country at all, or said
+  # worldwide outright.
+  #
+  # For somebody contracting from outside every one of the markets below, this
+  # is not the leftovers — it is the only group where geography is not an
+  # obstacle in the first place. It is deliberately listed first.
+  worldwide:
+    name: "Worldwide — no country tie"
+    countries: []          # membership is decided by the absence of a country
+    matches_missing_country: true
+
+  united_kingdom:
+    name: "United Kingdom"
+    countries: ["United Kingdom"]
+
+  european_union:
+    name: "European Union and EEA"
+    # The EU/EEA as one group rather than 27 files. A contract with a Dutch or
+    # an Irish company reaches the same kind of employer at the same kind of
+    # rate, and splitting them further produces files with two lines in them.
+    countries:
+      - "Austria"
+      - "Belgium"
+      - "Bulgaria"
+      - "Croatia"
+      - "Cyprus"
+      - "Czechia"
+      - "Denmark"
+      - "Estonia"
+      - "Finland"
+      - "France"
+      - "Germany"
+      - "Greece"
+      - "Hungary"
+      - "Iceland"
+      - "Ireland"
+      - "Italy"
+      - "Latvia"
+      - "Liechtenstein"
+      - "Lithuania"
+      - "Luxembourg"
+      - "Malta"
+      - "Netherlands"
+      - "Norway"
+      - "Poland"
+      - "Portugal"
+      - "Romania"
+      - "Slovakia"
+      - "Slovenia"
+      - "Spain"
+      - "Sweden"
+
+  canada:
+    name: "Canada"
+    countries: ["Canada"]
+
+  united_states:
+    name: "United States"
+    countries: ["United States"]
+
+  australia_new_zealand:
+    name: "Australia and New Zealand"
+    countries: ["Australia", "New Zealand"]
+
+  switzerland:
+    name: "Switzerland"
+    countries: ["Switzerland"]
+
+  israel:
+    name: "Israel"
+    countries: ["Israel"]
+
+  gulf:
+    name: "Gulf states"
+    countries:
+      - "United Arab Emirates"
+      - "Saudi Arabia"
+      - "Qatar"
+      - "Kuwait"
+      - "Bahrain"
+      - "Oman"
+
+  singapore:
+    name: "Singapore"
+    countries: ["Singapore"]

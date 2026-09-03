@@ -239,9 +239,13 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
             encoding="utf-8",
         )
 
-    md = report.build_report_markdown(vacancies, companies, state)
-    report_path = report.write_report(md)
-    return str(report_path)
+    # Every shortlist this identity is configured to produce. An identity that
+    # has said nothing about markets gets exactly one file, at the historical
+    # path — see tools/segments.py.
+    written = report.write_segmented_reports(vacancies, companies, state)
+    state["last_reports"] = {slug or "latest": str(path)
+                             for slug, path in written.items()}
+    return str(written.get("") or next(iter(written.values())))
 
 
 def run_pipeline(include_manual_placeholder_note: bool = True) -> dict:

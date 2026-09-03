@@ -36,6 +36,42 @@
 # explicitly: "I will take guaranteed dull, easy work for less money over
 
 remote_location_fit:
+  # Can a contractor sitting where this person sits actually take the work?
+  # See _residency_eligibility in tools/score.py — a separate axis from the
+  # score, because a vacancy that pays well and cannot be taken is worth less
+  # than one that pays adequately and can.
+  #
+  # These phrases decide the strongest verdict, CONFIRMED: the employer naming
+  # this person's country as somewhere they hire. The country name on its own
+  # is not enough and for this identity it is actively misleading — "Georgia"
+  # is a US state as well as a country, and "Atlanta, Georgia" is not an offer
+  # to hire in Tbilisi. So the name has to appear NEAR one of these.
+  residency_eligibility:
+    context_window_chars: 120
+    hiring_context_phrases:
+      - "we hire"
+      - "we can hire"
+      - "hiring in"
+      - "we employ"
+      - "accepted countries"
+      - "eligible countries"
+      - "supported countries"
+      - "countries we hire"
+      - "where we hire"
+      - "contractors in"
+      - "contractors located in"
+      - "contractors based in"
+      - "candidates in"
+      - "candidates located in"
+      - "candidates based in"
+      - "open to candidates"
+      - "residents of"
+      - "based anywhere in"
+      - "team members in"
+      - "employees in"
+      - "payroll in"
+      - "entities in"
+
   # The board's own structured location field — see
   # _check_location_field_arrangement in tools/score.py for the measurement.
   # Short and functional, so a word here is never about technology.
@@ -118,8 +154,13 @@ remote_location_fit:
       - "wherever you live"
       - "live anywhere"
       - "100% remote worldwide"
-      - "remote first company"
-      - "remote-first company"
+      # REMOVED 2026-08-12: "remote-first company", "remote first company".
+      # They describe how a company organises itself, not who it can engage.
+      # A remote-first company can hire in one country only, and this list is
+      # supposed to mean "geography is not in the way" — it decides both the
+      # score and the eligibility verdict (score._residency_eligibility).
+      # Measured before removing: 16 vacancies in the base rested on the weak
+      # phrases alone, every one of them Canonical and already rejected.
   eor_or_contractor_international:
     points: 8
     keywords: []  # filled from profile.yaml eor_platforms_signal plus contractor/1099/freelance
@@ -232,6 +273,20 @@ remote_location_fit:
       - "authorised to work in"
       - "work authorization in"
 
+    # Written as a pattern because a region tie has too many spellings to
+    # list. Measured 2026-08-12: the keywords held "remote latam" and missed
+    # "100% remote in LATAM" — one preposition away — which was leading the
+    # worldwide shortlist at 76. 57 postings in the base use the "in" form.
+    #
+    # These sit with the KEYWORDS rather than in hard_dealbreakers on
+    # purpose: a few lines further down in score.py an explicit worldwide or
+    # contractor signal still outranks them, so a posting that says
+    # "worldwide, and we already have people in LATAM" survives.
+    patterns:
+      - name: "tied to one region"
+        pattern: "\\b(remote|work|working|hiring|hire|based|candidates?|employees?|contractors?)\\s+(with)?in\\s+(the\\s+)?(latam|latin america|emea|apac|asia[- ]pacific|north america|south america|middle east)\\b"
+      - name: "residency in one region required"
+        pattern: "(must|need to|required to)\\s+(be\\s+)?(located|based|residing|living)\\s+in\\s+(the\\s+)?(latam|latin america|emea|apac|asia[- ]pacific|north america|south america|middle east|european union)\\b"
   net_exporter_penalty:
     # The one place where geography affects the score.
     #
@@ -296,6 +351,41 @@ remote_location_fit:
       # posting says "(hybrid and options for remote work)" — which offers
       # remote rather than refusing it. 61 matches across the base, every one
       # about a place of work.
+      # Work authorization stated as a NOUN. The patterns added on 2026-08-11
+      # all wanted the verb — "must be authorized to work" — and every real
+      # posting found on 2026-08-12 used the other form:
+      #
+      #   "Must have authorization to work in the UK without sponsorship"
+      #        Thermo Fisher, sitting in hot_lead at 64
+      #   "Legal authorization to work in the U.S. indefinitely is required.
+      #    Employer work permit sponsorship is not available."
+      #        Motorola Solutions, at 42
+      #   "Authorization to work in the United States. We are not able to
+      #    sponsor or transfer work visas at this time."
+      #        Edfinity, labelled "Anywhere in the World"
+      #
+      # 43 postings in the base use it. Requiring the demand ("must have",
+      # "is required") keeps an OFFER of sponsorship — which is a plus rather
+      # than a refusal — out of the match.
+      - name: "work authorization demanded"
+        pattern: "(must (have|possess|hold)|required to (have|hold)|is required|are required)[^.]{0,60}authoris?z\\w* to work"
+      # The window steps over a dot only when it belongs to an abbreviation
+      # ("U.S."), never over a full stop. Without that the Motorola posting
+      # — "Legal authorization to work in the U.S. indefinitely is required"
+      # — slips through; with a plain "any character" window instead, the
+      # pattern would happily span two sentences and reject "authorization to
+      # work in Germany. A driving licence is required."
+      - name: "work authorization required"
+        pattern: "(legal |valid |existing )?authoris?z\\w* to work (in|for)(?:[^.]|\\b[a-z]\\.){0,60}(is |are )?(required|mandatory|essential|a must)"
+      - name: "sponsorship explicitly unavailable"
+        pattern: "(sponsorship|work permit|visa)[^.]{0,40}(is|are) not (available|offered|provided|possible)"
+      - name: "will not sponsor a visa"
+        pattern: "(not able to|unable to|cannot|can not|will not|do not|does not) (sponsor|transfer)[^.]{0,30}(visa|sponsorship|work permit)"
+      # "Remote within the United States" and its family. 31 in the base; not
+      # one of them reached the shortlist, because something else caught each
+      # — but relying on that is luck rather than a rule.
+      - name: "remote within one country"
+        pattern: "remote (with)?in (the )?(us|usa|united states|uk|united kingdom|canada|europe|eu|india|australia|germany|france|spain|netherlands|poland|brazil|mexico|singapore)\\b"
       - name: "hybrid named in brackets"
         pattern: "\\((?![^)]*\\b(cloud|architecture|deployment|app|apps|mobile|encryption|search|model|integration|remote)\\b)[^)]{0,40}\\bhybrid\\b[^)]{0,40}\\)"
       - name: "listed as hybrid"

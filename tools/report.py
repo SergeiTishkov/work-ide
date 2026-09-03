@@ -24,6 +24,11 @@ t = i18n.translate
 
 TOP_N_PER_SECTION = 15
 
+# The classes a person actually reads. Everything else is in the database for
+# the record, not in the report for a decision.
+LISTED_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "national_market",
+                  "remote_unconfirmed")
+
 
 def _fmt_amount(value: float) -> str:
     if value == int(value):
@@ -263,6 +268,39 @@ def hiring_country(vacancy: dict):
     return None, None
 
 
+def _eligibility_rank(v: dict) -> int:
+    """Position in score.ELIGIBILITY_ORDER; anything unrecognised sorts last."""
+    import score as score_mod
+
+    verdict = (v.get("computed") or {}).get("residency_eligibility")
+    try:
+        return score_mod.ELIGIBILITY_ORDER.index(verdict)
+    except ValueError:
+        return len(score_mod.ELIGIBILITY_ORDER)
+
+
+def _fmt_eligibility(v: dict) -> list:
+    """Can a contractor sitting where this person sits actually take the work?
+
+    Shown separately from the score and never folded into it. A vacancy that
+    pays well and cannot be taken is worth less than one that pays adequately
+    and can, and a single number cannot say that — see
+    score._residency_eligibility.
+    """
+    c = v.get("computed") or {}
+    verdict = c.get("residency_eligibility")
+    if not verdict:
+        return []
+    label = {
+        "confirmed": "✅ " + t("eligibility: confirmed"),
+        "likely": "🟢 " + t("eligibility: likely"),
+        "unknown": "❔ " + t("eligibility: not stated"),
+        "no": "⛔ " + t("eligibility: no"),
+    }.get(verdict, verdict)
+    reason = c.get("residency_eligibility_reason")
+    return [f"  - {label}" + (f" — _{reason}_" if reason else "")]
+
+
 def _fmt_apply_channels(v: dict) -> list:
     """Where to apply without going through the board.
 
@@ -333,6 +371,7 @@ def _fmt_vacancy_line(v: dict) -> str:
     company_url = v.get("company_url")
     if company_url:
         lines.append(f"  - 🏢 {t('company site (apply directly)')}: {company_url}")
+    lines.extend(_fmt_eligibility(v))
     lines.extend(_fmt_apply_channels(v))
     techs = expected_technologies(v)
     if techs:
@@ -541,8 +580,63 @@ def _reputation_coverage_block(vacancies: dict, companies: dict) -> str:
     return "\n".join(lines)
 
 
+def segment_filename(slug: str, prefix: Optional[str] = None) -> str:
+    """The file one segment is written to.
+
+    An empty slug is the whole shortlist and keeps the historical name, because
+    `reports/<prefix>_latest.md` is what RUNBOOK.md, the archive and a person's
+    habit all point at.
+    """
+    prefix = prefix if prefix is not None else (common.FILE_PREFIX or "")
+    return f"{prefix}{slug}_latest.md" if slug else f"{prefix}latest.md"
+
+
+def _segment_banner(segment, siblings, shown: int, listed=()) -> str:
+    """Which shortlist this is, and where the others are.
+
+    Without this, splitting the report would quietly hide work: a person
+    opening the UK file has no way of knowing that the worldwide one — the one
+    where geography is not in the way at all — exists at all.
+    """
+    if segment is None:
+        return ""
+    others = [s for s in (siblings or []) if s.slug != segment.slug]
+    links = ", ".join(
+        f"[{s.name}]({segment_filename(s.slug)})" for s in others)
+    line = (f"**{t('This shortlist')}: {segment.name}** — "
+            f"{shown} {t('vacancies')}.")
+
+    # A segment holding several markets — `rest` above all — is otherwise a
+    # bag: 338 vacancies with no way of telling that two thirds of them are
+    # Singapore. The breakdown makes it legible without another file, and
+    # shows a person whether one is worth asking for.
+    if segment.rest or segment.everything:
+        import segments as segments_mod
+
+        tally = segments_mod.counts_by_group(
+            listed, lambda v: hiring_country(v)[0])
+        if len(tally) > 1:
+            parts = ", ".join(
+                f"{segments_mod.group_name(key)} {n}"
+                for key, n in sorted(tally.items(), key=lambda kv: -kv[1]))
+            line += f"\n\n_{t('Markets inside')}: {parts}._"
+
+    if links:
+        line += f"\n\n_{t('Other shortlists from this search')}: {links}._"
+    return line + "\n"
+
+
 def build_report_markdown(vacancies: dict, companies: dict, state: dict,
-                          criteria: Optional[dict] = None) -> str:
+                          criteria: Optional[dict] = None,
+                          segment=None, siblings=None) -> str:
+    """The shortlist as Markdown.
+
+    `segment` (tools/segments.Segment) narrows it to one market group; without
+    one the report covers everything, exactly as it did before splitting
+    existed. `siblings` are the other segments, so each file can point at the
+    others — a person who opens the UK shortlist should not have to remember
+    that a worldwide one exists.
+    """
     import score
 
     now = datetime.now(timezone.utc)
@@ -558,9 +652,34 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     items = [v for v in live if v.get("link_check", {}).get("status") != "dead"]
     duplicate_count = len(vacancies) - len(live)
 
+    # One market group's worth of the same shortlist. The counts above stay
+    # global on purpose: "collapsed N duplicates" is a fact about the run, and
+    # restating it per file would make eight different numbers for one thing.
+    # What the banner counts. NOT len(items): that includes everything the
+    # gates rejected, which in a segment banner reads as "this market has ten
+    # thousand vacancies for you" when it has eleven.
+    def _listed(candidates):
+        return sum(1 for v in candidates
+                   if (v.get("computed") or {}).get("classification") in LISTED_CLASSES)
+
+    segment_total = _listed(items)
+    if segment is not None:
+        import segments as segments_mod
+
+        claimed = segments_mod._claimed_groups(list(siblings or [segment]))
+        items = [v for v in items
+                 if segment.holds(segments_mod.group_of(hiring_country(v)[0]), claimed)]
+        segment_total = _listed(items)
+
     def by_class(cls):
         matching = [v for v in items if v.get("computed", {}).get("classification") == cls]
-        matching.sort(key=lambda v: -v.get("computed", {}).get("score", 0))
+        # Reachability first, score second. The owner's instruction, and the
+        # reason the two are separate axes at all: "$100/hour — Remote — US" is
+        # worth less than "$70/hour — Remote Worldwide" to somebody who cannot
+        # take the first. The score is still shown, so nothing is hidden — only
+        # reordered.
+        matching.sort(key=lambda v: (
+            _eligibility_rank(v), -v.get("computed", {}).get("score", 0)))
         return matching
 
     hot = by_class("hot_lead")
@@ -617,6 +736,10 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         "",
         f"_{t('Search identity')}: {_identity_display_name()}_",
         "",
+        _segment_banner(segment, siblings, segment_total,
+                        [v for v in items
+                         if (v.get('computed') or {}).get('classification')
+                         in LISTED_CLASSES]),
         f"{t('Run')} #{state.get('run_count', '?')}. "
         f"{t('Vacancies shown')}: {len(items)} "
         f"({t('collapsed')} {duplicate_count} {t('near-duplicates')}, "
@@ -679,7 +802,11 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         _section("needs_manual_review", review_items),
         f"## ⭐ {t('Company reputation checks')}",
         "",
-        _reputation_coverage_block(vacancies, companies),
+        # The shortlist THIS file shows, not the whole base: a person
+        # reading the UK list is not helped by a to-do list of Singapore
+        # companies, and before the split this block quietly named them.
+        _reputation_coverage_block(
+            {v.get('id') or i: v for i, v in enumerate(items)}, companies),
         "",
         f"## 📊 {t('Class statistics')}",
         "",
@@ -713,7 +840,49 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     return "\n".join(parts)
 
 
-def write_report(markdown_text: str, run_date: Optional[str] = None) -> Path:
+def write_segmented_reports(vacancies: dict, companies: dict, state: dict,
+                            criteria: Optional[dict] = None,
+                            run_date: Optional[str] = None) -> dict:
+    """Every shortlist this identity is configured to produce.
+
+    Returns {slug: path}, in configured order. An identity that has said
+    nothing about markets gets exactly one file, at the historical path — the
+    split is opt-in and costs nothing to ignore.
+
+    A broken `reports` document must not cost somebody their whole run: the
+    report is the last step of a cycle that has already done all the work, so a
+    configuration mistake falls back to the single undivided shortlist and says
+    so loudly.
+    """
+    import segments as segments_mod
+
+    try:
+        configured = segments_mod.load_segments()
+    except Exception as exc:  # noqa: BLE001 — see the docstring
+        common.eprint(f"[report] cannot read the report segmentation ({exc}); "
+                      "writing the single undivided shortlist instead")
+        configured = []
+    if not configured:
+        return {"": write_report(
+            build_report_markdown(vacancies, companies, state, criteria),
+            run_date)}
+
+    written = {}
+    for segment in configured:
+        markdown = build_report_markdown(
+            vacancies, companies, state, criteria,
+            segment=segment, siblings=configured)
+        written[segment.slug] = write_report(markdown, run_date, slug=segment.slug)
+        if segment.default and segment.slug:
+            # The same text at the historical path as well. Written rather than
+            # linked: a symlink would not survive being copied out of the
+            # repository, and this file gets forwarded.
+            written[""] = write_report(markdown, run_date)
+    return written
+
+
+def write_report(markdown_text: str, run_date: Optional[str] = None,
+                 slug: str = "") -> Path:
     """Writes the latest report and files a dated copy in the archive.
 
     The layout (at the owner's direct request; an improvement for everyone):
@@ -734,10 +903,12 @@ def write_report(markdown_text: str, run_date: Optional[str] = None) -> Path:
     run_date = run_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     prefix = common.FILE_PREFIX or ""
 
-    latest_path = common.REPORTS_DIR / f"{prefix}latest.md"
+    latest_path = common.REPORTS_DIR / segment_filename(slug, prefix)
     # No prefix is needed in the archive: the folder already belongs to the
-    # identity.
-    archived_path = common.REPORTS_ARCHIVE_DIR / f"{run_date}.md"
+    # identity. The slug is, so that a day's several shortlists do not
+    # overwrite one another.
+    archived_path = common.REPORTS_ARCHIVE_DIR / (
+        f"{run_date}_{slug}.md" if slug else f"{run_date}.md")
 
     latest_path.write_text(markdown_text, encoding="utf-8")
     archived_path.write_text(markdown_text, encoding="utf-8")
@@ -756,9 +927,9 @@ def main() -> None:
     vacancies = kb.load_vacancies()
     companies = kb.load_companies()
     state = common.load_json(common.STATE_PATH, default={})
-    md = build_report_markdown(vacancies, companies, state)
-    path = write_report(md)
-    print(f"Report saved: {path}")
+    written = write_segmented_reports(vacancies, companies, state)
+    for slug, path in written.items():
+        print(f"Report saved: {path}" + (f"  [{slug}]" if slug else ""))
 
 
 if __name__ == "__main__":
