@@ -6,6 +6,51 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V11 — the exemptions in V10 had to be earned, 2026-08-12
+
+Reading the shortlist V10 produced, twice more.
+
+**One stray word was enough to switch the discipline filter off.** V10 let a
+data or ML title through when the posting mentioned data-pipeline work, so that
+your Spark and Databricks experience would not be filtered away. But a single
+"ETL" anywhere counted. Measured: 64 vacancies in the shortlist carry exactly
+one such word against 45 carrying two or more. Two are now required, and a real
+data role names several.
+
+**"Solutions Consultant, Enterprise" @ Ramp** sat in long_shot at 21. Added to
+the hard tier — but only "solutions consultant" and "sales consultant", because
+".Net Technical Consultant" @ alfanar is a real .NET role and a broader pattern
+would have thrown it away.
+
+## V10 — a different branch of engineering is not a different stack, 2026-08-12
+
+You opened your own UK shortlist, reached line 39 and found **"Senior Security
+Engineer, Security Incident Response Team (SIRT)"** at 15. Security incident
+response is somebody else's profession; your CV is .NET end to end.
+
+**Why nothing caught it.** The soft profession filter is cancelled by any
+developer word in the title, and the override list holds a bare "engineer" —
+so the very word naming the wrong profession disarmed the rule. The hard filter
+would have caught it, but that one fires whatever the stack says, and measuring
+first showed what a blanket rule would cost: fifteen wrong vacancies removed
+and **five real ones with them**, including ".NET AppSec Engineer" and "Senior
+Software Engineer (WPF, Firmware & Systems)". A .NET job with an unusual title
+is still a .NET job.
+
+**So there is now a third tier.** `wrong_discipline_title_patterns` — security,
+data science, ML/AI, embedded and firmware, forward-deployed and support
+engineering — which fires UNLESS the vacancy names your core stack, or is data
+work over Spark/Databricks/ETL, which you confirmed on 2026-07-30 is wanted and
+which your CV carries. The employer's own word outranks the title's discipline.
+
+Two more went into the hard tier, where no stack could rescue them: "Vice
+President, Data & Insights" and "Sales Enablement | SDR", both of which had
+reached long_shot at 22. The list already held `vp`, and neither posting
+spells it that way.
+
+**What you will notice.** Titles that were never your work stop appearing —
+and the ones that only look like somebody else's work stay.
+
 ## V9 — the word "freelance" no longer cancels a continent, 2026-08-12
 
 V8 taught the filters to see "100% remote in LATAM". The vacancy stayed at the

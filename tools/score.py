@@ -1118,6 +1118,17 @@ def _check_stack_relevance(text: str, core_hits: list, strong_hits: list, criter
         "primary_language_hits": primary_language_hits,
         "tech_agnostic_override_hits": tech_agnostic_hits,
         "data_pipeline_exception_applied": data_pipeline_relevant,
+        # The context on its own, without the Java/Scala half. Not used for
+        # relevance — that rule is unchanged — but the wrong-discipline gate
+        # reads it: a data or analytics title over Spark/Databricks/ETL is
+        # work this person has done, which the owner confirmed on 2026-07-30
+        # and a test has asserted ever since.
+        #
+        # TWO of them, not one. Measured 2026-08-12: 64 vacancies in the
+        # shortlist carry exactly one context word against 45 carrying two
+        # or more, and a single stray "ETL" in a sales posting is not
+        # evidence of anything. A real data role names several.
+        "data_pipeline_context_hits": data_pipeline_context_hits,
     }
 
 
@@ -1162,7 +1173,8 @@ def _check_title_stack(title: str, criteria: dict, profile: dict):
     }
 
 
-def _score_role_relevance(text: str, title: str, criteria: dict):
+def _score_role_relevance(text: str, title: str, criteria: dict,
+                          stack_bd: Optional[dict] = None):
     """The "is this a software developer role at all" gate — a full rejection.
 
     Confirmed 2026-07-30 on real finds: "CFO Controller" and "Product
@@ -1211,12 +1223,50 @@ def _score_role_relevance(text: str, title: str, criteria: dict):
     ]
     tech_agnostic_hits = _matches(text, cfg["tech_agnostic_override_keywords"])
 
+    # A different branch of engineering. Between the two tiers above, and it
+    # needed to be its own thing rather than either.
+    #
+    # The owner, 2026-08-12, opening his UK shortlist and reaching "Senior
+    # Security Engineer, Security Incident Response Team (SIRT)": not my
+    # vacancy, filter on my CV. It was not caught because "engineer" is a
+    # developer override, so the soft tier was disarmed; and it does not
+    # belong in the hard tier either, because that one fires whatever the
+    # stack says — which would have thrown away ".NET AppSec Engineer" and
+    # "Senior Software Engineer (WPF, Firmware & Systems)", both of them real
+    # .NET work with an unusual title. Measured before this was written: five
+    # such vacancies would have been lost to a blanket rule.
+    #
+    # So: a security, data, ML or embedded title is not this person's work
+    # UNLESS the employer names the core stack in it. The employer's own word
+    # outranks the title's discipline, which is the same principle used
+    # everywhere else in this file.
+    discipline_hits = [
+        p for p in cfg.get("wrong_discipline_title_patterns", [])
+        if re.search(p, search_area, re.IGNORECASE)
+    ]
+    # Two ways a discipline title can still be this person's work.
+    #
+    # The second one is not a guess: the owner confirmed on 2026-07-30 that
+    # data engineering with Spark, Databricks and Scala IS wanted, and his
+    # CV carries all three. `data_pipeline_exception_applied` is where that
+    # decision already lives, and reading it here rather than re-deciding
+    # keeps the two from drifting apart.
+    stack_bd = stack_bd or {}
+    core_stack_named = bool(stack_bd.get("core_hits"))
+    wanted_anyway = (core_stack_named
+                     or bool(stack_bd.get("data_pipeline_exception_applied"))
+                     or len(stack_bd.get("data_pipeline_context_hits") or []) >= 2)
+    discipline_gate = bool(discipline_hits) and not wanted_anyway
+
     soft_gate = bool(wrong_profession_hits) and not developer_override_hits and not tech_agnostic_hits
-    gate_triggered = soft_gate or bool(hard_wrong_hits)
+    gate_triggered = soft_gate or bool(hard_wrong_hits) or discipline_gate
     return gate_triggered, {
         "gate_triggered": gate_triggered,
         "wrong_profession_hits": wrong_profession_hits + hard_wrong_hits,
         "hard_wrong_profession_hits": hard_wrong_hits,
+        "wrong_discipline_hits": discipline_hits,
+        "wrong_discipline_gate": discipline_gate,
+        "wrong_discipline_exempted": wanted_anyway and bool(discipline_hits),
         "developer_override_hits": developer_override_hits,
     }
 
@@ -1939,7 +1989,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         )
     stack_bd.update(stack_relevance_bd)
 
-    role_irrelevant, role_relevance_bd = _score_role_relevance(text, vacancy.get("title") or "", criteria)
+    role_irrelevant, role_relevance_bd = _score_role_relevance(
+        text, vacancy.get("title") or "", criteria, stack_bd)
     if role_irrelevant:
         dealbreakers.append(
             f"role: title suggests non-developer profession ({', '.join(role_relevance_bd['wrong_profession_hits'])})"

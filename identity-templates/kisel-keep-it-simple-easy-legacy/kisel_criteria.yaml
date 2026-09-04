@@ -987,6 +987,37 @@ role_relevance_signal:
   # contain "architect", "engineer" or "devops" in the title, so the ordinary
   # override lifted the gate — although these are plainly not ordinary
   # developer roles (go-to-market operations, pre-sales architecture,
+  # A DIFFERENT BRANCH OF ENGINEERING, not a different stack.
+  #
+  # Unlike hard_wrong_profession_title_patterns, these are cancelled when
+  # the vacancy names the core stack: ".NET AppSec Engineer" is a .NET job
+  # with an unusual title, and so is "Senior Software Engineer (WPF,
+  # Firmware & Systems)". Measured 2026-08-12 — a blanket rule would have
+  # thrown away five real ones to remove fifteen wrong ones.
+  #
+  # Found by the owner reading his own UK shortlist: "Senior Security
+  # Engineer, Security Incident Response Team (SIRT)" @ GitLab. The soft
+  # tier could not touch it because the bare word "engineer" counts as a
+  # developer override.
+  wrong_discipline_title_patterns:
+    # security
+    - "security engineer"
+    - "security (analyst|operations|specialist|architect)"
+    - "\\bsirt\\b|incident response"
+    - "\\bappsec\\b|application security|penetration test"
+    # data and analytics
+    - "data engineer"
+    - "analytics engineer"
+    - "data scientist|data analyst"
+    - "business intelligence|\\bbi developer\\b"
+    # machine learning as a profession, not as a buzzword in a stack list
+    - "\\b(ml|ai|machine learning)\\s+engineer\\b"
+    - "research (scientist|engineer)"
+    # hardware-adjacent
+    - "embedded (software )?engineer|\\bfirmware\\b|\\bfpga\\b|\\blabview\\b"
+    # customer-facing engineering
+    - "forward deployed"
+    - "(implementation|technical support|field) engineer"
   hard_wrong_profession_title_patterns:
     # QA and testing are a separate profession. The word "engineer" in a title
     # lifted the soft gate, so they are here in the hard list. A real complaint
@@ -1086,6 +1117,17 @@ role_relevance_signal:
   # A threshold is mandatory: one or two mentions of Kubernetes, Docker or
   # CI/CD are in almost every applied developer vacancy. Only a dense
   # concentration, meaning the role really is about operations, is cut.
+    # Added 2026-08-12: the list had "\\bvp\\b" but "Vice President, Data
+    # & Insights" spells it out, and "Sales Enablement | SDR" reached
+    # long_shot at 22. Neither is an individual contributor role at any
+    # stack.
+    - "vice president"
+    - "\\bsdr\\b|sales enablement|sales development|account executive"
+    # "Solutions Consultant, Enterprise" @ Ramp reached long_shot at 21.
+    # Deliberately NOT "technical consultant": ".Net Technical Consultant"
+    # @ alfanar is a real .NET role, and the measurement found it before
+    # this line was written.
+    - "solutions? consultant|sales consultant"
   infrastructure_role_gate:
     threshold_hits: 4
     description_keywords:
