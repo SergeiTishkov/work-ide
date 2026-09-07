@@ -21,7 +21,7 @@
 # =============================================================================
 
 schema_version: 1
-last_survey: "2026-08-04"
+last_survey: "2026-09-08"
 
 sources:
 
@@ -211,6 +211,131 @@ sources:
     reason: >
       HTTP 200, but the page has no vacancies: the exchange shows them only
       after registration. There is nothing to parse.
+
+  # --- Queued: UK sources, checked with live requests 2026-09-08 -------------
+  #
+  # Asked for by the owner, who wants the UK covered properly. Every one below
+  # was probed with the project's honest User-Agent — no fingerprint games —
+  # and the response is recorded whichever way it went.
+
+  - name: contractoruk
+    status: pending
+    priority: 1
+    kind: html
+    endpoint: "https://www.contractoruk.com/all_contract_jobs?q=.net"
+    measured: "200; 40 vacancies per page, 88 stack mentions (2026-09-08)"
+    note: >
+      The best of the nine and the best fit for this search: a CONTRACTOR board,
+      so its postings are day-rate contracts rather than payrolled staff jobs.
+      Plain GET, ordinary HTML, job links of the form /job/<id>-<slug>.
+      Careful with the URL: /contract_jobs?q= silently ignores the query and
+      returns building trades; /all_contract_jobs?q= is the one that filters.
+
+  - name: reed
+    status: pending
+    priority: 2
+    kind: html
+    endpoint: "https://www.reed.co.uk/jobs/net-developer-jobs"
+    measured: "200; 25 vacancies per page, titles all '.NET Developer', pagination via ?pageno= (2026-09-08)"
+    note: >
+      The largest of the nine. HTML only for now: the official API answers 401
+      without a key, and a key — even a free one — is a dependency the project
+      does not take on lightly (CLAUDE.md section 7 allows it only via an
+      environment variable). The HTML carries data-id and jobId attributes, so
+      the parse does not rest on visual markup alone.
+
+  - name: jobserve
+    status: pending
+    priority: 3
+    kind: html
+    endpoint: "https://www.jobserve.com/gb/en/Job-Search/"
+    measured: "200; 50 job ids per page (2026-09-08)"
+    note: >
+      Long-standing UK contract board. ASP.NET, so the search is stateful and
+      the links are built in script rather than written as hrefs; the job ids
+      are in the markup and reachable, but this is the fiddliest of the three
+      that work.
+
+  - name: outside_ir35_jobs
+    status: pending
+    priority: 4
+    kind: html
+    endpoint: "https://www.outsideir35jobs.com/jobs"
+    measured: "200; 50 job links per page (2026-09-08)"
+    note: >
+      Small and narrow, which is the appeal: every posting is a contract
+      declared outside IR35. Note the domain — the .co.uk does not resolve at
+      all, only the .com. No embedded JSON, so the listing has to be parsed
+      from HTML.
+
+  # --- Rejected: UK sources checked 2026-09-08, so as not to check again -----
+
+  - name: cwjobs
+    status: rejected
+    checked: "2026-09-08"
+    reason: >
+      The home page answers 200, and every page that actually holds vacancies
+      drops the connection — ConnectionError and ReadTimeout on /jobs/... at
+      both 30 and 60 seconds, from an IP that reaches the rest of the site.
+      That is bot management (the host resolves into Akamai), and the only way
+      past it is to impersonate a browser. CLAUDE.md section 5 says no.
+
+  - name: cv_library
+    status: rejected
+    checked: "2026-09-08"
+    reason: >
+      403 from Cloudflare on every listing and every feed URL tried, while the
+      home page answers 200 — protection aimed exactly at the data. Same
+      answer as Indeed and Glassdoor, and for the same reason.
+
+  - name: technojobs
+    status: rejected
+    checked: "2026-09-08"
+    reason: >
+      Unreachable, not blocked: www.technojobs.co.uk does not resolve at all
+      and the apex resolves but refuses every connection, over http and https
+      alike. Worth one more look in a few months — this is the failure mode of
+      a site that has moved or closed, and it may come back.
+
+  - name: itjobswatch
+    status: rejected
+    checked: "2026-09-08"
+    reason: >
+      Not a vacancy source. It answers 200 and is genuinely useful, but what it
+      publishes is statistics: "summary statistics and salary benchmarking for
+      jobs requiring .NET skills" over a six-month window. There is nothing to
+      apply to. See the note under salary benchmarking below.
+
+  - name: uk_recruitment_agencies
+    status: rejected
+    checked: "2026-09-08"
+    reason: >
+      Not a source but a category, and one the project already reaches two
+      ways: agencies post to LinkedIn in bulk (Sanderson, Vallum Associates,
+      Thomson Keene, SoCode and Goodman Masson are all in the current UK
+      shortlist through it), and those with a public board are covered by
+      fetch_ats. The platforms UK agencies actually run on were probed and none
+      serves a public list: Bullhorn 400, JobAdder 404, Vincere 401,
+      Teamtailor 406, Pinpoint 404 — all of them per-customer APIs behind
+      authentication. An agency worth following individually belongs in
+      <prefix>_ats_targets.yaml, one line each.
+
+  # --- Not a vacancy source, but wanted for something else -------------------
+
+  - name: itjobswatch_salary_benchmark
+    status: pending
+    priority: 6
+    kind: html
+    endpoint: "https://www.itjobswatch.co.uk/jobs/uk/.net.do"
+    measured: "200 (2026-09-08)"
+    note: >
+      IT Jobs Watch carries no vacancies, but it publishes exactly the thing
+      the report currently has to leave blank. CLAUDE.md section 5 defines
+      three levels of trust in a salary, and the middle one — "an approximate
+      range found by the agent on an external source" — is filled in by hand
+      today, for a handful of companies at a time. This would fill it
+      mechanically for a whole market, per technology, with a date. Not a
+      fetcher: a companion to company_intel.
 
   # --- Rejected: checked, so as not to check again ---------------------------
 

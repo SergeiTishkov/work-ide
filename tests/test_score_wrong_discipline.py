@@ -5,7 +5,7 @@ Found by the owner on 2026-08-12, reading his own UK shortlist and reaching
 line 39:
 
     **[15] Senior Security Engineer, Security Incident Response Team (SIRT)**
-    "ЭТО НЕ МОЯ ВАКАНСИЯ. Профильтруй базируясь на моем резюме"
+    "THIS IS NOT MY VACANCY. Filter based on my CV."
 
 His CV is a .NET one end to end — C#, ASP.NET, Entity Framework, Azure,
 MS SQL, with Angular and React on the front. Security incident response is
