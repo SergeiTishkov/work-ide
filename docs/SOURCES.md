@@ -20,6 +20,80 @@ The full registry of every source checked, including the rejected ones with
 reasons and response codes, is `config/sources.backlog.yaml`. It exists so that
 the same boards are not checked again a month later.
 
+## The UK, and why three of its four sources are contract boards
+
+Added 2026-09-08 at the owner's request. The reason to want them is not volume
+— LinkedIn already carries UK vacancies — but SHAPE. ContractorUK, JobServe and
+Outside IR35 Jobs list **contracts**: a day rate, a duration and an IR35
+determination. A contract declared outside IR35 is work somebody invoicing from
+another country can take; a payrolled UK job generally is not.
+
+| Source | What one card gives | Measured 2026-09-08 |
+|---|---|---|
+| **ContractorUK** | title, location, day rate, ~200-char summary, badges for Outside IR35 and Remote/Hybrid | 142 records over four queries; 121 with a rate, 52 badged Remote |
+| **Reed** | title, company, location, salary, date | 98 from one keyword; **every one with a stated salary** |
+| **JobServe** | title, agency, location ("Remote, UK"), rate, type, a real description | 20 a query; 14 naming the agency, all 20 with a description |
+| **Outside IR35 Jobs** | title, company, location, day rate, working mode | 50 in one request, every one outside IR35 |
+
+### The badge is worth more than the prose
+
+ContractorUK and Outside IR35 Jobs both state the working arrangement as their
+own field, and it goes straight into `workplace_type` — the same field the
+arrangement gate reads. That is a board ticking a box, not a phrase in a
+description that has to be matched with a regex and argued about.
+
+### Reed's filters were tested before being trusted
+
+This project spent weeks stamping every LinkedIn vacancy remote because of a
+filter that did nothing (see the LinkedIn section above). So Reed's were
+checked the same way, on the day they were added:
+
+    /jobs/net-developer-jobs            25 results
+    /jobs/remote-net-developer-jobs     25 results, 15 shared with the above
+    /jobs/contract-net-developer-jobs   25 results, ZERO shared with the above
+
+They genuinely filter, so the remote slug may set `workplace_type` — and a tag
+records that Reed classified it rather than the employer stating it. The
+contract slug is fetched too: that inventory is invisible to the plain search.
+
+### Traps, each of which cost time
+
+* **ContractorUK has two listing paths.** `/contract_jobs?q=` silently ignores
+  the query and returns building trades; `/all_contract_jobs?q=` filters. And
+  its pager is zero-based — a loop starting at 1 skips the best-matching page.
+* **"c#" is unsearchable on ContractorUK**, however it is encoded, and so are
+  "csharp" and "dotnet". C# work is reached through other words.
+* **Reed writes `title=` before `data-qa=`.** A regex assuming the other order
+  matches nothing and reports a markup change on markup that never changed.
+* **Reed's metadata icons are longer than 200 characters.** A capture window
+  sized for the text loses every salary on a board that states nearly all of
+  them.
+* **JobServe needs its form.** Three requests: GET the page, POST its hidden
+  fields with `ctl00$`-prefixed names, GET `JobListing.aspx?shid=...&ovrpp=jl`.
+  Without `&ovrpp=jl` the listing came back empty on one run in three.
+* **Only `outsideir35jobs.com` resolves.** The `.co.uk` is not in DNS.
+
+## A yardstick for pay: IT Jobs Watch
+
+Not a source of vacancies — it publishes none. It publishes six-month rolling
+medians per technology, and the report shows them beside the UK shortlist:
+
+    .NET      £60,000/year permanent (-4.0%)   £525/day contract (+6.6%)
+    ASP.NET   £55,000/year (-4.3%)             £475/day (-11.6%)
+    Azure     £65,000/year (+8.3%)             £525/day (+1.9%)
+
+That fills the middle of the three levels of trust in a salary (CLAUDE.md
+section 5): a person reading "£55,000 - £60,000" cannot otherwise tell whether
+it is generous or poor.
+
+**Two things it must never do**, both easy and both wrong: it must not fill in
+a vacancy's own salary — a market median is not what THIS employer pays — and
+it must not touch the score, where every UK .NET vacancy would gain the same
+points and the number would only get less honest. Both are asserted by tests.
+
+The site is British, so the block is rendered only where UK vacancies appear.
+No equivalent of this quality is known for the EU or Canada.
+
 ## LinkedIn in particular
 
 An earlier version of this document asserted that LinkedIn was unreachable. That

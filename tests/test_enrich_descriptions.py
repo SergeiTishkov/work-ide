@@ -24,8 +24,13 @@ def _facts(description, workplace_type=None, salary_raw=None, closed=False):
             "salary_raw": salary_raw, "closed": closed}
 
 
-def _vacancy(score, classification, description="", url="https://x/1", **extra):
+def _vacancy(score, classification, description="", url="https://x/1",
+             source="linkedin", **extra):
+    # The source matters now: enrichment only visits boards it has a reader
+    # for, so a fixture without one would be skipped and every test below
+    # would pass by doing nothing.
     record = {
+        "source": source,
         "url": url,
         "description_text": description,
         "computed": {"score": score, "classification": classification},
@@ -181,3 +186,72 @@ def test_a_salary_already_known_is_not_overwritten(monkeypatch):
     enrich_descriptions.enrich(vacancies)
 
     assert vacancies["a"]["salary_raw"] == "$120k-$140k"
+
+
+# --- one reader per source, and none at all for the rest -------------------
+
+def test_a_source_with_no_reader_is_never_visited():
+    """The trap this rule closes is silent. Sending LinkedIn's parser at a Reed
+    page finds nothing, returns empty, and RECORDS AN ATTEMPT — so the vacancy
+    is marked as tried and never looked at again. Reed contributes about a
+    hundred vacancies a run, none of them with a description on the card.
+    """
+    vacancies = {
+        "linkedin": _vacancy(60, "hot_lead", source="linkedin"),
+        "reed": _vacancy(59, "hot_lead", source="reed"),
+        "contractoruk": _vacancy(58, "hot_lead", source="contractoruk"),
+        "outside": _vacancy(57, "hot_lead", source="outside_ir35"),
+    }
+
+    assert set(enrich_descriptions.worklist(vacancies)) == {"linkedin", "reed"}
+
+
+def test_each_source_gets_its_own_reader():
+    """LinkedIn needs its own page parser; Reed publishes schema.org markup,
+    which any board doing the same can reuse without another parser."""
+    import fetch_linkedin
+
+    assert enrich_descriptions._reader_for("linkedin") is fetch_linkedin.fetch_page_facts
+    assert enrich_descriptions._reader_for("reed") is enrich_descriptions._json_ld_facts
+    assert enrich_descriptions._reader_for("contractoruk") is None
+    assert enrich_descriptions._reader_for(None) is None
+
+
+def test_the_json_ld_reader_finds_a_description_a_salary_and_telecommute(monkeypatch):
+    """Measured on a real Reed page 2026-09-08: 2935 characters of description
+    and a baseSalary, in markup no site-specific regex had to be written for."""
+    import requests
+
+    class FakeResponse:
+        status_code = 200
+        text = ('<html><script type="application/ld+json">'
+                '{"@type":"JobPosting","description":"<p>Maintain a legacy '
+                'ASP.NET platform in C#.</p>","jobLocationType":"TELECOMMUTE",'
+                '"baseSalary":{"@type":"MonetaryAmount","currency":"GBP",'
+                '"value":{"minValue":45000,"maxValue":48000,"unitText":"YEAR"}}}'
+                '</script></html>')
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse())
+
+    facts = enrich_descriptions._json_ld_facts("https://x/1", 10)
+
+    assert facts["description"] == "Maintain a legacy ASP.NET platform in C#."
+    assert facts["workplace_type"] == "remote"
+    assert facts["salary_raw"] == "GBP 45000-48000 YEAR"
+
+
+def test_the_json_ld_reader_never_raises(monkeypatch):
+    import requests
+
+    def explode(*a, **k):
+        raise RuntimeError("network")
+
+    monkeypatch.setattr(requests, "get", explode)
+
+    facts = enrich_descriptions._json_ld_facts("https://x/1", 10)
+
+    assert facts == {"description": "", "workplace_type": None,
+                     "salary_raw": None, "closed": False}

@@ -113,3 +113,36 @@ sources:
     # entered through tools/ingest_manual.py. It matters especially for this
     # identity: the public boards cover the combination "legacy + worldwide
     # remote + a high rate" poorly.
+
+  # --- The UK, added 2026-09-08 ---------------------------------------------
+  #
+  # Three of these four are CONTRACT boards. That is the point: a contract with
+  # a day rate and an outside-IR35 determination is work somebody invoicing
+  # from another country can actually take, where a payrolled UK job is not.
+
+  - name: contractoruk
+    enabled: true
+    params:
+      # The board matches loosely — ".net" also returns "Biodiversity Net Gain
+      # Officer" — so the queries are broad and our own gates do the filtering.
+      # "c#" is absent because it returns zero results there, however encoded.
+      queries: [".net", ".net developer", "sql server", "software developer"]
+      max_pages: 3
+
+  - name: reed
+    enabled: true
+    params:
+      keywords: ["net-developer", "c-net-developer", "software-developer",
+                 "sql-server-developer"]
+      max_pages: 3
+
+  - name: jobserve
+    enabled: true
+    params:
+      queries: [".net developer", "c# developer", "asp.net", "sql server developer"]
+
+  - name: outside_ir35
+    enabled: true
+    params:
+      # The whole board is fifty contracts, so one unfiltered request takes it.
+      queries: [""]

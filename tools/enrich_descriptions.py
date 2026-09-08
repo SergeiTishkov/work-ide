@@ -38,6 +38,7 @@ company_intel: the cache is what keeps this polite.
 """
 from __future__ import annotations
 
+import html as _html
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,7 +47,15 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 
-HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot")
+# The classes worth spending a request on.
+#
+# `remote_unconfirmed` was added 2026-09-08, and its absence was the single
+# largest hole in this step. That class holds more vacancies than every
+# confident tier put together — 1334 against 119 — and it exists precisely
+# because NOBODY SAID whether the work is remote. Reading the description is
+# the one thing that could settle it, and it was the one thing never done: of
+# Reed's 222 records, five had any text at all.
+HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "remote_unconfirmed")
 
 # How many descriptions to fetch per run. A bound rather than a target: 251
 # were outstanding on the first run, and clearing them over a few runs is
@@ -76,6 +85,83 @@ def _attempted_recently(record: dict, days: int = RETRY_AFTER_DAYS) -> bool:
     return (datetime.now(timezone.utc) - when).days < days
 
 
+# Which sources have a page worth reading, and who reads it.
+#
+# A source absent from here is not enriched at all — deliberately. Sending a
+# LinkedIn parser at a Reed page finds nothing, returns empty, and RECORDS AN
+# ATTEMPT, so the vacancy is marked as tried and never looked at again. Silence
+# of that kind is the expensive kind.
+#
+# Measured 2026-09-08:
+#   linkedin      a full page reader, plus salary, closure and TELECOMMUTE
+#   reed          schema.org JobPosting: 2935 characters of description
+#   contractoruk  the detail page repeats the card's summary; nothing to gain
+#   outside_ir35  no structured data, no fuller text
+READABLE_SOURCES = ("linkedin", "reed")
+
+
+def _json_ld_facts(url: str, timeout: int) -> dict:
+    """The same four facts, from schema.org markup rather than a site's HTML.
+
+    Generic on purpose: any board that publishes a JobPosting can be added to
+    READABLE_SOURCES without another parser.
+    """
+    import json as _json
+    import re as _re
+
+    import requests
+
+    facts = {"description": "", "workplace_type": None,
+             "salary_raw": None, "closed": False}
+    try:
+        resp = requests.get(url, headers={"User-Agent": common.USER_AGENT},
+                            timeout=timeout)
+        resp.raise_for_status()
+    except Exception:  # noqa: BLE001
+        return facts
+
+    body = resp.text
+    for block in _re.findall(
+            r'<script[^>]+application/ld\+json[^>]*>(.*?)</script>', body, _re.S):
+        try:
+            data = _json.loads(block)
+        except Exception:  # noqa: BLE001
+            continue
+        for node in (data if isinstance(data, list) else [data]):
+            if not isinstance(node, dict) or "JobPosting" not in str(node.get("@type")):
+                continue
+            description = _re.sub(r"<[^>]+>", " ", str(node.get("description") or ""))
+            description = " ".join(_html.unescape(description).split())
+            if description and len(description) > len(facts["description"]):
+                facts["description"] = description
+            if node.get("jobLocationType") == "TELECOMMUTE":
+                facts["workplace_type"] = "remote"
+            base = node.get("baseSalary")
+            if isinstance(base, dict) and not facts["salary_raw"]:
+                value = base.get("value")
+                if isinstance(value, dict):
+                    low = value.get("minValue") or value.get("value")
+                    if low is not None:
+                        high = value.get("maxValue")
+                        amount = f"{low}-{high}" if high and high != low else f"{low}"
+                        facts["salary_raw"] = " ".join(
+                            str(part) for part in
+                            (base.get("currency"), amount, value.get("unitText"))
+                            if part)
+    return facts
+
+
+def _reader_for(source: str):
+    """The right page reader for a source, or None if there is none."""
+    if source == "linkedin":
+        import fetch_linkedin
+
+        return fetch_linkedin.fetch_page_facts
+    if source in READABLE_SOURCES:
+        return _json_ld_facts
+    return None
+
+
 def worklist(vacancies: dict, classes=HEAD_CLASSES, limit: Optional[int] = None) -> list:
     """Shortlist vacancies with no description and no recent attempt.
 
@@ -93,6 +179,11 @@ def worklist(vacancies: dict, classes=HEAD_CLASSES, limit: Optional[int] = None)
         computed = record.get("computed") or {}
         if computed.get("classification") not in classes:
             continue
+        # No reader, no request. Sending the wrong parser at a page wastes a
+        # request AND marks the vacancy as tried, which is worse than leaving
+        # it alone. See READABLE_SOURCES.
+        if record.get("source") not in READABLE_SOURCES:
+            continue
         if _attempted_recently(record):
             continue
         todo.append((computed.get("score") or 0, key))
@@ -108,8 +199,6 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT) ->
     not stop a research cycle. One vacancy failing must not stop the rest
     either — the same reasoning as one source failing in the pipeline.
     """
-    import fetch_linkedin
-
     stats = {"considered": 0, "fetched": 0, "empty": 0, "errors": 0,
              "closed": 0, "declared_remote": 0, "salary_found": 0}
     for key in worklist(vacancies, classes, limit):
@@ -117,8 +206,10 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT) ->
         stats["considered"] += 1
         facts = {"description": "", "workplace_type": None,
                  "salary_raw": None, "closed": False}
+        reader = _reader_for(record.get("source"))
         try:
-            facts = fetch_linkedin.fetch_page_facts(record["url"], common.DEFAULT_TIMEOUT)
+            if reader is not None:
+                facts = reader(record["url"], common.DEFAULT_TIMEOUT)
         except Exception:  # noqa: BLE001 — one page must not stop the rest
             stats["errors"] += 1
         text = facts.get("description") or ""

@@ -226,6 +226,74 @@ sources:
       minority among them. Useful only to somebody who reads German or is
       willing to tolerate a low yield.
 
+  - name: contractoruk
+    kind: html_search
+    remote_only: false
+    params_schema:
+      queries: "search words; the board matches them as a loose substring"
+      max_pages: "pages of 20 cards per query (3 by default)"
+    yield_notes: >
+      Measured 2026-09-08: 20 cards a page, 142 records over four queries and
+      three pages, 121 of them with a day rate and 52 badged Remote. A board of
+      CONTRACTS rather than staff jobs — day rate, duration and IR35 status,
+      which is the shape of work a contractor abroad can take.
+    caveats: >
+      Two listing paths behave differently: /contract_jobs?q= silently ignores
+      the query and returns building trades, /all_contract_jobs?q= filters. The
+      pager is zero-based. "c#" is not searchable there however it is encoded.
+      The board never publishes the recruiter, so company is a placeholder, and
+      the card carries a ~200-character summary rather than a description.
+
+  - name: reed
+    kind: html_search
+    remote_only: false
+    params_schema:
+      keywords: "URL slugs, e.g. net-developer"
+      max_pages: "pages of 25 cards per keyword and variant (3 by default)"
+    yield_notes: >
+      Measured 2026-09-08: 25 cards a page, 98 records from one keyword over
+      two pages, every one of them with a stated salary. The largest of the UK
+      boards. Its filters were tested the way LinkedIn's should have been: the
+      remote slug shares 15 of 25 results with the plain search and the
+      contract slug shares none, so all three variants are fetched.
+    caveats: >
+      Class names are build hashes and change on every deploy — the parser
+      reads data-qa attributes instead. The card carries no description;
+      enrich_descriptions reads the vacancy page, which publishes a schema.org
+      JobPosting.
+
+  - name: jobserve
+    kind: html_form_search
+    remote_only: false
+    params_schema:
+      queries: "search phrases, e.g. '.net developer'"
+    yield_notes: >
+      Measured 2026-09-08: 20 results a query, 14 of 20 naming the agency, 16
+      with a day rate and all 20 with a real paragraph of description — the
+      richest card of the four UK sources, and the only one that publishes the
+      recruiter on the listing.
+    caveats: >
+      ASP.NET WebForms: a search is three requests (GET the form, POST its
+      hidden fields with the keyword, GET JobListing.aspx?shid=...). The field
+      names must carry the ctl00$ control prefix or the search silently does
+      not happen, and &ovrpp=jl is required — without it the listing came back
+      empty on one run in three.
+
+  - name: outside_ir35
+    kind: html_search
+    remote_only: false
+    params_schema:
+      queries: "optional search words; the whole board fits in one request"
+    yield_notes: >
+      Measured 2026-09-08: 50 contracts on a single page, every one with a
+      company, a day rate and a working mode, and every one declared outside
+      IR35. Only two were .NET that day — a tiny source where almost everything
+      is the right KIND of work.
+    caveats: >
+      Only the .com resolves; the .co.uk is not in DNS. Utility CSS, so the
+      parser hangs on the /job/<id> URL shape rather than class names. No
+      description on the card and no structured data on the vacancy page.
+
   - name: manual
     kind: manual_ingest
     remote_only: false

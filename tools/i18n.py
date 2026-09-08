@@ -67,6 +67,17 @@ CATALOGUES = {
         "eligibility: not stated": "про допуск ничего не сказано",
         "eligibility: no": "допуск исключён",
         "Markets inside": "Рынки внутри",
+        "What the UK market pays for this stack":
+            "Сколько британский рынок платит за этот стек",
+        "A yardstick, not an offer. These are market medians over the last "
+        "six months — they say whether a stated salary is generous or poor, "
+        "and they are never written onto a vacancy or into a score.":
+            "Линейка, а не предложение. Это медианы рынка за последние полгода: "
+            "они говорят, щедрая указанная зарплата или скромная, и никогда не "
+            "проставляются в вакансию и не влияют на оценку.",
+        "technology": "технология",
+        "permanent, per year": "в штате, за год",
+        "contract, per day": "контракт, за день",
         "This shortlist": "Эта выборка",
         "vacancies": "вакансий",
         "Other shortlists from this search":

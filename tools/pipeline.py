@@ -30,10 +30,14 @@ import fetch_himalayas  # noqa: E402
 import fetch_hn_whoishiring  # noqa: E402
 import fetch_jobicy  # noqa: E402
 import fetch_linkedin  # noqa: E402
+import fetch_contractoruk  # noqa: E402
 import fetch_devitjobs  # noqa: E402
 import fetch_jobs_ch  # noqa: E402
+import fetch_jobserve  # noqa: E402
 import fetch_landing_jobs  # noqa: E402
 import fetch_mycareersfuture  # noqa: E402
+import fetch_outside_ir35  # noqa: E402
+import fetch_reed  # noqa: E402
 import fetch_rss_boards  # noqa: E402
 import fetch_workingnomads  # noqa: E402
 import fetch_remoteok  # noqa: E402
@@ -47,6 +51,7 @@ import reputation  # noqa: E402
 import link_check  # noqa: E402
 import normalize  # noqa: E402
 import report  # noqa: E402
+import salary_benchmark  # noqa: E402
 import score  # noqa: E402
 
 FETCHERS = {
@@ -66,6 +71,12 @@ FETCHERS = {
     "landing_jobs": fetch_landing_jobs.fetch,
     "workingnomads": fetch_workingnomads.fetch,
     "rss_boards": fetch_rss_boards.fetch,
+    # The UK, added 2026-09-08. Three of the four are contract boards:
+    # day rates and IR35 status rather than payrolled employment.
+    "contractoruk": fetch_contractoruk.fetch,
+    "reed": fetch_reed.fetch,
+    "jobserve": fetch_jobserve.fetch,
+    "outside_ir35": fetch_outside_ir35.fetch,
 }
 
 
@@ -177,6 +188,18 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
     else:
         # Rescore: the gates now have text they did not have.
         rescore_all(vacancies, criteria, profile, prev_companies)
+
+    # What the UK market pays for this stack — a yardstick shown beside the
+    # shortlist, never written onto a vacancy and never scored. Six-month
+    # rolling medians, so it refetches monthly rather than every run.
+    try:
+        import score as score_mod
+
+        state["last_salary_benchmark"] = salary_benchmark.refresh_if_stale(
+            salary_benchmark.technologies_from_profile(score_mod.load_profile())
+        ).get("collected_at")
+    except Exception as exc:  # noqa: BLE001 — a yardstick must not kill the cycle
+        state["last_salary_benchmark"] = f"{type(exc).__name__}: {exc}"
 
     # Where a person can apply without going through the board. Last of the
     # enrichment steps and deliberately so: it needs the FINAL classification,

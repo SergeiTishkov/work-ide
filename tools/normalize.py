@@ -26,6 +26,18 @@ def epoch_to_iso(epoch) -> Optional[str]:
         return None
 
 
+# The vocabulary the arrangement gate understands. A source that invents a
+# spelling gets None rather than a value nothing downstream can read.
+WORKPLACE_TYPES = ("remote", "hybrid", "on-site")
+
+
+def _workplace_type(value):
+    if not value:
+        return None
+    text = str(value).strip().lower().replace("onsite", "on-site")
+    return text if text in WORKPLACE_TYPES else None
+
+
 def normalize_record(raw: dict) -> Optional[dict]:
     """raw -> canonical vacancy dict (without first_seen/last_seen/computed/
     manual — those are added when merging into the knowledge base in kb.py).
@@ -75,6 +87,16 @@ def normalize_record(raw: dict) -> Optional[dict]:
         "company_url": str(raw.get("company_url") or "").strip() or None,
         "location_raw": str(raw.get("location_raw") or "").strip(),
         "remote": remote,
+        # Where the employer or the board says the work happens: "remote",
+        # "hybrid", "on-site", or None for "nobody said". A separate field from
+        # `remote` on purpose — that one is a boolean guess, this one is a
+        # statement, and the arrangement gate reads only this.
+        #
+        # Added 2026-09-08 after it was found MISSING: ContractorUK badges 52
+        # of 142 vacancies Remote and Outside IR35 Jobs badges all 50, and
+        # every stored record had None. The tags beside it survived, so the
+        # loss looked like "those boards do not publish it".
+        "workplace_type": _workplace_type(raw.get("workplace_type")),
         "tags": tags,
         "description_text": description_text,
         "posted_at": posted_at,

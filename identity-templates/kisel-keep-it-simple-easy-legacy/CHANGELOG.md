@@ -6,6 +6,51 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V12 — the UK, and four sources that are mostly CONTRACTS, 2026-09-08
+
+Four new boards, and the reason to want them is the same in three cases: they
+list **contracts** rather than employment. A day rate with an outside-IR35
+determination is work somebody invoicing from another country can take; a
+payrolled UK job is not.
+
+    contractoruk    142 records over four queries. 121 with a day rate, 52
+                    badged Remote. The badge goes straight into workplace_type
+                    — the board ticking a box, not a phrase in prose.
+    reed            98 from one keyword, EVERY ONE with a stated salary. The
+                    largest UK board. Its remote and contract filters were
+                    tested before being trusted (see below).
+    jobserve        20 a query, and the richest card of the four: the agency's
+                    name, a rate, "Remote, UK" as a location, and a real
+                    paragraph of description rather than a snippet.
+    outside_ir35    50 contracts in one request, every one outside IR35. Tiny,
+                    and almost everything in it is the right KIND of work.
+
+**Reed's filters were tested the way LinkedIn's should have been.** This
+project stamped every LinkedIn vacancy remote on the strength of a filter that
+did nothing. So before trusting Reed's: the remote slug shares 15 of 25 results
+with the plain search, and the contract slug shares NONE. They work. All three
+variants are fetched, because the contract inventory is otherwise invisible.
+
+**A yardstick for pay.** IT Jobs Watch publishes no vacancies — it publishes
+six-month market medians, and the report now shows them beside the UK
+shortlist: .NET £60,000 a year permanent, £525 a day on contract, and the
+contract figure is up 6.6% while the permanent one is down 4%. It is never
+written onto a vacancy and never scored: a market median is not what THIS
+employer pays, and confusing the two is exactly what CLAUDE.md section 5
+forbids in the other direction.
+
+**One repair that came with it.** Description enrichment called LinkedIn's page
+parser for every source. Pointed at a Reed page it finds nothing, returns
+empty — and RECORDS AN ATTEMPT, so the vacancy is marked as tried and never
+looked at again. Reed contributes about a hundred vacancies a run and none has
+a description on the card, so all of them would have been scored on a title for
+ever. Enrichment now knows which sources it can read, and reads Reed through
+the schema.org markup its pages publish.
+
+**Does this affect your local settings?** Only if you kept your own
+`kisel_sources.yaml`: lists are replaced rather than merged, so a local copy
+must name the new sources to receive them.
+
 ## V11 — the exemptions in V10 had to be earned, 2026-08-12
 
 Reading the shortlist V10 produced, twice more.

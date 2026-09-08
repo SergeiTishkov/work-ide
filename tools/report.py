@@ -301,6 +301,56 @@ def _fmt_eligibility(v: dict) -> list:
     return [f"  - {label}" + (f" — _{reason}_" if reason else "")]
 
 
+def _salary_benchmark_block(segment) -> list:
+    """What the UK market pays for this stack, beside the shortlist.
+
+    Rendered only where UK vacancies appear. The source is British: putting
+    British medians at the top of the Canada file would be noise dressed as
+    information.
+
+    Nothing else reads this. It is context for a person, never a component of
+    a score and never a salary written onto a vacancy — see
+    tools/salary_benchmark.py for why both would be wrong.
+    """
+    import salary_benchmark
+    import segments as segments_mod
+
+    if segment is not None:
+        claimed = segments_mod._claimed_groups([segment])
+        if not segment.holds("united_kingdom", claimed):
+            return []
+
+    data = salary_benchmark.load()
+    rows = (data or {}).get("technologies") or {}
+    if not rows:
+        return []
+
+    lines = [
+        f"## 💷 {t('What the UK market pays for this stack')}",
+        "",
+        t("A yardstick, not an offer. These are market medians over the last "
+          "six months — they say whether a stated salary is generous or poor, "
+          "and they are never written onto a vacancy or into a score.") +
+        f" _({data.get('source')}, {(data.get('collected_at') or '?')[:10]})_",
+        "",
+        f"| {t('technology')} | {t('permanent, per year')} | {t('contract, per day')} |",
+        "|---|---|---|",
+    ]
+    for name, entry in rows.items():
+        permanent = entry.get("permanent") or {}
+        contract = entry.get("contract") or {}
+
+        def cell(item):
+            if not item.get("median"):
+                return "—"
+            change = item.get("year_on_year")
+            return item["median"] + (f" _({change})_" if change else "")
+
+        lines.append(f"| {name} | {cell(permanent)} | {cell(contract)} |")
+    lines.append("")
+    return lines
+
+
 def _fmt_apply_channels(v: dict) -> list:
     """Where to apply without going through the board.
 
@@ -800,6 +850,7 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         "updating the record through `tools/kb.py`."),
         "",
         _section("needs_manual_review", review_items),
+        *_salary_benchmark_block(segment),
         f"## ⭐ {t('Company reputation checks')}",
         "",
         # The shortlist THIS file shows, not the whole base: a person

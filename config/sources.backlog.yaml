@@ -219,11 +219,10 @@ sources:
   # and the response is recorded whichever way it went.
 
   - name: contractoruk
-    status: pending
-    priority: 1
+    status: implemented
     kind: html
     endpoint: "https://www.contractoruk.com/all_contract_jobs?q=.net"
-    measured: "200; 40 vacancies per page, 88 stack mentions (2026-09-08)"
+    measured: "142 records over four queries and three pages; 121 with a day rate, 52 badged Remote (2026-09-08)"
     note: >
       The best of the nine and the best fit for this search: a CONTRACTOR board,
       so its postings are day-rate contracts rather than payrolled staff jobs.
@@ -232,11 +231,10 @@ sources:
       returns building trades; /all_contract_jobs?q= is the one that filters.
 
   - name: reed
-    status: pending
-    priority: 2
+    status: implemented
     kind: html
     endpoint: "https://www.reed.co.uk/jobs/net-developer-jobs"
-    measured: "200; 25 vacancies per page, titles all '.NET Developer', pagination via ?pageno= (2026-09-08)"
+    measured: "98 records from one keyword over two pages, every one with a stated salary; three filter variants barely overlap (2026-09-08)"
     note: >
       The largest of the nine. HTML only for now: the official API answers 401
       without a key, and a key — even a free one — is a dependency the project
@@ -245,11 +243,10 @@ sources:
       the parse does not rest on visual markup alone.
 
   - name: jobserve
-    status: pending
-    priority: 3
+    status: implemented
     kind: html
     endpoint: "https://www.jobserve.com/gb/en/Job-Search/"
-    measured: "200; 50 job ids per page (2026-09-08)"
+    measured: "20 per query; 14 of 20 naming the agency, 16 with a day rate, all 20 with a real description (2026-09-08)"
     note: >
       Long-standing UK contract board. ASP.NET, so the search is stateful and
       the links are built in script rather than written as hrefs; the job ids
@@ -257,11 +254,10 @@ sources:
       that work.
 
   - name: outside_ir35_jobs
-    status: pending
-    priority: 4
+    status: implemented
     kind: html
     endpoint: "https://www.outsideir35jobs.com/jobs"
-    measured: "200; 50 job links per page (2026-09-08)"
+    measured: "50 contracts in a single request, all outside IR35, every one with a company, a rate and a working mode (2026-09-08)"
     note: >
       Small and narrow, which is the appeal: every posting is a contract
       declared outside IR35. Note the domain — the .co.uk does not resolve at

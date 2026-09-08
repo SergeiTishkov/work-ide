@@ -60,6 +60,10 @@ This is the one command mandatory on every run. It:
   description (`tools/enrich_descriptions.py`), which also picks up the stated
   salary, whether the posting still accepts applications, and whether the
   employer declares the role remote;
+- refreshes the UK market salary medians once a month
+  (`tools/salary_benchmark.py`) and shows them beside the UK shortlist — a
+  yardstick for judging a stated salary, never written onto a vacancy and
+  never scored;
 - looks for somewhere to apply that is not the board
   (`tools/apply_channels.py`) — the exact vacancy on the employer's own
   applicant-tracking system, their board, or an address they wrote into the
