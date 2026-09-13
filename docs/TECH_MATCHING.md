@@ -157,6 +157,27 @@ Bought with experience; no need to repeat it. Already caught:
 | `eor` | `theoretical` | a false hiring signal |
 | `G-P` | `Mentoring-Programm` | a false EOR |
 | `expo` | `exposure`, `export` | false mobile development |
+| `defi` | `defining`, `definitely` | "interesting work" on an AI-evaluation gig |
+| `llm` | `enrollment` | a false interest signal |
+| `anthropic` | `philanthropic` | a false interest signal |
+| ` je `, ` in de ` (spaces stripped) | `jede`, `in der` | German postings detected as Dutch, 18 of 72 |
+
+### A space at the edge of a keyword is a word boundary
+
+Found 2026-09-13, and the last row above is why it matters: keywords were
+written as `" je "`, `" des "`, `" defi "` precisely to match whole words, and
+the matcher silently threw the spaces away, because `normalize_for_matching`
+strips its input. `score.keyword_needle` now keeps a keyword's edge spaces, and
+the vacancy text is normalised the same way (whitespace collapsed to single
+spaces), so `" des "` matches the French word and not `design`.
+
+Two consequences worth remembering:
+
+* an edge space matches a space, never punctuation — `" defi "` does not match
+  `DeFi,`; list `" defi,"` or `"(defi"` separately when that form is likely;
+* `tests/test_templates.py` checks every template's `extra_signals` keywords
+  against a list of ordinary words known to hide tokens, using the same needle
+  scoring uses. Add a word to that list whenever a new trap is found.
 
 Hence the rules for `technologies` in the vocabulary:
 

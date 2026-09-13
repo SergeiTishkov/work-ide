@@ -6,6 +6,22 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V14 — a space at the edge of a keyword now means a word boundary, 2026-09-13
+
+No setting changed; two comments in `kisel_criteria.yaml` were wrong and are
+corrected, because the machinery under them was.
+
+Keywords such as the Dutch markers " je ", " het ", " in de " were written with
+spaces to match whole words. The matcher stripped those spaces, so they matched
+inside other words: 18 of 72 "Dutch" detections were German postings ("jede",
+"in der"), and V13's French " des " and " les " matched inside "design" and
+"sales". `score.keyword_needle` now keeps a keyword's edge spaces.
+
+Measured over this identity's base before the change: Dutch detections 72 ->
+54, French 86 -> 83, and not one vacancy a person sees changed its verdict —
+every lost detection was also refused for another reason, except a single
+French tutoring post with broken encoding.
+
 ## V13 — what a part-time search found in this one, 2026-09-13
 
 A second identity for the same person — paid part-time side work (PJOICE) —

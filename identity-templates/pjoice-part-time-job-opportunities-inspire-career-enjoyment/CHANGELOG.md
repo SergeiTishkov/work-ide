@@ -6,6 +6,27 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V3 — three words hiding inside ordinary ones, 2026-09-13
+
+Reading the rendered report: G2i's AI-evaluation gigs carried "interesting
+work: defi" — from "defining engineering standards". Two more keywords in
+`extra_signals.interesting_work` had the same flaw:
+
+    "defi"       inside "defining", "definitely", "deficit"
+    "llm"        inside "enrollment"
+    "anthropic"  inside "philanthropic"
+
+Replaced with forms that cannot occur inside a word (" defi ", "(llm",
+"anthropic api", ...). A test now checks every template's extra_signals against
+a list of ordinary words known to hide technology tokens, so the next one is
+caught before a run rather than in a report.
+
+That test failed on the fix itself, and found the deeper fault: the matcher
+stripped a keyword's edge spaces, so " defi " was still "defi". Fixed in
+`score.keyword_needle` for every identity (the KISEL template's V14 has the
+measurement); two comments about language markers in this file are corrected
+to match.
+
 ## V2 — what the first run taught, 2026-09-13
 
 The first run (1836 vacancies) was read line by line against the CV, and five

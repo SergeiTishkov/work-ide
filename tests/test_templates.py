@@ -49,6 +49,44 @@ def test_template_has_no_leftover_local_sentinels(name):
     assert not offenders, f"local sentinels left behind: {offenders}"
 
 
+# Ordinary words that hide a short technology token. Each one is either a real
+# false match this project has shipped or the same trap one letter away — see
+# docs/TECH_MATCHING.md for the class of mistake.
+_WORDS_THAT_HIDE_TOKENS = [
+    "defining", "definitely", "deficit", "enrollment", "philanthropic",
+    "theoretical", "theory", "no less than", "express", "export", "exposure",
+    "storage", "leverage", "average", "interpret", "trust", "said", "method",
+    "solution", "good", "diagram", "category", "strategic", "enterprise",
+    "nonetheless", "harnly.net",
+]
+
+
+@pytest.mark.parametrize("name", sorted(templates.template_folders()))
+def test_declared_signal_keywords_do_not_hide_inside_ordinary_words(name):
+    """`extra_signals` match by substring, like every keyword list in scoring.
+
+    Found 2026-09-13 in a rendered report: "interesting work: defi" on a
+    posting that said "defining engineering standards". "llm" and "anthropic"
+    had the same flaw ("enrollment", "philanthropic"). A keyword may still
+    EQUAL an ordinary word — that is a choice — but it must not sit inside one.
+    """
+    import score
+
+    path = templates.template_dir(name) / f"{name}_criteria.yaml"
+    if not path.exists():
+        return
+    criteria = common.load_yaml(path) or {}
+    offenders = []
+    for signal in criteria.get("extra_signals") or []:
+        for keyword in (signal.get("keywords") or []) + (signal.get("negative_keywords") or []):
+            # The needle scoring actually looks for, edge spaces included.
+            needle = score.keyword_needle(keyword)
+            for word in _WORDS_THAT_HIDE_TOKENS:
+                if needle and needle != word and needle in f" {word} ":
+                    offenders.append(f"{signal.get('name')}: '{keyword}' inside '{word}'")
+    assert not offenders, offenders
+
+
 @pytest.fixture()
 def sandbox(tmp_path, monkeypatch):
     """Its own set of templates and its own local-identities folder."""

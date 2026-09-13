@@ -1364,6 +1364,13 @@ language_requirement_signal:
                 # Measured 2026-08-05 across the whole base: they fire without
                 # a single explicit Dutch word on exactly one vacancy — and
                 # that one really is Dutch. Zero false positives.
+                #
+                # CORRECTED 2026-09-13: they were NOT matched as words. The
+                # matcher stripped the edge spaces, so " je " matched inside
+                # "jede" and "projekt", " in de " inside "in der", and German
+                # postings were being detected as Dutch — 18 of 72
+                # detections, every one of them also refused for other
+                # reasons. score.keyword_needle now keeps the spaces.
                 " je ", " het ", " van de ", " in de ", " voor de ",
                 " met een ", " zijn ", " worden ", " ontwikkelaar "]
     - language: spanish
@@ -1381,9 +1388,14 @@ language_requirement_signal:
     # "Télétravail : hybride". Functional words were added, and the threshold
     # rose from 3 to 4, both measured over this identity's base: 60 detections
     # became 86, not one earlier detection was lost, and every shown vacancy
-    # newly caught had a French title. At 3 the functional words also caught
-    # English postings that carry a French equal-opportunity paragraph —
-    # " nous ", " des ", " les " and nothing else.
+    # newly caught had a French title.
+    #
+    # CORRECTED the same day: those numbers were measured while the matcher
+    # still stripped a keyword's edge spaces, so " des " matched inside
+    # "design" and " les " inside "sales" — which is what the threshold of 3
+    # was really catching in English postings, not French paragraphs. Since
+    # score.keyword_needle keeps the spaces, detections are 83 rather than 86;
+    # not one vacancy a person sees changed verdict.
     - language: french
       threshold: 4
       markers: ["nous recherchons", "vos missions", "votre profil",

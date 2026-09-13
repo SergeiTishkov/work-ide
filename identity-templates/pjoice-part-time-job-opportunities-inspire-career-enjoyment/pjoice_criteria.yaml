@@ -1359,6 +1359,9 @@ language_requirement_signal:
                 # Measured 2026-08-05 across the whole base: they fire without
                 # a single explicit Dutch word on exactly one vacancy — and
                 # that one really is Dutch. Zero false positives.
+                # (Corrected 2026-09-13: the edge spaces were being stripped,
+                # so German postings matched as Dutch — see the KISEL
+                # template's V14.)
                 " je ", " het ", " van de ", " in de ", " voor de ",
                 " met een ", " zijn ", " worden ", " ontwikkelaar "]
     - language: spanish
@@ -1376,9 +1379,9 @@ language_requirement_signal:
     # "Télétravail : hybride". Functional words were added, and the threshold
     # rose from 3 to 4, both measured over KISEL's base: 60 detections became
     # 86, not one earlier detection was lost, and every shown vacancy newly
-    # caught had a French title. At 3 the functional words also caught English
-    # postings that carry a French equal-opportunity paragraph — " nous ",
-    # " des ", " les " and nothing else.
+    # caught had a French title. (Corrected the same day: at 3 the English
+    # false matches were " des " inside "design" and " les " inside "sales" —
+    # the matcher stripped edge spaces until score.keyword_needle stopped it.)
     - language: french
       threshold: 4
       markers: ["nous recherchons", "vos missions", "votre profil",
@@ -1686,7 +1689,14 @@ extra_signals:
       - "blockchain"
       - "web3"
       - "crypto"
-      - "defi"
+      # Never a bare "defi": it is inside "defining", "definitely" and
+      # "deficit". Seen on the first run, where G2i collected "interesting
+      # work: defi" for "defining engineering standards". The same trap as
+      # "LESS" in "no less than" (docs/TECH_MATCHING.md).
+      - " defi "
+      - " defi,"
+      - "(defi"
+      - "decentralized finance"
       - "ethereum"
       - "solana"
       - "bitcoin"
@@ -1695,14 +1705,20 @@ extra_signals:
       - "onchain"
       - "tokenization"
       - "large language model"
-      - "llm"
+      # Not a bare "llm", which is inside "enrollment".
+      - " llm "
+      - " llms"
+      - " llm-"
+      - "(llm"
       - "generative ai"
       - "genai"
       - "agentic"
       - "ai agents"
       - "retrieval-augmented"
       - "openai"
-      - "anthropic"
+      # Not a bare "anthropic", which is inside "philanthropic".
+      - "anthropic api"
+      - "claude code"
       - "semantic kernel"
       - "langchain"
       - "vector database"

@@ -207,19 +207,43 @@ def _matches_patterns(text: str, patterns: list, already_found: list = ()) -> li
     return found
 
 
+def keyword_needle(keyword: str) -> str:
+    """What a keyword is looked for as: normalised, with its EDGE SPACES KEPT.
+
+    A space at either end of a keyword is a word boundary its author asked for
+    — " des ", " je ", " defi " — and normalize_for_matching strips it. Until
+    2026-09-13 it did so here too, silently: the Dutch markers " je " and
+    " het " matched inside "project" and "whether", the French " des " and
+    " les " inside "design" and "sales", and " defi " inside "defining", which
+    is how a rendered report came to say "interesting work: defi" about
+    "defining engineering standards". Found by a test written to catch exactly
+    that trap in declared keywords, which failed on the fix meant to satisfy it.
+
+    The vacancy text is normalised the same way — lower case, whitespace
+    collapsed to single spaces — so a kept space matches a real space between
+    words, never punctuation.
+    """
+    needle = common.normalize_for_matching(keyword)
+    if not needle:
+        return needle
+    return ((" " if keyword[:1].isspace() else "") + needle
+            + (" " if keyword[-1:].isspace() else ""))
+
+
 def _matches(text: str, keywords: list) -> list:
     """Substring matching. Technologies marked `substring_unsafe` in the shared
     vocabulary are skipped here and matched only by _matches_patterns.
 
     Without that skip, ".NET" in a keyword list starts matching inside
     "asp.net" again — precisely the mistake the vocabulary exists to stop.
+    Deliberate edge spaces are kept — see keyword_needle.
     """
     unsafe = _substring_unsafe_names()
     found = []
     for kw in keywords or []:
         if kw in unsafe:
             continue
-        needle = common.normalize_for_matching(kw)
+        needle = keyword_needle(kw)
         if needle and needle in text and kw not in found:
             found.append(kw)
     return found
