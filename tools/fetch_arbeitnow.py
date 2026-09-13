@@ -76,6 +76,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "location_raw": item.get("location") or "",
         "remote": bool(item.get("remote")) if item.get("remote") is not None else None,
         "tags": list(item.get("tags") or []) + list(item.get("job_types") or []),
+        "employment_types": list(item.get("job_types") or []),
         "description_html": item.get("description") or "",
         "posted_at_epoch": item.get("created_at"),
         "salary_raw": None,  # arbeitnow rarely gives salary as its own field

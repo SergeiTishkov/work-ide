@@ -110,6 +110,9 @@ texts. Your own file holds only the differences.
 | Target markets of the search | `config/derivation/market_tiers.yaml` | `target_markets.tiers` plus `extra_locations` | — |
 | Geography rules | `config/derivation/regions.yaml` | `<p>_criteria.yaml` | — |
 | How technologies are written | `config/tech_vocabulary.yaml` | — (global by design) | — |
+| Whether hours matter at all | — (absent: the gate does not exist) | `engagement_fit` in `<p>_criteria.yaml`, with `unconfirmed_policy` | — |
+| A scoring axis the rubric does not have | — | `extra_signals` in `<p>_criteria.yaml` — a list, so a local copy REPLACES it | yes |
+| Pay graded by rate rather than "stated or not" | — | `compensation_signal.hourly_equivalent_tiers` | — |
 | Any scoring weight and any list | — | `<p>_criteria.yaml` in full | yes |
 
 ### Template text that reaches the REPORT

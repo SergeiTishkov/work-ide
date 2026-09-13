@@ -21,7 +21,7 @@
 # =============================================================================
 
 schema_version: 1
-last_survey: "2026-09-08"
+last_survey: "2026-09-13"
 
 sources:
 
@@ -56,6 +56,19 @@ sources:
     note: >
       2026-08-04: it returns companyName: "name" — literally the field name
       instead of the value. The real name is in companySlug; the parser knows.
+      2026-09-13: a search mode, /jobs/api/search?q=&employment_type=&page=,
+      which filters by engagement for real — the plain feed cannot.
+
+  - name: remoterocketship
+    status: implemented
+    kind: html_page_data
+    checked: "2026-09-13"
+    measured: >
+      twenty per (slug x employment type) listing; net/contract 115,
+      developer/part-time 114, fullstack-engineer/contract 454 in total
+    note: >
+      Next.js page data served to an ordinary GET. Filters by engagement for
+      real, salary in USD, the employer's posting URL. No anonymous paging.
 
   - name: hn_whoishiring
     status: implemented
@@ -409,6 +422,95 @@ sources:
     status: rejected
     checked: "2026-08-04"
     reason: "HTTP 403, the official API is 410 Gone. The agent gathers this by web search."
+
+  # --- Surveyed for part-time and freelance work, 2026-09-13 -----------------
+  #
+  # A search for side work needs boards that say HOW MANY HOURS. Most do not,
+  # and several that advertise a part-time filter turned out not to have one.
+
+  - name: hn_freelancer_thread
+    status: rejected
+    checked: "2026-09-13"
+    reason: >
+      "Ask HN: Freelancer? Seeking freelancer?" is posted monthly and alive,
+      but in September 2026 all 23 top-level comments were SEEKING WORK — not
+      one SEEKING FREELANCER. It is a place to advertise oneself, not to find
+      openings. Worth one look by hand; not worth a fetcher.
+
+  - name: web3_career
+    status: rejected
+    checked: "2026-09-13"
+    reason: >
+      HTML with schema.org JobPosting, open to a GET — but its part-time pages
+      are not part-time: every JobPosting on /part-time+backend-jobs and
+      /part-time+typescript-jobs says employmentType "Full-time", and they
+      hold 5 to 15 rows. A filter that does not filter is worse than none.
+
+  - name: cryptocurrencyjobs_co
+    status: rejected
+    checked: "2026-09-13"
+    reason: >
+      A clean RSS feed of 75, each stating its engagement in one sentence
+      ("This is a full-time position that is 100% remote with no geographical
+      restrictions") — 70 full-time, 5 contract, none part-time. The
+      /part-time/ page renders no job links in its HTML. Reconsider for a
+      full-time crypto search, where that sentence would be gold.
+
+  - name: cryptojobslist
+    status: rejected
+    checked: "2026-09-13"
+    reason: >
+      HTTP 403 with a Cloudflare "Just a moment..." challenge on both the page
+      and the RSS. Active protection; we do not go past it (CLAUDE.md §5).
+
+  - name: cryptojobs_com
+    status: rejected
+    checked: "2026-09-13"
+    reason: "HTTP 500 on the part-time listing."
+
+  - name: yc_jobs
+    status: rejected
+    checked: "2026-09-13"
+    reason: >
+      ycombinator.com/jobs serves its postings as Inertia page data, open to a
+      GET, with a `type` field — 29 of 30 remote engineering postings
+      "Full-time", and "US citizen/visa only" is common. Interesting companies,
+      the wrong engagement. Reconsider for a full-time startup search.
+
+  - name: fractionaljobs_io
+    status: rejected
+    checked: "2026-09-13"
+    reason: >
+      Fifty-five listings, nearly all executive (CFO, CISO, fractional
+      leaders), many "syndicated from LinkedIn" — which is already a source.
+
+  - name: braintrust
+    status: rejected
+    checked: "2026-09-13"
+    reason: >
+      The job pages are rendered in the browser; the HTML holds marketing copy
+      and no postings. A talent network: you apply once and are matched.
+
+  - name: arc_dev
+    status: pending
+    priority: 7
+    kind: html_page_data
+    checked: "2026-09-13"
+    reason_for_low_priority: >
+      Next.js page data with arcJobs and externalJobs (9031), jobType
+      permanent/contract — but the path filter is ignored: /remote-jobs/part-time,
+      /freelance and /part-time/.net return the same thirty. Needs its search
+      parameters worked out before it is worth a fetcher.
+
+  - name: aijobs_ai
+    status: pending
+    priority: 8
+    kind: html
+    checked: "2026-09-13"
+    reason_for_low_priority: >
+      21 job links on the remote page, a JobPosting on each job page, a job-type
+      filter in the UI. Mostly machine-learning roles, which a .NET CV does not
+      reach; worth it only for a search that does.
 
   # --- Need a free key: lowest priority --------------------------------------
 

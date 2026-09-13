@@ -61,7 +61,7 @@ import common  # noqa: E402
 
 # Which vacancies are worth the requests. Not a taste judgement: these are the
 # ones a person will actually open.
-TARGET_CLASSES = ("hot_lead", "remote_unconfirmed")
+TARGET_CLASSES = ("hot_lead", "remote_unconfirmed", "engagement_unconfirmed")
 
 DEFAULT_LIMIT = 60
 RETRY_AFTER_DAYS = 21

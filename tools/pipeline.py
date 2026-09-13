@@ -38,6 +38,7 @@ import fetch_landing_jobs  # noqa: E402
 import fetch_mycareersfuture  # noqa: E402
 import fetch_outside_ir35  # noqa: E402
 import fetch_reed  # noqa: E402
+import fetch_remoterocketship  # noqa: E402
 import fetch_rss_boards  # noqa: E402
 import fetch_workingnomads  # noqa: E402
 import fetch_remoteok  # noqa: E402
@@ -77,6 +78,9 @@ FETCHERS = {
     "reed": fetch_reed.fetch,
     "jobserve": fetch_jobserve.fetch,
     "outside_ir35": fetch_outside_ir35.fetch,
+    # Filters by engagement for real — part-time and contract as a field, not
+    # a phrase. Added 2026-09-13 for a search looking for side work.
+    "remoterocketship": fetch_remoterocketship.fetch,
 }
 
 
@@ -182,7 +186,10 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
     # it is a signal the fetcher does not have. Details in
     # tools/enrich_descriptions.py.
     try:
-        state["last_description_enrich"] = enrich_descriptions.enrich(vacancies)
+        # A search that asks about hours also needs the page of a vacancy that
+        # already has text but no stated engagement — see worklist().
+        state["last_description_enrich"] = enrich_descriptions.enrich(
+            vacancies, need_employment_types=bool(criteria.get("engagement_fit")))
     except Exception as exc:  # noqa: BLE001 — a description must not kill the cycle
         state["last_description_enrich"] = {"error": f"{type(exc).__name__}: {exc}"}
     else:

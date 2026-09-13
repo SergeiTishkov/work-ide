@@ -55,7 +55,13 @@ import common  # noqa: E402
 # because NOBODY SAID whether the work is remote. Reading the description is
 # the one thing that could settle it, and it was the one thing never done: of
 # Reed's 222 records, five had any text at all.
-HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "remote_unconfirmed")
+#
+# `engagement_unconfirmed` joined 2026-09-13 for the same reason: a search for
+# part-time work parks there everything nobody called part-time, and the
+# vacancy page — LinkedIn's "Employment type", a schema.org employmentType —
+# is where that is most often settled.
+HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "remote_unconfirmed",
+                "engagement_unconfirmed")
 
 # How many descriptions to fetch per run. A bound rather than a target: 251
 # were outstanding on the first run, and clearing them over a few runs is
@@ -97,7 +103,10 @@ def _attempted_recently(record: dict, days: int = RETRY_AFTER_DAYS) -> bool:
 #   reed          schema.org JobPosting: 2935 characters of description
 #   contractoruk  the detail page repeats the card's summary; nothing to gain
 #   outside_ir35  no structured data, no fuller text
-READABLE_SOURCES = ("linkedin", "reed")
+# Measured 2026-09-13:
+#   remoterocketship  schema.org JobPosting with the full text and
+#                     employmentType; the card holds a two-line summary
+READABLE_SOURCES = ("linkedin", "reed", "remoterocketship")
 
 
 def _json_ld_facts(url: str, timeout: int) -> dict:
@@ -112,7 +121,7 @@ def _json_ld_facts(url: str, timeout: int) -> dict:
     import requests
 
     facts = {"description": "", "workplace_type": None,
-             "salary_raw": None, "closed": False}
+             "salary_raw": None, "closed": False, "employment_types": []}
     try:
         resp = requests.get(url, headers={"User-Agent": common.USER_AGENT},
                             timeout=timeout)
@@ -136,6 +145,13 @@ def _json_ld_facts(url: str, timeout: int) -> dict:
                 facts["description"] = description
             if node.get("jobLocationType") == "TELECOMMUTE":
                 facts["workplace_type"] = "remote"
+            # "PART_TIME", ["FULL_TIME", "CONTRACTOR"] — schema.org allows both
+            # a string and a list; normalize reads either.
+            if node.get("employmentType") and not facts["employment_types"]:
+                import normalize
+
+                facts["employment_types"] = normalize.employment_types(
+                    node.get("employmentType"))
             base = node.get("baseSalary")
             if isinstance(base, dict) and not facts["salary_raw"]:
                 value = base.get("value")
@@ -162,8 +178,16 @@ def _reader_for(source: str):
     return None
 
 
-def worklist(vacancies: dict, classes=HEAD_CLASSES, limit: Optional[int] = None) -> list:
+def worklist(vacancies: dict, classes=HEAD_CLASSES, limit: Optional[int] = None,
+             need_employment_types: bool = False) -> list:
     """Shortlist vacancies with no description and no recent attempt.
+
+    With `need_employment_types`, also those that HAVE a description but no
+    stated engagement. A search that asks about hours (an `engagement_fit`
+    block) needs the page for that fact alone: the first part-time run held 73
+    LinkedIn vacancies in remote_unconfirmed, 69 of them with a description
+    fetched at collection time and 47 with no employment type — the one thing
+    the page would have settled.
 
     Ordered by score, highest first: if the budget runs out, it runs out on the
     vacancies a person is least likely to reach.
@@ -172,7 +196,9 @@ def worklist(vacancies: dict, classes=HEAD_CLASSES, limit: Optional[int] = None)
     for key, record in vacancies.items():
         if record.get("duplicate_of"):
             continue
-        if (record.get("description_text") or "").strip():
+        has_text = bool((record.get("description_text") or "").strip())
+        wants_type = need_employment_types and not record.get("employment_types")
+        if has_text and not wants_type:
             continue
         if not record.get("url"):
             continue
@@ -192,7 +218,8 @@ def worklist(vacancies: dict, classes=HEAD_CLASSES, limit: Optional[int] = None)
     return keys[:limit] if limit else keys
 
 
-def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT) -> dict:
+def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT,
+           need_employment_types: bool = False) -> dict:
     """Fetches the missing descriptions. Mutates `vacancies` in place.
 
     Never raises: a description is an improvement, and failing to get one must
@@ -201,7 +228,7 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT) ->
     """
     stats = {"considered": 0, "fetched": 0, "empty": 0, "errors": 0,
              "closed": 0, "declared_remote": 0, "salary_found": 0}
-    for key in worklist(vacancies, classes, limit):
+    for key in worklist(vacancies, classes, limit, need_employment_types):
         record = vacancies[key]
         stats["considered"] += 1
         facts = {"description": "", "workplace_type": None,
@@ -229,6 +256,15 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT) ->
         if facts.get("workplace_type"):
             record["workplace_type"] = facts["workplace_type"]
             stats["declared_remote"] += 1
+        # The engagement as the page states it. Merged rather than replaced: a
+        # board's card may already have said "contract", and the page adding
+        # "part-time" does not make the first statement untrue.
+        if facts.get("employment_types"):
+            import normalize
+
+            record["employment_types"] = normalize.employment_types(
+                list(record.get("employment_types") or []) + list(facts["employment_types"]))
+            stats["employment_type_found"] = stats.get("employment_type_found", 0) + 1
         # A salary stated in the vacancy is the highest level of trust there
         # is (CLAUDE.md §5) and it was being discarded on every LinkedIn card.
         if facts.get("salary_raw") and not record.get("salary_raw"):

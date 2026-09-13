@@ -96,6 +96,7 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "url": url,
         "location_raw": (item.get("jobGeo") or "").strip(),
         "remote": True,  # Jobicy is a remote-only board by definition
+        "employment_types": item.get("jobType"),
         "tags": tags,
         "description_html": description,
         "posted_at": item.get("pubDate"),

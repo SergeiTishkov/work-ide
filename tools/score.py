@@ -970,7 +970,16 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     # Israel/UAE role still gets it; an unconfirmed one now correctly lands in
     # `remote_unconfirmed` instead of the confident tiers, same as any other
     # vacancy nobody ever called remote.
-    if not (worldwide_hits or eor_hits or restrictive_hits):
+    # Only a NAMED platform exempts a vacancy from confirming it is remote —
+    # the same tightening the region-tie override got on 2026-08-12, for the
+    # same reason. Measured 2026-09-13 across KISEL's base: eight vacancies in
+    # the confident tiers were there on "freelance", "contractor" or "1099"
+    # alone, and not one of them was remote work — freelance missions in
+    # Brussels, Lille and Stevenage, and a Stripe posting where "1099" is the
+    # tax form its product files. They now wait for a person in
+    # remote_unconfirmed, with their scores untouched. The contractor words
+    # still earn their points above; they just prove nothing about location.
+    if not (worldwide_hits or eor_platform_hits or restrictive_hits):
         remote_word_hits = _matches(text, rl["remote_synonym_keywords"])
         # A board that publishes ONLY remote roles (WWR, RemoteOK, Remotive,
         # Jobicy, Himalayas — see remote_only in the sources catalogue) is
@@ -1284,6 +1293,14 @@ def _score_language_fit(text: str, criteria: dict):
     words and the "(m/w/d)" marker catches those too."""
     cfg = criteria["language_requirement_signal"]
     explicit_hits = _matches(text, cfg["explicit_requirement_keywords"])
+    # Requirements a word list cannot hold, because the same words mean the
+    # opposite in the next sentence. Found 2026-09-13: "fluent in Dutch or
+    # French" is a refusal, "Dutch or French is desirable" is not, and
+    # "LANGUAGES – MUST Dutch OR French: fluent" puts the demand after the
+    # languages. Measured over KISEL's base before writing: a bare "dutch or
+    # french" substring would have rejected two vacancies out of six wrongly.
+    explicit_hits += _matches_patterns(
+        text, cfg.get("explicit_requirement_patterns"), explicit_hits)
     german_market_hits = _matches(text, cfg["german_market_indicator_keywords"])
     # The gender marker "(m/w/d)" / "(f/m/d)" is unambiguous on its own: it
     # exists only in German-language postings, where anti-discrimination law
@@ -1482,6 +1499,112 @@ def _check_ai_training_crowdwork(text: str, criteria: dict):
     return bool(hits), {"gate_triggered": bool(hits), "hits": hits}
 
 
+# "Nobody said whether the hours fit." The engagement counterpart of
+# REMOTE_UNCONFIRMED, and a constant for the same reason: the classification
+# has to recognise it exactly, because it is the one engagement objection that
+# means "we do not know" rather than "no".
+ENGAGEMENT_UNCONFIRMED = "engagement: the employer never states the engagement this search needs"
+
+
+def _check_engagement(vacancy: dict, text: str, criteria: dict):
+    """Does the ENGAGEMENT — part-time, full-time, freelance — suit this search?
+
+    Returns (verdict, detail). The verdict is None when the identity has no
+    `engagement_fit` block at all: most searches do not care about hours, and
+    for them this gate does not exist.
+
+    Added 2026-09-13 for a search looking for side work beside a main job.
+    For that search a full-time role is not a weaker candidate but an
+    impossible one, and most postings never mention hours because full-time is
+    the default nobody writes down. So the rule has the same two halves as the
+    remote gate, and the split is the point (CLAUDE.md §5, "a refusal by
+    guesswork is not a refusal"):
+
+    * the employer's or the board's own statement decides — "Employment type:
+      Full-time" is a refusal, "Part-time" or "20 hours a week" a confirmation;
+    * silence decides nothing. It becomes ENGAGEMENT_UNCONFIRMED, which the
+      classification turns into a class of its own with the score untouched.
+
+    Order matters, and it leans towards keeping a vacancy: a confirmation
+    anywhere beats a refusal anywhere. "Full-time or part-time" is an offer of
+    part-time; a board's default "Full-time" beside an employer writing
+    "15 hours per week" is the board's default being wrong.
+    """
+    cfg = criteria.get("engagement_fit")
+    if not cfg:
+        return None, {}
+
+    stated = list(vacancy.get("employment_types") or [])
+    wanted = set(cfg.get("confirming_types") or [])
+    refused = set(cfg.get("contradicting_types") or [])
+    confirming = _matches_patterns(text, cfg.get("confirming_patterns") or [])
+    contradicting = _matches_patterns(text, cfg.get("contradicting_patterns") or [])
+
+    stated_wanted = [t for t in stated if t in wanted]
+    stated_refused = [t for t in stated if t in refused]
+    if stated_wanted:
+        verdict, reason = "confirmed", f"the board lists it as {', '.join(stated)}"
+    elif confirming:
+        verdict, reason = "confirmed", f"the posting says '{confirming[0]}'"
+    elif stated_refused:
+        verdict, reason = "contradicted", f"the board lists it as {', '.join(stated)}"
+    elif contradicting:
+        verdict, reason = "contradicted", f"the posting says '{contradicting[0]}'"
+    else:
+        verdict, reason = "unconfirmed", None
+
+    return verdict, {
+        "verdict": verdict,
+        "reason": reason,
+        "stated_types": stated,
+        "confirming_hits": confirming,
+        "contradicting_hits": contradicting,
+    }
+
+
+def _score_extra_signals(text: str, criteria: dict):
+    """Named keyword signals an identity declares for itself.
+
+    Every other component in this file is a fixed axis with a fixed name —
+    legacy, intensity, stack — because the first search that used this project
+    needed exactly those. The second one (2026-09-13) needed axes the first
+    one would have scored the other way round: "interesting technology" is a
+    plus there, and "crypto" sat in the first one's list of penalties. A new
+    axis should be configuration, not a new function here, so:
+
+        extra_signals:
+          - name: interesting_domain
+            points_per_keyword: 3
+            cap: 10
+            keywords: [blockchain, llm, microservices]
+            negative_keywords: []          # optional
+            negative_points_per_keyword: 0 # optional
+            floor: -10                     # optional
+
+    Substring matching, like every keyword list in this file, with the same
+    caveat: a short word is a trap (docs/TECH_MATCHING.md).
+    """
+    total = 0
+    detail = {}
+    for spec in criteria.get("extra_signals") or []:
+        name = (spec or {}).get("name")
+        if not name:
+            continue
+        positive = _matches(text, spec.get("keywords") or [])
+        negative = _matches(text, spec.get("negative_keywords") or [])
+        raw = (len(positive) * (spec.get("points_per_keyword") or 0)
+               + len(negative) * (spec.get("negative_points_per_keyword") or 0))
+        points = raw
+        if spec.get("cap") is not None:
+            points = min(points, spec["cap"])
+        if spec.get("floor") is not None:
+            points = max(points, spec["floor"])
+        detail[name] = {"points": points, "hits": positive, "negative_hits": negative,
+                        "label": spec.get("label") or name}
+        total += points
+    return total, detail
+
+
 def _score_legacy_enterprise(text: str, criteria: dict):
     cfg = criteria["legacy_enterprise_signal"]
     hits = _matches(text, cfg["keywords"])
@@ -1542,6 +1665,46 @@ def _extract_amounts(text: str):
         else:
             results.append((value, None, None))
     return results
+
+
+# What a stated amount may plausibly be, per unit. Outside these it is not a
+# rate but something else the extractor could not recognise: "$2,000,000
+# raised" with no "million" beside it, "$3 per seat".
+_PLAUSIBLE_ANNUAL = (10_000, 1_000_000)
+_PLAUSIBLE_HOURLY = (5, 1_000)
+_PLAUSIBLE_MONTHLY = (500, 100_000)
+
+
+def _hourly_equivalent(annuals, hourlies, monthlies, hours_per_year=2080):
+    """The best stated pay as US dollars an hour, or None.
+
+    Each unit contributes the middle of what was stated in it — a range of
+    "$90-150/hour" is taken as 120, neither the bait at the top nor the floor
+    at the bottom — and the best unit wins, because a posting that gives an
+    hourly rate and an annual equivalent means the same money twice.
+
+    An annual figure is converted at full-time hours even for a part-time
+    posting. That is deliberate: part-time postings quote the full-time
+    equivalent ("$150k pro rata"), and what the conversion yields is then the
+    real hourly rate — the number a person comparing offers needs.
+    """
+    hours = float(hours_per_year or 2080)
+    candidates = []
+
+    def middle(values, bounds):
+        kept = [v for v in values if bounds[0] <= v <= bounds[1]]
+        return (min(kept) + max(kept)) / 2.0 if kept else None
+
+    hourly = middle(hourlies, _PLAUSIBLE_HOURLY)
+    if hourly is not None:
+        candidates.append(hourly)
+    annual = middle(annuals, _PLAUSIBLE_ANNUAL)
+    if annual is not None:
+        candidates.append(annual / hours)
+    monthly = middle(monthlies, _PLAUSIBLE_MONTHLY)
+    if monthly is not None:
+        candidates.append(monthly * 12 / hours)
+    return max(candidates) if candidates else None
 
 
 def _score_external_salary_estimate(vacancy: dict, criteria: dict, profile: dict):
@@ -1638,13 +1801,43 @@ def _score_compensation(text: str, vacancy: dict, criteria: dict, profile: dict)
         elif min(monthlies) > hi:
             above = True
 
-    if below:
+    # Graded pay, for a search where money is the point rather than one
+    # consideration among several. When `hourly_equivalent_tiers` is set it
+    # REPLACES the below/above adjustment: both say "how does this pay compare",
+    # and a vacancy must not collect both.
+    #
+    # Amounts from the board's own salary field are preferred to amounts found
+    # in the description, which also holds funding rounds, prices and stipends
+    # that _extract_amounts does its best to recognise and sometimes cannot.
+    hourly_equivalent = None
+    tier_points = None
+    tiers = cfg.get("hourly_equivalent_tiers")
+    if tiers:
+        stated = (_extract_amounts(common.normalize_for_matching(vacancy.get("salary_raw")))
+                  if vacancy.get("salary_raw") else [])
+        pool = stated or amounts
+        hourly_equivalent = _hourly_equivalent(
+            [a for a, h, mo in pool if a is not None],
+            [h for a, h, mo in pool if h is not None],
+            [mo for a, h, mo in pool if mo is not None],
+            cfg.get("hours_per_year") or 2080)
+        if hourly_equivalent is not None:
+            for tier in sorted(tiers, key=lambda t: -float(t.get("at_least") or 0)):
+                if hourly_equivalent >= float(tier.get("at_least") or 0):
+                    tier_points = tier.get("points") or 0
+                    break
+        if tier_points is not None:
+            points += tier_points
+    elif below:
         points += cfg["below_target_penalty"]
     elif above:
         points += cfg["above_target_bonus"]
 
     return points, {
         "points": points,
+        "hourly_equivalent_usd": (round(hourly_equivalent, 1)
+                                  if hourly_equivalent is not None else None),
+        "rate_tier_points": tier_points,
         "explicit": True,
         "annual_amounts_found": annuals,
         "hourly_amounts_found": hourlies,
@@ -1963,6 +2156,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     complexity_gate, complexity_bd = _score_role_complexity(text, vacancy.get("title") or "", criteria)
     legacy_points, legacy_bd = _score_legacy_enterprise(text, criteria)
     intensity_points, intensity_bd = _score_low_intensity(text, criteria)
+    extra_points, extra_bd = _score_extra_signals(text, criteria)
     comp_points, comp_bd = _score_compensation(text, vacancy, criteria, profile)
     contractor_points, contractor_bd = _score_contractor_friendliness(text, criteria)
     reputation_points, reputation_bd, reputation_needs_review = _score_company_reputation(
@@ -1992,8 +2186,14 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     role_irrelevant, role_relevance_bd = _score_role_relevance(
         text, vacancy.get("title") or "", criteria, stack_bd)
     if role_irrelevant:
+        # The discipline tier (security, data, ML, embedded) fires with no
+        # profession hit at all, and the message used to read "profession ()"
+        # — a refusal that names no reason. Seen 2026-09-13 on a part-time
+        # "Machine Learning Engineer".
+        named = (role_relevance_bd["wrong_profession_hits"]
+                 or role_relevance_bd.get("wrong_discipline_hits") or [])
         dealbreakers.append(
-            f"role: title suggests non-developer profession ({', '.join(role_relevance_bd['wrong_profession_hits'])})"
+            f"role: title suggests non-developer profession ({', '.join(named)})"
         )
 
     title_mismatch, title_stack_bd = _check_title_stack(
@@ -2069,11 +2269,20 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     if employment_dealbreakers:
         dealbreakers.extend(f"employment: {d}" for d in employment_dealbreakers)
 
+    engagement, engagement_bd = _check_engagement(vacancy, text, criteria)
+    engagement_policy = (criteria.get("engagement_fit") or {}).get(
+        "unconfirmed_policy", "manual_check")
+    if engagement == "contradicted":
+        dealbreakers.append(f"engagement: {engagement_bd['reason']}")
+    elif engagement == "unconfirmed" and engagement_policy != "accept":
+        dealbreakers.append(ENGAGEMENT_UNCONFIRMED)
+
     raw_total = (
         rl_points
         + stack_points
         + legacy_points
         + intensity_points
+        + extra_points
         + comp_points
         + contractor_points
         + reputation_points
@@ -2118,16 +2327,45 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "unconfirmed_remote_policy", "manual_check")
     if policy == "accept":
         dealbreakers = [d for d in dealbreakers if d != REMOTE_UNCONFIRMED]
+    # The objections that mean "nobody said", for whichever gates send them to
+    # a person rather than to the bin. The engagement one works exactly like
+    # the remote one; see _check_engagement.
+    for_a_person = set()
+    if policy == "manual_check":
+        for_a_person.add(REMOTE_UNCONFIRMED)
+    if engagement_policy == "manual_check":
+        for_a_person.add(ENGAGEMENT_UNCONFIRMED)
     unconfirmed_only = bool(dealbreakers) and all(
-        d == REMOTE_UNCONFIRMED for d in dealbreakers)
+        d in for_a_person for d in dealbreakers)
 
-    if country_only:
+    # A vacancy parked for a person — national market, remote or hours not
+    # confirmed — whose role the complexity gate has already ruled out. Confirming
+    # the missing fact would only move it to low_priority, so showing it to a
+    # person asks them to check something that cannot change the outcome.
+    #
+    # Opt-in per identity. For a search where the gate means "this CV will not
+    # be considered" (PJOICE, 2026-09-13: a Principal Data Engineer sat in "hours
+    # not confirmed" at 55) it is plainly right. For KISEL, where a single
+    # "agentic" in a consultancy's boilerplate gates an ordinary ".NET
+    # Developer", it would hide 51 vacancies on a thin signal — measured before
+    # this was written — so KISEL keeps the old order.
+    parked = country_only or unconfirmed_only
+    complexity_cfg = criteria.get("role_complexity_signal") or {}
+    if parked and complexity_gate and complexity_cfg.get("applies_to_unconfirmed"):
+        classification = "low_priority"
+    elif country_only:
         classification = "national_market"
-    elif unconfirmed_only and policy == "manual_check":
+    elif unconfirmed_only:
         # The score is deliberately NOT reduced — a 70 here is the same 70 it
         # would have been in hot_lead. Only the certainty differs, and that is
         # what the separate section communicates.
-        classification = "remote_unconfirmed"
+        #
+        # When both are unknown, the remote question wins the class: it is
+        # the older section, and a vacancy that turns out not to be remote is
+        # out whatever its hours. Both objections stay in `dealbreakers`, so
+        # the report can say what is left to confirm.
+        classification = ("remote_unconfirmed" if REMOTE_UNCONFIRMED in dealbreakers
+                          else "engagement_unconfirmed")
     elif dealbreakers:
         classification = "rejected"
     elif complexity_gate:
@@ -2156,6 +2394,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "language_requirement_signal": language_bd,
         "legacy_enterprise_signal": legacy_bd,
         "low_intensity_signal": intensity_bd,
+        "extra_signals": extra_bd,
+        "engagement_fit": engagement_bd,
         "compensation_signal": comp_bd,
         "contractor_friendliness": contractor_bd,
         "company_reputation_signal": reputation_bd,

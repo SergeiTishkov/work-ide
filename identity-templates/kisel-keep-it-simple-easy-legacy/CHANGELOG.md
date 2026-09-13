@@ -6,6 +6,39 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V13 — what a part-time search found in this one, 2026-09-13
+
+A second identity for the same person — paid part-time side work (PJOICE) —
+ran for the first time, and reading its shortlist exposed four gaps that are
+this template's too. Each was measured over THIS identity's base before being
+changed, because the owner's standing rule is that no mass of real vacancies
+may quietly vanish.
+
+    French postings   The markers missed LinkedIn's French wording. Widened,
+                      threshold 3 -> 4: 60 detections -> 86, none lost; every
+                      newly caught shown vacancy had a French title.
+    language demands  explicit_requirement_patterns, read in context. Five new
+                      refusals among shown vacancies, all genuine ("fluency in
+                      English and French is required"); "Dutch or French is
+                      desirable" still passes.
+    percentage remote "up to 50% telework permitted" is hybrid. Two shown
+                      vacancies, both hybrid.
+    interns           Interns, working students, trainees, faculty. Three shown
+                      vacancies, all internships.
+
+Beside these, one change in shared CODE moves this identity's shortlist:
+"freelance", "contractor" and "1099" no longer exempt a vacancy from confirming
+it is remote — only a named platform does. Eight vacancies in the confident
+tiers stood on those words alone (freelance missions in Brussels, Lille and
+Stevenage; Stripe, whose "1099" is a tax form). They move to
+remote_unconfirmed with their scores unchanged.
+
+Not changed here, deliberately: the complexity gate still lets a vacancy it
+rules out wait in remote_unconfirmed. For this identity a single "agentic" in
+a consultancy's boilerplate gates an ordinary ".NET Developer", and turning on
+`role_complexity_signal.applies_to_unconfirmed` would hide 51 vacancies on that
+thin a signal.
+
 ## V12 — the UK, and four sources that are mostly CONTRACTS, 2026-09-08
 
 Four new boards, and the reason to want them is the same in three cases: they

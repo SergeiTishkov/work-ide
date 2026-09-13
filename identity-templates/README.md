@@ -114,6 +114,7 @@ Some worked examples:
 | Prefix | Expansion | Comment |
 |---|---|---|
 | `kisel` | **K**eep **I**t **S**imple, **E**asy, **L**egacy | Names the point, and happens to be pronounceable |
+| `pjoice` | **P**art-time **J**ob **O**pportunities **I**nspire **C**areer **E**njoyment | The same CV as `kisel`, the opposite search: paid side work |
 | `jvst` | **J**a**v**a **St**artup | Stack plus environment |
 | `usts` | **US** + **TS** (TypeScript) | Residency plus stack |
 

@@ -149,6 +149,7 @@ def _parse_recruitee(payload, company: str, token: str) -> list:
             "location_raw": location,
             "remote": True if str(j.get("remote")).lower() == "true" else None,
             "tags": [t for t in [j.get("department"), j.get("employment_type")] if t],
+            "employment_types": j.get("employment_type"),
             "description_html": j.get("description") or "",
             "posted_at": j.get("published_at"),
             "salary_raw": None,

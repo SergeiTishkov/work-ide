@@ -1,0 +1,118 @@
+# Sources for the PJOICE identity.
+#
+# ONLY preferences here: which sources are enabled, and with what parameters.
+# Endpoints and documentation live in config/sources.catalog.yaml; the survey of
+# part-time boards, including the ones rejected, is in config/sources.backlog.yaml.
+#
+# THE SELECTION PRINCIPLE: engagement before stack. A board that states the
+# employment type as a field beats one that has more .NET vacancies and never
+# says how many hours — the stack is checked by our own gates either way, the
+# hours only by what the source tells us.
+
+schema_version: 1
+
+sources:
+  # --- Boards that FILTER by engagement for real -----------------------------
+
+  - name: remoterocketship
+    enabled: true
+    params:
+      # Each slug was read before being listed; /jobs/c-sharp/ is a trap that
+      # returns every part-time job on the board.
+      slugs: ["net", "net-developer", "developer", "software-engineer",
+              "fullstack-engineer", "backend-engineer", "ai-engineer", "react"]
+      employment_types: ["part-time", "contract"]
+
+  - name: himalayas
+    enabled: true
+    params:
+      # Search mode: every query times every type, twenty records a page.
+      queries: [".net", "c#", "developer", "software engineer", "typescript", "angular"]
+      employment_types: ["Part Time", "Contractor"]
+      max_pages: 3
+
+  # --- Boards that state the type as a field ----------------------------------
+
+  - name: remotive
+    enabled: true
+
+  - name: jobicy
+    enabled: true
+
+  - name: linkedin
+    enabled: true
+    params:
+      # The guest search ignores LinkedIn's own job-type filter (measured
+      # 2026-08-05), so engagement goes into the words. The vacancy page then
+      # states "Employment type", which the fetcher reads.
+      keywords: ["part time .NET developer", "freelance C# developer",
+                 "part-time software engineer", "contract .NET developer",
+                 "fractional software engineer"]
+      max_pages: 2
+      enrich_limit: 150
+
+  # --- Broad remote boards: hours come from the text -------------------------
+
+  - name: weworkremotely
+    enabled: true
+
+  - name: remoteok
+    enabled: true
+
+  - name: workingnomads
+    enabled: true
+
+  - name: hn_whoishiring
+    enabled: true
+    params:
+      keywords: ["part-time", "contract", "freelance", ".NET", "C#"]
+      hits_per_keyword: 50
+
+  - name: manual
+    enabled: true
+    # Talent networks (Toptal, A.Team, Braintrust, Arc, Lemon.io, Gun.io,
+    # Turing, Contra) publish nothing to an anonymous request. A person applies
+    # once; anything they are offered can be entered here.
+
+  # --- Off for this search, and why ------------------------------------------
+
+  - name: ats
+    enabled: false
+    # Product companies' own boards are overwhelmingly full-time.
+
+  - name: 4dayweek
+    enabled: false
+    # A four-day week is a full-time job with a day off, not side work.
+
+  - name: arbeitnow
+    enabled: false
+    # German-language market; part-time there is "Teilzeit" on a local payroll.
+
+  - name: devitjobs
+    enabled: false
+
+  - name: jobs_ch
+    enabled: false
+
+  - name: mycareersfuture
+    enabled: false
+
+  - name: landing_jobs
+    enabled: false
+
+  - name: rss_boards
+    enabled: false
+
+  - name: contractoruk
+    enabled: false
+    # UK contracts are day-rate, five days a week.
+
+  - name: reed
+    enabled: false
+    # UK part-time roles are payrolled in the UK.
+
+  - name: jobserve
+    enabled: false
+
+  - name: outside_ir35
+    enabled: false

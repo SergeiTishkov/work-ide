@@ -163,6 +163,44 @@ _LD_JSON_RE = re.compile(r'<script type="application/ld\+json">(.*?)</script>', 
 # spellings, because one of them is a CSS class and classes get renamed.
 _CLOSED_RE = re.compile(r"no longer accepting applications|closed-job", re.I)
 
+# The criteria list under a posting: "Seniority level", "Employment type",
+# "Job function", "Industries". Served to the anonymous page, verified
+# 2026-09-13 on three postings: "Full-time", "Full-time", "Part-time" (a Swiss
+# insurer's "C# / .NET / React 80-100%"). The employer picks the value from a
+# fixed list, so it is a statement rather than a phrase to interpret.
+_EMPLOYMENT_TYPE_RE = re.compile(
+    r'description__job-criteria-subheader">\s*Employment type\s*</h3>\s*'
+    r'<span[^>]*>\s*([^<]+?)\s*</span>', re.I)
+
+# The guest fragment of one posting. The full /jobs/view/ page on a country
+# subdomain — ae., nl., il.linkedin.com — does not carry the criteria list at
+# all (checked 2026-09-13 on three postings: 230-270 KB of page, no "Employment
+# type"), while this fragment, served to the same anonymous GET, does. It is
+# asked for only when the page said nothing: one extra request, where needed.
+GUEST_POSTING_URL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
+_JOB_ID_RE = re.compile(r"(\d{8,})(?:[/?#]|$)")
+
+
+def _employment_types_from_guest_fragment(url: str, timeout: int) -> list:
+    """The employment type from the guest fragment, or [] — never raises."""
+    import requests
+
+    match = _JOB_ID_RE.search(url or "")
+    if not match:
+        return []
+    try:
+        resp = requests.get(GUEST_POSTING_URL.format(job_id=match.group(1)),
+                            headers={"User-Agent": common.USER_AGENT}, timeout=timeout)
+        resp.raise_for_status()
+    except Exception:  # noqa: BLE001
+        return []
+    found = _EMPLOYMENT_TYPE_RE.search(resp.text or "")
+    if not found:
+        return []
+    import normalize
+
+    return normalize.employment_types(html.unescape(found.group(1)))
+
 
 def _salary_from_ld(node: dict) -> Optional[str]:
     """schema.org baseSalary as a line a person can read.
@@ -209,7 +247,7 @@ def fetch_page_facts(url: str, timeout: int) -> dict:
     import requests
 
     facts = {"description": "", "workplace_type": None,
-             "salary_raw": None, "closed": False}
+             "salary_raw": None, "closed": False, "employment_types": []}
     try:
         resp = requests.get(url, headers={"User-Agent": common.USER_AGENT}, timeout=timeout)
         resp.raise_for_status()
@@ -218,6 +256,14 @@ def fetch_page_facts(url: str, timeout: int) -> dict:
 
     body = resp.text
     facts["closed"] = bool(_CLOSED_RE.search(body))
+    employment = _EMPLOYMENT_TYPE_RE.search(body)
+    if employment:
+        import normalize
+
+        facts["employment_types"] = normalize.employment_types(
+            html.unescape(employment.group(1)))
+    else:
+        facts["employment_types"] = _employment_types_from_guest_fragment(url, timeout)
 
     match = _DESCRIPTION_RE.search(body) or _DESCRIPTION_FALLBACK_RE.search(body)
     if match:
@@ -310,10 +356,20 @@ def fetch(keywords: Optional[List[str]] = None,
     if enrich_limit:
         records.sort(key=lambda r: 0 if _looks_like_dev_role(r["title"]) else 1)
         for rec in records[:enrich_limit]:
-            description = _fetch_description(rec["url"], timeout)
-            if description:
-                rec["description_text"] = description
+            # The whole page's facts rather than only its text: the request is
+            # the same, and until 2026-09-13 this loop threw away the employer's
+            # stated engagement, salary and TELECOMMUTE declaration that
+            # enrich_descriptions.py already knew how to keep.
+            facts = fetch_page_facts(rec["url"], timeout)
+            if facts.get("description"):
+                rec["description_text"] = facts["description"]
                 enriched += 1
+            if facts.get("employment_types"):
+                rec["employment_types"] = facts["employment_types"]
+            if facts.get("workplace_type"):
+                rec["workplace_type"] = facts["workplace_type"]
+            if facts.get("salary_raw"):
+                rec["salary_raw"] = facts["salary_raw"]
             time.sleep(PAUSE_SECONDS)
 
     note_parts = [f"cards {cards_seen}, records {len(records)}, with description {enriched}"]

@@ -27,7 +27,7 @@ TOP_N_PER_SECTION = 15
 # The classes a person actually reads. Everything else is in the database for
 # the record, not in the report for a decision.
 LISTED_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "national_market",
-                  "remote_unconfirmed")
+                  "remote_unconfirmed", "engagement_unconfirmed")
 
 
 def _fmt_amount(value: float) -> str:
@@ -399,6 +399,17 @@ def _fmt_vacancy_line(v: dict) -> str:
     intensity = bd.get("low_intensity_signal", {})
     if intensity.get("positive_hits"):
         highlights.append(t("low intensity") + ": " + ", ".join(intensity["positive_hits"][:4]))
+    # Axes an identity declared for itself (score._score_extra_signals). The
+    # label is the identity's own words, so it is shown as written.
+    for signal in (bd.get("extra_signals") or {}).values():
+        if signal.get("hits"):
+            highlights.append(f"{signal.get('label')}: " + ", ".join(signal["hits"][:4]))
+        if signal.get("negative_hits"):
+            highlights.append(f"⚠ {signal.get('label')}: "
+                              + ", ".join(signal["negative_hits"][:3]))
+    engagement = bd.get("engagement_fit") or {}
+    if engagement.get("verdict") == "confirmed":
+        highlights.append("⏱ " + t("engagement confirmed") + f" ({engagement.get('reason')})")
     complexity = bd.get("role_complexity_signal", {})
     if complexity.get("gate_triggered"):
         highlights.append("⚠ " + t("looks like a complex/R&D role, not a simple one"))
@@ -410,11 +421,28 @@ def _fmt_vacancy_line(v: dict) -> str:
 
     highlight_str = f" — _{'; '.join(highlights)}_" if highlights else ""
     salary_line = _fmt_salary_info(v, bd.get("compensation_signal", {}))
+    # The rate the graded pay component actually compared, when it ran. Shown
+    # because "$150k-$350k" and "$90-150/hour" are not comparable at a glance,
+    # and comparing them is the whole question for a search that ranks by pay.
+    hourly = (bd.get("compensation_signal") or {}).get("hourly_equivalent_usd")
+    if hourly:
+        salary_line += f" — ≈ ${hourly:,.0f}/{t('hour')}"
     lines = [
         f"- **[{score}] {title}** @ {company} — [{t('link')}]({url}) — "
         f"{t('status')}: `{status}`{highlight_str}",
         f"  - 💰 {t('salary')}: {salary_line}",
     ]
+    # What is still unknown, for a vacancy parked in a "check by hand" class.
+    # A vacancy can be missing both confirmations, and the section it sits in
+    # names only one of them.
+    pending = []
+    for objection in c.get("dealbreakers") or []:
+        if objection.startswith("location: the employer never states"):
+            pending.append(t("that it is remote"))
+        elif objection.startswith("engagement: the employer never states"):
+            pending.append(t("the hours (part-time, freelance)"))
+    if pending:
+        lines.append(f"  - ❓ {t('left to confirm')}: {', '.join(pending)}")
     # The employer's own site, when known — so the same vacancy can be found on
     # their careers page and applied to without an account on the job board
     # (WWR keeps the application funnel to itself, see docs/SOURCES.md).
@@ -723,13 +751,19 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
 
     def by_class(cls):
         matching = [v for v in items if v.get("computed", {}).get("classification") == cls]
-        # Reachability first, score second. The owner's instruction, and the
-        # reason the two are separate axes at all: "$100/hour — Remote — US" is
-        # worth less than "$70/hour — Remote Worldwide" to somebody who cannot
-        # take the first. The score is still shown, so nothing is hidden — only
-        # reordered.
+        # Score first; reachability only breaks a tie.
+        #
+        # From 2026-08-12 this was the other way round — reachability first,
+        # score second — and on 2026-09-13 the owner opened his UK shortlist
+        # and read "46, 40, then 60" in the hot leads: "they must be sorted".
+        # The grouping was real but invisible, and an order a person cannot
+        # see the reason for reads as no order at all.
+        #
+        # Reachability is not lost by this. It is printed on every vacancy,
+        # and the file split puts the worldwide shortlist — the one where
+        # geography is not in the way — first (see <prefix>_reports.yaml).
         matching.sort(key=lambda v: (
-            _eligibility_rank(v), -v.get("computed", {}).get("score", 0)))
+            -v.get("computed", {}).get("score", 0), _eligibility_rank(v)))
         return matching
 
     hot = by_class("hot_lead")
@@ -746,6 +780,26 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     # remote. Their own section, their own decision — and their score
     # untouched, at the owner's explicit direction (2026-08-11).
     unconfirmed = by_class("remote_unconfirmed")[:NATIONAL_MARKET_LIMIT]
+    # The same for the hours, in a search that has an engagement gate at all
+    # (score._check_engagement). A search that does not care about hours never
+    # sees the section: an empty heading in every report would be noise.
+    all_engagement_unconfirmed = by_class("engagement_unconfirmed")
+    engagement_unconfirmed = all_engagement_unconfirmed[:NATIONAL_MARKET_LIMIT]
+    engagement_block = []
+    if (criteria or {}).get("engagement_fit") or engagement_unconfirmed:
+        engagement_block = [
+            f"## ⏱️ {t('Hours not confirmed — check by hand')}",
+            "",
+            t("Remote and a good fit, but nobody said whether this is part-time "
+              "or full-time — and full-time is the default most employers never "
+              "write down. Where the employer or the board does say full-time, "
+              "the vacancy is rejected and is not here. The score is not "
+              "reduced: what is missing is the confirmation, not the quality.")
+            + " " + f"{t('Showing')} {len(engagement_unconfirmed)} {t('best of')} "
+            f"{len(all_engagement_unconfirmed)}.",
+            "",
+            _section("engagement_unconfirmed", engagement_unconfirmed),
+        ]
     # Only vacancies whose fate is still undecided need manual review.
     #
     # An actual complaint from the owner, 2026-08-05: this section contained
@@ -841,6 +895,7 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         f"{class_counts.get('remote_unconfirmed', 0)}.",
         "",
         _section("remote_unconfirmed", unconfirmed),
+        *engagement_block,
         f"## 🔎 {t('Needs a manual check by the agent or the owner')}",
         "",
         t("These are vacancies the automation is unsure about — most often ") +

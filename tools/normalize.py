@@ -38,6 +38,51 @@ def _workplace_type(value):
     return text if text in WORKPLACE_TYPES else None
 
 
+# The vocabulary the engagement gate understands, in a fixed order so that two
+# records saying the same thing store the same list.
+EMPLOYMENT_TYPES = ("full-time", "part-time", "contract", "freelance",
+                    "temporary", "internship")
+
+# Every spelling a board has been seen to use. Boards disagree on case,
+# separators and even the noun: Remotive "part_time", Himalayas "Part Time",
+# schema.org "PART_TIME", LinkedIn "Part-time", Remote Rocketship "part-time".
+#
+# "permanent" is deliberately ABSENT. It says how long the job lasts, not how
+# many hours it takes, and a UK "Permanent" role can be part-time. Mapping it
+# to full-time would turn a board's silence about hours into a refusal.
+_EMPLOYMENT_SPELLINGS = {
+    "full-time": "full-time", "fulltime": "full-time", "full time": "full-time",
+    "full_time": "full-time",
+    "part-time": "part-time", "parttime": "part-time", "part time": "part-time",
+    "part_time": "part-time",
+    "contract": "contract", "contractor": "contract", "contract to hire": "contract",
+    "contract-to-hire": "contract",
+    "freelance": "freelance", "freelancer": "freelance",
+    "temporary": "temporary", "temp": "temporary",
+    "internship": "internship", "intern": "internship",
+}
+
+
+def employment_types(value) -> list:
+    """A board's statement of the engagement, as canonical values.
+
+    Accepts a string, a comma-separated string or a list — boards use all
+    three. Anything unrecognised is dropped rather than kept: a value the gate
+    cannot read looks like knowledge and behaves like silence.
+    """
+    if not value:
+        return []
+    items = value if isinstance(value, (list, tuple)) else str(value).split(",")
+    found = set()
+    for item in items:
+        text = " ".join(str(item or "").strip().lower().replace("_", " ").split())
+        canonical = (_EMPLOYMENT_SPELLINGS.get(text)
+                     or _EMPLOYMENT_SPELLINGS.get(text.replace(" ", "-")))
+        if canonical:
+            found.add(canonical)
+    return [t for t in EMPLOYMENT_TYPES if t in found]
+
+
 def normalize_record(raw: dict) -> Optional[dict]:
     """raw -> canonical vacancy dict (without first_seen/last_seen/computed/
     manual — those are added when merging into the knowledge base in kb.py).
@@ -97,6 +142,12 @@ def normalize_record(raw: dict) -> Optional[dict]:
         # every stored record had None. The tags beside it survived, so the
         # loss looked like "those boards do not publish it".
         "workplace_type": _workplace_type(raw.get("workplace_type")),
+        # How the board classifies the engagement: ["part-time"], ["full-time",
+        # "contract"], or [] for "nobody said". Read by the engagement gate
+        # (score._check_engagement) before any phrase in the description, for
+        # the same reason as workplace_type: a board ticking a box is a
+        # statement, a word in prose is a guess.
+        "employment_types": employment_types(raw.get("employment_types")),
         "tags": tags,
         "description_text": description_text,
         "posted_at": posted_at,

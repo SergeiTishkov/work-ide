@@ -110,6 +110,22 @@ CATALOGUES = {
             "вакансия возвращается и под «on-site», и под «remote», и под "
             "«hybrid». Там, где работодатель сам пишет «гибрид» или «в "
             "офисе», вакансия отклоняется совсем и сюда не попадает.",
+        "Hours not confirmed — check by hand":
+            "Занятость не подтверждена — проверить руками",
+        "Remote and a good fit, but nobody said whether this is part-time "
+        "or full-time — and full-time is the default most employers never "
+        "write down. Where the employer or the board does say full-time, "
+        "the vacancy is rejected and is not here. The score is not "
+        "reduced: what is missing is the confirmation, not the quality.":
+            "Удалённые и подходящие, но никто не сказал, частичная это "
+            "занятость или полная — а полную большинство работодателей не "
+            "пишет, она подразумевается. Там, где работодатель или площадка "
+            "прямо пишут full-time, вакансия отклонена и сюда не попала. "
+            "Оценка не снижена: не хватает подтверждения, а не качества.",
+        "engagement confirmed": "занятость подтверждена",
+        "left to confirm": "осталось подтвердить",
+        "that it is remote": "что это удалёнка",
+        "the hours (part-time, freelance)": "занятость (part-time, фриланс)",
         "Needs a manual check by the agent or the owner":
             "Требуют ручной проверки агентом/владельцем",
         "Company reputation checks": "Проверка репутации компаний",

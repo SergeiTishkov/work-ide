@@ -1,0 +1,185 @@
+# =============================================================================
+#  PJOICE — the identity profile
+# =============================================================================
+#  The human-readable truth about who is searching, and for what.
+#  tools/score.py reads pjoice_criteria.yaml; this file is context for the agent
+#  and the person, which must not get lost in the code.
+#
+#  The full description of the identity is in pjoice_identity.md.
+#  Why the settings are what they are is in pjoice_questionnaire.yaml.
+# =============================================================================
+
+identity:
+  kind: personal
+  display_name: "Part-time side work: well paid, interesting where possible (.NET/JS)"
+  abbreviation: "PJOICE = Part-time Job Opportunities Inspire Career Enjoyment"
+  created_at: "2026-09-13"
+  # How to explain the score scale to a person in their report.
+  scoring_philosophy: >
+    The higher the score (0-100), the better the vacancy pays for part-time
+    work this .NET/JS CV will actually be hired for. Interesting technology —
+    crypto, AI, distributed systems — adds a little; dull work costs nothing.
+
+contact:
+  # The contact in the User-Agent (CLAUDE.md §5, "politeness by default"). The
+  # template sets no value: an address is personal.
+  user_agent_contact: ""
+
+# ==== PERSONAL: the values live in the local identity, outside git ====
+#
+# Name, LinkedIn, CV files, languages, residency and time zone are properties
+# of a person rather than of a search; they are layered on top from the local
+# identity (tools/settings.py). Until the required ones are filled in, no search
+# runs.
+owner:
+  role: "Senior Software Engineer (.NET / C#)"
+
+# Which labour markets the search covers. The country table is shared
+# (config/derivation/market_tiers.yaml); only the choice of tiers is here.
+target_markets:
+  tiers:
+    - importer_prime
+    - importer_ok
+  extra_locations: []
+
+target_regions:
+  dream: []
+  solid_realistic: []
+  note: >
+    "The company is based in region X" is not "the company requires residency
+    in X". A residency or citizenship requirement in a country the person does
+    not hold is always a dealbreaker, see pjoice_criteria.yaml ->
+    remote_location_fit.restrictive_region_signal.
+
+goal:
+  purpose: >
+    Side work beside a main job: part-time, freelance or fractional, paid as
+    well as the market allows. Money comes first. Interesting work — crypto,
+    AI, microservices, anything technically demanding — is a small plus; dull
+    work is neutral rather than a plus. Every candidate has to be one this CV
+    will be considered for: interesting work the CV cannot reach (research,
+    machine learning, data engineering, smart contracts) is not a candidate.
+  # A guide rather than a contract term: the hours a second job can take.
+  hours_per_week_target: [10, 20]
+  ai_assisted: true
+  ai_tools_note: >
+    AI tools (Claude, Cursor, Copilot) are used actively — it is how a bounded
+    number of hours stays enough.
+  # Pay expectations are personal. Only the SHAPE is here:
+  #
+  #   target_compensation:
+  #     hourly_contractor_usd: [60, 150]
+  #     annual_parttime_usd:   [125000, 300000]   # full-time equivalent
+  #
+  # The graded tiers that actually rank pay are in pjoice_criteria.yaml ->
+  # compensation_signal.hourly_equivalent_tiers.
+  target_compensation: {}
+
+employment_type_priority:
+  high: ["part-time", "freelance", "fractional", "hourly contract with flexible hours"]
+  medium: ["contract with bounded hours", "retainer"]
+  # Full-time is not low priority here — it is out (pjoice_criteria.yaml ->
+  # engagement_fit).
+  low_but_possible: []
+  dealbreaker_signals:
+    - "exclusive employment"
+    - "no other employment"
+    - "moonlighting prohibited"
+    - "sole and primary employer"
+    - "must not hold other employment"
+    - "security clearance required"
+    - "must relocate"
+    - "on-site required"
+    - "in-office"
+
+# The stack is the CV's, and the CV is the same as KISEL's — the frequencies
+# below were counted across the last 8 roles (2018-2026). See the KISEL
+# template's profile for the reasoning behind every omission.
+tech_stack:
+  core:
+    - ".NET"
+    - ".NET Core"
+    - ".NET Framework"
+    - "C#"
+    - "ASP.NET"
+    - "ASP.NET MVC"
+    - "ASP.NET Core"
+    - "ASP.NET Web API"
+    - "SQL Server"
+    - "MS SQL"
+    - "Angular"
+    - "AngularJS"
+  strong:
+    - "Entity Framework"
+    - "EF6"
+    - "EF Core"
+    - "TypeScript"
+    - "JavaScript"
+    - "React"
+    - "Azure"
+    - "Docker"
+    - "Microservices"
+    - "CQRS"
+    - "DDD"
+    - "Event Sourcing"
+    - "HTML"
+    - "CSS"
+  familiar:
+    - "Node.js"
+    - "Express.js"
+    - "MongoDB"
+    - "Cosmos DB"
+    - "DynamoDB"
+    - "Apache Spark"
+    - "Databricks"
+    - "Delta Lake"
+    - "Python"
+    - "SASS"
+    - "SCSS"
+    - "jQuery"
+    - "SOAP"
+    - "XSLT"
+    - "PHP"
+    - "GraphQL"
+    - "DevExpress"
+    - "Scala"
+    - "Java"
+    - "NgRx"
+    - "Redux"
+    - "MobX"
+
+ideal_company_traits:
+  high_priority:
+    - "pays a senior hourly rate"
+    - "asynchronous and remote-first, no fixed business-hours overlap"
+    - "crypto / web3 product"
+    - "AI product (LLM applications, agents) built by application developers"
+    - "distributed systems, microservices, event-driven architecture"
+    - "hires international contractors (EOR, invoices, Deel and the like)"
+  low_priority_avoid:
+    - "exclusivity clauses or moonlighting bans"
+    - "fixed daytime hours in a far time zone"
+    - "on-call duty"
+    - "a reputation for paying contractors late"
+
+eor_platforms_signal:
+  # Names that coincide with ordinary words are written as a domain — see the
+  # KISEL template for the 345 false matches that taught this.
+  - "Deel"
+  - "Remote.com"
+  - "Oyster HR"
+  - "Papaya Global"
+  - "multiplier.com"
+  - "Globalization Partners"
+  - "g-p.com"
+  - "Velocity Global"
+  - "Employer of Record"
+  - "EOR provider"
+  - "Remofirst"
+  - "Rippling EOR"
+  - "Safeguard Global"
+
+# ==== PREFERENCES: about the person, not about the search ====
+preferences:
+  # Language of the REPORT; the local identity sets the person's own.
+  language: "en"

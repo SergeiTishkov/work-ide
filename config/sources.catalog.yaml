@@ -85,11 +85,47 @@ sources:
     url: "https://himalayas.app/jobs/api?limit=100"
     params_schema:
       url: "the API endpoint"
+      queries: >
+        optional search words. When given, the source switches from the plain
+        feed (the newest twenty of ~100,000) to the filtered search endpoint
+      employment_types: >
+        optional, with queries: the board's own spellings — "Part Time",
+        "Contractor", "Full Time". Every query is multiplied by every type
+      max_pages: "pages per (query x type) in search mode, twenty records each (3 by default)"
     yield_notes: >
       ~20 vacancies per call regardless of limit. locationRestrictions is a
       list of permitted countries (empty = worldwide), the most explicit
-      geography signal of any source.
-    caveats: "Few vacancies, but free and keyless."
+      geography signal of any source. The search endpoint filters by
+      engagement for real (measured 2026-09-13): "developer" + "Part Time"
+      109, ".net" + "Part Time" 29, "c#" + "Contractor" 130, and every record
+      carries the type asked for as `employmentType`.
+    caveats: "The plain feed is few and arbitrary; the search mode is what makes it useful."
+
+  - name: remoterocketship
+    kind: html_page_data
+    remote_only: false
+    # No `url` on purpose: the listing is built from slug and employment type
+    # (https://www.remoterocketship.com/jobs/<slug>/<employment>/), and a
+    # templated url would be pinged literally by doctor.py and handed to a
+    # fetcher that has no such parameter.
+    params_schema:
+      slugs: >
+        title or technology slugs, e.g. net, developer, fullstack-engineer. Read
+        a slug's first page before listing it: some fall back to everything
+      employment_types: "part-time, contract (full-time exists but is the default nobody needs filtered)"
+    yield_notes: >
+      The one open board found that filters by engagement for real: every
+      record on /jobs/net/contract/ says contract, every one on
+      /jobs/developer/part-time/ says part-time, and the type arrives as a
+      field. Salary already converted to US dollars, a tech stack, and the
+      employer's own posting URL. Measured 2026-09-13: net/contract 115,
+      developer/part-time 114, fullstack-engineer/contract 454.
+    caveats: >
+      Twenty newest per listing and no paging for an anonymous page (?page=2
+      repeats 19 of 20), so breadth comes from more slugs. /jobs/c-sharp/ is a
+      trap: it claims thousands and lists pharmacists. An unknown slug is a
+      404 and is reported. The card holds a two-line summary only; the job
+      page's schema.org JobPosting has the full text.
 
   - name: linkedin
     kind: html_guest_search

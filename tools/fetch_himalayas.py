@@ -13,6 +13,7 @@ from phrases in the text.
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -22,22 +23,70 @@ import common  # noqa: E402
 SOURCE_NAME = "himalayas"
 API_URL = "https://himalayas.app/jobs/api?limit=100"
 
+# The search endpoint, which the plain feed above does not replace: the feed is
+# the newest twenty of ~100,000 vacancies, whatever they are. Measured
+# 2026-09-13, the search filters for real — "developer" + "Part Time" gives
+# 109, ".net" + "Part Time" 29, "c#" + "Contractor" 130, every record carrying
+# the employment type asked for — and `page` walks the results in twenties.
+SEARCH_URL = "https://himalayas.app/jobs/api/search"
+PAGE_SIZE = 20
+PAUSE_SECONDS = 1.0
 
-def fetch(url: str = API_URL, timeout: int = common.DEFAULT_TIMEOUT):
+
+def fetch(url: str = API_URL, queries: Optional[list] = None,
+          employment_types: Optional[list] = None, max_pages: int = 3,
+          timeout: int = common.DEFAULT_TIMEOUT):
+    """The newest vacancies, or — when `queries` is given — a filtered search.
+
+    Search mode multiplies every query by every employment type, so both lists
+    are meant to be short. Without `employment_types` the search is not
+    filtered by engagement at all.
+    """
+    if not queries:
+        return _fetch_feed(url, timeout)
+
+    records, seen, notes = [], set(), []
+    for query in queries:
+        for employment in (employment_types or [None]):
+            for page in range(1, max_pages + 1):
+                params = {"q": query, "page": page}
+                if employment:
+                    params["employment_type"] = employment
+                try:
+                    items = _get_jobs(SEARCH_URL, timeout, params)
+                except Exception as exc:  # noqa: BLE001
+                    notes.append(f"{query}/{employment} p{page}: {type(exc).__name__}")
+                    break
+                for item in items:
+                    rec = _to_common_schema(item)
+                    if rec is None or rec["external_id"] in seen:
+                        continue
+                    seen.add(rec["external_id"])
+                    records.append(rec)
+                time.sleep(PAUSE_SECONDS)
+                if len(items) < PAGE_SIZE:
+                    break
+    return records, ("; ".join(notes[:3]) or None)
+
+
+def _get_jobs(url: str, timeout: int, params: Optional[dict] = None) -> list:
     import requests
 
+    resp = requests.get(url, params=params, headers={"User-Agent": common.USER_AGENT},
+                        timeout=timeout)
+    resp.raise_for_status()
+    payload = resp.json()
+    items = payload.get("jobs") if isinstance(payload, dict) else None
+    if not isinstance(items, list):
+        raise ValueError("unexpected payload shape: 'jobs' list missing")
+    return items
+
+
+def _fetch_feed(url: str, timeout: int):
     try:
-        resp = requests.get(
-            url, headers={"User-Agent": common.USER_AGENT}, timeout=timeout
-        )
-        resp.raise_for_status()
-        payload = resp.json()
+        raw_items = _get_jobs(url, timeout)
     except Exception as exc:  # noqa: BLE001
         return [], f"{type(exc).__name__}: {exc}"
-
-    raw_items = payload.get("jobs") if isinstance(payload, dict) else None
-    if not isinstance(raw_items, list):
-        return [], "unexpected payload shape: 'jobs' list missing"
 
     records = []
     skipped = 0
@@ -151,6 +200,9 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "url": url,
         "location_raw": _format_location(item),
         "remote": True,  # Himalayas is a remote-only board by definition
+        # "Full Time", "Part Time", "Contractor", "Other" — normalize maps the
+        # spelling and drops "Other".
+        "employment_types": item.get("employmentType"),
         "tags": tags,
         "description_html": item.get("description") or item.get("excerpt") or "",
         "posted_at_epoch": item.get("pubDate"),

@@ -1,0 +1,34 @@
+# Which shortlists this search produces, one file each.
+#
+# Fewer than KISEL's, on purpose. Part-time side work is overwhelmingly remote
+# contract work bought from wherever the buyer is, so the split that matters is
+# "no country tie at all" against "tied to a market", and Europe is one market
+# for a contractor rather than two.
+#
+# `worldwide` first: it is the only group where geography is not an obstacle to
+# start with. Lists are REPLACED rather than merged when a layer overrides them
+# (docs/OVERRIDES.md), so a local copy must name every segment it wants.
+
+segments:
+  - slug: worldwide
+    name: "Worldwide — no country tie"
+    groups: [worldwide]
+
+  - slug: usa
+    name: "United States"
+    groups: [united_states]
+
+  - slug: europe
+    name: "United Kingdom and the European Union"
+    groups: [united_kingdom, european_union]
+
+  # Everything the segments above did not claim. Computed, not listed.
+  - slug: rest
+    name: "Rest of the world"
+    rest: true
+
+  # The whole shortlist, undivided; also written to pjoice_latest.md.
+  - slug: full
+    name: "Everything together"
+    everything: true
+    default: true

@@ -278,8 +278,8 @@ the shortlist and linking to the others.
 
 Every vacancy now carries a verdict alongside its score: CONFIRMED, LIKELY, NOT
 STATED or NO — can a contractor sitting where this person sits actually take
-the work? It is shown on its own line and it orders every section ahead of the
-score.
+the work? It is shown on its own line. It used to order every section ahead of
+the score; since 2026-09-13 it only breaks ties — see "Rejected approaches".
 
 **Why not a scoring component.** Because points average away exactly the
 distinction that matters:
@@ -303,7 +303,114 @@ hot_lead at 64; "100% remote in LATAM" led the worldwide shortlist at 76,
 because the region tie was cancelled by the word "freelance" elsewhere in the
 description.
 
+### Engagement as a gate with a section of its own (2026-09-13)
+
+A second identity for the same person — side work beside a main job — needed a
+question no search had asked: how many hours. A full-time role is not a weaker
+candidate for that search but an impossible one.
+
+`score._check_engagement` answers it from `employment_types`, a normalised
+field fetchers fill from the board's own classification (Remotive `job_type`,
+Himalayas `employmentType`, LinkedIn's "Employment type", schema.org), and
+from phrases the identity declares in `engagement_fit`.
+
+**Why the same two halves as the remote gate.** Full-time is the default most
+postings never write down, so silence is the common case, not the suspicious
+one. A statement decides — "Full-time" refuses, "Part-time" or "20 hours a
+week" confirms — and silence becomes `engagement_unconfirmed`: its own class,
+its own report section, the score untouched. Rejecting on silence would be a
+refusal by guesswork (CLAUDE.md §5).
+
+**Why a confirmation anywhere beats a refusal anywhere.** "Full-time or
+part-time" offers part-time; a board's default "Full-time" beside an employer
+writing "15 hours a week" is the default being wrong. Leaning towards keeping a
+vacancy is the cheap direction to be wrong in.
+
+**Why "contract" confirms nothing.** A UK day-rate contract is five days a week.
+A contract says who invoices whom, not how many hours.
+
+**Why a search without the block notices nothing.** It is absent from KISEL's
+criteria, and every test asserting KISEL's behaviour kept passing unchanged.
+When both remote and hours are unknown, the older remote class takes the
+vacancy and both objections stay listed, so the report can say what is left to
+confirm.
+
+### Axes an identity declares for itself: `extra_signals` (2026-09-13)
+
+Every scoring component used to be a named function with a named block —
+legacy, intensity, stack — because the first search needed exactly those. The
+second search needed "interesting work" (a plus), "fits beside a main job"
+(async against on-call) and "AI-training gig" (a visible minus), and scored
+several of the first search's words the other way round.
+
+A new axis is now configuration: `extra_signals` is a list of named keyword
+signals with points, cap and floor, summed into the score, listed in the
+breakdown under its own name, and printed in the report with the identity's
+own label. The fixed components stay: they carry measured history, and turning
+them into list entries would lose it for no gain. A search that does not want a
+fixed component zeroes it (PJOICE's `legacy_enterprise_signal` weighs 0).
+
+### Graded pay (2026-09-13)
+
+`compensation_signal` gave a flat plus for a stated salary and a small
+adjustment below or above a target range. For a search where money is the point
+that cannot rank "$130/hour" above "$45/hour" — both are simply "stated".
+
+With `hourly_equivalent_tiers` set, every amount becomes US dollars an hour (an
+annual figure over 2080 hours, a monthly one times twelve over 2080, a range as
+its middle), and the tier gives the points, replacing the below/above
+adjustment. The board's own salary field outranks amounts found in prose,
+which also hold stipends and prices; implausible amounts are ignored rather
+than trusted. No salary stays neutral, as the constitution requires.
+
+### A contractor word is not a location (2026-09-13)
+
+"freelance", "contractor" and "1099" sat in one list with named
+employer-of-record platforms, and a hit on that list skipped the check that a
+vacancy is remote at all. The first part-time run surfaced a Brussels "freelance
+mission, 50% remote" in its worth_a_look; the same override, measured over
+KISEL's base, held eight vacancies in the confident tiers on those words alone,
+not one of them remote — including a Stripe posting whose "1099" is a tax form.
+
+Only a NAMED platform now exempts (`eor_platform_hits`), as it already did for
+the region-tie override since 2026-08-12. The words keep their points; they
+prove nothing about location. The affected vacancies go to remote_unconfirmed
+with their scores unchanged — a person decides, nothing vanishes.
+
+The general lesson, now paid for twice: **a word that describes the contract
+does not describe the place or the hours.** "Contract" is five days a week in
+the UK, "freelance" is a full-time assignment at a client in Belgium and France.
+
+### A ruled-out role is not parked for a person — where the identity says so (2026-09-13)
+
+The classification checks "is this only unconfirmed?" before "has the
+complexity gate ruled the role out?", so a gated role can wait in a
+check-by-hand section even though confirming it could never make it a
+candidate. For PJOICE, where the gate means "this CV will not be considered", a
+Principal Data Engineer sat at 55 in "hours not confirmed".
+
+It is an opt-in, `role_complexity_signal.applies_to_unconfirmed`, rather than a
+fix for everybody, because the measurement for KISEL came out the other way: 51
+vacancies would leave its check-by-hand sections, the top ones ordinary ".NET
+Developer" postings gated by a single "agentic" in a consultancy's boilerplate.
+Hiding those would trade a small inconsistency for real false negatives.
+
 ## Rejected approaches
+
+### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)
+
+When eligibility became its own axis, sections were sorted by it first and by
+score second, so a CONFIRMED 46 came before an unstated 60. The reasoning was
+sound — "$100/hour, US" is worth less than "$70/hour, worldwide" to somebody who
+cannot take the first — and the result was unreadable: nothing on the page said
+why a 46 preceded a 60. The owner, opening the UK shortlist: "46, 40, then 60 —
+they must be sorted."
+
+An order whose reason is invisible reads as no order. Sections are now sorted
+by score, eligibility breaks ties only, and the preference for reachable work
+lives where it can be seen: the verdict on every vacancy, and the worldwide
+shortlist first among the files. `tests/test_report_order.py` holds the owner's
+exact case.
 
 ### The Local Constitution: a third layer, retired (2026-08-06)
 

@@ -1,39 +1,39 @@
-# The vacancy scoring rubric. Read by tools/score.py.
+# The vacancy scoring rubric for PJOICE. Read by tools/score.py.
 # The final score is 0..100, plus a separate list of dealbreaker flags and
 # needs_manual_review. Every component is explained in score_breakdown.
 #
-# The philosophy: an ordinary job-search system penalises "legacy", "boring"
-# and "bureaucracy" — here it is the other way round. We deliberately look for
-# what frightens most candidates off, because competition is lower there and
-# the willingness to pay for dull stability is higher.
+# The philosophy: side work beside a main job. Built from the KISEL template
+# and turned round on almost every axis KISEL scores:
+#
+#   * money is THE priority — graded by the hourly rate, not merely "a salary is
+#     stated" (compensation_signal.hourly_equivalent_tiers);
+#   * part-time, freelance or fractional hours are REQUIRED — a full-time role
+#     cannot be done beside a full-time job (engagement_fit);
+#   * dull work is neutral, not a plus (legacy_enterprise_signal weighs 0);
+#   * interesting work — crypto, AI, distributed systems — is a small plus
+#     (extra_signals.interesting_work), and crypto is no longer a dealbreaker;
+#   * but only work THIS CV will be considered for: research, machine learning,
+#     data engineering and smart contracts are cut however interesting they are
+#     (role_complexity_signal, repurposed — see there).
+#
+# What is unchanged from KISEL: geography, stack, language and profession
+# gates. They follow from the CV and the residency, which are the same person's.
 
 # HOW A COMPONENT'S WEIGHT WORKS
 #
-# There is NO separate `weights` block in this file, and that is deliberate. It
-# was here and no line of code read it: the points always came from the
-# components' own settings, while `weights` was a declaration of intent that
-# reality could drift away from at will. And it did.
+# There is no `weights` block (the KISEL template explains why). A component's
+# real weight is its cap or its range:
 #
-# A component's real weight is its CAP. The current values, largest first:
-#
-#   legacy_enterprise_signal.cap        25   ageing technologies = calm
-#   stack_fit.cap                       25   the fit to the stack
-#   low_intensity_signal.cap            25   direct signs of low intensity
-#   company_reputation_signal          ~24   reviews, work-life balance
-#   compensation_signal                ~15   money
-#   remote_location_fit.worldwide       6    "can I apply at all"
-#   contractor_friendliness.cap         5
-#
-# REVISED 2026-08-05 on the owner's direct instruction: "stack, pay, the signs
-# of easy work — those are the key signals. Target regions — who cares. What
-# does a region give me? What matters is the work itself, not geography."
-#
-# Before that, remote_location_fit.worldwide_remote gave 25 — more than the
-# stack (15) and money (10) together. The shortlist was ranked by WHERE a
-#
-# IMPORTANT, do not change: low_intensity_signal weighs more than
-# compensation_signal, and its range is wider. Confirmed by the owner
-# explicitly: "I will take guaranteed dull, easy work for less money over
+#   compensation_signal          -8..+34   the hourly rate, graded
+#   stack_fit.cap                     25   the fit to the CV
+#   company_reputation_signal        ~24   reviews
+#   extra_signals.interesting_work    +8   crypto, AI, distributed systems
+#   extra_signals.fits_beside_a_job -12..+6 async and flexible against on-call
+#   extra_signals.ai_training_gig     -6   paid, but not a product team
+#   remote_location_fit.worldwide      6
+#   contractor_friendliness.cap        5
+#   legacy_enterprise_signal           0   dull work is neutral here
+#   low_intensity_signal               0   replaced by fits_beside_a_job
 
 remote_location_fit:
   # Can a contractor sitting where this person sits actually take the work?
@@ -392,10 +392,8 @@ remote_location_fit:
         pattern: "\\((?![^)]*\\b(cloud|architecture|deployment|app|apps|mobile|encryption|search|model|integration|remote)\\b)[^)]{0,40}\\bhybrid\\b[^)]{0,40}\\)"
       - name: "listed as hybrid"
         pattern: "\\((\\s*hybrid\\s*|\\s*on-?site\\s*)\\)"
-      # "up to 50% telework permitted", "50% remote": the rest of the week is
-      # somewhere else. Found 2026-09-13 on a Brussels posting; measured over
-      # this identity's base: two shown vacancies, both hybrid. "100% remote"
-      # cannot match — the number has one or two digits and no leading zero.
+      # "Brussels | 50% remote" — the rest of the week is somewhere else. Added
+      # to both templates 2026-09-13; "100% remote" cannot match.
       - name: "partly remote, by percentage"
         pattern: '\b(?:up to\s+)?[1-9]\d?\s?%\s?(?:remote|telework|home[- ]?office|work(?:ing)? from home)\b'
       - name: "work arrangement stated as hybrid"
@@ -747,71 +745,74 @@ stack_fit:
     - "big data"
 
 role_complexity_signal:
-  # Confirmed by the owner explicitly (2026-07-30) on real findings:
-  # "Principal Machine Learning Scientist", "Staff Software Engineer,
-  # Agentic Platform" is NOT simple work for 2-4 hours a day, even if
-  # "enterprise" and "banking" appear in the company description as its market.
-  # This is an axis apart from legacy_enterprise_signal: legacy maintenance in
-  # a bank is one thing, R&D or new architecture from scratch at the same
-  # company quite another. When the gate fires, the classification cannot rise
-  # above low_priority regardless of the other components (the same mechanism
-  # as the stack_fit gate in score.py).
+  # Since V2: a vacancy this gate rules out is not parked for a person either
+  # (score.py, the classification). The first run showed a "Principal Data
+  # Engineer" at 55 in "hours not confirmed" — confirming its hours could not
+  # have made it a candidate.
+  applies_to_unconfirmed: true
+  # REPURPOSED. In KISEL this gate means "not simple work", and interesting,
+  # complex work is exactly what it keeps out. Here that work is WANTED, so the
+  # gate means something narrower: "this CV will not be considered".
   #
-  # A match in the vacancy TITLE gates at once (one hit is enough).
+  # The owner, 2026-09-13: "a data engineer, a model-training developer — with
+  # my CV they will not take me, no chance, no point trying. Although the work
+  # would be interesting."
+  #
+  # The mechanism is unchanged: one title hit, one strong single hit, or
+  # threshold_hits description hits, and the vacancy cannot rise above
+  # low_priority. What the patterns name is different.
+  #
+  # NOT here, deliberately: "AI engineer", "LLM engineer", "agentic". An
+  # application developer building on a model API is reachable from this CV,
+  # and those words are among the interesting ones (extra_signals).
   title_red_flag_patterns:
-    - "principal.*scientist"
-    - "staff.*scientist"
-    - "principal.*research"
-    - "staff.*research"
-    - "research scientist"
-    - "applied scientist"
-    - "machine learning scientist"
-    - "machine learning engineer"
-    - "\\bml engineer\\b"
-    - "data scientist"
-    - "founding engineer"
-    - "head of ai"
-    - "director of ai"
-    - "chief ai officer"
-    - "agentic"
-    - "llm engineer"
-    - "ai engineer"
-    - "artificial intelligence engineer"
-    - "genai engineer"
-  # Matches in the description need at least threshold_hits of them (one stray
-  # buzzword in boilerplate must not gate a normal legacy role).
+    - 'research scientist'
+    - 'applied scientist'
+    - '\bscientist\b'
+    - 'machine learning'
+    - '\bml engineer\b'
+    - '\bmlops\b'
+    - '\bml platform\b'
+    - 'data scientist'
+    - 'data engineer'
+    - 'analytics engineer'
+    - 'research engineer'
+    - '\bresearcher\b'
+    - 'computer vision'
+    - '\bnlp\b'
+    - 'deep learning'
+    - 'inference engineer'
+    - 'model training'
+    - 'smart contract'
+    - 'solidity'
+    - 'protocol engineer'
+    - '\bzk\b'
+    - 'zero[- ]knowledge'
+    - 'cryptograph'
+    - '\bquant\b'
+    - 'quantitative'
+    - 'firmware'
+    - 'embedded (?:software|systems|engineer|developer)'
+  # Needs threshold_hits of them: an application role may mention one or two
+  # in passing ("integrate with PyTorch models"), a research role names many.
   description_red_flag_keywords:
-    - "build from scratch"
-    - "greenfield"
-    - "0 to 1"
-    - "0->1"
-    - "own the technical vision"
-    - "own the entire architecture"
-    - "cutting-edge"
-    - "cutting edge"
-    - "state-of-the-art"
-    - "state of the art"
-    - "novel algorithms"
-    - "publish papers"
-    - "phd preferred"
-    - "phd required"
-    - "research new methods"
-    - "large-scale distributed systems"
-    - "hyperscale"
-  threshold_hits: 2
-  # A real case found (2026-07-30, through the manual checklist —
-  # docs/VACANCY_CHECKLIST.md): "Staff/Senior Software Engineer (AI CICD)"
-  # at Chainguard, a venture-backed startup building "agentic AI" products from
-  # scratch ("Extend Chainguard's agentic AI foundation..."). "Agentic",
-  # "LLM systems" and "GenAI" are unambiguous signals of an AI/R&D focus; one
-  # mention is enough and they need no threshold_hits bar (unlike the vaguer
-  # "cutting-edge" and the like, which may be marketing boilerplate).
-  #
+    - "pytorch"
+    - "tensorflow"
+    - "cuda"
+    - "hugging face"
+    - "scikit-learn"
+    - "model training"
+    - "training models"
+    - "fine-tuning models"
+    - "reinforcement learning"
+    - "published research"
+    - "phd"
+    - "solidity"
+    - "smart contract development"
+  threshold_hits: 3
   description_red_flag_keywords_strong_single_hit:
-    - "agentic"
-    - "agentic ai"
-    - "llm systems"
-    - "genai"
+    - "phd required"
+    - "phd is required"
 
 # The gate for "the title names somebody else's stack".
 #
@@ -1025,10 +1026,10 @@ role_relevance_signal:
     - "forward deployed"
     - "(implementation|technical support|field) engineer"
   hard_wrong_profession_title_patterns:
-    # Not a professional engagement at all. Found 2026-09-13 by a part-time
-    # search, where a board's "part-time" label put interns, a Werkstudent and
-    # a visiting professor in the shortlist. Measured here before adding: three
-    # shown vacancies, all internships.
+    # Not a professional engagement at all. A board's "part-time" label covers
+    # internships, working-student posts and teaching, and the first PJOICE run
+    # put "Software Engineering Intern", "Werkstudent", a "Co-op" and an
+    # "Online Visiting Professor" in the shortlist on the strength of it.
     - '\bintern\b'
     - '\binternship\b'
     - 'working student'
@@ -1224,16 +1225,10 @@ language_requirement_signal:
   # whereas a posting written entirely in it gives tens of per cent.
   readable_scripts: ["latin", "cyrillic"]
   unreadable_script_threshold: 0.15
-  # Language demands a word list cannot hold, because the same words mean the
-  # opposite a sentence later (score._score_language_fit). "Fluent in Dutch or
-  # French" refuses; "Dutch or French is desirable" does not; "LANGUAGES – MUST
-  # Dutch OR French: fluent" puts the demand after the languages.
-  #
-  # Measured 2026-09-13 over this identity's base: five new refusals among the
-  # vacancies shown, all five genuine — "fluency in English and French is
-  # required", "a good command of both Dutch and English" — and a bare
-  # substring "dutch or french" would have refused two of six wrongly. The
-  # languages named are the ones this search's person does NOT speak.
+  # Language demands a word list cannot hold (score._score_language_fit), added
+  # to both templates on 2026-09-13 — see the KISEL template for the
+  # measurement. The languages named are the ones this search's person does
+  # NOT speak.
   explicit_requirement_patterns:
     - name: "fluent in a language this person does not speak"
       pattern: '\b(?:fluen\w*|command of|proficien\w*|communicate fluently)\b[^.;]{0,20}\b(?:dutch|french|german|flemish)\b(?![^.;]{0,40}\b(?:desirable|optional\w*|a plus|plus|nice to have|advantage|asset|bonus|preferred|beneficial)\b)'
@@ -1379,11 +1374,11 @@ language_requirement_signal:
     # Widened 2026-09-13. The seven markers below missed LinkedIn's French
     # postings, which say "je recherche" rather than "nous recherchons" and
     # "Télétravail : hybride". Functional words were added, and the threshold
-    # rose from 3 to 4, both measured over this identity's base: 60 detections
-    # became 86, not one earlier detection was lost, and every shown vacancy
-    # newly caught had a French title. At 3 the functional words also caught
-    # English postings that carry a French equal-opportunity paragraph —
-    # " nous ", " des ", " les " and nothing else.
+    # rose from 3 to 4, both measured over KISEL's base: 60 detections became
+    # 86, not one earlier detection was lost, and every shown vacancy newly
+    # caught had a French title. At 3 the functional words also caught English
+    # postings that carry a French equal-opportunity paragraph — " nous ",
+    # " des ", " les " and nothing else.
     - language: french
       threshold: 4
       markers: ["nous recherchons", "vos missions", "votre profil",
@@ -1414,241 +1409,55 @@ language_requirement_signal:
 # rather than a penalty. The two-match threshold exists so that a vacancy
 # mentioning crypto in passing among its clients is not cut.
 industry_dealbreaker_gate:
+  # EMPTY ON PURPOSE. KISEL refuses crypto and web3 here; for this search they
+  # are among the interesting domains the owner named first (2026-09-13), and
+  # they are a plus in extra_signals.interesting_work.
   threshold_hits: 2
-  keywords:
-    - "web3"
-    - "blockchain"
-    - "crypto"
-    - "cryptocurrency"
-    - "defi"
-    - "nft"
-    - "smart contract"
-    - "polkadot"
-    - "ethereum"
-    - "solana"
-    - "token economics"
-    - "onchain"
-    - "on-chain"
+  keywords: []
 
 legacy_enterprise_signal:
-  points_per_keyword: 3
-  cap: 25
-  keywords:
-    - "legacy"
-    - "maintenance"
-    - "maintain existing"
-    - "support existing system"
-    - "enterprise"
-    - "back office"
-    - "internal tool"
-    - "internal tools"
-    - "on-premise"
-    - "on-premises"
-    - "monolith"
-    - "webforms"
-    - "winforms"
-    - "vb.net"
-    - "classic asp"
-    - "soap"
-    - "mainframe"
-    - "cobol"
-    - "insurance"
-    - "bank"
-    - "banking"
-    - "government"
-    - "public sector"
-    - "utility"
-    - "utilities"
-    - "healthcare"
-    - "logistics"
-    - "manufacturing"
-    - "higher education"
-    - "erp"
-    - "payroll system"
-    - "stable and mature codebase"
-    - "well-established"
-    # Nobody writes "we have legacy and tedium" (confirmed by the owner
-    # 2026-08-05). But an old stack is visible in the requirements — and it
-    # says more about the character of the work than any words about culture:
-    # where WebForms or WCF lives, there are no weekly rewrites from scratch.
-    #
-    # The list is deliberately of specific technologies rather than generic
-    # words: "legacy" occurs in marketing ("we free you from legacy"), WebForms
-    - "web forms"
-    - "asp.net webforms"
-    - "wcf"
-    - ".net framework 4"
-    - ".net framework 3"
-    - "vb6"
-    - "visual basic"
-    - "silverlight"
-    - "windows forms"
-    - "com+"
-    - "msmq"
-    - "web services description language"
-    - "wsdl"
-    - "xslt"
-    - "crystal reports"
-    - "ssrs"
-    # NOT "ssis": it is a substring of "ai-assisted", "assist", "assistance".
-    # Measured 2026-08-05: 1057 false matches, and they pushed a vacancy with
-    # no SSIS at all to the top of the shortlist. The same class of mistake as
-    # "LESS" inside "no less than" and "Multiplier" inside "productivity
-    # multiplier" — a short acronym must be written out in full.
-    - "sql server integration services"
-    - "ssis package"
-    # NOT "ssas": it is caught inside the Portuguese "nossas". The sources
-    # return text in many languages, and a three-letter acronym will sooner or
-    # later match somebody else's word.
-    - "sql server analysis services"
-    - "team foundation server"
-    - "tfs"
-    - "subversion"
-    - "svn"
-    - "angularjs"
-    - "angular 1"
-    - "knockout.js"
-    - "backbone.js"
-    - "jquery"
-    - "webpack 3"
-    - "bootstrap 3"
-    - "entity framework 6"
-    - "ef6"
-    - "web api 2"
-    - "sql server 2012"
-    - "sql server 2014"
-    - "sql server 2016"
-    - "windows server 2012"
-    - "windows server 2016"
-    - "iis"
-    - "oracle forms"
-    - "pl/sql"
-    - "as400"
-    - "as/400"
-    - "delphi"
-    - "coldfusion"
-    - "sharepoint"
-    - "biztalk"
-    - "dynamics ax"
-    - "dynamics nav"
-    - "navision"
-    - "sitecore"
-    - "umbraco"
-    - "episerver"
-    - "kentico"
-    # Support is a plus for this search (confirmed by the owner 2026-08-05):
-    # maintaining a working system is exactly the character of work being
-    # sought — predictable, no "build it from scratch", settled processes.
-    #
-    # This means ENGINEERING support specifically. Customer support stays in
-    # the profession disqualifiers (role_relevance_signal): that is not development.
-    - "application support"
-    - "production support"
-    - "product support engineer"
-    - "software support engineer"
-    - "technical support engineer"
-    - "l3 support"
-    - "level 3 support"
-    - "third line support"
-    - "3rd line support"
-    - "maintenance and support"
-    - "bug fixing"
-    - "defect resolution"
-    - "incident resolution"
-    - "keep the lights on"
-    - "business as usual"
-    - "run and maintain"
-    - "sustaining engineering"
-    - "legacy modernization"
-    - "legacy modernisation"
+  # NEUTRAL. The owner, 2026-09-13: "boring work is not a plus now, it is
+  # neutral". The block stays so the scoring's shape is the same across
+  # identities; it simply weighs nothing.
+  points_per_keyword: 0
+  cap: 0
+  keywords: []
 
 low_intensity_signal:
-  positive_points_per_keyword: 4
-  negative_points_per_keyword: -6
-  cap: 25
-  floor: -20
-  positive_keywords:
-    - "part-time"
-    - "part time"
-    - "flexible hours"
-    - "flexible schedule"
-    - "asynchronous"
-    - "async-first"
-    - "no on-call"
-    - "no on call"
-    - "low stress"
-    - "work-life balance"
-    - "work/life balance"
-    - "20 hours"
-    # Reduced-hours arrangements. They arrive as the structured schedule_type
-    # field from 4dayweek.io (see tools/fetch_4dayweek.py) — that is, not a
-    # guess from the vacancy text but the board's own classification. Both the
-    # machine and the human form are kept: the first survives a change in their
-    - "4-day week"
-    - "4 day week"
-    - "schedule:4_day_week"
-    - "schedule:4_day_week_pro_rata"
-    - "schedule:9_day_fortnight"
-    - "9-day fortnight"
-    - "schedule:compressed_week"
-    - "compressed week"
-    - "schedule:rotating_4_day"
-    - "schedule:half_day_fridays"
-    - "half-day fridays"
-    - "schedule:flexible_hours"
-    - "four-day week"
-    - "reduced hours"
-    - "reduced working week"
-    - "25 hours"
-    - "30 hours"
-    - "few meetings"
-    - "minimal meetings"
-    - "self-paced"
-    - "contractor"
-    - "freelance"
-    - "1099"
-    - "fractional"
-    - "moonlighting ok"
-    - "side project friendly"
-  negative_keywords:
-    - "fast-paced"
-    - "fast paced"
-    - "high growth"
-    - "move fast"
-    - "wear many hats"
-    - "rockstar"
-    - "ninja"
-    - "10x engineer"
-    - "24/7 on-call"
-    - "on-call rotation"
-    - "unlimited pto" # often a marker of "take leave if you survive" startup culture
-    - "hustle"
-    - "startup"
-    - "high-pressure"
-    - "tight deadlines"
-    - "crunch"
-    # profile.yaml → ideal_company_traits.low_priority_avoid: crypto/web3 —
-    # the direct opposite of the "dull legacy stability" being sought.
-    # A real finding, 2026-07-30: "Senior DevOps Engineer (Web3)" reached the
-    # candidates.
-    - "web3"
-    - "crypto"
-    - "blockchain"
-    - "defi"
-    - "nft"
+  # NEUTRAL. What matters here is not intensity but whether the work fits
+  # beside a main job — a different axis with different words, declared in
+  # extra_signals.fits_beside_a_job. Several of KISEL's words ("startup",
+  # "crypto", "fast-paced") are not minuses for this search at all.
+  positive_points_per_keyword: 0
+  negative_points_per_keyword: 0
+  cap: 0
+  floor: 0
+  positive_keywords: []
+  negative_keywords: []
 
 compensation_signal:
-  has_explicit_range_points: 8
-  # Confirmed by the owner explicitly (2026-07-30): if no salary is stated in
-  # the vacancy itself but the agent found an approximate range on an external
-  # source (Glassdoor and the like) through manual research, that is a small
-  # plus, less than a rate stated in the vacancy. Filled in through
-  # `tools/kb.py set-salary-estimate` into vacancy.external_signals.
-  external_estimate_points: 3
-  no_range_points: 0
-  below_target_penalty: -6
-  above_target_bonus: 2
-  # the target range comes from profile.yaml goal.target_compensation
+  # MONEY IS THE PRIORITY, so it is graded rather than merely noted. Every
+  # stated amount becomes US dollars an hour (see score._hourly_equivalent): an
+  # hourly rate as it is, an annual salary over 2080 hours — part-time postings
+  # quote the full-time equivalent — and a range as its middle.
+  #
+  # The tiers describe the remote contract market for a senior developer, not
+  # one person's expectation; a local override can move them.
+  has_explicit_range_points: 2
+  external_estimate_points: 1
+  no_range_points: 0          # no data is not bad pay (CLAUDE.md §5)
+  below_target_penalty: -6    # unused while tiers are set
+  above_target_bonus: 2       # unused while tiers are set
+  hours_per_year: 2080
+  hourly_equivalent_tiers:
+    - {at_least: 150, points: 32}
+    - {at_least: 120, points: 26}
+    - {at_least: 100, points: 20}
+    - {at_least: 80, points: 14}
+    - {at_least: 60, points: 8}
+    - {at_least: 45, points: 2}
+    - {at_least: 30, points: -4}
+    - {at_least: 0, points: -10}
 
 company_reputation_signal:
   # The cost of a red flag in points, not only a "check by hand" mark.
@@ -1714,12 +1523,15 @@ company_reputation_signal:
   # calm pace — exactly what is wanted. Until 2026-07-31 that trait was
   # recorded in the profile and checked nowhere.
   company_age:
+    # Not KISEL's "mature is calm". For side work the question is whether an
+    # invoice gets paid: a very young company is a small risk, an old one is
+    # not a plus in itself.
     mature_threshold_years: 10
-    mature_points: 6
+    mature_points: 1
     established_threshold_years: 5
-    established_points: 3
+    established_points: 1
     very_young_threshold_years: 3
-    very_young_points: -4   # under 3 years old is usually still startup mode
+    very_young_points: -3
 
 contractor_friendliness:
   points_per_keyword: 5
@@ -1737,53 +1549,12 @@ contractor_friendliness:
     - "velocity global"
 
 classification_thresholds:
-  # REVISED 2026-07-30 (an important change of logic).
-  #
-  # The 65/45/25 thresholds date from the era when the score was the ONLY
-  # filter, and a high threshold guarded against rubbish. Filtering is now done
-  # by the hard gates (stack, location, language, profession, role complexity):
-  # everything impassable is already in "rejected". For what the GATES LET
-  # THROUGH, the score should RANK rather than discard.
-  #
-  # The problem found (on real data): vacancies that passed every gate
-  # (worldwide remote, a JS/.NET stack, English, a developer role) — "Staff
-  # Software Engineer (Magic Containers)" (18 points), for instance — did not
-  # "Senior Vue Developer" (15), "Senior React Full-stack Developer" (15) —
-  # reach the report at all. An ordinary, perfectly normal remote vacancy with
-  # no "legacy", no "part-time" and no stated range scores only about 15: the
-  # bonuses are awarded for tedium and low intensity, which few write down.
-  # As a result, 1 of 966 vacancies was shown to the person — while about 50
-  # had genuinely passed every suitability check.
-  # RECALIBRATED 2026-08-05 along with the weights.
-  #
-  # The previous 45/25/8 described a different scale: remote_location_fit
-  # weighed 25 and was awarded to almost everything that passed the gates, so
-  # it acted as a constant term lifting the whole curve. Once geography stopped
-  # weighing, that same 45 cut everything: five hot_leads out of 11,414.
-  #
-  # The new values were chosen by measurement over the real base, not by eye:
-  #   38 -> 21 candidates at the head (0.18% of the base) — a readable number;
-  #   28 -> 51 more;
-  #   20 -> a tail of 132 instead of 261: cutting vacancies with no intelligible
-  #         signal beyond having passed the gates.
-  # Chosen by measurement over the 572 vacancies that passed every gate
-  # (2026-08-05, after geography stopped weighing and the scale compressed):
-  #
-  #   38 -> 24 candidates at the head. That is what a person reads over coffee.
-  #   28 -> 38 more.
-  #   10 -> the tail. An ordinary vacancy that passed EVERY gate but said
-  #         nothing about itself (no core stack, no legacy, no words about
-  #         intensity, no range) scores exactly 10. It has to be visible: the
-  #         gates have already confirmed one can apply, and here the score
-  #         ranks rather than filters — decided 2026-07-30, and it still holds.
-  #
-  # A long tail costs nothing: the report's sections print 15 records each and
-  # say how many are left.
-  hot_lead: 38
+  # Starting values, to be recalibrated by measurement over the first run's
+  # base — the same way KISEL's were (see the KISEL template). The scale is
+  # different: a stated $100/hour alone is worth 22 points here.
+  hot_lead: 40
   worth_a_look: 28
-  long_shot: 10
-  # below long_shot -> low_priority
-  # a hard dealbreaker keyword -> status "rejected" regardless of points
+  long_shot: 12
 
 talent_pipeline_gate:
   # An advertisement with no vacancy behind it. The employer is collecting CVs
@@ -1817,49 +1588,13 @@ talent_pipeline_gate:
     - "speculative application"
 
 ai_training_crowdwork_gate:
-  # A genre that appeared on the boards in 2024-2026: a platform hires
-  # developers not to build software but to produce training data for models —
-  # writing reference solutions, labelling, rating answers, assembling RL
-  # environments. The title meanwhile is ordinary: "Senior Software Engineer".
-  #
-  # Why this is a gate rather than a penalty: piecework with no project, team
-  # or product is not what somebody looking for a steady position wants.
-  # Measured 2026-08-05: such postings took four of the top nine positions,
-  # including the first, because they list every language at once, write "no
-  # set schedules" (which reads as low intensity) and quote an hourly rate.
-  #
-  # The markers are long and unambiguous: one is enough to reject, so each must
-  # be something an honest product company would never write about itself.
-  # Short ones ("ai", "training") would catch half the market.
-  keywords:
-    - "not a traditional software engineering role"
-    # Wordings of the same genre found 2026-08-05: the same platform came back
-    # as "Freelance Agent Evaluation Engineer" with rewritten text. A gate that
-    # catches one edition of a text catches an edition, not a genre.
-    #
-    - "project-based ai opportunities"
-    - "agent evaluation"
-    - "evaluating and improving ai"
-    - "testing, evaluating, and improving ai"
-    - "improving ai systems"
-    - "ai training data"
-    - "reinforcement learning environments"
-    - "ai training project"
-    - "ai trainer"
-    - "ai tutor"
-    - "help train and improve"
-    - "train and improve next-generation"
-    - "training data for ai"
-    - "improve ai models"
-    - "ai model's ability"
-    - "no minimum time or task commitments"
-    - "no minimum time commitment"
-    - "connects specialists with ai projects"
-    - "rate ai responses"
-    - "evaluate model responses"
-    - "rate model responses"
-    - "annotate training data"
-    - "data labeling project"
+  # EMPTY ON PURPOSE. KISEL gates AI-training piecework because a steady
+  # position is what it wants. Side work paid by the hour is a legitimate
+  # trade, and some of it pays $130 an hour — so the markers moved to
+  # extra_signals.ai_training_gig, where they cost points and carry a label a
+  # person reads, instead of hiding the vacancy. An assumption recorded
+  # 2026-09-13, not the owner's words: revisit if the owner says otherwise.
+  keywords: []
 
 mobile_role_gate:
   # Mobile development behind a neutral title. A real finding, 2026-08-05:
@@ -1889,3 +1624,170 @@ mobile_role_gate:
     - "mobile application"
     - "native app"
     - "mobile app"
+
+engagement_fit:
+  # A full-time role cannot be done beside a full-time job. The gate has the
+  # same two halves as the remote gate (see score._check_engagement):
+  #
+  #   * the employer's or the board's statement decides — a confirmation
+  #     anywhere beats a refusal anywhere, because "full-time or part-time" is
+  #     an offer of part-time;
+  #   * silence goes to a person with the score untouched, because full-time
+  #     is the default most postings never write down.
+  #
+  # "contract" is in neither list: a UK day-rate contract is five days a week.
+  #
+  # "freelance" is in neither list either, since V2. The first run showed why:
+  # in European IT contracting a "freelance .NET developer" is a contractor on
+  # a full-time assignment at a client — "Freelance Fullstack .NET Developer –
+  # Brussels, long-term assignment until 31/12/2026, 50% remote", "mission
+  # freelance" in Paris. It says who invoices whom, like "contract".
+  confirming_types: [part-time]
+  contradicting_types: [full-time, internship]
+  confirming_patterns:
+    - name: "part-time"
+      pattern: '\bpart[- ]?time\b'
+    - name: "fractional"
+      pattern: '\bfractional\b'
+    # Twenty-five, not thirty, and never after "minimum" or "at least": the
+    # first run confirmed "independent contractor status, minimum 30 hours a
+    # week (normal schedule)" as part-time. A floor is not a ceiling.
+    - name: "twenty-five hours a week or fewer"
+      pattern: '(?<!minimum )(?<!min\. )(?<!at least )\b(?:[5-9]|1\d|2[0-5])\s*\+?\s*(?:(?:-|to|–)\s*\d{1,2}\s*)?(?:hours|hrs|h)\s*(?:per|a|/|each)\s*week'
+    - name: "three days a week or fewer"
+      pattern: '\b(?:[123]|one|two|three)\s*(?:(?:-|to|–)\s*(?:[23]|two|three)\s*)?days?\s*(?:per|a|/)\s*week'
+    - name: "hours you set yourself"
+      pattern: '\b(?:set your own hours|choose your own hours|no minimum hours|as many or as few hours)\b'
+    - name: "beside a main job"
+      pattern: '\b(?:side project|moonlighting|alongside (?:your|a) (?:full[- ]time|day) job|evenings and weekends)\b'
+  contradicting_patterns:
+    - name: "a full-time position"
+      pattern: '\bfull[- ]?time (?:position|role|job|employment|opportunity|contract|engagement|commitment|hours|basis)\b'
+    - name: "employment type: full-time"
+      pattern: '\b(?:employment|job|contract|position|work) type\s*:?\s*full[- ]?time\b'
+    - name: "(full-time)"
+      pattern: '\(\s*full[- ]?time'
+    - name: "forty hours a week"
+      pattern: '\b(?:3[5-9]|4\d)\s*\+?\s*(?:hours|hrs|h)\s*(?:per|a|/)\s*week'
+  unconfirmed_policy: manual_check
+
+extra_signals:
+  # Axes this search needs and the shared rubric does not have
+  # (score._score_extra_signals). Substring matching: no short words.
+
+  - name: interesting_work
+    label: "interesting work"
+    # A small plus, capped low on purpose: interest must never lift a badly
+    # paid vacancy over a well paid one. The owner, 2026-09-13: crypto, AI,
+    # microservices and complex technology first.
+    points_per_keyword: 2
+    cap: 8
+    keywords:
+      - "blockchain"
+      - "web3"
+      - "crypto"
+      - "defi"
+      - "ethereum"
+      - "solana"
+      - "bitcoin"
+      - "stablecoin"
+      - "on-chain"
+      - "onchain"
+      - "tokenization"
+      - "large language model"
+      - "llm"
+      - "generative ai"
+      - "genai"
+      - "agentic"
+      - "ai agents"
+      - "retrieval-augmented"
+      - "openai"
+      - "anthropic"
+      - "semantic kernel"
+      - "langchain"
+      - "vector database"
+      - "microservices"
+      - "event sourcing"
+      - "cqrs"
+      - "event-driven"
+      - "distributed systems"
+      - "kafka"
+      - "kubernetes"
+      - "high-load"
+      - "low latency"
+      - "low-latency"
+      - "real-time"
+      - "grpc"
+      - "domain-driven design"
+
+  - name: fits_beside_a_job
+    label: "fits beside a main job"
+    points_per_keyword: 2
+    negative_points_per_keyword: -4
+    cap: 6
+    floor: -12
+    keywords:
+      - "asynchronous"
+      - "async-first"
+      - "async first"
+      - "flexible hours"
+      - "flexible schedule"
+      - "any time zone"
+      - "project-based"
+      - "milestone-based"
+      - "few meetings"
+      - "no meetings"
+    negative_keywords:
+      - "on-call"
+      - "on call rotation"
+      - "24/7"
+      - "must be available during"
+      - "core hours"
+      - "daily standup"
+      - "9am-5pm"
+      - "9am to 5pm"
+      - "immediate availability"
+      - "exclusive commitment"
+
+  - name: ai_training_gig
+    label: "AI-training gig, not a product team"
+    points_per_keyword: -6
+    cap: 0
+    floor: -6
+    keywords:
+      - "not a traditional software engineering role"
+      - "project-based ai opportunities"
+      - "agent evaluation"
+      - "evaluating and improving ai"
+      - "improving ai systems"
+      - "ai training data"
+      - "reinforcement learning environments"
+      - "ai training project"
+      - "ai trainer"
+      - "ai tutor"
+      - "help train and improve"
+      - "training data for ai"
+      - "improve ai models"
+      - "no minimum time or task commitments"
+      - "connects specialists with ai projects"
+      - "rate ai responses"
+      - "evaluate model responses"
+      - "annotate training data"
+      - "codebase q&a"
+      # Added in V2 from the first run, where three G2i postings led the
+      # shortlist — "This is not a traditional engineering role. You won't be
+      # writing production code. You'll be evaluating ... coding agents" — and
+      # 24-MAG and Anyone AI posted "developer" roles that grade benchmarks for
+      # AI labs. The rate is real ($100-200 an hour), so this stays a visible
+      # minus rather than a gate; the markers just have to recognise the genre.
+      - "not a traditional engineering role"
+      - "won't be writing production code"
+      - "will not be writing production code"
+      - "interaction evaluator"
+      - "coding agent evaluator"
+      - "ai code reviewer"
+      - "evaluate the quality of interactions"
+      - "project-based evaluations"
+      - "evaluations with a leading ai lab"
+      - "repository-level benchmarks"
+      - "grading integrity"

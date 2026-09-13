@@ -1,0 +1,78 @@
+# The template's questionnaire: WHY the settings are what they are.
+#
+# The answers here are at the level of the KIND of search — the same for
+# everybody who chose this template. Answers about a particular person (where
+# they live, what they want to earn, which languages they speak, which
+# countries they have experience with) do not reach the template: their place
+# is in the local identity, and that is where the agent writes them during
+# onboarding.
+#
+# The full list of questions and the order to ask them: docs/QUESTIONNAIRE.md.
+
+schema_version: 1
+identity_prefix: pjoice
+kind: template
+
+answers:
+
+  - question: "What exactly are you looking for?"
+    answer: >
+      Side work beside a main job: part-time, freelance or fractional, paid as
+      well as the market allows, and one this CV will be considered for.
+
+  - question: "What comes first?"
+    answer: >
+      Money. Then whether the work is interesting. Dull work is acceptable if
+      it pays — it is neutral, not a plus and not a minus.
+
+  - question: "What counts as interesting?"
+    answer: >
+      Crypto and web3 products, AI products (LLM applications, agents),
+      microservices, distributed and event-driven systems — technically
+      demanding work. A small plus, never enough to lift a badly paid vacancy.
+
+  - question: "Which interesting work is still not a candidate?"
+    answer: >
+      Work the CV will not be considered for: research, machine learning and
+      model training, data science, data engineering, smart contracts,
+      protocols, cryptography. Interesting, and a zero chance.
+
+  - question: "Is a full-time role acceptable?"
+    answer: >
+      No. It cannot be done beside a full-time job. Stated full-time is a
+      refusal; unstated goes to a person, because full-time is the default most
+      postings never write down.
+
+  - question: "Is a contract a confirmation of part-time?"
+    answer: >
+      No. A contract says who invoices whom, not how many hours: a UK day-rate
+      contract is five days a week. Only part-time, freelance, fractional or a
+      stated small number of hours confirms.
+
+  - question: "What about AI-training gigs?"
+    answer: >
+      Shown with a visible minus, not hidden. They pay by the hour, and for
+      side work that is a legitimate trade; KISEL gates them because a steady
+      position is what it wants, which is not the case here.
+
+  # --- QUESTIONS WHOSE ANSWERS ARE PERSONAL --------------------------------
+
+  - question: "Where do you live, and what is your residency?"
+    answer: null
+    note: >
+      The geography rules are DERIVED from residency. The derivation table is
+      config/derivation/regions.yaml.
+
+  - question: "Which languages do you know?"
+    answer: null
+
+  - question: "What hourly rate is the floor, and what is a good one?"
+    answer: null
+    note: >
+      The tiers in pjoice_criteria.yaml describe the remote contract market for
+      a senior developer. A person's own floor and target go in the local
+      profile (goal.target_compensation) and, if the tiers do not fit them, in
+      a local override of compensation_signal.hourly_equivalent_tiers.
+
+  - question: "Are there place names that are ambiguous for you personally?"
+    answer: null

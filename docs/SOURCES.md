@@ -94,6 +94,53 @@ points and the number would only get less honest. Both are asserted by tests.
 The site is British, so the block is rendered only where UK vacancies appear.
 No equivalent of this quality is known for the EU or Canada.
 
+## Part-time and freelance work: which boards say how many hours
+
+Surveyed 2026-09-13 for a search looking for side work. The question that
+decides a source for such a search is not how many .NET vacancies it has — our
+own gates check the stack either way — but whether it says **how many hours**.
+Most boards never do, and several that advertise a part-time filter turned out
+not to have one.
+
+| Board | Engagement, as the board states it | Verdict |
+|---|---|---|
+| **Remote Rocketship** | `employmentType` on every record; `/jobs/<slug>/part-time/` returns only part-time | **Connected** (`fetch_remoterocketship.py`) |
+| **Himalayas, search endpoint** | `employment_type=Part Time` / `Contractor` filters for real | **Connected** as a search mode of `fetch_himalayas.py` |
+| **LinkedIn vacancy page** | "Employment type: Part-time" in the criteria list | **Read** by the page reader the fetcher already used — and from the guest fragment `jobs-guest/jobs/api/jobPosting/<id>` when the page lacks it: the full `/jobs/view/` page on ae., nl. and il.linkedin.com carries no criteria list at all |
+| **Remotive, Jobicy** | `job_type` / `jobType` fields | **Kept** as `employment_types` instead of tags |
+| web3.career | part-time pages whose JobPostings all say "Full-time" | Rejected: a filter that does not filter |
+| cryptocurrencyjobs.co | one clear sentence per posting — 70 of 75 full-time | Rejected for part-time |
+| YC jobs | a `type` field, 29 of 30 full-time | Rejected for part-time |
+| HN "Freelancer? Seeking freelancer?" | 23 comments, all SEEKING WORK | Rejected: people offering, not buying |
+| CryptoJobsList | Cloudflare challenge | Rejected: active protection |
+
+The full list with measurements is in `config/sources.backlog.yaml`.
+
+### Remote Rocketship's traps
+
+* **Twenty per listing, and no paging.** `?page=2` repeats 19 of the first 20.
+  Breadth comes from more slugs, never from depth.
+* **Some slugs lie.** `/jobs/c-sharp/part-time/` claims 2689 results and lists
+  pharmacists and adjunct faculty: the slug falls back to everything
+  part-time. `/jobs/net/contract/` is real — 115 results, nearly all .NET. Read
+  a slug's first page before adding it.
+* **An unknown slug is a 404**, reported as a configuration mistake rather than
+  as an empty market.
+* **Salary periods the scoring does not know.** "$80 per day" read as it is
+  would be eighty dollars an hour; the fetcher converts days and weeks to hours
+  and years before the amount reaches `salary_raw`.
+* **The record's link is Remote Rocketship's page**, where schema.org JobPosting
+  holds the full text for the description reader; the employer's own posting
+  goes into `company_url`, which the report shows as the place to apply.
+
+### Talent networks are a manual channel
+
+Toptal, A.Team, Braintrust, Arc, Lemon.io, Gun.io, Turing and Contra carry much
+of the well-paid part-time contract work, and none publishes openings to an
+anonymous request: you apply once and are matched. Braintrust's job pages are
+rendered in the browser with nothing in the HTML. Worth a person's hour, once;
+not a fetcher. A.Team's openings do reach Remotive, which is connected.
+
 ## LinkedIn in particular
 
 An earlier version of this document asserted that LinkedIn was unreachable. That

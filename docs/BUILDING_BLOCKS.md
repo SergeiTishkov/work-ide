@@ -26,7 +26,7 @@ negatives.
 | **remoteok** | ~100 | A large flow, remote only | Noisy: content turns up that is not a vacancy at all. Returns only the latest ~100; no depth in time |
 | **jobicy** | ~100 | Structured salary and geography | The `industry=dev` filter is mandatory, or there is a lot of non-IT |
 | **remotive** | ~35 | An explicit `candidate_required_location` field | Not many. The `limit` and `search` parameters are ignored in practice |
-| **himalayas** | ~20 | `locationRestrictions` — the most explicit geography signal of any source | Very few; returns ~20 regardless of `limit` |
+| **himalayas** | ~20, or hundreds in search mode | `locationRestrictions` — the most explicit geography signal of any source. With `queries` and `employment_types` it uses the search endpoint, which filters by part-time and contract for real | The plain feed is ~20 regardless of `limit` |
 
 ### Straight from employers
 
@@ -49,6 +49,7 @@ A board token can be checked with one request:
 | Source | Volume | Comment |
 |---|---|---|
 | **linkedin** | depends on the query | The guest job-search endpoint: 200 to an ordinary GET, 30 cards per page, filterable by country. The one source that covers every market of interest at once — and the only HTML parser in the project, so it returns zero and an explicit error if the markup changes |
+| **remoterocketship** | 20 per slug and type | An aggregator of employers' own postings that **filters by engagement for real**: `/jobs/net/contract/`, `/jobs/developer/part-time/`. Employment type as a field, salary in USD, the employer's posting URL. The source for a search that needs part-time or contract work. No paging for an anonymous page, and some slugs fall back to everything — read one before adding it (docs/SOURCES.md) |
 | **hn_whoishiring** | ~22 | The monthly Hacker News thread. Legacy and enterprise vacancies often land here rather than on job boards, and quiet, uncontested positions occasionally turn up. The format is free-form, and company and location are parsed heuristically. The keywords are a parameter, and each costs one HTTP request |
 | **arbeitnow** | ~175 | **In practice the German market.** It gave 68% of the base at about 6% useful yield: most vacancies are German-language and are cut by the language filter. Disabled by default in the template; enable it if you read German |
 | **manual** | as much as you enter | Not automatic. The agent's finds from sites that cannot be read programmatically (Indeed, Glassdoor — 403 behind anti-bot protection) are entered through `tools/ingest_manual.py`. For narrow profiles this is often the most valuable channel: public boards cover rare combinations of requirements poorly |

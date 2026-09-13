@@ -254,4 +254,4 @@ def test_the_json_ld_reader_never_raises(monkeypatch):
     facts = enrich_descriptions._json_ld_facts("https://x/1", 10)
 
     assert facts == {"description": "", "workplace_type": None,
-                     "salary_raw": None, "closed": False}
+                     "salary_raw": None, "closed": False, "employment_types": []}

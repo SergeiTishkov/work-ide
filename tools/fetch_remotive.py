@@ -73,6 +73,9 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         # The board's structured geography restriction beats any text.
         "location_raw": (item.get("candidate_required_location") or "").strip(),
         "remote": True,  # Remotive is a remote-only board by definition
+        # "full_time", "part_time", "contract", "freelance" — the board's own
+        # classification; normalize maps the spelling.
+        "employment_types": item.get("job_type"),
         "tags": tags,
         "description_html": item.get("description") or "",
         "posted_at": item.get("publication_date"),

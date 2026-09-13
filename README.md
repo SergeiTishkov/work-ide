@@ -154,6 +154,8 @@ RUNBOOK.md             what to do in each search cycle
 identity-templates/    KINDS of search. In git. Not one personal fact.
   README.md              how to clone one, the naming rules
   blank-.../             an empty starting point if none of the others fit
+  kisel-.../, pjoice-.../  two opposite searches built for one CV: calm legacy
+                           work, and paid part-time side work
   <prefix>-<expansion>/  the folder explains itself by its name:
     template.yaml            the template version number
     CHANGELOG.md             what changed, newest first

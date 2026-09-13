@@ -1,0 +1,18 @@
+# The template manifest. The version is a NUMBER, and that is what decides
+# whether an update exists: parsing markdown to decide about a run will not do.
+#
+# When any template file changes, the version goes up by one and a section with
+# that number is added to CHANGELOG.md. Checked by the test
+# test_template_version_matches_changelog — a rule that rests on an agent's
+# memory has broken in this project before.
+
+name: pjoice
+version: 2
+summary: >
+  Part-time side work for a .NET/JS developer, paid as well as the market
+  allows. Part-time, freelance or fractional hours are required; the rate is
+  graded; interesting technology (crypto, AI, distributed systems) is a small
+  plus and dull work is neutral — but only roles this CV is hired for.
+suitable_for: >
+  A senior developer in .NET/C# or JS/TS with a main job, looking for a second,
+  bounded one — money first, interest second, and no full-time commitments.
