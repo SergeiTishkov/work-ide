@@ -1672,6 +1672,20 @@ engagement_fit:
       pattern: '\(\s*full[- ]?time'
     - name: "forty hours a week"
       pattern: '\b(?:3[5-9]|4\d)\s*\+?\s*(?:hours|hrs|h)\s*(?:per|a|/)\s*week'
+    # Added in V4, from reading the second run's "hours not confirmed" by hand:
+    #   "Work Conditions Type: Full-time & Long-term contract work"
+    #   "ability to work full-time remotely with no supervision"
+    #   "a contract to hire opportunity in Chicago"
+    # None names "employment type", all three say full-time. Contract-to-hire
+    # ends in a permanent full-time job by design.
+    - name: "type: full-time"
+      pattern: '\btype\s*:\s*full[- ]?time\b'
+    - name: "full-time contract work"
+      pattern: '\bfull[- ]?time\s*(?:&|and|/|\+)\s*(?:long[- ]term\s*)?contract'
+    - name: "to work full-time"
+      pattern: '\b(?:work|working|available|availability)\s+full[- ]?time\b'
+    - name: "contract to hire"
+      pattern: '\bcontract[- ]to[- ](?:hire|perm)'
   unconfirmed_policy: manual_check
 
 extra_signals:
@@ -1807,3 +1821,6 @@ extra_signals:
       - "evaluations with a leading ai lab"
       - "repository-level benchmarks"
       - "grading integrity"
+      # V4: micro1's "Backend C#/.NET Developer" — "apply your expertise to
+      # help train" an AI model.
+      - "expertise to help train"

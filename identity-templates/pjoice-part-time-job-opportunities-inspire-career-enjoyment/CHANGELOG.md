@@ -6,6 +6,19 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V4 — full-time said in words the patterns did not know, 2026-09-13
+
+The second run's "hours not confirmed" section was read by hand, posting by
+posting, and its top entries said full-time in so many words:
+
+    Jimmy Technologies  "Work Conditions Type: Full-time & Long-term contract"
+    Lemon.io            "ability to work full-time remotely with no supervision"
+    Korn Ferry          "a contract to hire opportunity in Chicago"
+
+Four contradicting patterns cover those forms; a confirmation anywhere still
+beats them. One AI-training marker added ("expertise to help train", micro1).
+The measurement before the change is in the section below the patterns.
+
 ## V3 — three words hiding inside ordinary ones, 2026-09-13
 
 Reading the rendered report: G2i's AI-evaluation gigs carried "interesting
