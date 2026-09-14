@@ -1106,12 +1106,83 @@ def _score_role_complexity(text: str, title: str, criteria: dict):
     # threshold of two for vague words, but "agentic", "llm systems" and
     # "genai" are unambiguous on their own, so one mention is enough.
     strong_hits = _matches(text, cfg.get("description_red_flag_keywords_strong_single_hit", []))
-    gate_triggered = bool(title_hits) or bool(strong_hits) or len(description_hits) >= cfg["threshold_hits"]
-    return gate_triggered, {
+    side = [_side_specialism(spec, text, title_norm) for spec in cfg.get("side_specialisms") or []]
+    side_gated = [s["name"] for s in side if s["gated"]]
+    gate_triggered = (bool(title_hits) or bool(strong_hits)
+                      or len(description_hits) >= cfg["threshold_hits"] or bool(side_gated))
+    detail = {
         "gate_triggered": gate_triggered,
         "title_hits": title_hits,
         "description_hits": description_hits,
         "strong_single_hit_matches": strong_hits,
+    }
+    if side:
+        detail["side_specialisms"] = side
+    return gate_triggered, detail
+
+
+def _side_specialism(spec: dict, text: str, title: str) -> dict:
+    """Is a specialism the ROLE, or something beside a role in the core stack?
+
+    The owner, 2026-09-14, about smart contracts: if they are not the core of
+    the work, they must not exclude the vacancy — ".NET with smart contracts"
+    is his work, "smart contracts with .NET" is not. A title-level refusal
+    cannot tell those apart: "Senior .NET Developer (Smart Contracts)" names
+    the specialism too.
+
+    So, in order:
+      * the title names only the specialism     -> the role
+      * the title names only the core stack     -> beside it
+      * the title names both                    -> whichever it names FIRST.
+        The owner's own wording is about order — ".NET with smart contracts"
+        against "smart contracts with .NET" — and so is a title's:
+        "Senior .NET Developer (Smart Contracts)" against "Solidity / C#
+        Developer".
+      * the title names neither                 -> the text decides: the role
+        only if the specialism is mentioned MORE often than the core stack. A
+        tie keeps the vacancy — a missed candidate costs more than a doubtful
+        one (CLAUDE.md §5).
+
+    Every pattern is a regex over normalised text; counts are occurrences, not
+    distinct patterns, because "described as .NET with smart contracts" is a
+    matter of how much of the posting each takes up.
+    """
+    def count(patterns, where):
+        return sum(len(re.findall(p, where, re.IGNORECASE)) for p in patterns or [])
+
+    def first(patterns, where):
+        starts = [m.start() for m in (re.search(p, where, re.IGNORECASE)
+                                      for p in patterns or []) if m]
+        return min(starts) if starts else None
+
+    title_specialism = first(spec.get("title_patterns"), title)
+    title_core = first(spec.get("core_patterns"), title)
+    text_specialism = count(spec.get("text_patterns"), text)
+    text_core = count(spec.get("core_patterns"), text)
+
+    if title_specialism is None and not text_specialism:
+        gated, reason = False, "not mentioned"
+    elif title_specialism is not None and title_core is None:
+        gated, reason = True, "the title makes it the role"
+    elif title_core is not None and title_specialism is None:
+        gated, reason = False, "the title names the core stack"
+    elif title_specialism is not None:
+        gated = title_specialism < title_core
+        reason = ("the title puts it before the core stack" if gated
+                  else "the title puts the core stack first")
+    elif text_specialism > text_core:
+        gated, reason = True, "the posting is mostly about it"
+    else:
+        gated, reason = False, ("not mentioned" if not text_specialism
+                                else "the core stack takes up at least as much of the posting")
+    return {
+        "name": spec.get("name") or "?",
+        "gated": gated,
+        "reason": reason,
+        "title_names_it": title_specialism is not None,
+        "title_names_core": title_core is not None,
+        "mentions": text_specialism,
+        "core_mentions": text_core,
     }
 
 

@@ -6,6 +6,32 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V5 — smart contracts rule a vacancy out only when they are the job, 2026-09-14
+
+The owner, reading the list of what this search cuts: "if smart contracts are
+not the main thing — if the base is .NET and the vacancy reads as .NET with
+smart contracts rather than smart contracts with .NET — they must not exclude
+it."
+
+`smart contract` and `solidity` left `role_complexity_signal`'s hard title and
+description lists for a new block, `side_specialisms` (score._side_specialism):
+
+    title names only smart contracts / Solidity / EVM   -> ruled out
+    title names only .NET / C# / ASP.NET                -> kept
+    title names both                                    -> the one named first
+    title names neither                                 -> ruled out only if the
+                                                           posting mentions them
+                                                           MORE often than .NET;
+                                                           a tie keeps it
+
+Protocol, zero-knowledge and cryptography engineering stay in the hard list: a
+separate profession, not something beside a .NET role.
+
+Measured over this search's base before the change: 18 vacancies mention smart
+contracts, Solidity or EVM — mostly once, inside an agency's list of every
+technology — and the old rule had ruled out none of them. Nothing in the
+shortlist moves; the refusal the owner described is closed before it happens.
+
 ## V4 — full-time said in words the patterns did not know, 2026-09-13
 
 The second run's "hours not confirmed" section was read by hand, posting by

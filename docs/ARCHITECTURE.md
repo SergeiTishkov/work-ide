@@ -395,6 +395,24 @@ vacancies would leave its check-by-hand sections, the top ones ordinary ".NET
 Developer" postings gated by a single "agentic" in a consultancy's boilerplate.
 Hiding those would trade a small inconsistency for real false negatives.
 
+### A specialism beside the core stack is not the role (2026-09-14)
+
+The complexity gate refused on a title pattern, so "Senior .NET Developer
+(Smart Contracts)" was ruled out as surely as "Smart Contract Engineer". The
+owner: smart contracts must exclude a vacancy only when they are the job — ".NET
+with smart contracts" is his work, "smart contracts with .NET" is not.
+
+`role_complexity_signal.side_specialisms` (score._side_specialism) decides that
+per specialism: a title naming only the specialism rules the vacancy out, a
+title naming only the core stack keeps it, a title naming both follows whichever
+it names first, and a neutral title leaves it to the posting — ruled out only
+if the specialism is mentioned more often than the core stack, a tie keeping it.
+
+**Why order in the title rather than counts everywhere.** A .NET posting about
+integrating smart contracts naturally repeats "smart contract", "Solidity",
+"EVM"; counting would refuse exactly the vacancy the owner described. The title
+is where an employer says what the job is.
+
 ## Rejected approaches
 
 ### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)

@@ -783,8 +783,9 @@ role_complexity_signal:
     - 'deep learning'
     - 'inference engineer'
     - 'model training'
-    - 'smart contract'
-    - 'solidity'
+    # Smart contracts moved to side_specialisms below in V5; protocol,
+    # zero-knowledge and cryptography work stays here — a separate profession
+    # rather than something beside a .NET role.
     - 'protocol engineer'
     - '\bzk\b'
     - 'zero[- ]knowledge'
@@ -807,12 +808,52 @@ role_complexity_signal:
     - "reinforcement learning"
     - "published research"
     - "phd"
-    - "solidity"
-    - "smart contract development"
   threshold_hits: 3
   description_red_flag_keywords_strong_single_hit:
     - "phd required"
     - "phd is required"
+  # A specialism that rules a vacancy out only when it IS the role
+  # (score._side_specialism). The owner, 2026-09-14: "if smart contracts are
+  # not the main thing, if the base is .NET and the vacancy reads as .NET with
+  # smart contracts rather than smart contracts with .NET, they must not
+  # exclude it."
+  #
+  #   title names only the specialism    -> ruled out
+  #   title names only the core stack    -> kept
+  #   title names both                   -> whichever comes FIRST: ".NET
+  #                                         Developer (Smart Contracts)" is
+  #                                         kept, "Solidity / C# Developer" not
+  #   title names neither                -> ruled out only if the posting
+  #                                         mentions the specialism MORE often
+  #                                         than the core stack; a tie keeps it
+  #
+  # Measured over this search's base on the day: 18 vacancies mention smart
+  # contracts, Solidity or EVM, most of them once, inside an agency's list of
+  # every technology beside five to seven mentions of .NET. None was ruled out
+  # by the old title rule, so nothing in the shortlist moves; the change closes
+  # the refusal the owner described before it happens.
+  side_specialisms:
+    - name: "smart contracts"
+      title_patterns:
+        - 'smart[- ]contracts?'
+        - '\bsolidity\b'
+        - '\bevm\b'
+        - '\bvyper\b'
+      text_patterns:
+        - 'smart[- ]contracts?'
+        - '\bsolidity\b'
+        - '\bevm\b'
+        - '\bvyper\b'
+        - '\bhardhat\b'
+        - '\bethers\.js\b'
+        - '\bweb3\.js\b'
+      core_patterns:
+        - '\.net\b'
+        - '\bdotnet\b'
+        - '\bc#'
+        - '\basp\.net\b'
+        - '\bblazor\b'
+        - '\bentity framework\b'
 
 # The gate for "the title names somebody else's stack".
 #

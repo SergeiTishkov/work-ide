@@ -53,10 +53,17 @@ its own:
    .NET/JS** — as in KISEL.
 3. **Beyond this CV** (`role_complexity_signal`, repurposed): research and
    applied scientists, machine-learning and MLOps engineers, data scientists,
-   data and analytics engineers, smart-contract and protocol engineers,
-   cryptographers, quants. The owner, 2026-09-13: "a data engineer, a
-   model-training developer — they will not take me with my CV, no chance, no
-   point trying. Although the work would be interesting."
+   data and analytics engineers, protocol engineers, cryptographers, quants.
+   The owner, 2026-09-13: "a data engineer, a model-training developer — they
+   will not take me with my CV, no chance, no point trying. Although the work
+   would be interesting."
+
+   **Smart contracts only when they are the job** (since V5, 2026-09-14). "Smart
+   Contract Engineer" or "Solidity / C# Developer" is ruled out; "Senior .NET
+   Developer (Smart Contracts)" is not. The owner: "if the base is .NET and the
+   vacancy reads as .NET with smart contracts rather than smart contracts with
+   .NET, they must not exclude it." How that is decided is in
+   `role_complexity_signal.side_specialisms`.
 
 ## What is NOT a disqualifier, and goes to a person instead
 

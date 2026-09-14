@@ -34,8 +34,9 @@ answers:
   - question: "Which interesting work is still not a candidate?"
     answer: >
       Work the CV will not be considered for: research, machine learning and
-      model training, data science, data engineering, smart contracts,
-      protocols, cryptography. Interesting, and a zero chance.
+      model training, data science, data engineering, protocols, cryptography.
+      Interesting, and a zero chance. Smart contracts only when they are the
+      job itself: .NET work with smart contracts beside it is a candidate.
 
   - question: "Is a full-time role acceptable?"
     answer: >
