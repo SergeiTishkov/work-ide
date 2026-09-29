@@ -109,6 +109,7 @@ function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new' } 
       eligibility: { level: 'likely', label: 'likely', reason: 'anywhere' },
       apply_channels: [], technologies: ['C#'], reputation: 'not checked',
       hiring_country: 'United Kingdom', company_age: null, note: null,
+      posted_on: id === 'a2r' ? null : '2026-09-20', first_seen_on: '2026-09-28',
       needs_manual_review: id.endsWith('r'),
     },
     feedback: { status, rejectedReason: null, buggedReason: null },

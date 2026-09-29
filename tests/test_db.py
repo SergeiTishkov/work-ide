@@ -148,6 +148,10 @@ def test_migration_moves_everything_and_keeps_a_backup(isolated_data_dir):
     assert feedback["a1"]["status"] == "rejected"
     assert feedback["a1"]["rejected_reason"] == "Java shop"
     assert feedback["b2"]["rejected_reason"] is None  # a blank note is no reason
+    # Settled under the old process: not pending review in the new one.
+    assert feedback["a1"]["reviewed_at"] == feedback["a1"]["at"]
+    import feedback as feedback_mod
+    assert feedback_mod.count() == {"bugged": 0, "rejected": 0}
     assert not common.VACANCIES_PATH.exists()
     assert common.VACANCIES_PATH.with_name(common.VACANCIES_PATH.name + ".bak").exists()
     assert common.COMPANIES_PATH.with_name(common.COMPANIES_PATH.name + ".bak").exists()

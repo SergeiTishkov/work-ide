@@ -226,9 +226,14 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT,
     not stop a research cycle. One vacancy failing must not stop the rest
     either — the same reasoning as one source failing in the pipeline.
     """
+    import progress
+
     stats = {"considered": 0, "fetched": 0, "empty": 0, "errors": 0,
              "closed": 0, "declared_remote": 0, "salary_found": 0}
-    for key in worklist(vacancies, classes, limit, need_employment_types):
+    keys = list(worklist(vacancies, classes, limit, need_employment_types))
+    tick = progress.Progress(len(keys), "descriptions")
+    for key in keys:
+        tick()
         record = vacancies[key]
         stats["considered"] += 1
         facts = {"description": "", "workplace_type": None,

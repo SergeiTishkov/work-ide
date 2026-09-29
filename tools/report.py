@@ -8,6 +8,7 @@ apply.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -405,6 +406,40 @@ def _hiring_country_text(v: dict, bd: dict) -> str:
             + (f" _({t('the board said')}: «{location}»)_" if location else ""))
 
 
+_ISO_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
+
+
+def calendar_date(value) -> Optional[str]:
+    """YYYY-MM-DD from whatever a source put in posted_at, or None.
+
+    Every board says it its own way — measured on the kisel base 2026-09-29:
+    unix seconds (4dayweek), ISO with and without an offset or milliseconds
+    (most), a bare date (LinkedIn, Reed), RFC 2822 (the RSS boards), nothing at
+    all (Jobserve). The date is taken as the source wrote it: shifting it into
+    another time zone would move "posted on the 29th" to the 28th for no gain.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        seconds = value / 1000 if value > 1e11 else value   # milliseconds, sometimes
+        try:
+            return datetime.fromtimestamp(seconds, tz=timezone.utc).strftime("%Y-%m-%d")
+        except (OverflowError, OSError, ValueError):
+            return None
+    text = str(value).strip()
+    match = _ISO_DATE.match(text)
+    if match:
+        return match.group(1)
+    if text.isdigit():
+        return calendar_date(int(text))
+    try:
+        from email.utils import parsedate_to_datetime
+
+        return parsedate_to_datetime(text).strftime("%Y-%m-%d")
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
 def vacancy_view(v: dict) -> dict:
     """Everything one vacancy row shows, as data.
 
@@ -502,6 +537,10 @@ def vacancy_view(v: dict) -> dict:
         "note": manual.get("notes") or None,
         "needs_manual_review": bool(c.get("needs_manual_review")),
         "first_seen": v.get("first_seen"),
+        # Two different dates, both shown in the app: when the employer put
+        # the vacancy up at the source, and when it first entered our base.
+        "posted_on": calendar_date(v.get("posted_at")),
+        "first_seen_on": calendar_date(v.get("first_seen")),
     }
 
 

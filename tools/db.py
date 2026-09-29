@@ -202,10 +202,15 @@ def migrate_from_json() -> dict:
         for vid, v in vacancies.items():
             manual = v.get("manual") or {}
             if manual.get("status") == "not_relevant":
+                # Reviewed as of the migration: these marks were made, and acted
+                # on, under the old process. Left pending, the first /feedback
+                # after migrating would re-open a hundred settled cases.
                 conn.execute(
                     "UPDATE vacancies SET feedback_status = 'rejected', "
-                    "rejected_reason = ?, feedback_at = ? WHERE id = ?",
-                    ((manual.get("notes") or "").strip() or None, migrated_at, vid),
+                    "rejected_reason = ?, feedback_at = ?, feedback_reviewed_at = ? "
+                    "WHERE id = ?",
+                    ((manual.get("notes") or "").strip() or None, migrated_at,
+                     migrated_at, vid),
                 )
                 rejected += 1
 

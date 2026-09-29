@@ -107,9 +107,13 @@ def check_links(
     def _work(v):
         return v["id"], _check_one(session, v["url"], timeout)
 
+    import progress
+
+    tick = progress.Progress(len(to_check), "link check")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(_work, v) for v in to_check]
         for future in as_completed(futures):
+            tick()
             vid, result = future.result()
             vacancies[vid]["link_check"] = {**result, "checked_at": datetime.now(timezone.utc).isoformat()}
             stats["checked"] += 1

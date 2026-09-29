@@ -114,8 +114,11 @@ tools create it themselves on the first run.
 
 ## The desktop app
 
-`WorkIDE.cmd` (double-click, or a desktop shortcut to it; elsewhere
-`cd app && npm install && npm start`) opens a window over the knowledge base:
+On Windows, `powershell -ExecutionPolicy Bypass -File app\scripts\install-shortcut.ps1`
+puts a **Work IDE** shortcut on the desktop and in the Start menu (no console
+window; pin it to the taskbar like any program). `WorkIDE.cmd` does the same
+from the repository folder; elsewhere, `cd app && npm install && npm start`.
+It opens a window over the knowledge base:
 
 - a tab per identity, and inside it a tab per market of the latest selection;
 - a filter per market: fresh without feedback (the default), all, all fresh,

@@ -31,6 +31,8 @@ function view(id, overrides = {}) {
     note: null,
     needs_manual_review: false,
     first_seen: '2026-09-01T00:00:00+00:00',
+    posted_on: '2026-08-30',
+    first_seen_on: '2026-09-01',
     ...overrides,
   };
 }

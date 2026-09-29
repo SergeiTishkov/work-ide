@@ -391,8 +391,13 @@ def collect(vacancies: dict, threshold: int, classes=TARGET_CLASSES,
     Never raises: an application channel is an improvement, and failing to find
     one must not stop a research cycle.
     """
+    import progress
+
     stats = {"considered": 0, "direct": 0, "board": 0, "email": 0, "nothing": 0}
-    for key in worklist(vacancies, threshold, classes, limit):
+    keys = list(worklist(vacancies, threshold, classes, limit))
+    tick = progress.Progress(len(keys), "apply channels")
+    for key in keys:
+        tick()
         record = vacancies[key]
         stats["considered"] += 1
         try:

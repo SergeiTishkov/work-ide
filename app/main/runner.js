@@ -78,6 +78,57 @@ function summarizeInput(input) {
   return `: ${text.length > 160 ? `${text.slice(0, 157)}...` : text}`;
 }
 
+// Follows the pipeline's own log while a run is going. The agent receives a
+// command's output only when the command ends, and a pipeline run takes an
+// hour: without this the panel would show "> Bash: python tools/pipeline.py"
+// and then nothing. tools/progress.py writes data/<p>/runs/pipeline_*.log.
+class PipelineLogFollower {
+  constructor({ dir, since, onLine, interval = 1000 }) {
+    this.dir = dir;
+    this.since = since;
+    this.onLine = onLine;
+    this.files = new Map();   // name -> { offset, rest }
+    this.timer = setInterval(() => this.poll(), interval);
+  }
+
+  poll() {
+    let names;
+    try {
+      names = fs.readdirSync(this.dir).filter((n) => /^pipeline_.*\.log$/.test(n)).sort();
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const file = path.join(this.dir, name);
+      let stat;
+      try {
+        stat = fs.statSync(file);
+      } catch {
+        continue;
+      }
+      if (!this.files.has(name)) {
+        if (stat.mtimeMs < this.since) continue;   // an older run's log
+        this.files.set(name, { offset: 0, rest: '' });
+      }
+      const state = this.files.get(name);
+      if (stat.size <= state.offset) continue;
+      const fd = fs.openSync(file, 'r');
+      const buffer = Buffer.alloc(stat.size - state.offset);
+      fs.readSync(fd, buffer, 0, buffer.length, state.offset);
+      fs.closeSync(fd);
+      state.offset = stat.size;
+      const lines = (state.rest + buffer.toString('utf8')).split(/\r?\n/);
+      state.rest = lines.pop();
+      for (const line of lines) if (line.trim()) this.onLine(line);
+    }
+  }
+
+  stop() {
+    clearInterval(this.timer);
+    this.poll();
+  }
+}
+
 function killTree(child) {
   if (process.platform === 'win32') {
     execFile('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {});
@@ -87,7 +138,9 @@ function killTree(child) {
 }
 
 class Runner {
-  constructor({ root, logDirOf, spawn = nodeSpawn, kill = killTree, claude = 'claude' }) {
+  constructor({ root, logDirOf, spawn = nodeSpawn, kill = killTree, claude = 'claude',
+    followInterval = 1000 }) {
+    this.followInterval = followInterval;
     this.root = root;
     this.logDirOf = logDirOf;
     this.spawn = spawn;
@@ -129,6 +182,12 @@ class Runner {
       log.end();
       return { ok: false, error: error.code === 'ENOENT' ? 'claude_not_found' : error.message };
     }
+    const follower = new PipelineLogFollower({
+      dir: logDir,
+      since: Date.now() - 1000,
+      onLine: (line) => this.emit({ type: 'output', text: `  | ${line}` }),
+      interval: this.followInterval,
+    });
     this.current = { kind, identity, child };
     this.emit({ type: 'start', kind, identity });
 
@@ -153,6 +212,7 @@ class Runner {
     const finish = (event) => {
       if (finished) return;
       finished = true;
+      follower.stop();
       log.end();
       this.current = null;
       this.emit({ ...event, kind, identity });
@@ -172,4 +232,4 @@ class Runner {
   }
 }
 
-module.exports = { Runner, buildCommand, describeEvent, ALLOWED_TOOLS };
+module.exports = { Runner, PipelineLogFollower, buildCommand, describeEvent, ALLOWED_TOOLS };

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,6 +55,7 @@ import normalize  # noqa: E402
 import report  # noqa: E402
 import salary_benchmark  # noqa: E402
 import score  # noqa: E402
+import progress  # noqa: E402
 import selections  # noqa: E402
 
 FETCHERS = {
@@ -158,9 +160,25 @@ def rescore_all(vacancies: dict, criteria: dict, profile: dict, companies: Optio
     is stored per company, while score is computed per vacancy."""
     if companies:
         kb.attach_company_reputation(vacancies, companies)
+    tick = progress.Progress(len(vacancies), "rescore")
     for v in vacancies.values():
         vacancy_view = {k: val for k, val in v.items() if k not in ("computed", "manual")}
         v["computed"] = score.score_vacancy(vacancy_view, criteria, profile)
+        tick()
+
+
+def _rescore_stage(vacancies: dict, criteria: dict, profile: dict,
+                   companies: Optional[dict], why: str) -> None:
+    with progress.stage(f"rescore the base, {why} ({progress.number(len(vacancies))} vacancies)"):
+        rescore_all(vacancies, criteria, profile, companies)
+
+
+def _stats_note(stats) -> str:
+    """A stage's own statistics, short: "checked 812, dead 40"."""
+    if not isinstance(stats, dict):
+        return str(stats)
+    return ", ".join(f"{k.replace('_', ' ')} {v}" for k, v in stats.items()
+                     if isinstance(v, (int, float, str)))
 
 
 def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
@@ -175,11 +193,16 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
     profile = score.load_profile()
     # prev_companies holds the reputation gathered so far — it is passed into
     # scoring before companies.json is rebuilt.
-    rescore_all(vacancies, criteria, profile, prev_companies)
-    kb.mark_duplicates(vacancies)
-    link_stats = link_check.check_links(vacancies)
+    _rescore_stage(vacancies, criteria, profile, prev_companies, "current criteria")
+    with progress.stage("mark near-duplicates") as st:
+        st.note = f"{kb.mark_duplicates(vacancies)} marked"
+    with progress.stage("check links") as st:
+        link_stats = link_check.check_links(vacancies)
+        st.note = _stats_note(link_stats)
     state["last_link_check"] = link_stats
-    companies = kb.build_companies_from_vacancies(vacancies, prev_companies)
+    with progress.stage("rebuild companies") as st:
+        companies = kb.build_companies_from_vacancies(vacancies, prev_companies)
+        st.note = f"{progress.number(len(companies))} companies"
 
     # Fetching descriptions for shortlist vacancies that arrived without one.
     #
@@ -194,13 +217,15 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
     try:
         # A search that asks about hours also needs the page of a vacancy that
         # already has text but no stated engagement — see worklist().
-        state["last_description_enrich"] = enrich_descriptions.enrich(
-            vacancies, need_employment_types=bool(criteria.get("engagement_fit")))
+        with progress.stage("fetch missing descriptions") as st:
+            state["last_description_enrich"] = enrich_descriptions.enrich(
+                vacancies, need_employment_types=bool(criteria.get("engagement_fit")))
+            st.note = _stats_note(state["last_description_enrich"])
     except Exception as exc:  # noqa: BLE001 — a description must not kill the cycle
         state["last_description_enrich"] = {"error": f"{type(exc).__name__}: {exc}"}
     else:
         # Rescore: the gates now have text they did not have.
-        rescore_all(vacancies, criteria, profile, prev_companies)
+        _rescore_stage(vacancies, criteria, profile, prev_companies, "with the new descriptions")
 
     # What the UK market pays for this stack — a yardstick shown beside the
     # shortlist, never written onto a vacancy and never scored. Six-month
@@ -208,9 +233,11 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
     try:
         import score as score_mod
 
-        state["last_salary_benchmark"] = salary_benchmark.refresh_if_stale(
-            salary_benchmark.technologies_from_profile(score_mod.load_profile())
-        ).get("collected_at")
+        with progress.stage("salary benchmark (refreshed monthly)") as st:
+            state["last_salary_benchmark"] = salary_benchmark.refresh_if_stale(
+                salary_benchmark.technologies_from_profile(score_mod.load_profile())
+            ).get("collected_at")
+            st.note = f"collected {state['last_salary_benchmark']}"
     except Exception as exc:  # noqa: BLE001 — a yardstick must not kill the cycle
         state["last_salary_benchmark"] = f"{type(exc).__name__}: {exc}"
 
@@ -220,8 +247,10 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
     # tools/apply_channels.py — including why a board answering 200 is not a
     # board.
     try:
-        state["last_apply_channels"] = apply_channels.collect(
-            vacancies, criteria["classification_thresholds"]["hot_lead"])
+        with progress.stage("find direct application channels") as st:
+            state["last_apply_channels"] = apply_channels.collect(
+                vacancies, criteria["classification_thresholds"]["hot_lead"])
+            st.note = _stats_note(state["last_apply_channels"])
     except Exception as exc:  # noqa: BLE001 — a channel must not kill the cycle
         state["last_apply_channels"] = {"error": f"{type(exc).__name__}: {exc}"}
 
@@ -245,13 +274,15 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
     }
     if shortlist_companies:
         try:
-            state["last_company_intel"] = company_intel.enrich_companies(
-                companies, only_names=shortlist_companies, limit=60
-            )
+            with progress.stage("company facts from Wikidata") as st:
+                state["last_company_intel"] = company_intel.enrich_companies(
+                    companies, only_names=shortlist_companies, limit=60
+                )
+                st.note = _stats_note(state["last_company_intel"])
         except Exception as exc:  # noqa: BLE001 — enrichment must not kill the cycle
             state["last_company_intel"] = {"error": f"{type(exc).__name__}: {exc}"}
         # Rescore after enrichment: company age takes part in the score.
-        rescore_all(vacancies, criteria, profile, companies)
+        _rescore_stage(vacancies, criteria, profile, companies, "with company facts")
 
     # Reputation of shortlist companies is tracked separately, because it cannot
     # be collected by script (the sites answer 403) while the system is obliged
@@ -263,12 +294,16 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
         item["company"] for item in reputation.worklist(vacancies, companies)
     ]
 
-    kb.save_vacancies(vacancies)
-    kb.save_companies(companies)
-    common.save_json_atomic(common.STATE_PATH, state)
+    with progress.stage("save the knowledge base"):
+        kb.save_vacancies(vacancies)
+        kb.save_companies(companies)
+        common.save_json_atomic(common.STATE_PATH, state)
     # What the desktop app lists. After the save: selection rows reference
     # vacancies that must already be in the database.
-    selections.record(vacancies, state, kind=selection_kind)
+    with progress.stage(f"record the selection ({selection_kind})") as st:
+        selection_id = selections.record(vacancies, state, kind=selection_kind)
+        st.note = (f"#{selection_id}, "
+                   f"{progress.number(len(selections.listed_vacancies(vacancies)))} listed")
 
     if not (common.KNOWLEDGE_DIR / "insights.md").exists():
         (common.KNOWLEDGE_DIR / "insights.md").write_text(
@@ -281,7 +316,9 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
     # Every shortlist this identity is configured to produce. An identity that
     # has said nothing about markets gets exactly one file, at the historical
     # path — see tools/segments.py.
-    written = report.write_segmented_reports(vacancies, companies, state)
+    with progress.stage("write the reports") as st:
+        written = report.write_segmented_reports(vacancies, companies, state)
+        st.note = f"{len(written)} files"
     state["last_reports"] = {slug or "latest": str(path)
                              for slug, path in written.items()}
     return str(written.get("") or next(iter(written.values())))
@@ -293,11 +330,20 @@ def run_pipeline(include_manual_placeholder_note: bool = True) -> dict:
     criteria = score.load_criteria()
     profile = score.load_profile()
 
-    vacancies = kb.load_vacancies()
-    prev_companies = kb.load_companies()
+    with progress.stage("load the knowledge base") as st:
+        vacancies = kb.load_vacancies()
+        prev_companies = kb.load_companies()
+        st.note = (f"{progress.number(len(vacancies))} vacancies, "
+                   f"{progress.number(len(prev_companies))} companies")
     state = common.load_json(common.STATE_PATH, default={"run_count": 0, "sources": {}})
     state.setdefault("sources", {})
 
+    enabled = [s for s in sources_cfg
+               if s.get("enabled", True) and s.get("kind") != "manual_ingest"
+               and FETCHERS.get(s.get("name")) is not None]
+    progress.log(f">> fetch {len(enabled)} sources: "
+                 + ", ".join(s.get("name") for s in enabled))
+    fetch_started = time.monotonic()
     new_count = 0
     updated_count = 0
     total_fetched = 0
@@ -311,6 +357,8 @@ def run_pipeline(include_manual_placeholder_note: bool = True) -> dict:
         if fetch_fn is None:
             continue
 
+        source_started = time.monotonic()
+        new_before, updated_before = new_count, updated_count
         raw_records, err = fetch_source_safely(name, fetch_fn, fetch_params(src))
         _archive_raw_records(name, raw_records)
         normalized, skipped = normalize.normalize_batch(raw_records)
@@ -337,6 +385,16 @@ def run_pipeline(include_manual_placeholder_note: bool = True) -> dict:
             else:
                 updated_count += 1
 
+        outcome = (f"{len(normalized)} records, {new_count - new_before} new, "
+                   f"{updated_count - updated_before} updated"
+                   + (f", {skipped} skipped" if skipped else ""))
+        if err:
+            outcome += f" - {err.splitlines()[0][:160]}"
+        progress.log(f"   {'!!' if fetch_failed else 'ok'} {name}: {outcome} "
+                     f"- {progress.duration(time.monotonic() - source_started)}")
+
+    progress.log(f"ok fetch - {progress.duration(time.monotonic() - fetch_started)} "
+                 f"({progress.number(total_fetched)} records, {progress.number(new_count)} new)")
     state["run_count"] = state.get("run_count", 0) + 1
     state["last_run_at"] = kb.now_iso()
     state["last_run_stats"] = {
@@ -364,7 +422,17 @@ def main() -> None:
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
 
-    result = run_pipeline()
+    # Mirrored into a file, so a run started by the agent or the app can be
+    # followed from outside: tail -f data/<prefix>/runs/pipeline_<time>.log
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    log_path = progress.open_log(common.DATA_DIR / "runs" / f"pipeline_{stamp}.log")
+    started = time.monotonic()
+    progress.log(f"pipeline for '{common.ACTIVE_IDENTITY}' started; log: {log_path}")
+    try:
+        result = run_pipeline()
+    finally:
+        progress.log(f"pipeline finished in {progress.duration(time.monotonic() - started)}")
+        progress.close_log()
     print("Pipeline finished:")
     for k, v in result.items():
         print(f"  {k}: {v}")

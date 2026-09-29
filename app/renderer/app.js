@@ -88,6 +88,13 @@
     return el(tag, { ...(attrs || {}), html: inlineMarkdown(text) });
   }
 
+  // "2026-09-29" -> "29.09.2026"; the pipeline has already reduced every
+  // source's format to YYYY-MM-DD, or to null when the source gave none.
+  function formatDate(isoDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate || '');
+    return match ? `${match[3]}.${match[2]}.${match[1]}` : t('row.date_unknown');
+  }
+
   function filterKey(identity, segment) {
     return `${identity}/${segment}`;
   }
@@ -431,6 +438,11 @@
       el('div', { class: 'row-facts' },
         view.hiring_country && md('span', `${t('row.hiring_country')}: ${view.hiring_country}`),
         view.salary && md('span', `${t('row.salary')}: ${view.salary}`)),
+      // When the employer posted it, and when it first reached our base.
+      el('div', { class: 'row-facts row-dates' },
+        el('span', { testid: 'posted-on' }, t('row.posted_on', { date: formatDate(view.posted_on) })),
+        el('span', { testid: 'first-seen-on' },
+          t('row.first_seen_on', { date: formatDate(view.first_seen_on) }))),
     ];
     if (view.highlights && view.highlights.length) {
       children.push(md('div', view.highlights.join('; '), { class: 'highlights' }));

@@ -104,3 +104,23 @@ test('stream-json lines are described for the log panel', () => {
     '= success ($1.23)\nok');
   assert.equal(describeEvent('not json'), 'not json');
 });
+
+test('the pipeline log of this run is followed line by line; older logs are not', async () => {
+  const { PipelineLogFollower } = require('../../main/runner');
+  const dir = tempDir();
+  const old = path.join(dir, 'pipeline_2026-01-01_000000.log');
+  fs.writeFileSync(old, 'an older run\n');
+  fs.utimesSync(old, new Date('2026-01-01'), new Date('2026-01-01'));
+
+  const lines = [];
+  const follower = new PipelineLogFollower({
+    dir, since: Date.now() - 1000, onLine: (l) => lines.push(l), interval: 10,
+  });
+  const current = path.join(dir, 'pipeline_2026-09-30_002341.log');
+  fs.writeFileSync(current, '[00:23:41] >> load the knowledge base\n[00:23:42] ok load');
+  await new Promise((r) => setTimeout(r, 60));
+  assert.deepEqual(lines, ['[00:23:41] >> load the knowledge base']);   // the half line waits
+  fs.appendFileSync(current, ' - 0 s\n');
+  follower.stop();
+  assert.deepEqual(lines, ['[00:23:41] >> load the knowledge base', '[00:23:42] ok load - 0 s']);
+});

@@ -46,7 +46,11 @@ clone: it is created when a template is cloned, see
 python tools/pipeline.py --identity <p>
 ```
 
-This is the one command mandatory on every run. It:
+This is the one command mandatory on every run. A full run takes about an
+hour (most of it checking links and rescoring); it reports every stage with
+its duration, every source with its counts, and progress on the long loops, on
+stderr and in `data/<p>/runs/pipeline_<time>.log` (the desktop app shows that
+file live). It:
 - collects vacancies from the sources enabled in `<p>_sources.yaml`;
 - never fails wholesale, even when one source is unavailable — watch the output
   and the "Source health" section of the report;

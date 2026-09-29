@@ -206,3 +206,13 @@ test('data text is shown as text, never as markup', async ({ page }) => {
   await expect(byId(page, 'a1').locator('.highlights em')).toHaveText('fine');
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
 });
+
+test('every row shows when it was posted and when we first downloaded it', async ({ page }) => {
+  await open(page);
+  const row = byId(page, 'a1');
+  await expect(row.getByTestId('posted-on')).toHaveText(ru['row.posted_on'].replace('{date}', '20.09.2026'));
+  await expect(row.getByTestId('first-seen-on'))
+    .toHaveText(ru['row.first_seen_on'].replace('{date}', '28.09.2026'));
+  await expect(byId(page, 'a2r').getByTestId('posted-on'))
+    .toHaveText(ru['row.posted_on'].replace('{date}', ru['row.date_unknown']));
+});

@@ -142,8 +142,12 @@ def enrich_companies(companies: dict, only_names: Optional[set] = None,
     """Adds facts to companies.json. Checks only the companies named in
     only_names (normally the ones appearing in the report), so as not to make
     hundreds of requests for companies that were filtered out anyway."""
+    import progress
+
     now = datetime.now(timezone.utc)
     stats = {"checked": 0, "found": 0, "skipped": 0}
+    candidates = len(only_names) if only_names is not None else len(companies)
+    tick = progress.Progress(min(candidates, limit) if limit else candidates, "company facts")
 
     for slug, entry in companies.items():
         if only_names is not None and entry.get("name") not in only_names:
@@ -159,6 +163,7 @@ def enrich_companies(companies: dict, only_names: Optional[set] = None,
                 pass
 
         entry["intel"] = fetch_company_facts(entry.get("name", slug))
+        tick()
         stats["checked"] += 1
         if entry["intel"].get("found"):
             stats["found"] += 1

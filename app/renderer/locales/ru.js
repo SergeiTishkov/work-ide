@@ -50,6 +50,9 @@
   'list.empty': 'Здесь пусто.',
 
   'row.details': 'Подробнее',
+  'row.posted_on': '📅 Опубликована: {date}',
+  'row.first_seen_on': '📥 Скачана: {date}',
+  'row.date_unknown': 'не указано',
   'row.salary': '💰 ЗП',
   'row.hiring_country': '🌍 Страна найма',
   'row.to_confirm': '❓ Осталось уточнить',
