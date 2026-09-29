@@ -261,6 +261,21 @@ CATALOGUES = {
 }
 
 
+# The active identity's language, resolved once. Resolving the profile parses
+# three YAML files, and translate() runs for every phrase of every vacancy:
+# uncached, rendering one vacancy took half a second (measured 2026-09-29),
+# and listing a whole shortlist took minutes. Keyed by the profile loader as
+# well, so a test that swaps the loader is not served a stale answer.
+_LANGUAGE_CACHE = {}
+
+
+def _reset_language_cache() -> None:
+    _LANGUAGE_CACHE.clear()
+
+
+common.register_identity_hook(_reset_language_cache)
+
+
 def language(profile: Optional[dict] = None) -> str:
     """Report language for the active identity.
 
@@ -268,10 +283,13 @@ def language(profile: Optional[dict] = None) -> str:
     report the owner cannot skim, which is the one thing the report must do.
     """
     if profile is None:
-        try:
-            profile = common.load_profile()
-        except Exception:  # noqa: BLE001 — язык не повод ронять отчёт
-            return DEFAULT_LANGUAGE
+        key = (common.ACTIVE_IDENTITY, common.load_profile)
+        if key not in _LANGUAGE_CACHE:
+            try:
+                _LANGUAGE_CACHE[key] = language(common.load_profile())
+            except Exception:  # noqa: BLE001 — a language is no reason to fail a report
+                return DEFAULT_LANGUAGE
+        return _LANGUAGE_CACHE[key]
     value = ((profile or {}).get("preferences") or {}).get("language")
     if not value:
         return DEFAULT_LANGUAGE

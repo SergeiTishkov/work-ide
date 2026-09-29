@@ -54,6 +54,7 @@ import normalize  # noqa: E402
 import report  # noqa: E402
 import salary_benchmark  # noqa: E402
 import score  # noqa: E402
+import selections  # noqa: E402
 
 FETCHERS = {
     "arbeitnow": fetch_arbeitnow.fetch,
@@ -162,9 +163,14 @@ def rescore_all(vacancies: dict, criteria: dict, profile: dict, companies: Optio
         v["computed"] = score.score_vacancy(vacancy_view, criteria, profile)
 
 
-def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> str:
+def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
+                        selection_kind: str = "run") -> str:
     """The shared tail of the cycle: recompute companies, save KB and state,
-    generate the report. Returns the path to the report."""
+    record the selection, generate the report. Returns the path to the report.
+
+    selection_kind is "run" for a fetch cycle and "rebuild" otherwise (see
+    tools/selections.py): only a real run moves the baseline of what counts as
+    a fresh vacancy, so re-selecting must not make unread vacancies look old."""
     criteria = score.load_criteria()
     profile = score.load_profile()
     # prev_companies holds the reputation gathered so far — it is passed into
@@ -260,6 +266,9 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict) -> s
     kb.save_vacancies(vacancies)
     kb.save_companies(companies)
     common.save_json_atomic(common.STATE_PATH, state)
+    # What the desktop app lists. After the save: selection rows reference
+    # vacancies that must already be in the database.
+    selections.record(vacancies, state, kind=selection_kind)
 
     if not (common.KNOWLEDGE_DIR / "insights.md").exists():
         (common.KNOWLEDGE_DIR / "insights.md").write_text(
@@ -359,6 +368,15 @@ def main() -> None:
     print("Pipeline finished:")
     for k, v in result.items():
         print(f"  {k}: {v}")
+    # A reminder that lives in the output rather than in somebody's memory:
+    # feedback left in the app is a bug report against the filter.
+    import feedback
+
+    pending = feedback.count()
+    if pending["bugged"] or pending["rejected"]:
+        print(f"  pending feedback: {pending['bugged']} wrong picks, "
+              f"{pending['rejected']} not for me — review with /feedback "
+              f"(python tools/feedback.py --identity {common.ACTIVE_IDENTITY} collect)")
 
 
 if __name__ == "__main__":

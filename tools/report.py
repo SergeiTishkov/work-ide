@@ -162,14 +162,25 @@ def expected_technologies(vacancy: dict, limit: int = 24) -> list:
         return []
 
     found = []
-    for canonical, forms in _tech_vocabulary().items():
-        for form in (forms or []):
-            if common.normalize_for_matching(form) in haystack:
-                found.append(canonical)
-                break
+    for canonical, forms in _normalized_tech_vocabulary():
+        if any(form in haystack for form in forms):
+            found.append(canonical)
         if len(found) >= limit:
             break
     return found
+
+
+_NORMALIZED_VOCABULARY_CACHE = []
+
+
+def _normalized_tech_vocabulary() -> list:
+    """[(canonical, [normalised forms])], normalised once. Normalising every
+    form again for every vacancy made rendering the whole base take minutes."""
+    if not _NORMALIZED_VOCABULARY_CACHE:
+        for canonical, forms in _tech_vocabulary().items():
+            _NORMALIZED_VOCABULARY_CACHE.append(
+                (canonical, [common.normalize_for_matching(f) for f in (forms or [])]))
+    return _NORMALIZED_VOCABULARY_CACHE
 
 
 # Countries, spelled the way the job boards spell them.
@@ -279,7 +290,7 @@ def _eligibility_rank(v: dict) -> int:
         return len(score_mod.ELIGIBILITY_ORDER)
 
 
-def _fmt_eligibility(v: dict) -> list:
+def _eligibility_parts(v: dict) -> Optional[dict]:
     """Can a contractor sitting where this person sits actually take the work?
 
     Shown separately from the score and never folded into it. A vacancy that
@@ -290,15 +301,15 @@ def _fmt_eligibility(v: dict) -> list:
     c = v.get("computed") or {}
     verdict = c.get("residency_eligibility")
     if not verdict:
-        return []
+        return None
     label = {
         "confirmed": "✅ " + t("eligibility: confirmed"),
         "likely": "🟢 " + t("eligibility: likely"),
         "unknown": "❔ " + t("eligibility: not stated"),
         "no": "⛔ " + t("eligibility: no"),
     }.get(verdict, verdict)
-    reason = c.get("residency_eligibility_reason")
-    return [f"  - {label}" + (f" — _{reason}_" if reason else "")]
+    return {"level": verdict, "label": label,
+            "reason": c.get("residency_eligibility_reason")}
 
 
 def _salary_benchmark_block(segment) -> list:
@@ -351,7 +362,7 @@ def _salary_benchmark_block(segment) -> list:
     return lines
 
 
-def _fmt_apply_channels(v: dict) -> list:
+def _apply_channel_items(v: dict) -> list:
     """Where to apply without going through the board.
 
     Only looked up for the top of the shortlist (tools/apply_channels.py), so
@@ -361,32 +372,55 @@ def _fmt_apply_channels(v: dict) -> list:
     found = v.get("apply_channels")
     if not found:
         return []
-    lines = []
+    items = []
     if found.get("direct_apply_url"):
-        lines.append(f"  - 📨 {t('apply directly')}: {found['direct_apply_url']}")
+        items.append(f"📨 {t('apply directly')}: {found['direct_apply_url']}")
     elif found.get("board_url"):
-        lines.append(
-            f"  - 📨 {t('the company hires through')} "
+        items.append(
+            f"📨 {t('the company hires through')} "
             f"{found.get('board_provider') or '?'}: {found['board_url']} "
             f"_({t('this vacancy is not on the board — possibly placed through an agency')})_")
     if found.get("emails"):
-        lines.append(f"  - ✉️ {t('address given in the vacancy')}: "
+        items.append(f"✉️ {t('address given in the vacancy')}: "
                      + ", ".join(found["emails"]))
-    if not lines:
-        lines.append(f"  - 📨 _{t('no direct way to apply found — only through the board')}_")
-    return lines
+    if not items:
+        items.append(f"📨 _{t('no direct way to apply found — only through the board')}_")
+    return items
 
 
-def _fmt_vacancy_line(v: dict) -> str:
+def _hiring_country_text(v: dict, bd: dict) -> str:
+    country, country_source = hiring_country(v)
+    if country:
+        suffix = "" if country_source == HIRING_OFFICE else f" _({t(country_source)})_"
+        return f"{country}{suffix}"
+    # A missing country comes in two different kinds, worth keeping apart:
+    # either the vacancy is deliberately geography-free, or the board did not
+    # say.
+    verdict = (bd.get("remote_location_fit", {})
+               .get("structured_location", {}).get("verdict"))
+    location = (v.get("location_raw") or "").strip()
+    if verdict in ("worldwide", "worldwide_by_continents", "remote_without_country"):
+        return t("without a country")
+    return (t("not determined")
+            + (f" _({t('the board said')}: «{location}»)_" if location else ""))
+
+
+def vacancy_view(v: dict) -> dict:
+    """Everything one vacancy row shows, as data.
+
+    The single source for both renderings of a vacancy: the Markdown report
+    (_fmt_vacancy_line) and the desktop app, which reads it from
+    vacancies.view in the database. Two renderers built from one dict cannot
+    drift apart the way two copies of the formatting logic would.
+
+    Texts are already in the identity's report language and may carry the
+    light Markdown the report always used (_italic_, **bold**, `code`).
+    """
     c = v.get("computed", {})
-    score = c.get("score", 0)
-    title = v.get("title", "?")
-    company = v.get("company", "?")
-    url = v.get("url", "")
     manual = v.get("manual", {})
-    status = manual.get("status", "new")
-
     bd = c.get("score_breakdown", {})
+
+    highlights = []
     highlights = []
     legacy_hits = bd.get("legacy_enterprise_signal", {}).get("hits", [])
     if legacy_hits:
@@ -419,7 +453,6 @@ def _fmt_vacancy_line(v: dict) -> str:
     if link_status == "unknown":
         highlights.append("🔗 " + t("the link could not be verified conclusively"))
 
-    highlight_str = f" — _{'; '.join(highlights)}_" if highlights else ""
     salary_line = _fmt_salary_info(v, bd.get("compensation_signal", {}))
     # The rate the graded pay component actually compared, when it ran. Shown
     # because "$150k-$350k" and "$90-150/hour" are not comparable at a glance,
@@ -427,11 +460,6 @@ def _fmt_vacancy_line(v: dict) -> str:
     hourly = (bd.get("compensation_signal") or {}).get("hourly_equivalent_usd")
     if hourly:
         salary_line += f" — ≈ ${hourly:,.0f}/{t('hour')}"
-    lines = [
-        f"- **[{score}] {title}** @ {company} — [{t('link')}]({url}) — "
-        f"{t('status')}: `{status}`{highlight_str}",
-        f"  - 💰 {t('salary')}: {salary_line}",
-    ]
     # What is still unknown, for a vacancy parked in a "check by hand" class.
     # A vacancy can be missing both confirmations, and the section it sits in
     # names only one of them.
@@ -441,46 +469,69 @@ def _fmt_vacancy_line(v: dict) -> str:
             pending.append(t("that it is remote"))
         elif objection.startswith("engagement: the employer never states"):
             pending.append(t("the hours (part-time, freelance)"))
-    if pending:
-        lines.append(f"  - ❓ {t('left to confirm')}: {', '.join(pending)}")
-    # The employer's own site, when known — so the same vacancy can be found on
-    # their careers page and applied to without an account on the job board
-    # (WWR keeps the application funnel to itself, see docs/SOURCES.md).
-    company_url = v.get("company_url")
-    if company_url:
-        lines.append(f"  - 🏢 {t('company site (apply directly)')}: {company_url}")
-    lines.extend(_fmt_eligibility(v))
-    lines.extend(_fmt_apply_channels(v))
-    techs = expected_technologies(v)
-    if techs:
-        lines.append(f"  - 🧰 {t('technologies')}: {', '.join(techs)}")
-    lines.append("  - ⭐ " + t("reputation") + ": " + _fmt_reputation(
-        bd.get("company_reputation_signal", {}), c.get("classification", "")))
-    country, country_source = hiring_country(v)
-    if country:
-        suffix = "" if country_source == HIRING_OFFICE else f" _({t(country_source)})_"
-        lines.append(f"  - 🌍 {t('hiring country')}: {country}{suffix}")
-    else:
-        # A missing country comes in two different kinds, worth keeping apart:
-        # either the vacancy is deliberately geography-free, or the board did
-        # not say.
-        verdict = (bd.get("remote_location_fit", {})
-                   .get("structured_location", {}).get("verdict"))
-        location = (v.get("location_raw") or "").strip()
-        if verdict in ("worldwide", "worldwide_by_continents", "remote_without_country"):
-            lines.append(f"  - 🌍 {t('hiring country')}: {t('without a country')}")
-        else:
-            lines.append(f"  - 🌍 {t('hiring country')}: {t('not determined')}"
-                         + (f" _({t('the board said')}: «{location}»)_" if location else ""))
     age_bd = bd.get("company_age_signal", {})
+    company_age = None
     if age_bd.get("has_data"):
         emp = f", ~{age_bd['employees']} {t('employees')}" if age_bd.get("employees") else ""
-        lines.append(
-            f"  - 🏛 {t('company')}: {t('founded')} {age_bd['founded_year']} "
-            f"({age_bd['age_years']} {t('years old')}{emp}) _(Wikidata)_"
-        )
-    if manual.get("notes"):
-        lines.append(f"  - {t('note')}: {manual['notes']}")
+        company_age = (f"{t('founded')} {age_bd['founded_year']} "
+                       f"({age_bd['age_years']} {t('years old')}{emp}) _(Wikidata)_")
+
+    return {
+        "id": v.get("id"),
+        "title": v.get("title", "?"),
+        "company": v.get("company", "?"),
+        "url": v.get("url", ""),
+        "score": c.get("score", 0),
+        "classification": c.get("classification"),
+        "status": manual.get("status", "new"),
+        "highlights": highlights,
+        "salary": salary_line,
+        "to_confirm": pending,
+        # The employer's own site, when known — so the same vacancy can be
+        # found on their careers page and applied to without an account on the
+        # job board (WWR keeps the application funnel to itself, see
+        # docs/SOURCES.md).
+        "company_url": v.get("company_url"),
+        "eligibility": _eligibility_parts(v),
+        "apply_channels": _apply_channel_items(v),
+        "technologies": expected_technologies(v),
+        "reputation": _fmt_reputation(bd.get("company_reputation_signal", {}),
+                                      c.get("classification", "")),
+        "hiring_country": _hiring_country_text(v, bd),
+        "company_age": company_age,
+        "note": manual.get("notes") or None,
+        "needs_manual_review": bool(c.get("needs_manual_review")),
+        "first_seen": v.get("first_seen"),
+    }
+
+
+def _fmt_vacancy_line(v: dict) -> str:
+    view = vacancy_view(v)
+    highlights = view["highlights"]
+    highlight_str = f" — _{'; '.join(highlights)}_" if highlights else ""
+    lines = [
+        f"- **[{view['score']}] {view['title']}** @ {view['company']} — "
+        f"[{t('link')}]({view['url']}) — "
+        f"{t('status')}: `{view['status']}`{highlight_str}",
+        f"  - 💰 {t('salary')}: {view['salary']}",
+    ]
+    if view["to_confirm"]:
+        lines.append(f"  - ❓ {t('left to confirm')}: {', '.join(view['to_confirm'])}")
+    if view["company_url"]:
+        lines.append(f"  - 🏢 {t('company site (apply directly)')}: {view['company_url']}")
+    eligibility = view["eligibility"]
+    if eligibility is not None:
+        reason = eligibility["reason"]
+        lines.append(f"  - {eligibility['label']}" + (f" — _{reason}_" if reason else ""))
+    lines.extend(f"  - {item}" for item in view["apply_channels"])
+    if view["technologies"]:
+        lines.append(f"  - 🧰 {t('technologies')}: {', '.join(view['technologies'])}")
+    lines.append("  - ⭐ " + t("reputation") + ": " + view["reputation"])
+    lines.append(f"  - 🌍 {t('hiring country')}: {view['hiring_country']}")
+    if view["company_age"]:
+        lines.append(f"  - 🏛 {t('company')}: {view['company_age']}")
+    if view["note"]:
+        lines.append(f"  - {t('note')}: {view['note']}")
     return "\n".join(lines)
 
 
@@ -1033,6 +1084,10 @@ def main() -> None:
     vacancies = kb.load_vacancies()
     companies = kb.load_companies()
     state = common.load_json(common.STATE_PATH, default={})
+    import selections
+
+    selection_id = selections.record(vacancies, state, kind="rebuild")
+    print(f"Selection #{selection_id} recorded (what the desktop app lists).")
     written = write_segmented_reports(vacancies, companies, state)
     for slug, path in written.items():
         print(f"Report saved: {path}" + (f"  [{slug}]" if slug else ""))

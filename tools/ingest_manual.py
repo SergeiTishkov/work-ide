@@ -83,7 +83,10 @@ def ingest(records: list, source_name: str = "manual") -> dict:
     src_state["last_ingest_count"] = len(normalized)
     src_state["last_ingest_skipped"] = skipped
 
-    report_path = pipeline.finalize_and_report(vacancies, prev_companies, state)
+    # A rebuild, not a run: vacancies from the run this ingest follows must stay
+    # fresh until a person has had a chance to see them.
+    report_path = pipeline.finalize_and_report(vacancies, prev_companies, state,
+                                               selection_kind="rebuild")
 
     return {
         "new_vacancies": new_count,

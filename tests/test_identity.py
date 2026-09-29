@@ -502,3 +502,14 @@ def test_clone_refuses_the_frozen_fixture():
     with pytest.raises(identity.InvalidIdentityError) as exc:
         identity.clone_identity("ftf", "dstp", "Cloned Search")
     assert "fixture" in str(exc.value)
+
+
+def test_identities_for_app_leave_fixtures_out_and_name_the_database():
+    """The desktop app builds its tabs from this; a fixture tab would invite a
+    search that activation refuses anyway."""
+    entries = identity.identities_for_app()
+    prefixes = [e["prefix"] for e in entries]
+    assert "ftf" not in prefixes
+    for entry in entries:
+        assert entry["database"].endswith(f"{entry['prefix']}.sqlite")
+        assert isinstance(entry["has_database"], bool)

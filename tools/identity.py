@@ -27,6 +27,7 @@ folders cannot. Templates to clone from live in `identity-templates/`.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -507,7 +508,36 @@ def activate_or_exit(cli_value: Optional[str] = None, *, quiet: bool = False) ->
 
 # --- CLI ------------------------------------------------------------------
 
-def cmd_list(_args) -> None:
+def identities_for_app() -> List[dict]:
+    """The identities the desktop app shows as tabs, with where their database
+    lives. Fixtures are left out: a real search against one is refused anyway.
+
+    The display name is resolved through the profile layers, not read from one
+    file as describe() does: in a personal identity the root profile file
+    usually does not repeat it, and the tab would say just "kisel"."""
+    import settings
+
+    result = []
+    for prefix in list_identities(include_fixtures=False):
+        try:
+            profile, _ = settings.resolve("profile", prefix)
+            display_name = (profile.get("identity") or {}).get("display_name") or ""
+        except Exception:  # noqa: BLE001 — a caption must not hide the tab
+            display_name = ""
+        database = common.DATA_ROOT / prefix / f"{prefix}.sqlite"
+        result.append({
+            "prefix": prefix,
+            "display_name": display_name,
+            "database": str(database),
+            "has_database": database.exists(),
+        })
+    return result
+
+
+def cmd_list(args) -> None:
+    if getattr(args, "json", False):
+        print(json.dumps(identities_for_app()))
+        return
     identities = list_identities(include_fixtures=True)
     if not identities:
         print("No identities are set up.")
@@ -877,7 +907,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Manage search identities")
     sub = p.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("list", help="Show every identity present").set_defaults(func=cmd_list)
+    p_list = sub.add_parser("list", help="Show every identity present")
+    p_list.add_argument("--json", action="store_true",
+                        help="Machine-readable, for the desktop app (fixtures left out)")
+    p_list.set_defaults(func=cmd_list)
 
     p_new = sub.add_parser(
         "new",

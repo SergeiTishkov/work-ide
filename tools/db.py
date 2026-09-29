@@ -103,7 +103,7 @@ def session(path: Optional[Path] = None) -> Iterator[sqlite3.Connection]:
             yield conn
 
 
-def _dumps(value) -> str:
+def dumps(value) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
@@ -128,7 +128,7 @@ def save_vacancies(vacancies: dict) -> None:
         conn.executemany(
             "INSERT INTO vacancies (id, data) VALUES (?, ?) "
             "ON CONFLICT(id) DO UPDATE SET data = excluded.data",
-            ((vid, _dumps(v)) for vid, v in vacancies.items()),
+            ((vid, dumps(v)) for vid, v in vacancies.items()),
         )
 
 
@@ -147,7 +147,7 @@ def save_companies(companies: dict) -> None:
     with session() as conn:
         conn.execute("DELETE FROM companies")
         conn.executemany("INSERT INTO companies (key, data) VALUES (?, ?)",
-                         ((key, _dumps(c)) for key, c in companies.items()))
+                         ((key, dumps(c)) for key, c in companies.items()))
 
 
 def load_feedback() -> dict:
@@ -196,9 +196,9 @@ def migrate_from_json() -> dict:
     # An explicit path skips the "not migrated yet" guard — this IS the migration.
     with session(db_path()) as conn:
         conn.executemany("INSERT INTO vacancies (id, data) VALUES (?, ?)",
-                         ((vid, _dumps(v)) for vid, v in vacancies.items()))
+                         ((vid, dumps(v)) for vid, v in vacancies.items()))
         conn.executemany("INSERT INTO companies (key, data) VALUES (?, ?)",
-                         ((key, _dumps(c)) for key, c in companies.items()))
+                         ((key, dumps(c)) for key, c in companies.items()))
         for vid, v in vacancies.items():
             manual = v.get("manual") or {}
             if manual.get("status") == "not_relevant":

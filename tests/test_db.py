@@ -29,7 +29,7 @@ def _set_feedback(vid, status, reason=None):
 
 def test_vacancies_round_trip_unchanged(isolated_data_dir):
     vacancies = {
-        "a1": _vacancy("a1", title="Разработчик .NET", tags=["market:uk"], manual={"status": "new"}),
+        "a1": _vacancy("a1", title="\u0420\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a .NET", tags=["market:uk"], manual={"status": "new"}),
         "b2": _vacancy("b2", salary_raw=None, remote=True),
     }
     kb.save_vacancies(vacancies)
