@@ -89,7 +89,16 @@ button.open { margin-right: 10px; color: var(--accent); border-color: var(--acce
 .reason-actions { display: flex; gap: 6px; margin-top: 4px; }
 .reason-text { color: var(--muted); font-style: italic; }
 
-.badge { font-size: 12px; border-radius: 10px; padding: 1px 8px; border: 1px solid currentColor; }
+/* inline-flex + line-height 1 puts the text box in the middle of the pill
+   rather than on the line's baseline. The uneven padding (1px over 5px) then
+   centres the INK: badge texts are lowercase, and the empty ascender space
+   above lowercase letters made a geometrically centred label look low —
+   checked on a 6x screenshot. */
+.badge {
+  display: inline-flex; align-items: center; align-self: center;
+  font-size: 12px; line-height: 1; border-radius: 10px; padding: 1px 8px 5px;
+  border: 1px solid currentColor;
+}
 .badge.fresh { color: var(--fresh); }
 .badge.review { color: var(--rejected); }
 .badge.status.applied { color: var(--applied); }
