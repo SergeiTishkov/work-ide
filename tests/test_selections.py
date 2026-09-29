@@ -219,3 +219,32 @@ def test_display_name_is_recorded_for_the_app(isolated_data_dir):
 def test_record_refuses_an_unknown_kind(isolated_data_dir):
     with pytest.raises(ValueError):
         selections.record({}, {}, kind="whatever")
+
+
+def test_decisions_from_earlier_collections_are_settled_and_hidden(isolated_data_dir):
+    """The owner, 2026-09-30: "rejected" listed vacancies turned down a month
+    ago. A selection shows the feedback of its own collection only."""
+    first = _store({"old": _vacancy("old"), "kept": _vacancy("kept")})
+    _set_feedback("old", "rejected", "a month ago", selection_id=first)
+    assert _ids(_listing(first, filter_name="rejected")) == ["old"]
+
+    second = _store({"old": _vacancy("old"), "kept": _vacancy("kept"),
+                     "new": _vacancy("new")}, run=2)
+    for name in selections.FILTERS:
+        assert "old" not in _ids(_listing(second, filter_name=name)), name
+    with db.session() as conn:
+        assert selections.listing_counts(conn, second, "full")["rejected"] == 0
+
+    # Decided now, then re-selected without fetching: same collection, still shown.
+    _set_feedback("new", "rejected", "not for me", selection_id=second)
+    rebuilt = _store({"old": _vacancy("old"), "kept": _vacancy("kept"),
+                      "new": _vacancy("new")}, kind="rebuild", run=2)
+    assert _ids(_listing(rebuilt, filter_name="rejected")) == ["new"]
+
+
+def test_feedback_carried_over_from_before_selections_is_settled(isolated_data_dir):
+    """Migrated 'not_relevant' marks have no selection: decided before any."""
+    sel = _store({"a": _vacancy("a"), "b": _vacancy("b")})
+    _set_feedback("a", "rejected", "migrated", selection_id=None)
+    assert _ids(_listing(sel, filter_name="rejected")) == []
+    assert _ids(_listing(sel, filter_name="all")) == ["b"]

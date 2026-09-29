@@ -8,6 +8,13 @@
 -- would otherwise make nothing fresh at all, although nothing was read yet.
 -- With no run recorded yet, everything is fresh.
 --
+-- DECIDED EARLIER. A selection shows the feedback given during the current
+-- collection only: since the latest real run (rebuilds belong to the run they
+-- follow). A vacancy decided in an earlier collection — rejected a month ago,
+-- or carried over from before selections existed (no feedback_selection_id) —
+-- is settled and appears in none of the filters; otherwise "rejected" and
+-- "all" fill up with old decisions (the owner, 2026-09-30).
+--
 -- LIMIT. Vacancies without feedback are capped at section_limit per class,
 -- ranked AFTER the filter, so "fresh without feedback" shows the top of the
 -- fresh ones. Vacancies with feedback are never capped: there are few, and
@@ -46,6 +53,8 @@ base AS (
   FROM selection_items i
   JOIN vacancies v ON v.id = i.vacancy_id
   WHERE i.selection_id = :selection_id AND i.segment = :segment
+    AND (v.feedback_status = 'new'
+         OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
 ),
 filtered AS (
   SELECT * FROM base
@@ -84,6 +93,8 @@ base AS (
   FROM selection_items i
   JOIN vacancies v ON v.id = i.vacancy_id
   WHERE i.selection_id = :selection_id AND i.segment = :segment
+    AND (v.feedback_status = 'new'
+         OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
 ),
 per_class AS (
   SELECT class, section_limit,
