@@ -70,7 +70,7 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .filter .count { color: var(--muted); }
 
 .class-section h2 { font-size: 15px; margin: 18px 0 8px; }
-.row { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.row { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 12px; margin-bottom: 8px; }
 .row.stub { color: var(--muted); padding: 6px 12px; }
 .row-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .score { font-weight: 700; min-width: 28px; color: var(--accent); }
