@@ -10,6 +10,7 @@ const { Runner } = require('./runner');
 const { listIdentities } = require('./identities');
 
 const root = repoRoot();
+const UI_ZOOM = 1.2;
 let identities = [];
 
 const store = new Store({
@@ -86,6 +87,10 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       backgroundThrottling: !hidden,
+      // The whole interface 20% larger — text, buttons and spacing alike, so
+      // the proportions stay as designed. Read on a laptop screen (the owner,
+      // 2026-09-30); it survives Refresh.
+      zoomFactor: UI_ZOOM,
     },
   });
   window.removeMenu();
