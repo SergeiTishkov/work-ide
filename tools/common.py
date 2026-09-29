@@ -118,6 +118,10 @@ REPORTS_DIR: Optional[Path] = None
 REPORTS_ARCHIVE_DIR: Optional[Path] = None
 STATE_PATH: Optional[Path] = None
 
+# The knowledge base proper (tools/db.py). VACANCIES_PATH and COMPANIES_PATH
+# name the JSON files it replaced; they are kept only so a not-yet-migrated
+# identity is recognised and migrated (db.migrate_from_json).
+DB_PATH: Optional[Path] = None
 VACANCIES_PATH: Optional[Path] = None
 COMPANIES_PATH: Optional[Path] = None
 RECRUITERS_PATH: Optional[Path] = None
@@ -216,7 +220,7 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
 
     global ACTIVE_IDENTITY, IDENTITY_DIR, FILE_PREFIX
     global DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, REPORTS_ARCHIVE_DIR, STATE_PATH
-    global VACANCIES_PATH, COMPANIES_PATH, RECRUITERS_PATH, INSIGHTS_PATH, USER_AGENT
+    global DB_PATH, VACANCIES_PATH, COMPANIES_PATH, RECRUITERS_PATH, INSIGHTS_PATH, USER_AGENT
 
     root = Path(data_root) if data_root else DATA_ROOT
 
@@ -246,6 +250,7 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
     REPORTS_ARCHIVE_DIR = reports_base / "archive" / prefix
     STATE_PATH = DATA_DIR / f"{FILE_PREFIX}state.json"
 
+    DB_PATH = DATA_DIR / f"{prefix}.sqlite"
     VACANCIES_PATH = KNOWLEDGE_DIR / f"{FILE_PREFIX}vacancies.json"
     COMPANIES_PATH = KNOWLEDGE_DIR / f"{FILE_PREFIX}companies.json"
     RECRUITERS_PATH = KNOWLEDGE_DIR / f"{FILE_PREFIX}recruiters.json"
@@ -261,11 +266,11 @@ def deactivate_identity() -> None:
     """Clears the active identity. Needed by tests that check the refusal."""
     global ACTIVE_IDENTITY, IDENTITY_DIR, FILE_PREFIX
     global DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, REPORTS_ARCHIVE_DIR, STATE_PATH
-    global VACANCIES_PATH, COMPANIES_PATH, RECRUITERS_PATH, INSIGHTS_PATH, USER_AGENT
+    global DB_PATH, VACANCIES_PATH, COMPANIES_PATH, RECRUITERS_PATH, INSIGHTS_PATH, USER_AGENT
 
     ACTIVE_IDENTITY = IDENTITY_DIR = FILE_PREFIX = None
     DATA_DIR = KNOWLEDGE_DIR = RAW_DIR = REPORTS_DIR = REPORTS_ARCHIVE_DIR = STATE_PATH = None
-    VACANCIES_PATH = COMPANIES_PATH = RECRUITERS_PATH = INSIGHTS_PATH = None
+    DB_PATH = VACANCIES_PATH = COMPANIES_PATH = RECRUITERS_PATH = INSIGHTS_PATH = None
     USER_AGENT = None
     for hook in _IDENTITY_HOOKS:
         hook()

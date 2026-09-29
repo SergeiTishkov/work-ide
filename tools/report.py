@@ -936,7 +936,7 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         f"## {t('What next')}",
         "",
         f"- {t('Accumulated market findings')}: `{_rel(common.INSIGHTS_PATH)}`",
-        f"- {t('Full vacancy database')}: `{_rel(common.VACANCIES_PATH)}` "
+        f"- {t('Full vacancy database')}: `{_rel(common.DB_PATH)}` "
         f"(or `python tools/kb.py list --identity {common.ACTIVE_IDENTITY}`)",
         f"- {t('Archive of past reports')}: `{_rel(common.REPORTS_ARCHIVE_DIR)}`",
         f"- {t('Mark status after applying')}: `python tools/kb.py set-status "

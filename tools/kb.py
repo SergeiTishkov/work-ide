@@ -1,10 +1,11 @@
 """
 The knowledge base: vacancies, companies, recruiters.
 
-Stored as human-readable JSON under data/knowledge/*.json. This file also
-holds the CLI for managing records by hand — marking a vacancy's status,
-adding a note, looking at statistics — usable from an interactive session
-without having to open the JSON.
+Vacancies and companies live in SQLite (data/<prefix>/<prefix>.sqlite, see
+tools/db.py); recruiters stay a small JSON file. This file also holds the CLI
+for managing records by hand — marking a vacancy's status, adding a note,
+looking at statistics — usable from an interactive session without opening
+the database.
 
 An important invariant: re-running the pipeline must NEVER overwrite the
 "manual" field (status/notes), which a person or agent may have edited. It is
@@ -22,6 +23,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
+import db  # noqa: E402
 import score  # noqa: E402
 
 VALID_STATUSES = (
@@ -51,22 +53,22 @@ def now_iso() -> str:
 
 def load_vacancies() -> dict:
     common.require_identity()
-    return common.load_json(common.VACANCIES_PATH, default={})
+    return db.load_vacancies()
 
 
 def save_vacancies(vacancies: dict) -> None:
     common.require_identity()
-    common.save_json_atomic(common.VACANCIES_PATH, vacancies)
+    db.save_vacancies(vacancies)
 
 
 def load_companies() -> dict:
     common.require_identity()
-    return common.load_json(common.COMPANIES_PATH, default={})
+    return db.load_companies()
 
 
 def save_companies(companies: dict) -> None:
     common.require_identity()
-    common.save_json_atomic(common.COMPANIES_PATH, companies)
+    db.save_companies(companies)
 
 
 def load_recruiters() -> list:
@@ -424,9 +426,24 @@ def attach_company_reputation(vacancies: dict, companies: dict) -> None:
             v.pop("_company_intel", None)
 
 
+def cmd_migrate_to_sqlite(_args) -> None:
+    result = db.migrate_from_json()
+    print(
+        f"OK: moved into {common.DB_PATH}: {result['vacancies']} vacancies, "
+        f"{result['companies']} companies; {result['rejected']} 'not_relevant' "
+        "statuses carried over as 'rejected' feedback. The JSON files were "
+        "renamed to *.json.bak."
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Manage the Work IDE knowledge base")
     sub = p.add_subparsers(dest="command", required=True)
+
+    sub.add_parser(
+        "migrate-to-sqlite",
+        help="One-off: move this identity's JSON knowledge base into SQLite",
+    ).set_defaults(func=cmd_migrate_to_sqlite)
 
     sub.add_parser("stats", help="Summary statistics for the knowledge base"
                    ).set_defaults(func=cmd_stats)

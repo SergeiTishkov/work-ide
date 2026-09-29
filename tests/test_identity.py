@@ -198,7 +198,7 @@ def test_activation_binds_all_paths(tmp_path):
         assert common.ACTIVE_IDENTITY == "ftf"
         assert common.FILE_PREFIX == "ftf_"
         assert common.DATA_DIR == tmp_path / "ftf"
-        assert common.VACANCIES_PATH.name == "ftf_vacancies.json"
+        assert common.DB_PATH == tmp_path / "ftf" / "ftf.sqlite"
         assert common.STATE_PATH.name == "ftf_state.json"
         # Reports live separately from accumulated data: a shared reports/
         # folder, with the archive inside it split per identity. On an isolated

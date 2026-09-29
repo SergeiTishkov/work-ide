@@ -80,6 +80,7 @@ def test_data_written_under_a_is_invisible_under_b(two_identities):
 
 def _identity_paths() -> dict:
     return {
+        "database": common.DB_PATH,
         "vacancies": common.VACANCIES_PATH,
         "companies": common.COMPANIES_PATH,
         "state": common.STATE_PATH,
