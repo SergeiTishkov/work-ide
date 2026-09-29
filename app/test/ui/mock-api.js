@@ -10,6 +10,8 @@ function installMockApi(fixture) {
   const data = JSON.parse(JSON.stringify(fixture));
   window.__calls = calls;
   window.__emitRunEvent = (event) => listeners.forEach((l) => l(event));
+  window.__setPipeline = (identity, status) => { data.pipelines = { ...(data.pipelines || {}), [identity]: status }; };
+  window.__WORK_IDE_POLL_MS = 50;
 
   function record(name, args) {
     calls.push({ name, args });
@@ -72,6 +74,10 @@ function installMockApi(fixture) {
         bugged: statuses.filter((s) => s === 'bugged').length,
         rejected: statuses.filter((s) => s === 'rejected').length,
       };
+    },
+    async pipelineStatus(identity) {
+      record('pipelineStatus', [identity]);
+      return (data.pipelines || {})[identity] || { running: false };
     },
     async getRunState() {
       record('getRunState', []);

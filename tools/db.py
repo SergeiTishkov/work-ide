@@ -28,7 +28,11 @@ from typing import Iterator, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 
-SCHEMA_VERSION = 1
+# 2: pipeline_runs. Every change so far only ADDS tables (CREATE ... IF NOT
+# EXISTS in schemas/db.sql), so an older database is upgraded by applying the
+# schema and raising the number; a change that alters existing tables will
+# need a real migration step here.
+SCHEMA_VERSION = 2
 SCHEMA_PATH = common.ROOT / "schemas" / "db.sql"
 
 # How long a writer waits for another writer's transaction before giving up.
@@ -75,9 +79,14 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         with conn:
             conn.execute("INSERT INTO meta (key, value) VALUES ('schema_version', ?)",
                          (str(SCHEMA_VERSION),))
-    elif row[0] != str(SCHEMA_VERSION):
+    elif int(row[0]) < SCHEMA_VERSION:
+        with conn:
+            conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'",
+                         (str(SCHEMA_VERSION),))
+    elif int(row[0]) > SCHEMA_VERSION:
         raise SchemaVersionError(
-            f"{db_path()} has schema version {row[0]}, this code expects {SCHEMA_VERSION}."
+            f"the database has schema version {row[0]}, newer than this code "
+            f"({SCHEMA_VERSION}); update the code before using it."
         )
 
 

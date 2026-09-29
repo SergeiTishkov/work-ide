@@ -51,6 +51,7 @@ function registerIpc(window) {
   handle('counts', (identity, segment) => store.counts(identity, segment));
   handle('set-feedback', (identity, id, status, reason) => store.setFeedback(identity, id, status, reason));
   handle('pending-feedback', (identity) => store.pendingFeedback(identity));
+  handle('pipeline-status', (identity) => store.pipelineStatus(identity));
   handle('run-state', () => runner.state());
   handle('start-run', ({ identity, kind }) => {
     // The agent may create or rebuild the database; do not hold it open.

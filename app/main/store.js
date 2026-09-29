@@ -5,10 +5,25 @@
 // `vacancies`. Everything else in the database belongs to the pipeline; that
 // column ownership is what lets both write at the same time.
 const fs = require('node:fs');
+const os = require('node:os');
 const { DatabaseSync } = require('node:sqlite');
 const { loadQueries } = require('./queries');
 
-const SCHEMA_VERSION = '1';
+const SCHEMA_VERSION = '2';
+// The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
+// beaten for this long is gone, whatever its row still says.
+const STALE_AFTER_MS = 45000;
+
+// process.kill(pid, 0) sends nothing; it only asks whether the process exists,
+// on Windows as elsewhere. EPERM means it exists but is not ours.
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+}
 const BUSY_TIMEOUT_MS = 60000;
 const FILTERS = ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged'];
 const STATUSES = ['new', 'applied', 'rejected', 'bugged'];
@@ -23,10 +38,27 @@ class SchemaMismatchError extends Error {}
 
 class Store {
   // databasePathOf(identity) -> the file of that identity's database.
-  constructor({ schemaDir, databasePathOf }) {
+  constructor({ schemaDir, databasePathOf, isPidAlive = pidAlive, hostname = os.hostname() }) {
     this.queries = loadQueries(schemaDir);
     this.databasePathOf = databasePathOf;
+    this.isPidAlive = isPidAlive;
+    this.hostname = hostname;
     this.connections = new Map();
+  }
+
+  // Is a pipeline run of this identity going right now — started from here,
+  // from a terminal or by the agent? tools/runstate.py keeps the row; a run
+  // killed without cleaning up is recognised by its silent heartbeat, or at
+  // once by its dead pid when it ran on this machine.
+  pipelineStatus(identity, now = Date.now()) {
+    const db = this.connection(identity);
+    if (!db) return { running: false };
+    const row = db.prepare(this.queries.pipeline_running).get();
+    if (!row) return { running: false };
+    const beat = Date.parse(row.heartbeat_at);
+    if (Number.isNaN(beat) || now - beat > STALE_AFTER_MS) return { running: false };
+    if (row.host === this.hostname && row.pid && !this.isPidAlive(row.pid)) return { running: false };
+    return { running: true, stage: row.stage, startedAt: row.started_at, pid: row.pid, host: row.host };
   }
 
   // null when the identity has never been collected: the app never creates a

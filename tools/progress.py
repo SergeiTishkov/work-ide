@@ -33,6 +33,14 @@ from typing import Iterator, Optional
 PROGRESS_EVERY = 15.0
 
 _log_file = None
+# Told the name of every stage as it starts; tools/runstate.py records it so
+# the desktop app can show what a run is doing.
+_stage_listener = None
+
+
+def set_stage_listener(listener) -> None:
+    global _stage_listener
+    _stage_listener = listener
 
 
 def open_log(path: Path) -> Path:
@@ -84,6 +92,8 @@ class Stage:
 def stage(name: str) -> Iterator[Stage]:
     started = time.monotonic()
     log(f">> {name}")
+    if _stage_listener is not None:
+        _stage_listener(name)
     current = Stage()
     try:
         yield current

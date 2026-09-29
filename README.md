@@ -130,6 +130,10 @@ It opens a window over the knowledge base:
   with a live log; **Review feedback (N)** runs `/feedback`, which gathers the
   pending answers (`tools/feedback.py`) and fixes the filter. The agent edits
   and tests but never commits — the changes wait for you.
+- the collect button shows when a run of that identity is going, and at what
+  stage — whoever started it (the app, the agent, a terminal); a dot marks the
+  identity's tab. **Refresh** re-reads everything and reloads the interface
+  itself (markup, styles, code), keeping the tab, market and filter.
 
 It needs Node.js and, for the two buttons, the `claude` CLI on `PATH`. The app
 only lists and records; everything else is the same Python as ever. Its tests

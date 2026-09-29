@@ -2,6 +2,7 @@
 // The real Electron window over a fixture repository: real IPC, real SQLite,
 // the agent replaced by a fake command (WORK_IDE_FAKE_RUNNER=1).
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const { test, expect, _electron: electron } = require('@playwright/test');
@@ -63,6 +64,20 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await expect(window.getByTestId('run-status')).toContainText(ru['run.finished']);
     await expect(window.getByTestId('run-collect')).toBeEnabled();
     expect(fs.readdirSync(path.join(repo.root, 'data', 'kisel', 'runs'))).toHaveLength(1);
+
+    // The indicator reads tools/runstate.py's row: a live one (this test's own
+    // pid, fresh heartbeat) shows, a finished one clears within a poll.
+    const runs = new DatabaseSync(repo.database);
+    const now = new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
+    const { lastInsertRowid } = runs.prepare(
+      "INSERT INTO pipeline_runs (started_at, heartbeat_at, status, stage, pid, host) "
+      + "VALUES (?, ?, 'running', 'check links', ?, ?)").run(now, now, process.pid, os.hostname());
+    await expect(window.getByTestId('collect-indicator')).toBeVisible({ timeout: 10000 });
+    await expect(window.getByTestId('run-collect')).toContainText('check links');
+    runs.prepare("UPDATE pipeline_runs SET status = 'finished' WHERE id = ?").run(lastInsertRowid);
+    runs.close();
+    await expect(window.getByTestId('collect-indicator')).toHaveCount(0, { timeout: 10000 });
+    await expect(window.getByTestId('run-collect')).toBeEnabled();
 
     await window.getByTestId('identity-tab-pjoice').click();
     await expect(window.getByTestId('never-collected')).toBeVisible();

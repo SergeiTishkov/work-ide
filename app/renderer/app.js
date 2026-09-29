@@ -32,6 +32,9 @@
   const RUN_KIND_KEYS = { collect: 'run.kind.collect', feedback: 'run.kind.feedback' };
   const REASON_KEYS = { rejected: 'reason.rejected', bugged: 'reason.bugged' };
   const LOG_LIMIT = 500;
+  // How often the pipeline indicator asks the databases. Tests shorten it.
+  const POLL_MS = window.__WORK_IDE_POLL_MS || 5000;
+  const SESSION_KEY = 'work-ide-view';
 
   const state = {
     identities: [],
@@ -49,7 +52,47 @@
     run: { running: false },
     runStatus: '',
     log: [],
+    // prefix -> { running, stage, startedAt }: a pipeline run of that
+    // identity, however it was started (tools/runstate.py)
+    pipelines: {},
+    // restored after "Refresh" (page reload): which tab, market and filter
+    restored: null,
   };
+
+  // --- the view survives "Refresh" -------------------------------------------
+
+  function saveView() {
+    const segments = {};
+    for (const [prefix, info] of Object.entries(state.byIdentity)) {
+      if (info && info.activeSegment) segments[prefix] = info.activeSegment;
+    }
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(
+        { active: state.active, segments, filters: state.filters }));
+    } catch {
+      // storage unavailable: a refresh starts from the defaults
+    }
+  }
+
+  function restoreView() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+      if (saved) {
+        state.active = saved.active || null;
+        state.filters = saved.filters || {};
+        state.restored = saved;
+      }
+    } catch {
+      state.restored = null;
+    }
+  }
+
+  // Reloads the whole interface — markup, styles, code — keeping the view.
+  // Useful after editing the renderer, and to re-read everything at once.
+  function refresh() {
+    saveView();
+    window.location.reload();
+  }
 
   // --- small helpers ---------------------------------------------------------
 
@@ -144,6 +187,9 @@
     const data = await api.loadSegments(prefix);
     const segments = data.segments || [];
     let activeSegment = keepSegment && previous ? previous.activeSegment : null;
+    if (!activeSegment && state.restored && state.restored.segments) {
+      activeSegment = state.restored.segments[prefix] || null;
+    }
     if (!segments.some((s) => s.slug === activeSegment)) {
       const preferred = segments.find((s) => s.isDefault) || segments[0];
       activeSegment = preferred ? preferred.slug : null;
@@ -296,14 +342,18 @@
 
   function renderIdentityTabs() {
     const nav = document.querySelector('[data-testid="identity-tabs"]');
-    nav.replaceChildren(...state.identities.map((identity) => el('button', {
-      class: `tab${identity.prefix === state.active ? ' active' : ''}`,
-      role: 'tab',
-      'aria-selected': identity.prefix === state.active ? 'true' : 'false',
-      title: identity.displayName || null,
-      testid: `identity-tab-${identity.prefix}`,
-      onclick: () => selectIdentity(identity.prefix),
-    }, identity.prefix)));
+    nav.replaceChildren(...state.identities.map((identity) => {
+      const collecting = (state.pipelines[identity.prefix] || {}).running;
+      return el('button', {
+        class: `tab${identity.prefix === state.active ? ' active' : ''}`,
+        role: 'tab',
+        'aria-selected': identity.prefix === state.active ? 'true' : 'false',
+        title: identity.displayName || null,
+        testid: `identity-tab-${identity.prefix}`,
+        onclick: () => selectIdentity(identity.prefix),
+      }, identity.prefix,
+      collecting && el('span', { class: 'tab-dot', testid: 'tab-collecting', title: t('run.collecting') }));
+    }));
   }
 
   function renderPanel() {
@@ -329,6 +379,24 @@
     panel.replaceChildren(...parts);
   }
 
+  function collectButton(running) {
+    const pipeline = state.pipelines[state.active] || { running: false };
+    if (!pipeline.running) {
+      return el('button', {
+        class: 'primary', testid: 'run-collect', disabled: running,
+        onclick: () => startRun('collect'),
+      }, t('run.collect'));
+    }
+    // A run of this identity is going — from here or from anywhere else.
+    const since = String(pipeline.startedAt || '').slice(11, 16);
+    return el('button', {
+      class: 'primary collecting', testid: 'run-collect', disabled: true,
+      title: t('run.collecting_since', { time: since }),
+    },
+    el('span', { class: 'spinner', testid: 'collect-indicator' }),
+    pipeline.stage ? t('run.collecting_stage', { stage: pipeline.stage }) : t('run.collecting'));
+  }
+
   function renderToolbar(identity, info) {
     const running = state.run.running;
     const pending = info.pending ? info.pending.bugged + info.pending.rejected : 0;
@@ -343,10 +411,8 @@
             date: String(selection.created_at || '').slice(0, 16).replace('T', ' '),
           }) + (selection.kind === 'rebuild' ? ` · ${t('selection.rebuild')}` : ''))),
       el('div', { class: 'actions' },
-        el('button', {
-          class: 'primary', testid: 'run-collect', disabled: running,
-          onclick: () => startRun('collect'),
-        }, t('run.collect')),
+        el('button', { testid: 'refresh', title: t('app.refresh_hint'), onclick: refresh }, t('app.refresh')),
+        collectButton(running),
         el('button', {
           testid: 'run-feedback', disabled: running || pending === 0,
           onclick: () => startRun('feedback'),
@@ -498,7 +564,13 @@
         onclick: () => { state.reasonFor = { id: item.id, status: 'bugged' }; render(); },
       }, t('action.bugged')));
     if (!open) return answers;
-    const input = el('textarea', { testid: 'reason-input', rows: '2', placeholder: t(REASON_KEYS[open]) });
+    // The draft lives in the state: the pipeline indicator re-renders the
+    // list now and then, and must not wipe a reason half typed.
+    const input = el('textarea', {
+      testid: 'reason-input', rows: '2', placeholder: t(REASON_KEYS[open]),
+      oninput: (event) => { state.reasonFor.draft = event.target.value; },
+    });
+    input.value = state.reasonFor.draft || '';
     const form = el('div', { class: 'reason', testid: 'reason-form' },
       input,
       el('div', { class: 'reason-actions' },
@@ -506,7 +578,12 @@
           t('reason.save')),
         el('button', { testid: 'reason-cancel', onclick: () => { state.reasonFor = null; render(); } },
           t('reason.cancel'))));
-    setTimeout(() => input.focus(), 0);
+    setTimeout(() => {
+      if (document.activeElement !== input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    }, 0);
     return el('div', {}, answers, form);
   }
 
@@ -532,9 +609,36 @@
     log.scrollTop = log.scrollHeight;
   }
 
+  // --- the pipeline indicator ------------------------------------------------
+
+  async function pollPipelines() {
+    let changed = false;
+    const finished = [];
+    for (const identity of state.identities) {
+      let status;
+      try {
+        status = await api.pipelineStatus(identity.prefix);
+      } catch {
+        status = { running: false };
+      }
+      const before = state.pipelines[identity.prefix] || { running: false };
+      if (JSON.stringify(before) !== JSON.stringify(status)) changed = true;
+      if (before.running && !status.running) finished.push(identity.prefix);
+      state.pipelines[identity.prefix] = status;
+    }
+    // A run just ended: its identity has a new selection to show.
+    for (const prefix of finished) {
+      if (prefix === state.active) await guarded(() => loadIdentity(prefix));
+      else delete state.byIdentity[prefix];
+    }
+    if (changed) render();
+  }
+
   // --- start -----------------------------------------------------------------
 
   api.onRunEvent(onRunEvent);
+  restoreView();
+  window.addEventListener('beforeunload', saveView);
   guarded(async () => {
     const run = await api.getRunState();
     if (run && run.running) {
@@ -543,6 +647,8 @@
     }
     render();
     await loadIdentities();
+    await pollPipelines();
     render();
+    setInterval(() => { pollPipelines(); }, POLL_MS);
   });
 }());

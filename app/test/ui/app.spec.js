@@ -229,3 +229,46 @@ test('"Open the vacancy link" hands the URL to the system browser, marked or not
   await byId(page, 'x1').getByTestId('btn-open').click();
   expect((await calls(page, 'openExternal')).at(-1)).toEqual(['https://example.test/x1']);
 });
+
+test('a pipeline run going anywhere shows on the button and the tab, then clears', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => window.__setPipeline('kisel',
+    { running: true, stage: 'check links', startedAt: '2026-09-30T00:23:41+00:00' }));
+  const button = page.getByTestId('run-collect');
+  await expect(button).toContainText(ru['run.collecting_stage'].replace('{stage}', 'check links'));
+  await expect(button).toBeDisabled();
+  await expect(button.getByTestId('collect-indicator')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-kisel').getByTestId('tab-collecting')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-pjoice').getByTestId('tab-collecting')).toHaveCount(0);
+
+  const loadsBefore = (await calls(page, 'loadSegments')).length;
+  await page.evaluate(() => window.__setPipeline('kisel', { running: false }));
+  await expect(button).toHaveText(ru['run.collect']);
+  await expect(button).toBeEnabled();
+  await expect(page.getByTestId('tab-collecting')).toHaveCount(0);
+  await expect.poll(async () => (await calls(page, 'loadSegments')).length).toBeGreaterThan(loadsBefore);
+});
+
+test('a reason being typed survives the indicator re-rendering the list', async ({ page }) => {
+  await open(page);
+  await byId(page, 'a1').getByTestId('btn-bugged').click();
+  await byId(page, 'a1').getByTestId('reason-input').fill('half typed');
+  await page.evaluate(() => window.__setPipeline('kisel', { running: true, stage: 'rescore' }));
+  await expect(page.getByTestId('run-collect')).toContainText('rescore');
+  await expect(byId(page, 'a1').getByTestId('reason-input')).toHaveValue('half typed');
+});
+
+test('"Refresh" reloads the interface and keeps the tab, market and filter', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('identity-tab-kisel').click();
+  await page.getByTestId('segment-tab-uk').click();
+  await page.getByTestId('filter-all').check();
+  await expect(page.getByTestId('refresh')).toHaveText(ru['app.refresh']);
+  await page.evaluate(() => { window.__beforeRefresh = true; });
+
+  await page.getByTestId('refresh').click();
+  await expect(page.getByTestId('segment-tab-uk')).toHaveAttribute('aria-selected', 'true');
+  expect(await page.evaluate(() => window.__beforeRefresh)).toBeUndefined();   // a new page
+  await expect(page.getByTestId('filter-all')).toBeChecked();
+  expect((await calls(page, 'loadListing'))[0]).toEqual(['kisel', 'uk', 'all']);
+});

@@ -98,11 +98,61 @@ test('bad input is refused', () => {
 test('a database of another schema version is refused', () => {
   const { store, file } = setup();
   const db = new DatabaseSync(file);
-  db.prepare("UPDATE meta SET value = '2' WHERE key = 'schema_version'").run();
+  db.prepare("UPDATE meta SET value = '3' WHERE key = 'schema_version'").run();
   db.close();
   assert.throws(() => store.segments('test'), SchemaMismatchError);
 });
 
 test('timestamps in the format tools/db.py writes', () => {
   assert.equal(nowIso(new Date('2026-09-29T10:11:12.345Z')), '2026-09-29T10:11:12+00:00');
+});
+
+function insertRun(file, { heartbeat, pid, host, stage = 'check links', status = 'running' }) {
+  const db = new DatabaseSync(file);
+  db.prepare('INSERT INTO pipeline_runs (started_at, heartbeat_at, status, stage, pid, host) '
+    + 'VALUES (?, ?, ?, ?, ?, ?)').run('2026-09-30T00:23:41+00:00', heartbeat, status, stage, pid, host);
+  db.close();
+}
+
+test('a live pipeline run is reported with its stage', () => {
+  const { file } = setup();
+  insertRun(file, { heartbeat: nowIso(), pid: process.pid, host: 'here' });
+  const store = new Store({ schemaDir: SCHEMA_DIR, databasePathOf: () => file, hostname: 'here' });
+  assert.deepEqual(store.pipelineStatus('test'), {
+    running: true, stage: 'check links', startedAt: '2026-09-30T00:23:41+00:00',
+    pid: process.pid, host: 'here',
+  });
+  store.closeAll();
+});
+
+test('a run that stopped beating is not running, whatever its row says', () => {
+  const { file } = setup();
+  insertRun(file, { heartbeat: nowIso(new Date(Date.now() - 60000)), pid: process.pid, host: 'here' });
+  const store = new Store({ schemaDir: SCHEMA_DIR, databasePathOf: () => file, hostname: 'here' });
+  assert.deepEqual(store.pipelineStatus('test'), { running: false });
+  store.closeAll();
+});
+
+test('a run on this machine whose process is gone is not running at once', () => {
+  const { file } = setup();
+  insertRun(file, { heartbeat: nowIso(), pid: 4242, host: 'here' });
+  const alive = new Set();
+  const store = new Store({
+    schemaDir: SCHEMA_DIR, databasePathOf: () => file, hostname: 'here', isPidAlive: (p) => alive.has(p),
+  });
+  assert.equal(store.pipelineStatus('test').running, false);
+  const elsewhere = new Store({
+    schemaDir: SCHEMA_DIR, databasePathOf: () => file, hostname: 'another-machine', isPidAlive: () => false,
+  });
+  assert.equal(elsewhere.pipelineStatus('test').running, true, 'a pid on another host cannot be checked');
+  store.closeAll();
+  elsewhere.closeAll();
+});
+
+test('finished runs and a missing database mean not running', () => {
+  const { store, file } = setup();
+  insertRun(file, { heartbeat: nowIso(), pid: process.pid, host: 'x', status: 'finished' });
+  assert.deepEqual(store.pipelineStatus('test'), { running: false });
+  assert.deepEqual(store.pipelineStatus('other'), { running: false });
+  store.closeAll();
 });

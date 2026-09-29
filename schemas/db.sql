@@ -10,8 +10,11 @@
 -- WHO WRITES WHAT. Each column has exactly one writer, which is what lets the
 -- pipeline and the app write at the same time without overwriting each other:
 --   vacancies.data, vacancies.view, companies, selections*   - the pipeline
+--   pipeline_runs                                            - the pipeline (tools/runstate.py)
 --   vacancies.feedback_* (except feedback_reviewed_at)       - the app
 --   vacancies.feedback_reviewed_at                           - tools/feedback.py
+--
+-- VERSIONS. 1: the first schema. 2: pipeline_runs.
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -80,3 +83,23 @@ CREATE TABLE IF NOT EXISTS selection_items (
 );
 
 CREATE INDEX IF NOT EXISTS selection_items_vacancy ON selection_items(vacancy_id);
+
+-- One row per pipeline run: whether one is going right now, and at what stage.
+-- A run that dies without its `finally` (killed, power cut) stops beating:
+-- readers treat a 'running' row whose heartbeat is older than a threshold as
+-- not running, and the next run marks it 'interrupted'. See tools/runstate.py.
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at   TEXT NOT NULL,
+  heartbeat_at TEXT NOT NULL,
+  finished_at  TEXT,
+  status       TEXT NOT NULL
+               CHECK (status IN ('running', 'finished', 'failed', 'interrupted')),
+  stage        TEXT,
+  pid          INTEGER,
+  host         TEXT,
+  log_path     TEXT,
+  error        TEXT
+);
+
+CREATE INDEX IF NOT EXISTS pipeline_runs_status ON pipeline_runs(status);

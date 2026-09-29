@@ -112,6 +112,15 @@ SELECT COALESCE(capped.fresh_new_shown, 0)                                   AS 
        COALESCE(marked.bugged, 0)                                            AS bugged
 FROM capped, marked;
 
+-- name: pipeline_running
+-- The latest run still marked running. Whether it is really alive is decided
+-- by the reader from heartbeat_at (and the pid, on the same host).
+SELECT id, started_at, heartbeat_at, stage, pid, host
+FROM pipeline_runs
+WHERE status = 'running'
+ORDER BY id DESC
+LIMIT 1;
+
 -- name: set_feedback
 UPDATE vacancies
 SET feedback_status = :status,

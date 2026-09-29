@@ -33,6 +33,17 @@ place in the top at once. Selections are never changed, only added: feedback
 remembers the selection it was given in, and `tools/feedback.py` shows the
 agent the class then and now, so a fix can be seen to have taken.
 
+### Whether a run is going: a heartbeat, not a flag
+`pipeline_runs` (tools/runstate.py) holds one row per pipeline run. A plain
+"running" flag would stay set forever after a hard kill, since the code that
+clears it never runs. So a run refreshes `heartbeat_at` every 10 s from a
+background thread; readers treat a row silent for 45 s as not running, the app
+also checks the pid when the run is on its own machine, and the next run marks
+the silent row 'interrupted'. A normal end or an exception clears the row in
+`finally`. The same row refuses a second concurrent run of one identity: each
+run loads the base, works for an hour and saves it whole, and the second save
+would undo the first. Portable by construction — a timestamp in a file.
+
 ### One row view, two renderers
 `report.vacancy_view()` builds the data of one vacancy row; the Markdown
 report and the app both render it. Two copies of the formatting would drift

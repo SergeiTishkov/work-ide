@@ -11,6 +11,8 @@
   'app.loading': 'Загрузка…',
   'app.error': 'Ошибка: {message}',
   'app.no_identities': 'Идентичностей пока нет. Как создать первую — в docs/ONBOARDING.md.',
+  'app.refresh': '⟳ Обновить',
+  'app.refresh_hint': 'Перечитать списки и перезагрузить интерфейс (разметку, стили, код)',
 
   'identity.never_collected': 'По этой идентичности вакансии ещё не собирались. Нажми «Собрать вакансии».',
   'identity.no_segments': 'В последней подборке нет рынков.',
@@ -19,6 +21,9 @@
   'selection.rebuild': 'пересборка без скачивания',
 
   'run.collect': 'Собрать вакансии',
+  'run.collecting': 'Идёт сбор вакансий…',
+  'run.collecting_stage': 'Идёт сбор: {stage}',
+  'run.collecting_since': 'Сбор идёт с {time} (UTC)',
   'run.feedback': 'Разобрать фидбек ({n})',
   'run.stop': 'Остановить',
   'run.running': 'Идёт {kind}: {identity}…',

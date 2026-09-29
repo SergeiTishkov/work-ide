@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   listingCounts: (identity, segment) => call('counts', identity, segment),
   setFeedback: (identity, id, status, reason) => call('set-feedback', identity, id, status, reason ?? null),
   pendingFeedbackCount: (identity) => call('pending-feedback', identity),
+  pipelineStatus: (identity) => call('pipeline-status', identity),
   getRunState: () => call('run-state'),
   startRun: (request) => call('start-run', request),
   stopRun: () => call('stop-run'),

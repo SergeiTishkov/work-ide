@@ -56,6 +56,7 @@ import report  # noqa: E402
 import salary_benchmark  # noqa: E402
 import score  # noqa: E402
 import progress  # noqa: E402
+import runstate  # noqa: E402
 import selections  # noqa: E402
 
 FETCHERS = {
@@ -429,7 +430,14 @@ def main() -> None:
     started = time.monotonic()
     progress.log(f"pipeline for '{common.ACTIVE_IDENTITY}' started; log: {log_path}")
     try:
-        result = run_pipeline()
+        # Marks the run as going in the database (the app's indicator), and
+        # refuses to start while another run of this identity is alive.
+        with runstate.PipelineRun(log_path=log_path):
+            result = run_pipeline()
+    except runstate.AlreadyRunningError as exc:
+        progress.log(f"!! not started: {exc}")
+        progress.close_log()
+        sys.exit(2)
     finally:
         progress.log(f"pipeline finished in {progress.duration(time.monotonic() - started)}")
         progress.close_log()
