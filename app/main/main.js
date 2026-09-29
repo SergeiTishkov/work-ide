@@ -1,0 +1,101 @@
+'use strict';
+// The Electron main process: one window, and the IPC behind window.api
+// (main/preload.js). All data access and process control lives here; the
+// renderer only asks.
+const path = require('node:path');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { repoRoot, schemaDir } = require('./paths');
+const { Store } = require('./store');
+const { Runner } = require('./runner');
+const { listIdentities } = require('./identities');
+
+const root = repoRoot();
+let identities = [];
+
+const store = new Store({
+  schemaDir: schemaDir(root),
+  databasePathOf: (prefix) => {
+    const entry = identities.find((e) => e.prefix === prefix);
+    return entry ? entry.database : null;
+  },
+});
+
+const fake = process.env.WORK_IDE_FAKE_RUNNER === '1' ? require('./fake-runner') : null;
+const runner = new Runner({
+  root,
+  logDirOf: (prefix) => {
+    const entry = identities.find((e) => e.prefix === prefix);
+    return path.join(entry ? path.dirname(entry.database) : path.join(root, 'data', prefix), 'runs');
+  },
+  ...(fake ? { spawn: fake.fakeSpawn, kill: fake.fakeKill } : {}),
+});
+
+// Errors cross IPC as values, not exceptions: the renderer shows them.
+function handle(channel, fn) {
+  ipcMain.handle(channel, async (_event, ...args) => {
+    try {
+      return { ok: true, value: await fn(...args) };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+}
+
+function registerIpc(window) {
+  handle('identities', async () => {
+    identities = await listIdentities({ root });
+    return identities.map(({ prefix, displayName, hasDatabase }) => ({ prefix, displayName, hasDatabase }));
+  });
+  handle('segments', (identity) => store.segments(identity));
+  handle('listing', (identity, segment, filter) => store.listing(identity, segment, filter));
+  handle('counts', (identity, segment) => store.counts(identity, segment));
+  handle('set-feedback', (identity, id, status, reason) => store.setFeedback(identity, id, status, reason));
+  handle('pending-feedback', (identity) => store.pendingFeedback(identity));
+  handle('run-state', () => runner.state());
+  handle('start-run', ({ identity, kind }) => {
+    // The agent may create or rebuild the database; do not hold it open.
+    store.closeAll();
+    return runner.start(kind, identity);
+  });
+  handle('stop-run', () => runner.stop());
+  handle('open-external', (url) => {
+    if (!/^https?:\/\//i.test(url)) throw new Error('only http(s) links open');
+    return shell.openExternal(url);
+  });
+
+  runner.onEvent((event) => {
+    if (event.type === 'exit') store.closeAll();
+    if (!window.isDestroyed()) window.webContents.send('run-event', event);
+  });
+}
+
+function createWindow() {
+  // WORK_IDE_HIDDEN_WINDOW=1: the window is never shown, though its page still
+  // renders and responds. The smoke test drives the real app this way, so
+  // running the tests does not flash a window on the desktop.
+  const hidden = process.env.WORK_IDE_HIDDEN_WINDOW === '1';
+  const window = new BrowserWindow({
+    width: 1280,
+    height: 900,
+    show: !hidden,
+    paintWhenInitiallyHidden: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      backgroundThrottling: !hidden,
+    },
+  });
+  window.removeMenu();
+  registerIpc(window);
+  window.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  return window;
+}
+
+app.whenReady().then(createWindow);
+app.on('window-all-closed', () => {
+  if (runner.state().running) runner.stop();
+  store.closeAll();
+  app.quit();
+});

@@ -1,0 +1,17 @@
+{
+  "name": "work-ide-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Work IDE desktop app: per-identity vacancy lists, feedback, and agent runs",
+  "main": "main/main.js",
+  "scripts": {
+    "start": "node scripts/start.js",
+    "test": "npm run test:unit && npm run test:ui",
+    "test:unit": "node --test --disable-warning=ExperimentalWarning \"test/unit/*.test.js\"",
+    "test:ui": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "electron": "44.4.5"
+  }
+}

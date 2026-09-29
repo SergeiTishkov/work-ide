@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title></title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <nav class="tabs identity-tabs" role="tablist" data-testid="identity-tabs"></nav>
+  </header>
+  <div class="error" data-testid="error" hidden></div>
+  <main class="panel" data-testid="panel"></main>
+  <section class="runlog" data-testid="run-panel" hidden>
+    <div class="runlog-head">
+      <span class="runlog-title" data-testid="run-status"></span>
+    </div>
+    <pre data-testid="run-log"></pre>
+  </section>
+  <script src="locales/ru.js"></script>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
