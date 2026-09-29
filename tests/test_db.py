@@ -158,3 +158,29 @@ def test_migration_refuses_to_run_twice(isolated_data_dir):
     db.migrate_from_json()
     with pytest.raises(RuntimeError):
         db.migrate_from_json()
+
+
+def test_dump_gives_the_shortlist_with_full_descriptions(isolated_data_dir, capsys):
+    """RUNBOOK step 1.5 reads full descriptions; the base is no longer a file
+    one can open, so `kb.py dump` is the way in."""
+    import argparse
+
+    import yaml
+
+    def shortlisted(vid, cls, score):
+        return _vacancy(vid, computed={"score": score, "classification": cls},
+                        description_text=f"Full text of {vid}")
+
+    kb.save_vacancies({
+        "h": shortlisted("h", "hot_lead", 70),
+        "l": shortlisted("l", "long_shot", 30),
+        "r": shortlisted("r", "rejected", 0),
+        "d": {**shortlisted("d", "hot_lead", 90), "duplicate_of": "h"},
+    })
+    kb.cmd_dump(argparse.Namespace(id=None, min_class="long_shot"))
+    records = yaml.safe_load(capsys.readouterr().out)
+    assert [r["id"] for r in records] == ["h", "l"]
+    assert records[0]["description_text"] == "Full text of h"
+
+    kb.cmd_dump(argparse.Namespace(id=None, min_class="hot_lead"))
+    assert [r["id"] for r in yaml.safe_load(capsys.readouterr().out)] == ["h"]

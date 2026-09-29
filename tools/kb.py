@@ -426,6 +426,45 @@ def attach_company_reputation(vacancies: dict, companies: dict) -> None:
             v.pop("_company_intel", None)
 
 
+# The shortlist classes from best to worst; `dump --min-class` takes a cut.
+SHORTLIST_ORDER = ("hot_lead", "worth_a_look", "long_shot")
+
+
+def cmd_dump(args) -> None:
+    """Full records, descriptions included, as YAML — what the checklist pass
+    (RUNBOOK step 1.5) reads. It used to open the JSON file directly; the base
+    is a database now, and this is the readable way into it."""
+    import yaml
+
+    vacancies = load_vacancies()
+    if args.id:
+        chosen = [vacancies[i] for i in args.id if i in vacancies]
+    else:
+        wanted = SHORTLIST_ORDER[:SHORTLIST_ORDER.index(args.min_class) + 1]
+        chosen = [
+            v for v in vacancies.values()
+            if (v.get("computed") or {}).get("classification") in wanted
+            and not v.get("duplicate_of")
+            and (v.get("link_check") or {}).get("status") != "dead"
+        ]
+        chosen.sort(key=lambda v: -(v.get("computed") or {}).get("score", 0))
+    records = []
+    for v in chosen:
+        c = v.get("computed") or {}
+        records.append({
+            "id": v["id"], "title": v.get("title"), "company": v.get("company"),
+            "url": v.get("url"), "source": v.get("source"),
+            "location_raw": v.get("location_raw"),
+            "classification": c.get("classification"), "score": c.get("score"),
+            "needs_manual_review": c.get("needs_manual_review"),
+            "dealbreakers": c.get("dealbreakers") or [],
+            "manual": v.get("manual") or {},
+            "description_text": v.get("description_text") or "",
+        })
+    sys.stdout.reconfigure(encoding="utf-8")
+    print(yaml.safe_dump(records, allow_unicode=True, sort_keys=False, width=100))
+
+
 def cmd_migrate_to_sqlite(_args) -> None:
     result = db.migrate_from_json()
     print(
@@ -456,6 +495,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_list.add_argument("--include-duplicates", action="store_true",
                         help="Do not hide records marked as duplicates")
     p_list.set_defaults(func=cmd_list)
+
+    p_dump = sub.add_parser(
+        "dump", help="Shortlist records with full descriptions, as YAML (the checklist pass)")
+    p_dump.add_argument("--min-class", choices=SHORTLIST_ORDER, default="long_shot",
+                        help="Include this class and everything above it")
+    p_dump.add_argument("--id", action="append", default=None,
+                        help="Dump these vacancies instead (repeatable)")
+    p_dump.set_defaults(func=cmd_dump)
 
     p_show = sub.add_parser("show", help="The full vacancy record, by id")
     p_show.add_argument("--id", required=True)

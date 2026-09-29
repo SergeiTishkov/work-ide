@@ -112,6 +112,30 @@ repository root: the report is opened by hand, and hunting for it in a tree of
 accumulated data is a nuisance. It is not in git and not in a fresh clone — the
 tools create it themselves on the first run.
 
+## The desktop app
+
+`WorkIDE.cmd` (double-click, or a desktop shortcut to it; elsewhere
+`cd app && npm install && npm start`) opens a window over the knowledge base:
+
+- a tab per identity, and inside it a tab per market of the latest selection;
+- a filter per market: fresh without feedback (the default), all, all fresh,
+  applied, not for me, wrong pick — each market remembers its own;
+- three answers on every vacancy: **Applied**, **Not for me**, **Wrong pick**,
+  the last two with an optional reason. A wrong pick is a bug report against
+  the filter;
+- **Collect vacancies** runs `/run` for the identity in Claude Code, headless,
+  with a live log; **Review feedback (N)** runs `/feedback`, which gathers the
+  pending answers (`tools/feedback.py`) and fixes the filter. The agent edits
+  and tests but never commits — the changes wait for you.
+
+It needs Node.js and, for the two buttons, the `claude` CLI on `PATH`. The app
+only lists and records; everything else is the same Python as ever. Its tests
+(`cd app && npm test`) spend no tokens: the agent is mocked at the boundary.
+
+The knowledge base of an identity created before the app is still JSON; move it
+once with `python tools/kb.py --identity <prefix> migrate-to-sqlite` (it keeps
+the JSON as `*.json.bak`).
+
 ## How it works
 
 1. **Collection.** Several sources needing no authorisation: remote-work
@@ -248,6 +272,7 @@ If you work through Claude Code, the project ships some ready-made entry points:
 | `/add-identity` | Add another search without breaking the one already tuned |
 | `/check` | Self-check: environment, identities, sources, tests |
 | `/applied` | Record an application and its outcome |
+| `/feedback` | Review the answers given in the desktop app and fix the filter |
 
 These are thin wrappers over the documentation rather than a duplicate of it:
 they guarantee the right document gets read and the mandatory steps are not
@@ -259,5 +284,6 @@ Apache License 2.0 — see [LICENSE](LICENSE). Use it, change it, share it.
 
 ## Requirements
 
-Python 3.9+ and three dependencies (`requests`, `PyYAML`, `pytest`). No API
-keys, no paid subscriptions, no external services.
+Python 3.9+ and three dependencies (`requests`, `PyYAML`, `pytest`); SQLite
+comes with Python. No API keys, no paid subscriptions, no external services.
+The desktop app additionally needs Node.js.

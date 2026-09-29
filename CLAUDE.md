@@ -157,16 +157,21 @@ The project is succeeding if:
   the market, rather than restating what the code already says.
 - The tests (`pytest`) pass and genuinely exercise edge cases, not only the
   happy path.
-- The data is readable by a person directly in a text editor (Markdown, JSON,
-  YAML), with no database or UI to start up.
+- The data is readable by a person without a server to start up: Markdown,
+  JSON and YAML in a text editor, and the knowledge base through the desktop
+  app or `tools/kb.py` / `tools/feedback.py`, which print it as YAML.
 
 ---
 
 ## 5. Engineering principles
 
-- **The file system is the database.** No SQL or NoSQL servers. Human-readable
-  formats: JSON for machine-readable structures, Markdown for reports and for
-  accumulated conclusions, YAML for configuration.
+- **The database is a file.** No SQL or NoSQL servers. The knowledge base of
+  each identity is one SQLite file (`data/<prefix>/<prefix>.sqlite`, schema in
+  `schemas/db.sql`) — since 2026-09-29, when the desktop app became a second
+  writer beside the pipeline and a 150 MB JSON file could no longer be written
+  by both safely. Everything else stays human-readable: JSON for small
+  machine-readable state, Markdown for reports and accumulated conclusions,
+  YAML for configuration.
 - **Idempotence, and safety on re-run.** The pipeline can be run as many times
   in a row as you like; it creates no duplicates, loses no history, and does not
   fail when an external source is unavailable — it logs the problem and carries

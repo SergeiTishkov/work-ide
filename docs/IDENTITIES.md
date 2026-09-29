@@ -97,7 +97,7 @@ in different folders, and that will be a silent mistake. `kisel_notes.md` and
 in any context: in a project-wide search, in an editor tab, in `grep` output.
 
 The rule extends to the data:
-`data/kisel/knowledge/kisel_vacancies.json`, `reports/kisel_latest.md`. A report
+`data/kisel/kisel.sqlite`, `reports/kisel_latest.md`. A report
 opened in its own tab or forwarded to somebody has to identify itself.
 
 Checked automatically: `python tools/identity.py validate`.

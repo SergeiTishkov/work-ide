@@ -89,8 +89,9 @@ Confirmed explicitly by the user (2026-07-30) after a vacancy with an outright
 the final word.** For every vacancy at `long_shot` and above (including
 `needs_manual_review`) the agent must:
 
-1. Read its **full** `description_text` from
-   `data/<p>/knowledge/<p>_vacancies.json` (locally, no network) — not only the
+1. Read its **full** `description_text` —
+   `python tools/kb.py --identity <p> dump --min-class long_shot` prints every
+   such vacancy with its description (locally, no network) — not only the
    `score_breakdown` and highlights in the report.
 2. Work through [docs/VACANCY_CHECKLIST.md](docs/VACANCY_CHECKLIST.md) point by
    point, recording each result explicitly rather than by eye.

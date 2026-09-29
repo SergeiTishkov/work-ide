@@ -6,8 +6,8 @@ the word "required", "ITAR: must be a U.S. person" and the like). So for every
 vacancy that passed the automation and landed in
 `hot_lead`/`worth_a_look`/`long_shot`/`needs_manual_review` — **before treating
 it as a real find** — the agent must read its description in full
-(`data/<p>/knowledge/<p>_vacancies.json` → `description_text`, locally, no
-network) and work through this checklist point by point. The checklist lives in
+(`python tools/kb.py --identity <p> dump --min-class long_shot` →
+`description_text`, locally, no network) and work through this checklist point by point. The checklist lives in
 a file deliberately, rather than in the agent's memory, so that every point can
 be seen to be closed rather than relying on "it looked all right".
 

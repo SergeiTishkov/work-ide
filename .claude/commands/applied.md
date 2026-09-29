@@ -11,8 +11,13 @@ python tools/kb.py set-status --identity <p> --id <id> \
     --status applied --notes "what exactly was sent, and when"
 ```
 
-Statuses: `new`, `applied`, `interviewing`, `offer`, `rejected`,
-`not_relevant`.
+Statuses: `new`, `shortlisted`, `applied`, `interviewing`, `offer`,
+`rejected_by_owner`, `dead_link`, `not_relevant`.
+
+In the desktop app the person records the same with one click ("Applied", "Not
+for me", "Wrong pick"); that is kept as feedback in the database and gathered
+by `tools/feedback.py` (see `/feedback`). This command stays for what the app
+does not cover yet: interviews, offers, notes on what was sent.
 
 ## Why this matters
 

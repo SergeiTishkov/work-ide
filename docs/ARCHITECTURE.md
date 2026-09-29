@@ -6,12 +6,38 @@ section 6).
 
 ## Decisions taken
 
-### The file system as the database
-JSON for machine-readable structures (`vacancies.json`, `companies.json`,
-`state.json`), Markdown for reports and for `insights.md`, YAML for
-configuration. No SQL or NoSQL server — the repository has to be both the
-program and the knowledge base at once, readable in an ordinary editor (a
-requirement of the brief and of CLAUDE.md).
+### The database is a file
+No SQL or NoSQL server — the repository has to be both the program and the
+knowledge base at once (a requirement of the brief and of CLAUDE.md).
+
+Vacancies and companies live in one SQLite file per identity,
+`data/<prefix>/<prefix>.sqlite` (schema: `schemas/db.sql`, access:
+`tools/db.py`). Until 2026-09-29 they were `vacancies.json` and
+`companies.json`; the move came with the desktop app, which records a person's
+feedback while the pipeline may be rewriting the base. With a 150 MB JSON file
+every click rewrote the whole file and two writers could silently lose each
+other's work. In SQLite **each column has exactly one writer** (listed at the
+top of `schemas/db.sql`): the pipeline the record and the selections, the app
+the feedback, `tools/feedback.py` the review mark. `kb.load_vacancies()` still
+returns a dict, so the rest of the code did not change.
+
+`state.json` and `recruiters.json` stay JSON (small, one writer), Markdown
+stays for reports and `insights.md`, YAML for configuration.
+
+### Selections: what each run showed
+Every run records a selection (`tools/selections.py`): the shortlist split by
+market exactly as the report splits it, every listed vacancy with its class and
+score at that moment. The app lists vacancies with queries over it
+(`schemas/queries.sql`) rather than from files, so marking a vacancy frees its
+place in the top at once. Selections are never changed, only added: feedback
+remembers the selection it was given in, and `tools/feedback.py` shows the
+agent the class then and now, so a fix can be seen to have taken.
+
+### One row view, two renderers
+`report.vacancy_view()` builds the data of one vacancy row; the Markdown
+report and the app both render it. Two copies of the formatting would drift
+apart. The refactor that introduced it was checked byte for byte against the
+old renderer on 400 real vacancies.
 
 ### Boring, minimal dependencies
 Only `requests` and `PyYAML` (plus `pytest` for the tests). RSS is parsed with
@@ -30,11 +56,11 @@ deliberate division of labour rather than an omission: the automation is a
 recall-oriented first filter (better to let through something not quite
 relevant than to miss a good vacancy), the agent a precision-oriented second.
 
-### `companies.json` as a derived view
-Originally `companies.json` was updated incrementally alongside the vacancies.
+### Companies as a derived view
+Originally companies were updated incrementally alongside the vacancies.
 Testing on real data showed that would desynchronise the counters between runs.
-Rebuilt: `companies.json` is now **recomputed whole** on every run from the
-current `vacancies.json` (`kb.build_companies_from_vacancies`), carrying over
+Rebuilt: companies are now **recomputed whole** on every run from the
+current vacancies (`kb.build_companies_from_vacancies`), carrying over
 only `notes` and `first_seen` from the previous version. That guarantees
 `vacancy_ids` and the signal counters can never drift away from the real state
 of the vacancy database.

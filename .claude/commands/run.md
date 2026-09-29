@@ -4,6 +4,8 @@ description: Run the ordinary research cycle and produce a shortlist of vacancie
 
 Run the full search cycle.
 
+Identity, when given: `$ARGUMENTS` (empty means: establish it in step 1).
+
 **The instructions are in `RUNBOOK.md`; read it in full.** What follows is only
 the skeleton, plus the parts most often skipped.
 
@@ -27,7 +29,8 @@ the skeleton, plus the parts most often skipped.
 3. `python tools/pipeline.py --identity <p>` — collection, scoring, report.
 4. **Work through `docs/VACANCY_CHECKLIST.md` for every candidate at long_shot
    and above — this is a mandatory step, not a recommendation.** Read the full
-   `description_text` from the base, not only the score breakdown.
+   `description_text` from the base, not only the score breakdown:
+   `python tools/kb.py --identity <p> dump --min-class long_shot`.
 5. **Close out the reputation of the shortlist companies — also mandatory.**
 
    ```
@@ -67,6 +70,28 @@ Fix what you find **systemically**: edit `<p>_criteria.yaml` rather than
 discarding one vacancy by hand. And record the conclusions in
 `data/<p>/knowledge/<p>_insights.md` — the next run should be more accurate than
 this one.
+
+## Feedback from the app
+
+The pipeline ends with a line like `pending feedback: 3 wrong picks, 1 not for
+me` when the person has marked vacancies in the desktop app. A "wrong pick" is
+a bug report against the filter. After the steps above, handle it as
+`/feedback` describes (`.claude/commands/feedback.md`).
+
+## Started from the desktop app (headless)
+
+The app runs this command as `claude -p "/run <p>"`, with the identity given.
+Nobody is there to answer, so:
+
+- **Do not ask anything.** The identity is the one given; do not look for
+  another.
+- **The template question in step 2 is answered "not now"**: report in the
+  summary that the template moved ahead and what changed, and leave the update
+  to the person.
+- **Do not commit.** Edit code, criteria and tests as usual and run pytest;
+  the person reviews the changes.
+- The app shows your text as a live log, so say briefly what each step is
+  doing as you go.
 
 ## At the end
 
