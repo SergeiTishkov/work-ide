@@ -83,6 +83,7 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .details summary { cursor: pointer; color: var(--accent); }
 .details ul { margin: 4px 0; padding-left: 18px; }
 .answers, .marked { display: flex; gap: 6px; align-items: center; margin: 8px 0 0 38px; }
+button.open { margin-right: 10px; color: var(--accent); border-color: var(--accent); }
 .reason { margin: 6px 0 0 38px; }
 .reason textarea { width: 100%; max-width: 640px; font: inherit; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
 .reason-actions { display: flex; gap: 6px; margin-top: 4px; }

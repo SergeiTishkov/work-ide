@@ -428,7 +428,7 @@
           href: view.url || '#', class: 'title', testid: 'title',
           onclick: (event) => {
             event.preventDefault();
-            if (view.url) guarded(() => api.openExternal(view.url));
+            openLink(view);
           },
         }, view.title || item.id),
         el('span', { class: 'company' }, view.company || ''),
@@ -472,9 +472,22 @@
     return el('details', { class: 'details' }, el('summary', {}, t('row.details')), el('ul', {}, lines));
   }
 
+  // Opens the vacancy the way the operating system opens any link: in the
+  // default browser, as a new tab when it is already running.
+  function openLink(view) {
+    if (view.url) guarded(() => api.openExternal(view.url));
+  }
+
+  function openButton(view) {
+    return el('button', {
+      class: 'open', testid: 'btn-open', disabled: !view.url, onclick: () => openLink(view),
+    }, t('action.open'));
+  }
+
   function renderAnswers(item) {
     const open = state.reasonFor && state.reasonFor.id === item.id ? state.reasonFor.status : null;
     const answers = el('div', { class: 'answers' },
+      openButton(item.view || {}),
       el('button', { testid: 'btn-applied', onclick: () => mark(item, 'applied', null) }, t('action.applied')),
       el('button', {
         testid: 'btn-rejected', class: open === 'rejected' ? 'pressed' : null,
@@ -501,6 +514,7 @@
     const { status, rejectedReason, buggedReason } = item.feedback;
     const reason = status === 'rejected' ? rejectedReason : status === 'bugged' ? buggedReason : null;
     return el('div', { class: 'marked' },
+      openButton(item.view || {}),
       el('span', { class: `badge status ${status}`, testid: 'status-badge' }, t(STATUS_KEYS[status])),
       reason && el('span', { class: 'reason-text', testid: 'status-reason' }, reason),
       el('button', { class: 'link', testid: 'btn-undo', onclick: () => undo(item.id) }, t('action.undo')));

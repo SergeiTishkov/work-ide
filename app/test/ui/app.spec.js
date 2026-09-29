@@ -216,3 +216,16 @@ test('every row shows when it was posted and when we first downloaded it', async
   await expect(byId(page, 'a2r').getByTestId('posted-on'))
     .toHaveText(ru['row.posted_on'].replace('{date}', ru['row.date_unknown']));
 });
+
+test('"Open the vacancy link" hands the URL to the system browser, marked or not', async ({ page }) => {
+  await open(page);
+  const button = byId(page, 'a1').getByTestId('btn-open');
+  await expect(button).toHaveText(ru['action.open']);
+  await button.click();
+  expect(await calls(page, 'openExternal')).toEqual([['https://example.test/a1']]);
+  expect(await calls(page, 'setFeedback')).toEqual([]);   // opening is not an answer
+
+  await page.getByTestId('filter-bugged').check();
+  await byId(page, 'x1').getByTestId('btn-open').click();
+  expect((await calls(page, 'openExternal')).at(-1)).toEqual(['https://example.test/x1']);
+});
