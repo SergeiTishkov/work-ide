@@ -39,6 +39,8 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
       WORK_IDE_IDENTITIES_JSON: repo.identities,
       WORK_IDE_FAKE_RUNNER: '1',
       WORK_IDE_HIDDEN_WINDOW: '1',
+      // Its own profile: the real app may be open on the owner's desktop.
+      WORK_IDE_USER_DATA: path.join(repo.root, 'electron-profile'),
     },
   });
   try {

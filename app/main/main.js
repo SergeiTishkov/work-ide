@@ -9,6 +9,11 @@ const { Store } = require('./store');
 const { Runner } = require('./runner');
 const { listIdentities } = require('./identities');
 
+// A separate profile folder for test instances. Two Electron processes on one
+// profile collide — the smoke test failed at random while the owner had the
+// real app open (2026-09-30).
+if (process.env.WORK_IDE_USER_DATA) app.setPath('userData', process.env.WORK_IDE_USER_DATA);
+
 const root = repoRoot();
 const UI_ZOOM = 1.2;
 let identities = [];
