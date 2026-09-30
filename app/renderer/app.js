@@ -86,13 +86,15 @@
     expanded: new Set(),   // classes showing all their rows in this view
     classTotals: {},       // class -> how many the current filter holds
     run: { running: false },
-    runStatus: '',
+    // a function, so the status follows a change of language
+    runStatus: null,
     log: [],
     // prefix -> { running, stage, startedAt }: a pipeline run of that
     // identity, however it was started (tools/runstate.py)
     pipelines: {},
     // restored after "Refresh" (page reload): which tab, market and filter
     restored: null,
+    languageOpen: false,   // the language drop-down is open
   };
 
   // --- the view survives "Refresh" and a restart ----------------------------
@@ -179,9 +181,12 @@
 
   // "2026-09-29" -> "29.09.2026"; the pipeline has already reduced every
   // source's format to YYYY-MM-DD, or to null when the source gave none.
+  // Written as the language writes dates: "29.09.2026", "29 Sep 2026".
   function formatDate(isoDate) {
     const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate || '');
-    return match ? `${match[3]}.${match[2]}.${match[1]}` : t('row.date_unknown');
+    if (!match) return t('row.date_unknown');
+    const month = t('date.months').split(' ')[Number(match[2]) - 1];
+    return t('date.format', { day: match[3], mm: match[2], month, year: match[1] });
   }
 
   function filterKey(identity, segment) {
@@ -409,7 +414,8 @@
       }
       state.run = { running: true, identity: state.active, kind };
       state.log = [];
-      state.runStatus = t('run.running', { kind: t(RUN_KIND_KEYS[kind]), identity: state.active });
+      const identity = state.active;
+      state.runStatus = () => t('run.running', { kind: t(RUN_KIND_KEYS[kind]), identity });
       render();
     });
   }
@@ -423,16 +429,16 @@
   function onRunEvent(event) {
     if (event.type === 'start') {
       state.run = { running: true, identity: event.identity, kind: event.kind };
-      state.runStatus = t('run.running', { kind: t(RUN_KIND_KEYS[event.kind]), identity: event.identity });
+      state.runStatus = () => t('run.running', { kind: t(RUN_KIND_KEYS[event.kind]), identity: event.identity });
     } else if (event.type === 'output') {
       state.log.push(event.text);
       if (state.log.length > LOG_LIMIT) state.log.splice(0, state.log.length - LOG_LIMIT);
     } else if (event.type === 'exit') {
       state.run = { running: false };
-      if (event.error === 'claude_not_found') state.runStatus = t('run.claude_not_found');
-      else if (event.code === 0) state.runStatus = t('run.finished');
-      else if (event.code === null) state.runStatus = t('run.stopped');
-      else state.runStatus = t('run.failed', { code: event.code });
+      if (event.error === 'claude_not_found') state.runStatus = () => t('run.claude_not_found');
+      else if (event.code === 0) state.runStatus = () => t('run.finished');
+      else if (event.code === null) state.runStatus = () => t('run.stopped');
+      else state.runStatus = () => t('run.failed', { code: event.code });
       render();
       // A run may have created the database, recorded a selection or changed
       // the feedback: everything on screen is reloaded.
@@ -450,10 +456,54 @@
 
   function render() {
     document.title = t('app.title');
+    renderLanguagePicker();
     renderIdentityTabs();
     renderPanel();
     renderRunPanel();
   }
+
+  // --- the language: a small drop-down of flags --------------------------------
+
+  function flag(language) {
+    return el('img', { class: 'flag', src: `flags/${language}.svg`, alt: '', width: 21, height: 14 });
+  }
+
+  function renderLanguagePicker() {
+    const picker = document.querySelector('[data-testid="language-picker"]');
+    const current = I18n.language();
+    const button = el('button', {
+      class: 'language-button', testid: 'language-button',
+      title: t('language.choose'), 'aria-label': t('language.choose'),
+      'aria-haspopup': 'listbox', 'aria-expanded': state.languageOpen ? 'true' : 'false',
+      onclick: (event) => { event.stopPropagation(); toggleLanguages(!state.languageOpen); },
+    }, flag(current), el('span', { class: 'caret' }, '▾'));
+    const menu = state.languageOpen && el('ul', { class: 'language-menu', role: 'listbox', testid: 'language-menu' },
+      I18n.languages.map((language) => el('li', {
+        role: 'option',
+        class: language === current ? 'active' : null,
+        'aria-selected': language === current ? 'true' : 'false',
+        testid: `language-option-${language}`,
+        onclick: (event) => { event.stopPropagation(); chooseLanguage(language); },
+      }, flag(language), el('span', {}, t('language.name', null, language)))));
+    picker.replaceChildren(button, menu || '');
+  }
+
+  function toggleLanguages(open) {
+    if (state.languageOpen === open) return;
+    state.languageOpen = open;
+    renderLanguagePicker();
+  }
+
+  function chooseLanguage(language) {
+    state.languageOpen = false;
+    I18n.setLanguage(language);
+    render();
+  }
+
+  document.addEventListener('click', () => toggleLanguages(false));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') toggleLanguages(false);
+  });
 
   function renderIdentityTabs() {
     const nav = document.querySelector('[data-testid="identity-tabs"]');
@@ -810,7 +860,7 @@
     panel.hidden = !visible;
     if (!visible) return;
     document.querySelector('[data-testid="run-status"]').textContent =
-      `${t('run.log_title')} · ${state.runStatus}`;
+      `${t('run.log_title')} · ${state.runStatus ? state.runStatus() : ''}`;
     const log = document.querySelector('[data-testid="run-log"]');
     log.textContent = state.log.join('\n');
     log.scrollTop = log.scrollHeight;
@@ -850,7 +900,7 @@
     const run = await api.getRunState();
     if (run && run.running) {
       state.run = run;
-      state.runStatus = t('run.running', { kind: t(RUN_KIND_KEYS[run.kind]), identity: run.identity });
+      state.runStatus = () => t('run.running', { kind: t(RUN_KIND_KEYS[run.kind]), identity: run.identity });
     }
     render();
     await loadIdentities();

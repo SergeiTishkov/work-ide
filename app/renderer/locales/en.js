@@ -1,0 +1,120 @@
+// English texts of the interface. Holds exactly the keys of ru.js (a unit
+// test compares them), each with the same {placeholders}.
+(function (root, factory) {
+  const value = factory();
+  if (typeof module === 'object' && module.exports) module.exports = value;
+  else root.LOCALE_EN = value;
+}(typeof self !== 'undefined' ? self : this, () => ({
+  'language.name': 'English',
+  'language.choose': 'Interface language',
+
+  'app.title': 'Work IDE',
+  'app.loading': 'Loading…',
+  'app.error': 'Error: {message}',
+  'app.no_identities': 'No identities yet. How to create the first one: docs/ONBOARDING.md.',
+  'app.refresh': '⟳ Refresh',
+  'app.refresh_hint': 'Re-read the lists and reload the interface (markup, styles, code)',
+
+  'date.format': '{day} {month} {year}',
+  'date.months': 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec',
+
+  'identity.never_collected': 'No vacancies have been collected for this identity yet. Press "Collect vacancies".',
+  'identity.no_segments': 'The latest selection has no markets.',
+
+  'selection.caption': 'Selection #{id} · run {run} · {date}',
+  'selection.rebuild': 'rebuilt without downloading',
+
+  'run.collect': 'Collect vacancies',
+  'run.collecting': 'Collecting vacancies…',
+  'run.collecting_stage': 'Collecting: {stage}',
+  'run.collecting_since': 'Collecting since {time} (UTC)',
+  'run.feedback': 'Review feedback ({n})',
+  'run.stop': 'Stop',
+  'run.running': 'Running {kind}: {identity}…',
+  'run.kind.collect': 'vacancy collection',
+  'run.kind.feedback': 'feedback review',
+  'run.finished': 'The run has finished.',
+  'run.failed': 'The run failed (code {code}).',
+  'run.stopped': 'The run was stopped.',
+  'run.claude_not_found': 'The claude command was not found. Install the Claude Code CLI and check PATH.',
+  'run.busy': 'Another run is already going.',
+  'run.log_title': 'Run log',
+
+  'filter.legend': 'Show',
+  'filter.fresh_new': 'Fresh, no feedback',
+  'filter.all': 'All',
+  'filter.fresh': 'All fresh',
+  'filter.applied': 'Applied',
+  'filter.rejected': 'Not for me',
+  'filter.bugged': 'Wrong picks',
+  'filter.expired': 'Expired',
+  'filter.contacted': 'Contact made',
+  'filter.interview': 'Interviews',
+  'filter.awaiting_final': 'Waiting for the final word',
+  'filter.count': '({n})',
+
+  'class.hot_lead': '🔥 Hot leads — look at these first',
+  'class.worth_a_look': '👀 Worth a look',
+  'class.long_shot': '🕰️ Long shots',
+  'class.national_market': '🌍 National markets',
+  'class.remote_unconfirmed': '🏢 Remote not confirmed',
+  'class.engagement_unconfirmed': '⏱️ Hours not confirmed',
+
+  'list.empty': 'Nothing here.',
+  'list.show_more': 'Show {n} more',
+  'list.show_less': 'Show less',
+
+  'row.details': 'Details',
+  'row.posted_on': '📅 Posted: {date}',
+  'row.first_seen_on': '📥 Downloaded: {date}',
+  'row.date_unknown': 'not stated',
+  'row.salary': '💰 Salary',
+  'row.hiring_country': '🌍 Hiring country',
+  'row.to_confirm': '❓ Still to confirm',
+  'row.technologies': '🧰 Technologies',
+  'row.reputation': '⭐ Reputation',
+  'row.company_age': '🏛 Company',
+  'row.company_site': '🏢 Company site',
+  'row.note': 'Note',
+
+  'badge.fresh': 'fresh',
+  'badge.manual_review': 'needs a manual check',
+
+  'action.open': '🔗 Open the vacancy link',
+  'action.applied': 'Applied',
+  'action.rejected': 'Not for me',
+  'action.bugged': 'Wrong pick',
+  'action.expired': 'Vacancy expired',
+  'action.undo': 'undo',
+
+  'reason.rejected': 'Why not for you? (optional)',
+  'reason.bugged': 'What is wrong with the pick? (optional)',
+  'reason.save': 'Save',
+  'reason.cancel': 'Cancel',
+
+  'status.applied': 'Applied',
+  'status.rejected': 'Not for me',
+  'status.bugged': 'Wrong pick',
+  'status.expired': 'Vacancy expired',
+  'status.contacted': 'Contact happened',
+  'status.interview': 'Interview',
+  'status.awaiting_final': 'Waiting for the final word',
+
+  'step.contacted': 'Contact happened',
+  'step.interview': 'Interview scheduled',
+  'step.awaiting_final': 'Waiting for the final word',
+  'step.hint.contacted': 'How did the first contact go? Who, what was agreed… (optional)',
+  'step.hint.interview': 'The interview: with whom, when, how it went, what they asked… (optional)',
+  'step.hint.awaiting_final': 'What they promised to answer, and when… (optional)',
+
+  'timeline.applied': 'Applied',
+  'timeline.contact': 'First contact happened',
+  'timeline.interview': 'Interview #{n} done',
+  'timeline.final': 'Waiting for the final word',
+  'timeline.rejected': 'Not for me',
+  'timeline.bugged': 'Wrong pick',
+  'timeline.expired': 'Vacancy expired',
+  'timeline.edit': 'Edit the comment',
+  'timeline.edit_hint': 'Comment',
+  'stub.marked': 'Marked: {status}',
+})));

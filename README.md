@@ -141,6 +141,10 @@ It opens a window over the knowledge base:
   stage — whoever started it (the app, the agent, a terminal); a dot marks the
   identity's tab. **Refresh** re-reads everything and reloads the interface
   itself (markup, styles, code), keeping the tab, market and filter.
+- the interface speaks Russian or English: a flag in the top right opens a
+  drop-down of flags, and the choice is remembered. It covers the interface
+  only — the lines the pipeline writes about a vacancy (highlights, salary
+  notes) follow `preferences.language` of the identity, like the report.
 
 It needs Node.js and, for the two buttons, the `claude` CLI on `PATH`. The app
 only lists and records; everything else is the same Python as ever. Its tests

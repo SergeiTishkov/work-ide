@@ -1,5 +1,6 @@
-// Russian texts of the interface: the only place UI text lives. Keys are
-// "namespace.name"; {name} is replaced by t(key, {name: value}).
+// Russian texts of the interface (en.js holds the same keys in English): the
+// only place UI text lives. Keys are "namespace.name"; {name} is replaced by
+// t(key, {name: value}).
 // A plain script (not a module) so it loads the same way in Electron, in a
 // headless browser and in node:test.
 (function (root, factory) {
@@ -7,12 +8,18 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.LOCALE_RU = value;
 }(typeof self !== 'undefined' ? self : this, () => ({
+  'language.name': 'Русский',
+  'language.choose': 'Язык интерфейса',
+
   'app.title': 'Work IDE',
   'app.loading': 'Загрузка…',
   'app.error': 'Ошибка: {message}',
   'app.no_identities': 'Идентичностей пока нет. Как создать первую — в docs/ONBOARDING.md.',
   'app.refresh': '⟳ Обновить',
   'app.refresh_hint': 'Перечитать списки и перезагрузить интерфейс (разметку, стили, код)',
+
+  'date.format': '{day}.{mm}.{year}',
+  'date.months': 'янв фев мар апр мая июн июл авг сен окт ноя дек',
 
   'identity.never_collected': 'По этой идентичности вакансии ещё не собирались. Нажми «Собрать вакансии».',
   'identity.no_segments': 'В последней подборке нет рынков.',

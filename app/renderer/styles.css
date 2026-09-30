@@ -59,7 +59,25 @@ button.collecting { display: inline-flex; align-items: center; gap: 8px; opacity
 @keyframes pulse { 50% { opacity: .25; } }
 button.link { border: none; background: none; color: var(--accent); padding: 0 4px; text-decoration: underline; }
 
-.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; }
+.topbar {
+  background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.topbar .identity-tabs { flex: 1; }
+
+/* The language: a flag that opens a small list of flags. */
+.language { position: relative; }
+.language-button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; }
+.language-button .caret { color: var(--muted); font-size: 11px; }
+.flag { display: block; width: 21px; height: 14px; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
+.language-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 10; margin: 0; padding: 4px;
+  list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15); min-width: 150px;
+}
+.language-menu li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+.language-menu li:hover { background: var(--accent-soft); }
+.language-menu li.active { font-weight: 600; }
 .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 10px 14px; }
 .tab.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
