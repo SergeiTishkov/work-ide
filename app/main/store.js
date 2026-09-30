@@ -101,13 +101,14 @@ class Store {
     return { selection, displayName: name ? name.value : null, segments };
   }
 
-  listing(identity, segment, filter) {
+  // The top of each class, and every row of the classes in `expanded`.
+  listing(identity, segment, filter, expanded = []) {
     if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db);
     if (!selection) return [];
     return db.prepare(this.queries.listing)
-      .all({ selection_id: selection.id, segment, filter })
+      .all({ selection_id: selection.id, segment, filter, expanded: `,${expanded.join(',')},` })
       .map((row) => ({
         id: row.vacancy_id,
         class: row.class,
@@ -121,6 +122,17 @@ class Store {
           at: row.feedback_at,
         },
       }));
+  }
+
+  // { class: how many the filter holds } — "N more" under a capped class.
+  classTotals(identity, segment, filter) {
+    if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
+    const db = this.connection(identity);
+    const selection = db && this.latestSelection(db);
+    if (!selection) return {};
+    const rows = db.prepare(this.queries.listing_class_totals)
+      .all({ selection_id: selection.id, segment, filter });
+    return Object.fromEntries(rows.map((r) => [r.class, r.total]));
   }
 
   counts(identity, segment) {

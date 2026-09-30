@@ -49,6 +49,8 @@
     // filter, kept as a one-line stub with an undo until the view changes
     stubs: new Map(),
     reasonFor: null,   // { id, status } while a reason form is open
+    expanded: new Set(),   // classes showing all their rows in this view
+    classTotals: {},       // class -> how many the current filter holds
     run: { running: false },
     runStatus: '',
     log: [],
@@ -213,13 +215,18 @@
       render();
       return;
     }
-    const [listing, counts, pending] = await Promise.all([
-      api.loadListing(state.active, info.activeSegment, currentFilter()),
+    const expanded = [...state.expanded];
+    const [listing, counts, totals, pending] = await Promise.all([
+      expanded.length
+        ? api.loadListing(state.active, info.activeSegment, currentFilter(), expanded)
+        : api.loadListing(state.active, info.activeSegment, currentFilter()),
       api.listingCounts(state.active, info.activeSegment),
+      api.classTotals(state.active, info.activeSegment, currentFilter()),
       api.pendingFeedbackCount(state.active),
     ]);
     state.listing = listing;
     state.counts = counts;
+    state.classTotals = totals;
     info.pending = pending;
     render();
   }
@@ -227,6 +234,17 @@
   function resetView() {
     state.stubs.clear();
     state.reasonFor = null;
+    state.expanded.clear();
+  }
+
+  // A class shows its top rows; "N more" opens the rest of it, "Collapse"
+  // closes it again. Counts above are always the whole number.
+  function toggleClass(cls) {
+    return guarded(async () => {
+      if (state.expanded.has(cls)) state.expanded.delete(cls);
+      else state.expanded.add(cls);
+      await loadList();
+    });
   }
 
   // --- actions ---------------------------------------------------------------
@@ -474,8 +492,23 @@
     return el('div', { class: 'list', testid: 'list' }, sections.map((cls) => el('section', {
       class: 'class-section', testid: `section-${cls}`,
     },
-    el('h2', {}, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls),
-    byClass.get(cls).map((item) => (item.kind === 'row' ? renderRow(item.row) : renderStub(item.id, item.stub))))));
+    el('h2', {}, el('span', { class: 'section-title' }, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls),
+      el('span', { class: 'count', testid: `section-count-${cls}` }, ` ${t('filter.count', {
+        n: state.classTotals[cls] || byClass.get(cls).filter((i) => i.kind === 'row').length,
+      })}`)),
+    byClass.get(cls).map((item) => (item.kind === 'row' ? renderRow(item.row) : renderStub(item.id, item.stub))),
+    renderMore(cls, byClass.get(cls).filter((i) => i.kind === 'row').length))));
+  }
+
+  function renderMore(cls, shown) {
+    const hidden = (state.classTotals[cls] || 0) - shown;
+    if (state.expanded.has(cls)) {
+      return el('button', { class: 'more', testid: `show-less-${cls}`, onclick: () => toggleClass(cls) },
+        t('list.show_less'));
+    }
+    if (hidden <= 0) return null;
+    return el('button', { class: 'more', testid: `show-more-${cls}`, onclick: () => toggleClass(cls) },
+      t('list.show_more', { n: hidden }));
   }
 
   function renderStub(id, stub) {

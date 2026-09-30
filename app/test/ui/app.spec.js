@@ -36,7 +36,7 @@ test('opens on the first identity, its default market, fresh without feedback', 
 
 test('sections follow the class order, with their titles from the locale', async ({ page }) => {
   await open(page);
-  const titles = await page.locator('.class-section h2').allTextContents();
+  const titles = await page.locator('.class-section h2 .section-title').allTextContents();
   expect(titles).toEqual([ru['class.hot_lead'], ru['class.worth_a_look']]);
 });
 
@@ -271,4 +271,23 @@ test('"Refresh" reloads the interface and keeps the tab, market and filter', asy
   expect(await page.evaluate(() => window.__beforeRefresh)).toBeUndefined();   // a new page
   await expect(page.getByTestId('filter-all')).toBeChecked();
   expect((await calls(page, 'loadListing'))[0]).toEqual(['kisel', 'uk', 'all']);
+});
+
+test('a capped class says how many more it holds, opens and closes', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.limit = 1;   // a1 and a2r are fresh hot leads: one shown, one more
+  await open(page, fixture);
+  await expect(page.getByTestId('section-count-hot_lead')).toHaveText(' (2)');
+  await expect(page.getByTestId('filter-count-fresh_new')).toHaveText('(3)');   // whole numbers
+  await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(1);
+
+  await page.getByTestId('show-more-hot_lead').click();
+  await expect(page.getByTestId('show-more-hot_lead')).toHaveCount(0);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'fresh_new', ['hot_lead']]);
+  await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(2);
+
+  await page.getByTestId('show-less-hot_lead').click();
+  await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(1);
+  await expect(page.getByTestId('show-more-hot_lead'))
+    .toHaveText(ru['list.show_more'].replace('{n}', '1'));
 });

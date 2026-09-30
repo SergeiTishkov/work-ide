@@ -53,6 +53,8 @@
   'class.engagement_unconfirmed': '⏱️ Часы не подтверждены',
 
   'list.empty': 'Здесь пусто.',
+  'list.show_more': 'Показать ещё {n}',
+  'list.show_less': 'Свернуть',
 
   'row.details': 'Подробнее',
   'row.posted_on': '📅 Опубликована: {date}',

@@ -53,7 +53,9 @@ function registerIpc(window) {
     return identities.map(({ prefix, displayName, hasDatabase }) => ({ prefix, displayName, hasDatabase }));
   });
   handle('segments', (identity) => store.segments(identity));
-  handle('listing', (identity, segment, filter) => store.listing(identity, segment, filter));
+  handle('listing', (identity, segment, filter, expanded) =>
+    store.listing(identity, segment, filter, expanded || []));
+  handle('class-totals', (identity, segment, filter) => store.classTotals(identity, segment, filter));
   handle('counts', (identity, segment) => store.counts(identity, segment));
   handle('set-feedback', (identity, id, status, reason) => store.setFeedback(identity, id, status, reason));
   handle('pending-feedback', (identity) => store.pendingFeedback(identity));

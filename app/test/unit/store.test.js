@@ -74,14 +74,15 @@ test('undo returns a vacancy to new and erases its reason', () => {
   store.closeAll();
 });
 
-test('counts agree with the listing for every filter', () => {
+test('counts agree with the fully expanded listing for every filter', () => {
   const { store } = setup();
   store.setFeedback('test', 'old00', 'applied');
   store.setFeedback('test', 'new1', 'rejected');
   for (const segment of ['full', 'uk', 'worldwide']) {
     const counts = store.counts('test', segment);
     for (const filter of Object.keys(counts)) {
-      assert.equal(counts[filter], store.listing('test', segment, filter).length, `${segment}/${filter}`);
+      const all = store.listing('test', segment, filter, ['hot_lead', 'worth_a_look']);
+      assert.equal(counts[filter], all.length, `${segment}/${filter}`);
     }
   }
   store.closeAll();
@@ -154,5 +155,17 @@ test('finished runs and a missing database mean not running', () => {
   insertRun(file, { heartbeat: nowIso(), pid: process.pid, host: 'x', status: 'finished' });
   assert.deepEqual(store.pipelineStatus('test'), { running: false });
   assert.deepEqual(store.pipelineStatus('other'), { running: false });
+  store.closeAll();
+});
+
+test('counts are whole numbers; the list is capped unless a class is expanded', () => {
+  const { store } = setup();
+  const counts = store.counts('test', 'full');
+  assert.equal(counts.all, 23, 'every vacancy, not the 15 + 3 on screen');
+  assert.deepEqual(store.classTotals('test', 'full', 'all'), { hot_lead: 20, worth_a_look: 3 });
+  assert.equal(store.listing('test', 'full', 'all').length, 18);
+  assert.equal(store.listing('test', 'full', 'all', ['hot_lead']).length, 23);
+  const byMarket = store.counts('test', 'uk').all + store.counts('test', 'worldwide').all;
+  assert.equal(byMarket, counts.all, 'markets add up to everything');
   store.closeAll();
 });

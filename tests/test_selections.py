@@ -178,7 +178,11 @@ def test_limit_applies_after_the_filter_and_never_to_marked(isolated_data_dir):
     assert len(_listing(sel, filter_name="applied")) == limit + 2, "marked ones are never capped"
 
 
-def test_counts_match_the_listing_for_every_filter(isolated_data_dir):
+def _all_classes():
+    return tuple(report.LISTED_CLASSES)
+
+
+def test_counts_are_whole_numbers_and_the_list_says_how_many_more(isolated_data_dir):
     limit = report.TOP_N_PER_SECTION
     _store({f"o{i:02}": _vacancy(f"o{i:02}") for i in range(limit + 3)})
     vacancies = {f"o{i:02}": _vacancy(f"o{i:02}") for i in range(limit + 3)}
@@ -189,11 +193,46 @@ def test_counts_match_the_listing_for_every_filter(isolated_data_dir):
     _set_feedback("f00", "rejected", selection_id=sel)
     _set_feedback("f01", "applied", selection_id=sel)
 
-    for segment in ("full", "worldwide", "uk"):
-        with db.session() as conn:
-            counts = selections.listing_counts(conn, sel, segment)
+    with db.session() as conn:
+        counts = selections.listing_counts(conn, sel, "full")
         for name in selections.FILTERS:
-            assert counts[name] == len(_listing(sel, segment, name)), (segment, name)
+            everything = selections.listing(conn, sel, "full", name, expanded=_all_classes())
+            totals = selections.class_totals(conn, sel, "full", name)
+            assert counts[name] == len(everything) == sum(totals.values()), name
+    # fresh worth_a_look: limit+4 of which 2 marked -> limit+2 new, capped on screen
+    with db.session() as conn:
+        shown = selections.listing(conn, sel, "full", "fresh_new")
+        totals = selections.class_totals(conn, sel, "full", "fresh_new")
+    assert totals == {"worth_a_look": limit + 2}
+    assert len(shown) == limit, "the list stays capped; the count does not"
+
+
+def test_markets_add_up_to_everything(isolated_data_dir):
+    """The owner, 2026-09-30: UK 40 + ANZ 15 was more than "everything" 54,
+    because each count was capped separately."""
+    countries = [None, "London, United Kingdom", "Toronto, Ontario, Canada"]
+    vacancies = {}
+    for i in range(60):
+        vid = f"v{i:02}"
+        vacancies[vid] = _vacancy(vid, countries[i % 3], score=100 - i,
+                                  classification=("hot_lead", "long_shot")[i % 2])
+    sel = _store(vacancies)
+    _set_feedback("v00", "rejected", selection_id=sel)
+    with db.session() as conn:
+        for name in selections.FILTERS:
+            full = selections.listing_counts(conn, sel, "full")[name]
+            parts = sum(selections.listing_counts(conn, sel, seg)[name]
+                        for seg in ("worldwide", "uk", "rest"))
+            assert parts == full, name
+
+
+def test_an_expanded_class_shows_every_row(isolated_data_dir):
+    limit = report.TOP_N_PER_SECTION
+    sel = _store({f"v{i:02}": _vacancy(f"v{i:02}", score=100 - i) for i in range(limit + 5)})
+    with db.session() as conn:
+        assert len(selections.listing(conn, sel, "full", "all")) == limit
+        assert len(selections.listing(conn, sel, "full", "all", expanded=("hot_lead",))) == limit + 5
+        assert len(selections.listing(conn, sel, "full", "all", expanded=("long_shot",))) == limit
 
 
 def test_row_view_is_the_one_the_report_renders(isolated_data_dir):

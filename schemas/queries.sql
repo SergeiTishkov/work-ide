@@ -15,10 +15,14 @@
 -- is settled and appears in none of the filters; otherwise "rejected" and
 -- "all" fill up with old decisions (the owner, 2026-09-30).
 --
--- LIMIT. Vacancies without feedback are capped at section_limit per class,
--- ranked AFTER the filter, so "fresh without feedback" shows the top of the
--- fresh ones. Vacancies with feedback are never capped: there are few, and
--- hiding one a person has marked would make the mark look lost.
+-- LIMIT. The LIST shows vacancies without feedback up to section_limit per
+-- class, ranked AFTER the filter, so "fresh without feedback" shows the top of
+-- the fresh ones; a class the person expanded (:expanded, ",hot_lead,...,")
+-- shows all of them. Vacancies with feedback are never capped. The COUNTS are
+-- never capped either: a count is how many there are, not how many rows are
+-- on screen — capped counts did not add up across markets (the owner,
+-- 2026-09-30: UK 40 + ANZ 15 > "everything" 54), and the list says "N more"
+-- under a capped class instead.
 
 -- name: latest_selection
 SELECT MAX(id) AS id FROM selections;
@@ -75,14 +79,16 @@ SELECT vacancy_id, class, score, eligibility_rank, fresh, view, feedback_status,
        rejected_reason, bugged_reason, feedback_at
 FROM ranked
 WHERE feedback_status <> 'new' OR rank_in_class <= section_limit
+   OR instr(:expanded, ',' || class || ',') > 0
 ORDER BY class_position, score DESC, eligibility_rank, vacancy_id;
 
 -- name: listing_counts
+-- How many vacancies each filter holds — the whole number, not the rows shown.
 WITH baseline AS (
   SELECT MAX(id) AS id FROM selections WHERE kind = 'run' AND id <= :selection_id
 ),
 base AS (
-  SELECT i.class, i.section_limit, v.feedback_status,
+  SELECT i.class, v.feedback_status,
          CASE
            WHEN (SELECT id FROM baseline) IS NULL THEN 1
            WHEN EXISTS (SELECT 1 FROM selection_items o
@@ -95,33 +101,45 @@ base AS (
   WHERE i.selection_id = :selection_id AND i.segment = :segment
     AND (v.feedback_status = 'new'
          OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
-),
-per_class AS (
-  SELECT class, section_limit,
-         SUM(feedback_status = 'new')              AS new_n,
-         SUM(feedback_status = 'new' AND fresh = 1) AS fresh_new_n
-  FROM base GROUP BY class, section_limit
-),
-capped AS (
-  SELECT SUM(MIN(section_limit, new_n))       AS new_shown,
-         SUM(MIN(section_limit, fresh_new_n)) AS fresh_new_shown
-  FROM per_class
-),
-marked AS (
-  SELECT SUM(feedback_status <> 'new')              AS all_marked,
-         SUM(feedback_status <> 'new' AND fresh = 1) AS fresh_marked,
-         SUM(feedback_status = 'applied')           AS applied,
-         SUM(feedback_status = 'rejected')          AS rejected,
-         SUM(feedback_status = 'bugged')            AS bugged
-  FROM base
 )
-SELECT COALESCE(capped.fresh_new_shown, 0)                                   AS fresh_new,
-       COALESCE(capped.new_shown, 0) + COALESCE(marked.all_marked, 0)        AS "all",
-       COALESCE(capped.fresh_new_shown, 0) + COALESCE(marked.fresh_marked, 0) AS fresh,
-       COALESCE(marked.applied, 0)                                           AS applied,
-       COALESCE(marked.rejected, 0)                                          AS rejected,
-       COALESCE(marked.bugged, 0)                                            AS bugged
-FROM capped, marked;
+SELECT COALESCE(SUM(fresh = 1 AND feedback_status = 'new'), 0) AS fresh_new,
+       COUNT(*)                                                AS "all",
+       COALESCE(SUM(fresh = 1), 0)                             AS fresh,
+       COALESCE(SUM(feedback_status = 'applied'), 0)           AS applied,
+       COALESCE(SUM(feedback_status = 'rejected'), 0)          AS rejected,
+       COALESCE(SUM(feedback_status = 'bugged'), 0)            AS bugged
+FROM base;
+
+-- name: listing_class_totals
+-- Per class, how many the filter holds: the list says "N more" under a
+-- capped class.
+WITH baseline AS (
+  SELECT MAX(id) AS id FROM selections WHERE kind = 'run' AND id <= :selection_id
+),
+base AS (
+  SELECT i.class, v.feedback_status,
+         CASE
+           WHEN (SELECT id FROM baseline) IS NULL THEN 1
+           WHEN EXISTS (SELECT 1 FROM selection_items o
+                        WHERE o.vacancy_id = i.vacancy_id
+                          AND o.selection_id < (SELECT id FROM baseline)) THEN 0
+           ELSE 1
+         END AS fresh
+  FROM selection_items i
+  JOIN vacancies v ON v.id = i.vacancy_id
+  WHERE i.selection_id = :selection_id AND i.segment = :segment
+    AND (v.feedback_status = 'new'
+         OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
+)
+SELECT class, COUNT(*) AS total
+FROM base
+WHERE CASE :filter
+        WHEN 'fresh_new' THEN fresh = 1 AND feedback_status = 'new'
+        WHEN 'all'       THEN 1
+        WHEN 'fresh'     THEN fresh = 1
+        ELSE feedback_status = :filter
+      END
+GROUP BY class;
 
 -- name: pipeline_running
 -- The latest run still marked running. Whether it is really alive is decided

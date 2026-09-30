@@ -13,7 +13,9 @@ async function call(channel, ...args) {
 contextBridge.exposeInMainWorld('api', {
   listIdentities: () => call('identities'),
   loadSegments: (identity) => call('segments', identity),
-  loadListing: (identity, segment, filter) => call('listing', identity, segment, filter),
+  loadListing: (identity, segment, filter, expanded) =>
+    call('listing', identity, segment, filter, expanded || []),
+  classTotals: (identity, segment, filter) => call('class-totals', identity, segment, filter),
   listingCounts: (identity, segment) => call('counts', identity, segment),
   setFeedback: (identity, id, status, reason) => call('set-feedback', identity, id, status, reason ?? null),
   pendingFeedbackCount: (identity) => call('pending-feedback', identity),

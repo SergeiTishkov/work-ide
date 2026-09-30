@@ -153,16 +153,30 @@ def latest_selection_id(conn) -> Optional[int]:
     return row[0] if row and row[0] is not None else None
 
 
-def listing(conn, selection_id: int, segment: str, filter_name: str) -> list:
+def listing(conn, selection_id: int, segment: str, filter_name: str,
+            expanded=()) -> list:
+    """The rows of one market under one filter: the top of each class, and
+    every row of the classes named in `expanded`."""
     if filter_name not in FILTERS:
         raise ValueError(f"unknown filter {filter_name!r}")
     conn.row_factory = _dict_row
     try:
         return conn.execute(load_queries()["listing"], {
             "selection_id": selection_id, "segment": segment, "filter": filter_name,
+            "expanded": "," + ",".join(expanded) + ",",
         }).fetchall()
     finally:
         conn.row_factory = None
+
+
+def class_totals(conn, selection_id: int, segment: str, filter_name: str) -> dict:
+    """{class: how many the filter holds} — for "N more" under a capped class."""
+    if filter_name not in FILTERS:
+        raise ValueError(f"unknown filter {filter_name!r}")
+    rows = conn.execute(load_queries()["listing_class_totals"], {
+        "selection_id": selection_id, "segment": segment, "filter": filter_name,
+    }).fetchall()
+    return {cls: total for cls, total in rows}
 
 
 def listing_counts(conn, selection_id: int, segment: str) -> dict:

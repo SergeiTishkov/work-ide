@@ -38,9 +38,23 @@ function installMockApi(fixture) {
       record('loadSegments', [identity]);
       return data.segments[identity] || { selection: null, displayName: null, segments: [] };
     },
-    async loadListing(identity, segment, filter) {
-      record('loadListing', [identity, segment, filter]);
-      return rowsOf(identity, segment).filter((row) => matches(row, filter));
+    async loadListing(identity, segment, filter, expanded) {
+      record('loadListing', expanded ? [identity, segment, filter, expanded] : [identity, segment, filter]);
+      const limit = data.limit || 1000;
+      const seen = {};
+      return rowsOf(identity, segment).filter((row) => matches(row, filter)).filter((row) => {
+        if (row.feedback.status !== 'new' || (expanded || []).includes(row.class)) return true;
+        seen[row.class] = (seen[row.class] || 0) + 1;
+        return seen[row.class] <= limit;
+      });
+    },
+    async classTotals(identity, segment, filter) {
+      record('classTotals', [identity, segment, filter]);
+      const totals = {};
+      for (const row of rowsOf(identity, segment).filter((r) => matches(r, filter))) {
+        totals[row.class] = (totals[row.class] || 0) + 1;
+      }
+      return totals;
     },
     async listingCounts(identity, segment) {
       record('listingCounts', [identity, segment]);
