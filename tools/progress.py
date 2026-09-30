@@ -121,15 +121,27 @@ class Progress:
         self.done = 0
         self.started = time.monotonic()
         self.last_report = self.started
+        self.done_at_last_report = 0
 
     def __call__(self, step: int = 1) -> None:
         self.done += step
         now = time.monotonic()
         if now - self.last_report < self.every or self.done >= self.total:
             return
+        # The estimate uses the pace since the last report, not the average
+        # since the start: in the link check the fast answers come first and
+        # the slow ones last, and an average promised "2:30 left" for many
+        # minutes on end (2026-09-30).
+        window = now - self.last_report
+        recent = self.done - self.done_at_last_report
         self.last_report = now
+        self.done_at_last_report = self.done
         elapsed = now - self.started
-        left = elapsed / self.done * (self.total - self.done) if self.done else 0
+        if recent and window > 0:
+            rate = recent / window
+        else:
+            rate = self.done / elapsed if elapsed > 0 else 0
+        left = (self.total - self.done) / rate if rate else 0
         share = 100 * self.done // self.total if self.total else 100
         log(f"   {self.label}: {number(self.done)}/{number(self.total)} ({share}%), "
             f"~{duration(left)} left")

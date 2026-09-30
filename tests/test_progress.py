@@ -49,3 +49,16 @@ def test_lines_are_mirrored_into_the_log_file(tmp_path, capsys):
 @pytest.mark.parametrize("seconds, text", [(5, "5 s"), (75, "1:15"), (3725, "1:02:05")])
 def test_durations_read_like_a_clock(seconds, text):
     assert progress.duration(seconds) == text
+
+
+def test_the_estimate_follows_the_recent_pace(monkeypatch, capsys):
+    """Fast at first, slow now: the time left is judged by now."""
+    clock = [0.0]
+    monkeypatch.setattr(progress.time, "monotonic", lambda: clock[0])
+    tick = progress.Progress(1000, "link check", every=10)
+    clock[0] = 10.0
+    tick(500)                    # 50 per second at first
+    clock[0] = 20.0
+    tick(10)                     # 1 per second now: 490 left -> ~8 minutes
+    lines = capsys.readouterr().err.splitlines()
+    assert lines[-1].endswith("~8:10 left")
