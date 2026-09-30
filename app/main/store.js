@@ -10,7 +10,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { loadQueries } = require('./queries');
 const funnel = require('../renderer/funnel.js');
 
-const SCHEMA_VERSION = '4';
+const SCHEMA_VERSION = '5';
 // The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
 // beaten for this long is gone, whatever its row still says.
 const STALE_AFTER_MS = 45000;
@@ -151,6 +151,8 @@ class Store {
       score: row.score,
       fresh: row.fresh === 1,
       view: row.view ? JSON.parse(row.view) : null,
+      // the same row in every interface language; the renderer picks one
+      views: row.views ? JSON.parse(row.views) : null,
       feedback: recordOf(row),
     }));
   }

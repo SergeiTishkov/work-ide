@@ -325,3 +325,29 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
         row = conn.execute(selections.load_queries()["vacancy_progress"], {"id": "a"}).fetchone()
     assert row["applied_at"] is None and row["contact_at"] is None
     assert row["interview_comments"] is None and row["final_comment"] is None
+
+
+def test_every_language_of_the_app_gets_its_row_and_view_keeps_the_identitys(isolated_data_dir):
+    import i18n
+
+    sel = _store({"a": _vacancy("a")})
+    row = _listing(sel)[0]
+    views = json.loads(row["views"])
+    assert set(views) == set(i18n.LANGUAGES)
+    assert json.loads(row["view"]) == views[i18n.language()]
+    assert views["ru"]["salary"] != views["en"]["salary"]
+
+
+def test_refresh_views_renders_shown_rows_again_without_a_selection(isolated_data_dir):
+    sel = _store({"a": _vacancy("a")})
+    kb.save_vacancies({"b": _vacancy("b")})          # never shown: stays without a row
+    with db.session() as conn:
+        conn.execute("UPDATE vacancies SET views = NULL")
+    renamed = {"a": {**_vacancy("a"), "title": "Renamed"}, "b": _vacancy("b")}
+    assert selections.refresh_views(renamed) == 1
+    row = _listing(sel)[0]
+    assert {v["title"] for v in json.loads(row["views"]).values()} == {"Renamed"}
+    assert json.loads(row["view"])["title"] == "Renamed"
+    with db.session() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM selections").fetchone()[0] == 1
+        assert conn.execute("SELECT view FROM vacancies WHERE id = 'b'").fetchone()[0] is None

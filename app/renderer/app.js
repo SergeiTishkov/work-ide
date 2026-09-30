@@ -664,8 +664,15 @@
       el('button', { class: 'link', testid: 'btn-undo', onclick: () => undo(id) }, t('action.undo')));
   }
 
+  // The vacancy's lines in the interface language. The pipeline renders them
+  // in every language (vacancies.views); a row recorded before it did has
+  // only the identity's own (view).
+  function viewOf(item) {
+    return (item.views && item.views[I18n.language()]) || item.view || {};
+  }
+
   function renderRow(item) {
-    const view = item.view || {};
+    const view = viewOf(item);
     const status = item.feedback.status;
     const children = [
       el('div', { class: 'row-head' },
@@ -735,7 +742,7 @@
   function renderAnswers(item) {
     const open = state.reasonFor && state.reasonFor.id === item.id ? state.reasonFor.status : null;
     const answers = el('div', { class: 'answers' },
-      openButton(item.view || {}),
+      openButton(viewOf(item)),
       el('button', { testid: 'btn-applied', onclick: () => mark(item, 'applied', null) }, t('action.applied')),
       el('button', {
         testid: 'btn-rejected', class: open === 'rejected' ? 'pressed' : null,
@@ -777,7 +784,7 @@
     const { status } = item.feedback;
     const pressed = state.stepFor && state.stepFor.id === item.id ? state.stepFor.step : null;
     return el('div', { class: 'marked' },
-      openButton(item.view || {}),
+      openButton(viewOf(item)),
       el('span', { class: `badge status ${status}`, testid: 'status-badge' }, t(STATUS_KEYS[status])),
       Funnel.nextSteps(status).map((step) => el('button', {
         testid: `btn-step-${step}`, class: pressed === step ? 'pressed' : null,

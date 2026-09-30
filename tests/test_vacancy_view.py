@@ -35,3 +35,30 @@ def test_view_carries_posted_and_first_seen_dates():
 def test_a_vacancy_without_dates_says_so_with_none():
     view = report.vacancy_view({"id": "a", "computed": {}})
     assert view["posted_on"] is None and view["first_seen_on"] is None
+
+
+def test_the_row_is_rendered_in_every_language_of_the_app():
+    import i18n
+
+    before = i18n.language()
+    views = report.vacancy_views({"id": "a", "computed": {
+        "score": 10, "classification": "hot_lead", "score_breakdown": {}}})
+    assert set(views) == set(i18n.LANGUAGES) == {"en", "ru"}
+    assert views["en"]["salary"].startswith("not stated")
+    assert views["ru"]["salary"].startswith(i18n.translate("not stated", "ru"))
+    assert views["ru"]["salary"] != views["en"]["salary"]
+    assert i18n.language() == before, "the identity's language is back after rendering"
+
+
+def test_speaking_refuses_an_unknown_language_and_always_restores():
+    import i18n
+
+    before = i18n.language()
+    with pytest.raises(ValueError):
+        with i18n.speaking("xx"):
+            pass
+    with pytest.raises(RuntimeError):
+        with i18n.speaking("ru"):
+            assert i18n.language() == "ru"
+            raise RuntimeError("a rendering failed")
+    assert i18n.language() == before

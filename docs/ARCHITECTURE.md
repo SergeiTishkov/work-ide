@@ -50,6 +50,12 @@ report and the app both render it. Two copies of the formatting would drift
 apart. The refactor that introduced it was checked byte for byte against the
 old renderer on 400 real vacancies.
 
+The app's interface has a language switch, so the pipeline stores the row in
+every language it can render (`report.vacancy_views()` → `vacancies.views`,
+via `i18n.speaking()`); `vacancies.view` keeps the identity's own language
+for the report and the feedback package. The app shows the one picked and
+falls back to `view` for a row recorded before `views` existed.
+
 ### Boring, minimal dependencies
 Only `requests` and `PyYAML` (plus `pytest` for the tests). RSS is parsed with
 the standard library's `xml.etree.ElementTree`, HTML is cleaned by our own regex

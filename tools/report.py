@@ -544,6 +544,17 @@ def vacancy_view(v: dict) -> dict:
     }
 
 
+def vacancy_views(v: dict) -> dict:
+    """vacancy_view() in every language the app's interface offers, keyed by
+    language: the app shows the lines in whichever the person picked, while
+    vacancies.view keeps the identity's own for the report and feedback."""
+    views = {}
+    for lang in i18n.LANGUAGES:
+        with i18n.speaking(lang):
+            views[lang] = vacancy_view(v)
+    return views
+
+
 def _fmt_vacancy_line(v: dict) -> str:
     view = vacancy_view(v)
     highlights = view["highlights"]

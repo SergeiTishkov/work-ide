@@ -45,7 +45,7 @@ WITH baseline AS (
 ),
 base AS (
   SELECT i.vacancy_id, i.class, i.class_position, i.section_limit, i.score,
-         i.eligibility_rank, v.view, v.feedback_status, v.rejected_reason,
+         i.eligibility_rank, v.view, v.views, v.feedback_status, v.rejected_reason,
          v.bugged_reason, v.feedback_at, v.applied_at, v.contact_comment, v.contact_at,
          v.interview_comments, v.interview_at, v.final_comment, v.final_at,
          CASE
@@ -76,7 +76,7 @@ ranked AS (
            ORDER BY score DESC, eligibility_rank, vacancy_id) AS rank_in_class
   FROM filtered
 )
-SELECT vacancy_id, class, score, eligibility_rank, fresh, view, feedback_status,
+SELECT vacancy_id, class, score, eligibility_rank, fresh, view, views, feedback_status,
        rejected_reason, bugged_reason, feedback_at, applied_at, contact_comment,
        contact_at, interview_comments, interview_at, final_comment, final_at
 FROM ranked
@@ -180,7 +180,7 @@ WHERE id = :id;
 SELECT v.id AS vacancy_id,
        json_extract(v.view, '$.classification') AS class,
        COALESCE(json_extract(v.view, '$.score'), 0) AS score,
-       0 AS eligibility_rank, 0 AS fresh, v.view, v.feedback_status,
+       0 AS eligibility_rank, 0 AS fresh, v.view, v.views, v.feedback_status,
        v.rejected_reason, v.bugged_reason, v.feedback_at, v.applied_at, v.contact_comment, v.contact_at, v.interview_comments, v.interview_at, v.final_comment, v.final_at
 FROM vacancies v
 WHERE v.feedback_status = :filter AND v.view IS NOT NULL

@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS vacancies (
   data                  TEXT NOT NULL,
   -- report.vacancy_view() as JSON: what a row in the app shows. Latest version.
   view                  TEXT,
+  -- The same in every language of the app's interface, {"en": {...}, "ru":
+  -- {...}} (report.vacancy_views): the app shows the one the person picked.
+  -- `view` stays the identity's own language, for the report and feedback.
+  views                 TEXT,
   feedback_status       TEXT NOT NULL DEFAULT 'new'
                         CHECK (feedback_status IN ('new', 'applied', 'rejected', 'bugged',
                                                    'expired', 'contacted', 'interview',

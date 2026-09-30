@@ -33,7 +33,7 @@ import common  # noqa: E402
 # 3: feedback status 'expired'; 4: the application funnel (contacted,
 #    interview, awaiting_final) with a comment and a date per step. Both change
 #    the vacancies table, rebuilt by _rebuild_vacancies.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 SCHEMA_PATH = common.ROOT / "schemas" / "db.sql"
 
 # How long a writer waits for another writer's transaction before giving up.
@@ -118,8 +118,9 @@ def _rebuild_vacancies(conn: sqlite3.Connection) -> None:
 # version reached -> the step that reaches it. Versions without a step only
 # added tables, which applying the schema already did. Version 3 (status
 # 'expired') and 4 (the funnel) both change the vacancies table; one rebuild
-# to the current definition, at 4, covers both.
-MIGRATIONS = {4: _rebuild_vacancies}
+# to the current definition, at 4, covers both. Version 5 adds `views`; on a
+# base coming from 3, the rebuild at 4 has already added it and 5 is a no-op.
+MIGRATIONS = {4: _rebuild_vacancies, 5: _rebuild_vacancies}
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:

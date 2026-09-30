@@ -29,6 +29,7 @@ present in the sources, rather than by hoping someone remembers.
 from __future__ import annotations
 
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -261,6 +262,31 @@ CATALOGUES = {
 }
 
 
+# Every language a text can be rendered in: English, the source, and each
+# catalogue. The app offers the same ones in its interface and shows each
+# vacancy's lines in whichever the person picked, so the pipeline renders them
+# in all of these (report.vacancy_views).
+LANGUAGES = (DEFAULT_LANGUAGE, *CATALOGUES)
+
+# Set while rendering in a language other than the identity's (speaking()).
+_SPOKEN = None
+
+
+@contextmanager
+def speaking(lang: str):
+    """Within the block, translate() speaks `lang` instead of the identity's
+    language. For rendering one text in several languages; the report itself
+    keeps the identity's."""
+    global _SPOKEN
+    if lang not in LANGUAGES:
+        raise ValueError(f"no such language: {lang!r} (known: {', '.join(LANGUAGES)})")
+    previous, _SPOKEN = _SPOKEN, lang
+    try:
+        yield
+    finally:
+        _SPOKEN = previous
+
+
 # The active identity's language, resolved once. Resolving the profile parses
 # three YAML files, and translate() runs for every phrase of every vacancy:
 # uncached, rendering one vacancy took half a second (measured 2026-09-29),
@@ -283,6 +309,8 @@ def language(profile: Optional[dict] = None) -> str:
     report the owner cannot skim, which is the one thing the report must do.
     """
     if profile is None:
+        if _SPOKEN is not None:
+            return _SPOKEN
         key = (common.ACTIVE_IDENTITY, common.load_profile)
         if key not in _LANGUAGE_CACHE:
             try:

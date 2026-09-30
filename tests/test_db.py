@@ -283,3 +283,32 @@ def test_version_3_gains_the_funnel_keeping_expired_marks(isolated_data_dir):
         conn.execute("UPDATE vacancies SET feedback_status = 'awaiting_final', "
                      "final_comment = '' WHERE id = 'b'")
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_version_4_gains_views_in_every_language_keeping_the_rest(isolated_data_dir):
+    import re
+
+    kb.save_vacancies({"a": _vacancy("a")})
+    _set_feedback("a", "rejected", "far too senior")
+    schema = db.SCHEMA_PATH.read_text(encoding="utf-8")
+    table = re.search(r"CREATE TABLE IF NOT EXISTS vacancies (\(.*?\n\));", schema, re.S).group(1)
+    version_4 = "CREATE TABLE vacancies_v4 " + re.sub(r"\n\s*views\s+TEXT,", "", table)
+    assert "views" not in re.sub(r"--[^\n]*", "", version_4)
+    raw = sqlite3.connect(str(db.db_path()))
+    raw.execute("PRAGMA foreign_keys = OFF")
+    raw.execute(version_4)
+    columns = ", ".join(row[1] for row in raw.execute("PRAGMA table_info(vacancies)")
+                        if row[1] != "views")
+    raw.execute(f"INSERT INTO vacancies_v4 ({columns}) SELECT {columns} FROM vacancies")
+    raw.execute("DROP TABLE vacancies")
+    raw.execute("ALTER TABLE vacancies_v4 RENAME TO vacancies")
+    raw.execute("UPDATE meta SET value = '4' WHERE key = 'schema_version'")
+    raw.commit()
+    raw.close()
+
+    assert db.load_feedback()["a"]["rejected_reason"] == "far too senior"
+    with db.session() as conn:
+        assert "views" in {row[1] for row in conn.execute("PRAGMA table_info(vacancies)")}
+        assert conn.execute("SELECT value FROM meta WHERE key = 'schema_version'"
+                            ).fetchone()[0] == "5"
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []

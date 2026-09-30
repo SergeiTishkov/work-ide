@@ -142,9 +142,12 @@ It opens a window over the knowledge base:
   identity's tab. **Refresh** re-reads everything and reloads the interface
   itself (markup, styles, code), keeping the tab, market and filter.
 - the interface speaks Russian or English: a flag in the top right opens a
-  drop-down of flags, and the choice is remembered. It covers the interface
-  only — the lines the pipeline writes about a vacancy (highlights, salary
-  notes) follow `preferences.language` of the identity, like the report.
+  drop-down of flags, and the choice is remembered. The lines the pipeline
+  writes about a vacancy (highlights, salary notes, eligibility) switch too:
+  it renders them in every language of the app. What the sources and the
+  agent wrote themselves (the posting, notes) stays as written. After a change
+  to that rendering, `python tools/kb.py --identity <prefix> refresh-views`
+  renders the rows again without a new run.
 
 It needs Node.js and, for the two buttons, the `claude` CLI on `PATH`. The app
 only lists and records; everything else is the same Python as ever. Its tests

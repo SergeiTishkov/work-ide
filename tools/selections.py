@@ -50,6 +50,34 @@ def listed_vacancies(vacancies: dict) -> list:
     ]
 
 
+def _view_row(v: dict) -> tuple:
+    """(view, views, id) for the UPDATE of one vacancy's display row: `view`
+    in the identity's language, `views` in every language of the app."""
+    import i18n
+    import report
+
+    views = report.vacancy_views(v)
+    own = views.get(i18n.language()) or report.vacancy_view(v)
+    return db.dumps(own), db.dumps(views), v["id"]
+
+
+UPDATE_VIEWS = "UPDATE vacancies SET view = ?, views = ? WHERE id = ?"
+
+
+def refresh_views(vacancies: dict) -> int:
+    """Renders the display row again for every vacancy that has one, without
+    recording a selection: after the rendering itself changed (a new language,
+    a new line), so rows shown from older selections — the funnel keeps them
+    for weeks — change too. Returns how many were rendered."""
+    with db.session() as conn:
+        shown = {row[0] for row in conn.execute(
+            "SELECT id FROM vacancies WHERE view IS NOT NULL")}
+    rows = [_view_row(v) for vid, v in vacancies.items() if vid in shown]
+    with db.session() as conn:
+        conn.executemany(UPDATE_VIEWS, rows)
+    return len(rows)
+
+
 def _configured_segments() -> list:
     """The identity's markets; an identity that configured none gets one
     segment holding everything — the same fallback the report uses."""
@@ -86,7 +114,7 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
         vid = v["id"]
         c = v.get("computed") or {}
         cls = c["classification"]
-        views.append((db.dumps(report.vacancy_view(v)), vid))
+        views.append(_view_row(v))
         group = segments_mod.group_of(report.hiring_country(v)[0])
         for segment in configured:
             if segment.holds(group, claimed):
@@ -105,7 +133,7 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
             ((selection_id, s.slug, s.name, i, int(s.default))
              for i, s in enumerate(configured)),
         )
-        conn.executemany("UPDATE vacancies SET view = ? WHERE id = ?", views)
+        conn.executemany(UPDATE_VIEWS, views)
         conn.executemany(
             "INSERT INTO selection_items (selection_id, segment, vacancy_id, class, "
             "class_position, section_limit, score, eligibility_rank) "

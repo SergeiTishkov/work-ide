@@ -475,6 +475,14 @@ def cmd_migrate_to_sqlite(_args) -> None:
     )
 
 
+def cmd_refresh_views(_args) -> None:
+    import selections
+
+    count = selections.refresh_views(load_vacancies())
+    print(f"OK: rendered the display rows of {count} vacancies again, in every "
+          "language of the app. No selection was recorded.")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Manage the Work IDE knowledge base")
     sub = p.add_subparsers(dest="command", required=True)
@@ -486,6 +494,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("stats", help="Summary statistics for the knowledge base"
                    ).set_defaults(func=cmd_stats)
+
+    sub.add_parser(
+        "refresh-views",
+        help="Render the app's rows again (all languages) without a new selection",
+    ).set_defaults(func=cmd_refresh_views)
 
     p_list = sub.add_parser("list", help="List vacancies, sorted by score")
     p_list.add_argument("--classification", default=None, choices=[

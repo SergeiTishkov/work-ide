@@ -87,3 +87,24 @@ test('a click elsewhere or Escape closes the drop-down without a change', async 
   await expect(page.getByTestId('language-menu')).toHaveCount(0);
   await expect(page.getByTestId('run-collect')).toHaveText(ru['run.collect']);
 });
+
+test("a vacancy's own lines follow the language, a row without them keeps its one", async ({ page }) => {
+  const fixture = standardFixture();
+  const [withViews, without] = fixture.rows.kisel.full;
+  withViews.views = {
+    ru: { ...withViews.view, highlights: ['nizkaya nagruzka'], salary: 'ne ukazana' },
+    en: { ...withViews.view, highlights: ['low intensity'], salary: 'not stated' },
+  };
+  without.view.highlights = ['only one language'];
+  await page.addInitScript(installMockApi, fixture);
+  await page.goto(PAGE);
+  const card = page.getByTestId(`vacancy-${withViews.id}`);
+  await expect(card.locator('.highlights')).toHaveText('nizkaya nagruzka');
+  await expect(card).toContainText('ne ukazana');
+
+  await page.getByTestId('language-button').click();
+  await page.getByTestId('language-option-en').click();
+  await expect(card.locator('.highlights')).toHaveText('low intensity');
+  await expect(card).toContainText('not stated');
+  await expect(page.getByTestId(`vacancy-${without.id}`).locator('.highlights')).toHaveText('only one language');
+});

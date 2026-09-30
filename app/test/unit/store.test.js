@@ -99,7 +99,7 @@ test('bad input is refused', () => {
 test('a database of another schema version is refused', () => {
   const { store, file } = setup();
   const db = new DatabaseSync(file);
-  db.prepare("UPDATE meta SET value = '5' WHERE key = 'schema_version'").run();
+  db.prepare("UPDATE meta SET value = '999' WHERE key = 'schema_version'").run();
   db.close();
   assert.throws(() => store.segments('test'), SchemaMismatchError);
 });
@@ -240,5 +240,19 @@ test('comments are edited in place', () => {
   store.setFeedback('test', 'new2', 'rejected', 'travel');
   store.editComment('test', 'new2', 'rejected', null, 'travel 50%');
   assert.equal(store.listing('test', 'full', 'rejected')[0].feedback.rejectedReason, 'travel 50%');
+  store.closeAll();
+});
+
+test('a row carries its lines in every language, and in funnel filters too', () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  const views = { en: { title: 'in English' }, ru: { title: 'in Russian' } };
+  db.prepare('UPDATE vacancies SET views = ? WHERE id = ?').run(JSON.stringify(views), 'old00');
+  db.close();
+  const all = store.listing('test', 'full', 'all');
+  assert.deepEqual(all.find((r) => r.id === 'old00').views, views);
+  assert.equal(all.find((r) => r.id === 'old01').views, null, 'a row from before has only its view');
+  store.setFeedback('test', 'old00', 'applied', null);
+  assert.deepEqual(store.listing('test', 'full', 'applied')[0].views, views);
   store.closeAll();
 });
