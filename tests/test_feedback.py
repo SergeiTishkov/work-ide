@@ -100,3 +100,10 @@ def test_feedback_changed_after_review_is_pending_again(isolated_data_dir, monke
 def test_missing_database_counts_zero(isolated_data_dir):
     assert feedback.count() == {"bugged": 0, "rejected": 0}
     assert feedback.pending_items() == []
+
+
+def test_expired_is_not_feedback_on_the_filter(isolated_data_dir):
+    """A closed vacancy or a dead link says nothing about the pick."""
+    _setup({"gone": "expired", "bug": "bugged"})
+    assert feedback.count() == {"bugged": 1, "rejected": 0}
+    assert [it["id"] for it in feedback.pending_items()] == ["bug"]

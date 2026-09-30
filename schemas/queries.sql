@@ -107,7 +107,8 @@ SELECT COALESCE(SUM(fresh = 1 AND feedback_status = 'new'), 0) AS fresh_new,
        COALESCE(SUM(fresh = 1), 0)                             AS fresh,
        COALESCE(SUM(feedback_status = 'applied'), 0)           AS applied,
        COALESCE(SUM(feedback_status = 'rejected'), 0)          AS rejected,
-       COALESCE(SUM(feedback_status = 'bugged'), 0)            AS bugged
+       COALESCE(SUM(feedback_status = 'bugged'), 0)            AS bugged,
+       COALESCE(SUM(feedback_status = 'expired'), 0)           AS expired
 FROM base;
 
 -- name: listing_class_totals

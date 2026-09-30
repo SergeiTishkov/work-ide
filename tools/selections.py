@@ -145,7 +145,7 @@ def load_queries() -> dict:
     return queries
 
 
-FILTERS = ("fresh_new", "all", "fresh", "applied", "rejected", "bugged")
+FILTERS = ("fresh_new", "all", "fresh", "applied", "rejected", "bugged", "expired")
 
 
 def latest_selection_id(conn) -> Optional[int]:

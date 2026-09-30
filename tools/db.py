@@ -18,6 +18,7 @@ The schema lives in schemas/db.sql, shared with the app's tests.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import sys
 from contextlib import closing, contextmanager
@@ -28,18 +29,17 @@ from typing import Iterator, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 
-# 2: pipeline_runs. Every change so far only ADDS tables (CREATE ... IF NOT
-# EXISTS in schemas/db.sql), so an older database is upgraded by applying the
-# schema and raising the number; a change that alters existing tables will
-# need a real migration step here.
-SCHEMA_VERSION = 2
+# 2: pipeline_runs — a new table, created by applying the schema.
+# 3: feedback status 'expired' — a CHECK constraint SQLite cannot alter, so
+#    the vacancies table is rebuilt (_migrate_to_3).
+SCHEMA_VERSION = 3
 SCHEMA_PATH = common.ROOT / "schemas" / "db.sql"
 
 # How long a writer waits for another writer's transaction before giving up.
 # The pipeline's largest transaction (saving the whole base) takes seconds.
 BUSY_TIMEOUT_MS = 60_000
 
-FEEDBACK_STATUSES = ("new", "applied", "rejected", "bugged")
+FEEDBACK_STATUSES = ("new", "applied", "rejected", "bugged", "expired")
 
 
 class NotMigratedError(RuntimeError):
@@ -72,6 +72,43 @@ def _check_not_legacy() -> None:
         )
 
 
+def _migrate_to_3(conn: sqlite3.Connection) -> None:
+    """Allows feedback_status 'expired'. SQLite cannot change a CHECK
+    constraint, so the table is rebuilt the documented way: a new table with
+    the new constraint, the rows copied, the old one dropped, the new one
+    renamed — in one transaction, with foreign keys off so that the selection
+    rows referring to vacancies survive the swap."""
+    (ddl,) = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vacancies'").fetchone()
+    if "'expired'" in ddl:
+        return   # created by a schema that already allows it
+    old_check = "'rejected', 'bugged')"
+    if old_check not in ddl:
+        raise SchemaVersionError("unexpected vacancies table definition; cannot add 'expired'")
+    # The stored definition names the table as it was created: bare, or
+    # quoted after a rename ('CREATE TABLE "vacancies"').
+    new_ddl = re.sub(r'^CREATE TABLE\s+(["`]?)vacancies\1', "CREATE TABLE vacancies_new",
+                     ddl.replace(old_check, "'rejected', 'bugged', 'expired')", 1), count=1)
+    if not new_ddl.startswith("CREATE TABLE vacancies_new"):
+        raise SchemaVersionError("unexpected vacancies table definition; cannot add 'expired'")
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        with conn:
+            conn.execute(new_ddl)
+            conn.execute("INSERT INTO vacancies_new SELECT * FROM vacancies")
+            conn.execute("DROP TABLE vacancies")
+            conn.execute("ALTER TABLE vacancies_new RENAME TO vacancies")
+            conn.execute("CREATE INDEX IF NOT EXISTS vacancies_feedback "
+                         "ON vacancies(feedback_status, feedback_reviewed_at)")
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
+
+
+# version reached -> the step that reaches it. Versions without a step only
+# add tables, which applying the schema already did.
+MIGRATIONS = {3: _migrate_to_3}
+
+
 def ensure_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     row = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
@@ -79,15 +116,21 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         with conn:
             conn.execute("INSERT INTO meta (key, value) VALUES ('schema_version', ?)",
                          (str(SCHEMA_VERSION),))
-    elif int(row[0]) < SCHEMA_VERSION:
-        with conn:
-            conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'",
-                         (str(SCHEMA_VERSION),))
-    elif int(row[0]) > SCHEMA_VERSION:
+        return
+    version = int(row[0])
+    if version > SCHEMA_VERSION:
         raise SchemaVersionError(
             f"the database has schema version {row[0]}, newer than this code "
             f"({SCHEMA_VERSION}); update the code before using it."
         )
+    while version < SCHEMA_VERSION:
+        version += 1
+        step = MIGRATIONS.get(version)
+        if step is not None:
+            step(conn)
+        with conn:
+            conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'",
+                         (str(version),))
 
 
 def connect(path: Optional[Path] = None) -> sqlite3.Connection:

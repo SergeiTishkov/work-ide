@@ -14,7 +14,8 @@
 --   vacancies.feedback_* (except feedback_reviewed_at)       - the app
 --   vacancies.feedback_reviewed_at                           - tools/feedback.py
 --
--- VERSIONS. 1: the first schema. 2: pipeline_runs.
+-- VERSIONS. 1: the first schema. 2: pipeline_runs. 3: feedback status 'expired'
+-- (the vacancy was closed or its link dead — not a judgement of the pick).
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -30,7 +31,7 @@ CREATE TABLE IF NOT EXISTS vacancies (
   -- report.vacancy_view() as JSON: what a row in the app shows. Latest version.
   view                  TEXT,
   feedback_status       TEXT NOT NULL DEFAULT 'new'
-                        CHECK (feedback_status IN ('new', 'applied', 'rejected', 'bugged')),
+                        CHECK (feedback_status IN ('new', 'applied', 'rejected', 'bugged', 'expired')),
   rejected_reason       TEXT,
   bugged_reason         TEXT,
   feedback_at           TEXT,

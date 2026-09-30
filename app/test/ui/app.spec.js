@@ -325,3 +325,21 @@ test('"Refresh" still reloads against an older main process without the channel'
   await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__beforeRefresh)).toBeUndefined();
 });
+
+test('"Vacancy expired" is recorded at once, with no reason, and has its own filter', async ({ page }) => {
+  await open(page);
+  const button = byId(page, 'a1').getByTestId('btn-expired');
+  await expect(button).toHaveText(ru['action.expired']);
+  await button.click();
+  expect(await calls(page, 'setFeedback')).toEqual([['kisel', 'a1', 'expired', null]]);
+  await expect(page.getByTestId('reason-form')).toHaveCount(0);
+  await expect(page.getByTestId('stub-a1'))
+    .toContainText(ru['stub.marked'].replace('{status}', ru['status.expired']));
+  await expect(page.getByTestId('filter-count-expired')).toHaveText('(1)');
+
+  await page.getByTestId('filter-expired').check();
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'expired']);
+  await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(ru['status.expired']);
+  await byId(page, 'a1').getByTestId('btn-undo').click();
+  expect((await calls(page, 'setFeedback')).at(-1)).toEqual(['kisel', 'a1', 'new', null]);
+});

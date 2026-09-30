@@ -118,9 +118,11 @@ button.open { margin-right: 10px; color: var(--accent); border-color: var(--acce
 .badge.status.applied { color: var(--applied); }
 .badge.status.rejected { color: var(--rejected); }
 .badge.status.bugged { color: var(--bugged); }
+.badge.status.expired { color: var(--muted); }
 .row.status-applied { border-left: 3px solid var(--applied); }
 .row.status-rejected { border-left: 3px solid var(--rejected); }
 .row.status-bugged { border-left: 3px solid var(--bugged); }
+.row.status-expired { border-left: 3px solid var(--muted); }
 
 .runlog { border-top: 1px solid var(--border); background: var(--surface); max-height: 32vh; display: flex; flex-direction: column; }
 .runlog-head { padding: 6px 16px; font-weight: 600; }

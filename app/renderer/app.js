@@ -6,7 +6,7 @@
 (function () {
   const api = window.api;
 
-  const FILTERS = ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged'];
+  const FILTERS = ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired'];
   const DEFAULT_FILTER = 'fresh_new';
   const CLASS_KEYS = {
     hot_lead: 'class.hot_lead',
@@ -23,11 +23,13 @@
     applied: 'filter.applied',
     rejected: 'filter.rejected',
     bugged: 'filter.bugged',
+    expired: 'filter.expired',
   };
   const STATUS_KEYS = {
     applied: 'status.applied',
     rejected: 'status.rejected',
     bugged: 'status.bugged',
+    expired: 'status.expired',
   };
   const RUN_KIND_KEYS = { collect: 'run.kind.collect', feedback: 'run.kind.feedback' };
   const REASON_KEYS = { rejected: 'reason.rejected', bugged: 'reason.bugged' };
@@ -609,7 +611,10 @@
       el('button', {
         testid: 'btn-bugged', class: open === 'bugged' ? 'pressed' : null,
         onclick: () => { state.reasonFor = { id: item.id, status: 'bugged' }; render(); },
-      }, t('action.bugged')));
+      }, t('action.bugged')),
+      // Closed at the source or a dead link: recorded at once, no reason —
+      // it says nothing about the pick.
+      el('button', { testid: 'btn-expired', onclick: () => mark(item, 'expired', null) }, t('action.expired')));
     if (!open) return answers;
     // The draft lives in the state: the pipeline indicator re-renders the
     // list now and then, and must not wipe a reason half typed.

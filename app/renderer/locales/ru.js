@@ -43,6 +43,7 @@
   'filter.applied': 'Откликнулся',
   'filter.rejected': 'Отказался',
   'filter.bugged': 'Багнутые',
+  'filter.expired': 'Просроченные',
   'filter.count': '({n})',
 
   'class.hot_lead': '🔥 Горячие — смотреть в первую очередь',
@@ -76,6 +77,7 @@
   'action.applied': 'Откликнулся',
   'action.rejected': 'Не подходит',
   'action.bugged': 'Ошибка подборки',
+  'action.expired': 'Вакансия просрочена',
   'action.undo': 'отменить',
 
   'reason.rejected': 'Почему не подходит? (необязательно)',
@@ -86,5 +88,6 @@
   'status.applied': 'Откликнулся',
   'status.rejected': 'Не подходит',
   'status.bugged': 'Ошибка подборки',
+  'status.expired': 'Вакансия просрочена',
   'stub.marked': 'Отмечено: {status}',
 })));

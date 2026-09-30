@@ -99,7 +99,7 @@ test('bad input is refused', () => {
 test('a database of another schema version is refused', () => {
   const { store, file } = setup();
   const db = new DatabaseSync(file);
-  db.prepare("UPDATE meta SET value = '3' WHERE key = 'schema_version'").run();
+  db.prepare("UPDATE meta SET value = '4' WHERE key = 'schema_version'").run();
   db.close();
   assert.throws(() => store.segments('test'), SchemaMismatchError);
 });
@@ -167,5 +167,18 @@ test('counts are whole numbers; the list is capped unless a class is expanded', 
   assert.equal(store.listing('test', 'full', 'all', ['hot_lead']).length, 23);
   const byMarket = store.counts('test', 'uk').all + store.counts('test', 'worldwide').all;
   assert.equal(byMarket, counts.all, 'markets add up to everything');
+  store.closeAll();
+});
+
+test('"expired" is a status of its own: no reason, out of the list, not pending review', () => {
+  const { store } = setup();
+  store.setFeedback('test', 'new0', 'expired', 'ignored');
+  assert.deepEqual(store.listing('test', 'full', 'fresh_new').map((r) => r.id), ['new1', 'new2']);
+  const [row] = store.listing('test', 'full', 'expired');
+  assert.equal(row.id, 'new0');
+  assert.equal(row.feedback.rejectedReason, null);
+  assert.equal(row.feedback.buggedReason, null);
+  assert.equal(store.counts('test', 'full').expired, 1);
+  assert.deepEqual(store.pendingFeedback('test'), { bugged: 0, rejected: 0 });
   store.closeAll();
 });

@@ -123,9 +123,10 @@ It opens a window over the knowledge base:
 - a tab per identity, and inside it a tab per market of the latest selection;
 - a filter per market: fresh without feedback (the default), all, all fresh,
   applied, not for me, wrong pick — each market remembers its own;
-- three answers on every vacancy: **Applied**, **Not for me**, **Wrong pick**,
-  the last two with an optional reason. A wrong pick is a bug report against
-  the filter;
+- four answers on every vacancy: **Applied**, **Not for me**, **Wrong pick**
+  (these two with an optional reason) and **Vacancy expired** — closed at the
+  source or a dead link, which says nothing about the pick. A wrong pick is a
+  bug report against the filter;
 - **Collect vacancies** runs `/run` for the identity in Claude Code, headless,
   with a live log; **Review feedback (N)** runs `/feedback`, which gathers the
   pending answers (`tools/feedback.py`) and fixes the filter. The agent edits

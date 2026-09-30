@@ -9,7 +9,7 @@ const os = require('node:os');
 const { DatabaseSync } = require('node:sqlite');
 const { loadQueries } = require('./queries');
 
-const SCHEMA_VERSION = '2';
+const SCHEMA_VERSION = '3';
 // The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
 // beaten for this long is gone, whatever its row still says.
 const STALE_AFTER_MS = 45000;
@@ -25,8 +25,8 @@ function pidAlive(pid) {
   }
 }
 const BUSY_TIMEOUT_MS = 60000;
-const FILTERS = ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged'];
-const STATUSES = ['new', 'applied', 'rejected', 'bugged'];
+const FILTERS = ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired'];
+const STATUSES = ['new', 'applied', 'rejected', 'bugged', 'expired'];
 
 // The timestamp format tools/db.py writes (seconds, "+00:00"). Feedback and
 // review times are compared as strings, so both writers must agree on it.
