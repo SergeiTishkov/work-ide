@@ -190,15 +190,30 @@ def test_dump_gives_the_shortlist_with_full_descriptions(isolated_data_dir, caps
     assert [r["id"] for r in yaml.safe_load(capsys.readouterr().out)] == ["h"]
 
 
+# The vacancies table exactly as schema version 2 defined it.
+VERSION_2_VACANCIES = """CREATE TABLE vacancies_v2 (
+  id                    TEXT PRIMARY KEY,
+  data                  TEXT NOT NULL,
+  view                  TEXT,
+  feedback_status       TEXT NOT NULL DEFAULT 'new'
+                        CHECK (feedback_status IN ('new', 'applied', 'rejected', 'bugged')),
+  rejected_reason       TEXT,
+  bugged_reason         TEXT,
+  feedback_at           TEXT,
+  feedback_selection_id INTEGER REFERENCES selections(id),
+  feedback_reviewed_at  TEXT
+)"""
+
+
 def _downgrade_to_version_2(path):
-    """Rebuilds the vacancies table the way schema 2 defined it."""
+    """Rebuilds the vacancies table the way schema 2 defined it (the rename
+    leaves its stored definition quoted, as a real rename would)."""
     raw = sqlite3.connect(str(path))
-    (ddl,) = raw.execute("SELECT sql FROM sqlite_master WHERE name = 'vacancies'").fetchone()
-    old = ddl.replace("'bugged', 'expired')", "'bugged')").replace(
-        "CREATE TABLE vacancies", "CREATE TABLE vacancies_v2", 1)
     raw.execute("PRAGMA foreign_keys = OFF")
-    raw.execute(old)
-    raw.execute("INSERT INTO vacancies_v2 SELECT * FROM vacancies")
+    raw.execute(VERSION_2_VACANCIES)
+    columns = ("id, data, view, feedback_status, rejected_reason, bugged_reason, "
+               "feedback_at, feedback_selection_id, feedback_reviewed_at")
+    raw.execute(f"INSERT INTO vacancies_v2 ({columns}) SELECT {columns} FROM vacancies")
     raw.execute("DROP TABLE vacancies")
     raw.execute("ALTER TABLE vacancies_v2 RENAME TO vacancies")
     raw.execute("UPDATE meta SET value = '2' WHERE key = 'schema_version'")
@@ -206,7 +221,7 @@ def _downgrade_to_version_2(path):
     raw.close()
 
 
-def test_version_2_is_migrated_to_allow_expired_keeping_everything(isolated_data_dir):
+def test_version_2_is_migrated_to_the_current_table_keeping_everything(isolated_data_dir):
     import selections
 
     listed = {"score": 60, "classification": "hot_lead", "score_breakdown": {}, "dealbreakers": []}
@@ -232,6 +247,9 @@ def test_version_2_is_migrated_to_allow_expired_keeping_everything(isolated_data
     assert db.load_feedback()["a"]["rejected_reason"] == "too much travel"
     _set_feedback("b", "expired")
     assert db.load_feedback()["b"]["status"] == "expired"
+    with db.session() as conn:
+        conn.execute("UPDATE vacancies SET feedback_status = 'interview', "
+                     "interview_comments = '[\"\"]' WHERE id = 'b'")   # the funnel columns exist
 
 
 def test_migration_runs_once(isolated_data_dir):
@@ -241,3 +259,27 @@ def test_migration_runs_once(isolated_data_dir):
     kb.load_vacancies()          # already at the latest version: nothing to redo
     with db.session() as conn:
         assert conn.execute("SELECT COUNT(*) FROM vacancies").fetchone()[0] == 1
+
+
+def test_version_3_gains_the_funnel_keeping_expired_marks(isolated_data_dir):
+    kb.save_vacancies({"a": _vacancy("a"), "b": _vacancy("b")})
+    _set_feedback("a", "expired")
+    raw = sqlite3.connect(str(db.db_path()))
+    version_3 = VERSION_2_VACANCIES.replace("'bugged')", "'bugged', 'expired')").replace(
+        "vacancies_v2", "vacancies_v3")
+    raw.execute("PRAGMA foreign_keys = OFF")
+    raw.execute(version_3)
+    columns = ("id, data, view, feedback_status, rejected_reason, bugged_reason, "
+               "feedback_at, feedback_selection_id, feedback_reviewed_at")
+    raw.execute(f"INSERT INTO vacancies_v3 ({columns}) SELECT {columns} FROM vacancies")
+    raw.execute("DROP TABLE vacancies")
+    raw.execute("ALTER TABLE vacancies_v3 RENAME TO vacancies")
+    raw.execute("UPDATE meta SET value = '3' WHERE key = 'schema_version'")
+    raw.commit()
+    raw.close()
+
+    assert db.load_feedback()["a"]["status"] == "expired"
+    with db.session() as conn:
+        conn.execute("UPDATE vacancies SET feedback_status = 'awaiting_final', "
+                     "final_comment = '' WHERE id = 'b'")
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []

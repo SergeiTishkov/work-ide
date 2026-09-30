@@ -99,7 +99,7 @@ test('bad input is refused', () => {
 test('a database of another schema version is refused', () => {
   const { store, file } = setup();
   const db = new DatabaseSync(file);
-  db.prepare("UPDATE meta SET value = '4' WHERE key = 'schema_version'").run();
+  db.prepare("UPDATE meta SET value = '5' WHERE key = 'schema_version'").run();
   db.close();
   assert.throws(() => store.segments('test'), SchemaMismatchError);
 });
@@ -180,5 +180,65 @@ test('"expired" is a status of its own: no reason, out of the list, not pending 
   assert.equal(row.feedback.buggedReason, null);
   assert.equal(store.counts('test', 'full').expired, 1);
   assert.deepEqual(store.pendingFeedback('test'), { bugged: 0, rejected: 0 });
+  store.closeAll();
+});
+
+test('the funnel is written step by step, arrays and dates included', () => {
+  const { file } = setup();
+  let tick = 0;
+  const clock = () => `2026-10-0${++tick}T10:00:00+00:00`;
+  const store = new Store({ schemaDir: SCHEMA_DIR, databasePathOf: () => file, clock });
+  store.setFeedback('test', 'new0', 'applied');
+  store.advance('test', 'new0', 'contacted', '');
+  store.advance('test', 'new0', 'interview', 'tech round');
+  store.advance('test', 'new0', 'interview', '');
+  store.advance('test', 'new0', 'awaiting_final', 'answer by Friday');
+  assert.throws(() => store.advance('test', 'new0', 'contacted', ''), /cannot go/);
+  store.closeAll();
+
+  const db = new DatabaseSync(file);
+  const row = db.prepare('SELECT * FROM vacancies WHERE id = ?').get('new0');
+  db.close();
+  assert.equal(row.feedback_status, 'awaiting_final');
+  assert.equal(row.applied_at, '2026-10-01T10:00:00+00:00');
+  assert.equal(row.contact_comment, '', 'an empty comment is "", not NULL');
+  assert.equal(row.interview_comments, '["tech round",""]');
+  assert.equal(row.interview_at, '["2026-10-03T10:00:00+00:00","2026-10-04T10:00:00+00:00"]');
+  assert.equal(row.final_comment, 'answer by Friday');
+});
+
+test('funnel filters list applications in every market, and undo steps back', () => {
+  const { store } = setup();
+  store.setFeedback('test', 'old00', 'applied');       // an old01..: worldwide / old00: worldwide
+  store.advance('test', 'old00', 'contacted', 'hr');
+  for (const segment of ['full', 'uk', 'worldwide']) {
+    assert.deepEqual(store.listing('test', segment, 'contacted').map((r) => r.id), ['old00'], segment);
+    assert.equal(store.counts('test', segment).contacted, 1);
+  }
+  const [row] = store.listing('test', 'full', 'contacted');
+  assert.equal(row.feedback.contactComment, 'hr');
+  assert.deepEqual(row.feedback.interviewComments, []);
+
+  store.stepBack('test', 'old00');
+  assert.deepEqual(store.listing('test', 'full', 'applied').map((r) => r.id), ['old00']);
+  store.stepBack('test', 'old00');
+  assert.equal(store.counts('test', 'full').applied, 0);
+  store.closeAll();
+});
+
+test('comments are edited in place', () => {
+  const { store } = setup();
+  store.setFeedback('test', 'new1', 'applied');
+  store.advance('test', 'new1', 'contacted', '');
+  store.advance('test', 'new1', 'interview', '');
+  store.editComment('test', 'new1', 'interview', 0, 'system design, went fine');
+  store.editComment('test', 'new1', 'contact', null, 'recruiter on LinkedIn');
+  const [row] = store.listing('test', 'full', 'interview');
+  assert.deepEqual(row.feedback.interviewComments, ['system design, went fine']);
+  assert.equal(row.feedback.contactComment, 'recruiter on LinkedIn');
+
+  store.setFeedback('test', 'new2', 'rejected', 'travel');
+  store.editComment('test', 'new2', 'rejected', null, 'travel 50%');
+  assert.equal(store.listing('test', 'full', 'rejected')[0].feedback.rejectedReason, 'travel 50%');
   store.closeAll();
 });

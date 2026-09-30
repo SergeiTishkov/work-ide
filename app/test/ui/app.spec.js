@@ -98,7 +98,7 @@ test('"Wrong pick" asks for a reason, saves it, and leaves an undoable stub', as
   await expect(page.getByTestId('run-feedback')).toHaveText(ru['run.feedback'].replace('{n}', '2'));
 
   await stub.getByTestId('btn-undo').click();
-  expect((await calls(page, 'setFeedback')).at(-1)).toEqual(['kisel', 'a1', 'new', null]);
+  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['kisel', 'a1']);
   await expect(byId(page, 'a1')).toBeVisible();
   await expect(page.getByTestId('stub-a1')).toHaveCount(0);
 });
@@ -136,7 +136,7 @@ test('filters ask for their own list and show their counts', async ({ page }) =>
   await expect(byId(page, 'x1').getByTestId('status-badge')).toHaveText(ru['status.bugged']);
 
   await byId(page, 'x1').getByTestId('btn-undo').click();
-  expect((await calls(page, 'setFeedback')).at(-1)).toEqual(['kisel', 'x1', 'new', null]);
+  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['kisel', 'x1']);
 });
 
 test('each market of each identity keeps its own filter', async ({ page }) => {
@@ -341,5 +341,5 @@ test('"Vacancy expired" is recorded at once, with no reason, and has its own fil
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'expired']);
   await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(ru['status.expired']);
   await byId(page, 'a1').getByTestId('btn-undo').click();
-  expect((await calls(page, 'setFeedback')).at(-1)).toEqual(['kisel', 'a1', 'new', null]);
+  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['kisel', 'a1']);
 });

@@ -287,3 +287,41 @@ def test_feedback_carried_over_from_before_selections_is_settled(isolated_data_d
     _set_feedback("a", "rejected", "migrated", selection_id=None)
     assert _ids(_listing(sel, filter_name="rejected")) == []
     assert _ids(_listing(sel, filter_name="all")) == ["b"]
+
+
+def test_applications_stay_listed_across_collections_and_markets(isolated_data_dir):
+    """An application lives for weeks; a later run must not make it vanish."""
+    first = _store({"a": _vacancy("a", "London, United Kingdom"), "b": _vacancy("b")})
+    _set_feedback("a", "applied", selection_id=first)
+    second = _store({"b": _vacancy("b"), "c": _vacancy("c")}, run=2)   # "a" gone from the list
+    for segment in ("full", "uk", "worldwide"):
+        with db.session() as conn:
+            assert _ids(selections.listing(conn, second, segment, "applied")) == ["a"], segment
+            assert selections.listing_counts(conn, second, segment)["applied"] == 1
+            assert selections.class_totals(conn, second, segment, "applied") == {"hot_lead": 1}
+
+
+def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
+    sel = _store({"a": _vacancy("a")})
+    _set_feedback("a", "applied", selection_id=sel)
+    with db.session() as conn:
+        conn.execute(selections.load_queries()["write_progress"], {
+            "id": "a", "status": "interview", "at": "2026-10-02T10:00:00+00:00",
+            "rejected_reason": None, "bugged_reason": None,
+            "applied_at": "2026-10-01T10:00:00+00:00",
+            "contact_comment": "", "contact_at": "2026-10-01T12:00:00+00:00",
+            "interview_comments": '["went well"]', "interview_at": '["2026-10-02T10:00:00+00:00"]',
+            "final_comment": None, "final_at": None,
+        })
+        conn.row_factory = selections._dict_row
+        row = conn.execute(selections.load_queries()["vacancy_progress"], {"id": "a"}).fetchone()
+    assert row["feedback_status"] == "interview"
+    assert row["contact_comment"] == "" and row["interview_comments"] == '["went well"]'
+    assert _ids(_listing(sel, filter_name="interview")) == ["a"]
+
+    _set_feedback("a", "new", selection_id=None)
+    with db.session() as conn:
+        conn.row_factory = selections._dict_row
+        row = conn.execute(selections.load_queries()["vacancy_progress"], {"id": "a"}).fetchone()
+    assert row["applied_at"] is None and row["contact_at"] is None
+    assert row["interview_comments"] is None and row["final_comment"] is None

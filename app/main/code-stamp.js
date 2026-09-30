@@ -9,12 +9,17 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-function codeStamp(dir = __dirname) {
-  return fs.readdirSync(dir)
+// Code the main process loads from outside main/: the funnel rules it shares
+// with the page.
+const SHARED = [path.join(__dirname, '..', 'renderer', 'funnel.js')];
+
+function codeStamp(dir = __dirname, shared = SHARED) {
+  const files = fs.readdirSync(dir)
     .filter((name) => name.endsWith('.js'))
     .sort()
-    .map((name) => `${name}:${fs.statSync(path.join(dir, name)).mtimeMs}`)
-    .join('|');
+    .map((name) => path.join(dir, name))
+    .concat(shared.filter((file) => fs.existsSync(file)));
+  return files.map((file) => `${path.basename(file)}:${fs.statSync(file).mtimeMs}`).join('|');
 }
 
 // What Refresh should do: 'reload' the page, 'relaunch' the app because the

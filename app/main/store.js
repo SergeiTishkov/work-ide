@@ -1,15 +1,16 @@
 'use strict';
 // The app's access to the identities' SQLite databases (schemas/db.sql).
 //
-// The app reads selections and writes ONLY the feedback columns of
+// The app reads selections and writes ONLY the feedback and funnel columns of
 // `vacancies`. Everything else in the database belongs to the pipeline; that
 // column ownership is what lets both write at the same time.
 const fs = require('node:fs');
 const os = require('node:os');
 const { DatabaseSync } = require('node:sqlite');
 const { loadQueries } = require('./queries');
+const funnel = require('../renderer/funnel.js');
 
-const SCHEMA_VERSION = '3';
+const SCHEMA_VERSION = '4';
 // The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
 // beaten for this long is gone, whatever its row still says.
 const STALE_AFTER_MS = 45000;
@@ -25,7 +26,12 @@ function pidAlive(pid) {
   }
 }
 const BUSY_TIMEOUT_MS = 60000;
-const FILTERS = ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired'];
+// The funnel filters list the person's applications across collections and
+// markets (funnel_listing); the others look at the latest selection.
+const FUNNEL = funnel.FUNNEL;
+const FILTERS = ['fresh_new', 'all', 'fresh', 'rejected', 'bugged', 'expired', ...FUNNEL];
+// The first answers, set directly; the funnel beyond "applied" is reached
+// only step by step (advance).
 const STATUSES = ['new', 'applied', 'rejected', 'bugged', 'expired'];
 
 // The timestamp format tools/db.py writes (seconds, "+00:00"). Feedback and
@@ -34,15 +40,41 @@ function nowIso(date = new Date()) {
   return date.toISOString().replace(/\.\d{3}Z$/, '+00:00');
 }
 
+function jsonArray(text) {
+  if (!text) return [];
+  const value = JSON.parse(text);
+  return Array.isArray(value) ? value : [];
+}
+
+// A row's feedback columns -> the record renderer/funnel.js works with.
+function recordOf(row) {
+  return {
+    status: row.feedback_status,
+    at: row.feedback_at,
+    rejectedReason: row.rejected_reason,
+    buggedReason: row.bugged_reason,
+    appliedAt: row.applied_at,
+    contactComment: row.contact_comment,
+    contactAt: row.contact_at,
+    interviewComments: jsonArray(row.interview_comments),
+    interviewAt: jsonArray(row.interview_at),
+    finalComment: row.final_comment,
+    finalAt: row.final_at,
+  };
+}
+
 class SchemaMismatchError extends Error {}
 
 class Store {
   // databasePathOf(identity) -> the file of that identity's database.
-  constructor({ schemaDir, databasePathOf, isPidAlive = pidAlive, hostname = os.hostname() }) {
+  constructor({
+    schemaDir, databasePathOf, isPidAlive = pidAlive, hostname = os.hostname(), clock = nowIso,
+  }) {
     this.queries = loadQueries(schemaDir);
     this.databasePathOf = databasePathOf;
     this.isPidAlive = isPidAlive;
     this.hostname = hostname;
+    this.clock = clock;
     this.connections = new Map();
   }
 
@@ -74,7 +106,8 @@ class Store {
       if (!row || row.value !== SCHEMA_VERSION) {
         db.close();
         throw new SchemaMismatchError(
-          `${file}: schema version ${row ? row.value : 'missing'}, the app expects ${SCHEMA_VERSION}`);
+          `${file}: schema version ${row ? row.value : 'missing'}, the app expects ${SCHEMA_VERSION}`
+          + ' — any Python tool (e.g. tools/feedback.py count) upgrades it');
       }
       this.connections.set(file, db);
     }
@@ -101,27 +134,25 @@ class Store {
     return { selection, displayName: name ? name.value : null, segments };
   }
 
-  // The top of each class, and every row of the classes in `expanded`.
+  // The top of each class, and every row of the classes in `expanded`; the
+  // funnel filters list every application, uncapped.
   listing(identity, segment, filter, expanded = []) {
     if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db);
     if (!selection) return [];
-    return db.prepare(this.queries.listing)
-      .all({ selection_id: selection.id, segment, filter, expanded: `,${expanded.join(',')},` })
-      .map((row) => ({
-        id: row.vacancy_id,
-        class: row.class,
-        score: row.score,
-        fresh: row.fresh === 1,
-        view: row.view ? JSON.parse(row.view) : null,
-        feedback: {
-          status: row.feedback_status,
-          rejectedReason: row.rejected_reason,
-          buggedReason: row.bugged_reason,
-          at: row.feedback_at,
-        },
-      }));
+    const rows = FUNNEL.includes(filter)
+      ? db.prepare(this.queries.funnel_listing).all({ filter })
+      : db.prepare(this.queries.listing)
+        .all({ selection_id: selection.id, segment, filter, expanded: `,${expanded.join(',')},` });
+    return rows.map((row) => ({
+      id: row.vacancy_id,
+      class: row.class,
+      score: row.score,
+      fresh: row.fresh === 1,
+      view: row.view ? JSON.parse(row.view) : null,
+      feedback: recordOf(row),
+    }));
   }
 
   // { class: how many the filter holds } — "N more" under a capped class.
@@ -130,6 +161,13 @@ class Store {
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db);
     if (!selection) return {};
+    if (FUNNEL.includes(filter)) {
+      const totals = {};
+      for (const row of this.listing(identity, segment, filter)) {
+        totals[row.class] = (totals[row.class] || 0) + 1;
+      }
+      return totals;
+    }
     const rows = db.prepare(this.queries.listing_class_totals)
       .all({ selection_id: selection.id, segment, filter });
     return Object.fromEntries(rows.map((r) => [r.class, r.total]));
@@ -142,11 +180,12 @@ class Store {
     if (!selection) return empty;
     const row = db.prepare(this.queries.listing_counts)
       .get({ selection_id: selection.id, segment });
-    return Object.fromEntries(FILTERS.map((f) => [f, row[f] || 0]));
+    const inFunnel = db.prepare(this.queries.funnel_counts).get();
+    return Object.fromEntries(FILTERS.map((f) => [f, (FUNNEL.includes(f) ? inFunnel[f] : row[f]) || 0]));
   }
 
-  // status 'new' takes the mark back; a reason is kept only for the status it
-  // explains.
+  // The first answer on a vacancy. 'new' takes it back; a reason is kept only
+  // for the status it explains.
   setFeedback(identity, vacancyId, status, reason = null) {
     if (!STATUSES.includes(status)) throw new Error(`unknown feedback status: ${status}`);
     const db = this.connection(identity);
@@ -158,10 +197,55 @@ class Store {
       status,
       rejected_reason: status === 'rejected' ? text : null,
       bugged_reason: status === 'bugged' ? text : null,
-      at: nowIso(),
+      at: this.clock(),
       selection_id: status === 'new' || !selection ? null : selection.id,
     });
     if (result.changes !== 1) throw new Error(`no vacancy ${vacancyId} in ${identity}`);
+  }
+
+  // --- the application funnel (renderer/funnel.js decides, this writes) ---
+
+  record(identity, vacancyId) {
+    const db = this.connection(identity);
+    if (!db) throw new Error(`no database for identity ${identity}`);
+    const row = db.prepare(this.queries.vacancy_progress).get({ id: vacancyId });
+    if (!row) throw new Error(`no vacancy ${vacancyId} in ${identity}`);
+    return { db, record: recordOf(row) };
+  }
+
+  write(db, vacancyId, record) {
+    db.prepare(this.queries.write_progress).run({
+      id: vacancyId,
+      status: record.status,
+      at: record.at,
+      rejected_reason: record.rejectedReason ?? null,
+      bugged_reason: record.buggedReason ?? null,
+      applied_at: record.appliedAt ?? null,
+      contact_comment: record.contactComment ?? null,
+      contact_at: record.contactAt ?? null,
+      interview_comments: record.interviewComments.length ? JSON.stringify(record.interviewComments) : null,
+      interview_at: record.interviewAt.length ? JSON.stringify(record.interviewAt) : null,
+      final_comment: record.finalComment ?? null,
+      final_at: record.finalAt ?? null,
+    });
+  }
+
+  // One step forward: contacted, interview (again and again), awaiting_final.
+  advance(identity, vacancyId, step, comment) {
+    const { db, record } = this.record(identity, vacancyId);
+    this.write(db, vacancyId, funnel.advance(record, step, comment, this.clock()));
+  }
+
+  // "Undo" on a vacancy with an answer: one step back.
+  stepBack(identity, vacancyId) {
+    const { db, record } = this.record(identity, vacancyId);
+    this.write(db, vacancyId, funnel.stepBack(record, this.clock()));
+  }
+
+  // Rewrites one comment of the timeline under a vacancy.
+  editComment(identity, vacancyId, kind, index, text) {
+    const { db, record } = this.record(identity, vacancyId);
+    this.write(db, vacancyId, funnel.editComment(record, kind, index, text, this.clock()));
   }
 
   pendingFeedback(identity) {
@@ -178,4 +262,4 @@ class Store {
   }
 }
 
-module.exports = { Store, SchemaMismatchError, FILTERS, STATUSES, nowIso };
+module.exports = { Store, SchemaMismatchError, FILTERS, STATUSES, FUNNEL, nowIso };

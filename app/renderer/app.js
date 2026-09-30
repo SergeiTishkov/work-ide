@@ -6,7 +6,8 @@
 (function () {
   const api = window.api;
 
-  const FILTERS = ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired'];
+  const FILTERS = ['fresh_new', 'all', 'fresh', 'rejected', 'bugged', 'expired',
+    'applied', 'contacted', 'interview', 'awaiting_final'];
   const DEFAULT_FILTER = 'fresh_new';
   const CLASS_KEYS = {
     hot_lead: 'class.hot_lead',
@@ -24,12 +25,40 @@
     rejected: 'filter.rejected',
     bugged: 'filter.bugged',
     expired: 'filter.expired',
+    contacted: 'filter.contacted',
+    interview: 'filter.interview',
+    awaiting_final: 'filter.awaiting_final',
   };
   const STATUS_KEYS = {
     applied: 'status.applied',
     rejected: 'status.rejected',
     bugged: 'status.bugged',
     expired: 'status.expired',
+    contacted: 'status.contacted',
+    interview: 'status.interview',
+    awaiting_final: 'status.awaiting_final',
+  };
+  // The funnel: the buttons that move an application on, what each step
+  // asks for, and how the timeline under a vacancy names its entries.
+  const Funnel = window.WorkIdeFunnel;
+  const STEP_KEYS = {
+    contacted: 'step.contacted',
+    interview: 'step.interview',
+    awaiting_final: 'step.awaiting_final',
+  };
+  const STEP_HINT_KEYS = {
+    contacted: 'step.hint.contacted',
+    interview: 'step.hint.interview',
+    awaiting_final: 'step.hint.awaiting_final',
+  };
+  const TIMELINE_KEYS = {
+    applied: 'timeline.applied',
+    contact: 'timeline.contact',
+    interview: 'timeline.interview',
+    final: 'timeline.final',
+    rejected: 'timeline.rejected',
+    bugged: 'timeline.bugged',
+    expired: 'timeline.expired',
   };
   const RUN_KIND_KEYS = { collect: 'run.kind.collect', feedback: 'run.kind.feedback' };
   const REASON_KEYS = { rejected: 'reason.rejected', bugged: 'reason.bugged' };
@@ -51,6 +80,9 @@
     // filter, kept as a one-line stub with an undo until the view changes
     stubs: new Map(),
     reasonFor: null,   // { id, status } while a reason form is open
+    stepFor: null,     // { id, step, draft } while a funnel step's comment is written
+    editing: null,     // { key, id, kind, index, draft } while a timeline comment is edited
+    openEntries: new Set(),   // timeline entries shown opened, by key
     expanded: new Set(),   // classes showing all their rows in this view
     classTotals: {},       // class -> how many the current filter holds
     run: { running: false },
@@ -250,6 +282,8 @@
   function resetView() {
     state.stubs.clear();
     state.reasonFor = null;
+    state.stepFor = null;
+    state.editing = null;
     state.expanded.clear();
   }
 
@@ -296,24 +330,71 @@
     });
   }
 
+  // After an answer: reload, and when the row left the current filter leave
+  // a one-line stub in its place (with undo) until the view changes.
+  async function answered(item, status) {
+    const sameClass = state.listing.filter((row) => row.class === item.class);
+    const index = sameClass.findIndex((row) => row.id === item.id);
+    await loadList();
+    if (status !== 'new' && !state.listing.some((row) => row.id === item.id)) {
+      state.stubs.set(item.id, { class: item.class, index, status });
+      render();
+    }
+  }
+
   function mark(item, status, reason) {
     return guarded(async () => {
       state.reasonFor = null;
       await api.setFeedback(state.active, item.id, status, reason);
-      const sameClass = state.listing.filter((row) => row.class === item.class);
-      const index = sameClass.findIndex((row) => row.id === item.id);
-      await loadList();
-      if (status !== 'new' && !state.listing.some((row) => row.id === item.id)) {
-        state.stubs.set(item.id, { class: item.class, index, status });
-        render();
-      }
+      await answered(item, status);
     });
   }
 
+  // One step along the funnel; the comment is '' when nothing was written.
+  function advance(item, step, comment) {
+    return guarded(async () => {
+      state.stepFor = null;
+      await api.advance(state.active, item.id, step, comment || '');
+      await answered(item, step);
+    });
+  }
+
+  // "Undo": one step back — the funnel's last step, or the answer altogether.
   function undo(id) {
     return guarded(async () => {
       state.stubs.delete(id);
-      await api.setFeedback(state.active, id, 'new', null);
+      state.stepFor = null;
+      state.editing = null;
+      await api.stepBack(state.active, id);
+      await loadList();
+    });
+  }
+
+  function entryKey(id, step) {
+    return `${id}:${step.kind}:${step.index == null ? '' : step.index}`;
+  }
+
+  function toggleEntry(key) {
+    if (state.openEntries.has(key)) state.openEntries.delete(key);
+    else state.openEntries.add(key);
+    render();
+  }
+
+  function startEdit(item, step) {
+    const key = entryKey(item.id, step);
+    state.editing = { key, id: item.id, kind: step.kind, index: step.index, draft: step.comment || '' };
+    render();
+  }
+
+  function saveEdit() {
+    const editing = state.editing;
+    return guarded(async () => {
+      await api.editComment(state.active, editing.id, editing.kind,
+        editing.index == null ? null : editing.index, editing.draft);
+      state.editing = null;
+      // A comment written is a comment to read: its entry stays open.
+      if (editing.draft.trim()) state.openEntries.add(editing.key);
+      else state.openEntries.delete(editing.key);
       await loadList();
     });
   }
@@ -564,6 +645,8 @@
     }
     children.push(renderDetails(view));
     children.push(status === 'new' ? renderAnswers(item) : renderMarked(item));
+    children.push(renderTimeline(item));
+    children.push(renderStepForm(item));
     return el('article', { class: `row status-${status}`, testid: `vacancy-${item.id}` }, children);
   }
 
@@ -639,14 +722,86 @@
     return el('div', {}, answers, form);
   }
 
+  // A vacancy with an answer: its status, the next steps of the funnel, undo.
   function renderMarked(item) {
-    const { status, rejectedReason, buggedReason } = item.feedback;
-    const reason = status === 'rejected' ? rejectedReason : status === 'bugged' ? buggedReason : null;
+    const { status } = item.feedback;
+    const pressed = state.stepFor && state.stepFor.id === item.id ? state.stepFor.step : null;
     return el('div', { class: 'marked' },
       openButton(item.view || {}),
       el('span', { class: `badge status ${status}`, testid: 'status-badge' }, t(STATUS_KEYS[status])),
-      reason && el('span', { class: 'reason-text', testid: 'status-reason' }, reason),
+      Funnel.nextSteps(status).map((step) => el('button', {
+        testid: `btn-step-${step}`, class: pressed === step ? 'pressed' : null,
+        onclick: () => { state.stepFor = { id: item.id, step, draft: '' }; render(); },
+      }, t(STEP_KEYS[step]))),
       el('button', { class: 'link', testid: 'btn-undo', onclick: () => undo(item.id) }, t('action.undo')));
+  }
+
+  // The comment for a funnel step: a large, optional text area at the bottom
+  // of the card. Saved empty, the step still happened.
+  function renderStepForm(item) {
+    const form = state.stepFor;
+    if (!form || form.id !== item.id) return null;
+    const input = el('textarea', {
+      class: 'big', testid: 'step-input', rows: '6', placeholder: t(STEP_HINT_KEYS[form.step]),
+      oninput: (event) => { form.draft = event.target.value; },
+    });
+    input.value = form.draft || '';
+    setTimeout(() => { if (document.activeElement !== input) input.focus(); }, 0);
+    return el('div', { class: 'step-form', testid: 'step-form' },
+      el('div', { class: 'step-form-title' }, t(STEP_KEYS[form.step])),
+      input,
+      el('div', { class: 'reason-actions' },
+        el('button', { class: 'primary', testid: 'step-save', onclick: () => advance(item, form.step, input.value) },
+          t('reason.save')),
+        el('button', { testid: 'step-cancel', onclick: () => { state.stepFor = null; render(); } },
+          t('reason.cancel'))));
+  }
+
+  // Every step with its date, as a column: a step with a comment is an
+  // accordion (the arrow opens the text under the date); an empty one is a
+  // plain line. The pencil edits in place and opens the entry.
+  function renderTimeline(item) {
+    const steps = Funnel.timeline(item.feedback);
+    if (!steps.length) return null;
+    return el('div', { class: 'timeline', testid: 'timeline' }, steps.map((step) => renderEntry(item, step)));
+  }
+
+  function renderEntry(item, step) {
+    const key = entryKey(item.id, step);
+    const editing = state.editing && state.editing.key === key;
+    const hasText = Boolean(step.comment);
+    const open = editing || (hasText && state.openEntries.has(key));
+    const label = t(TIMELINE_KEYS[step.kind], { n: (step.index || 0) + 1 });
+    const head = el('div', { class: 'entry-head' },
+      hasText || editing
+        ? el('button', {
+          class: `entry-toggle${open ? ' is-open' : ''}`, testid: 'entry-toggle',
+          'aria-expanded': open ? 'true' : 'false', onclick: () => toggleEntry(key),
+        })
+        : el('span', { class: 'entry-toggle none' }),
+      el('span', { class: 'entry-date', testid: 'entry-date' }, formatDate(step.at)),
+      el('span', { class: 'entry-label', testid: 'entry-label' }, label),
+      step.editable && !editing && el('button', {
+        class: 'pencil', testid: 'entry-edit', title: t('timeline.edit'), onclick: () => startEdit(item, step),
+      }, '\u270E'));
+    let body = null;
+    if (editing) {
+      const input = el('textarea', {
+        testid: 'entry-input', rows: '4', placeholder: t('timeline.edit_hint'),
+        oninput: (event) => { state.editing.draft = event.target.value; },
+      });
+      input.value = state.editing.draft;
+      setTimeout(() => { if (document.activeElement !== input) input.focus(); }, 0);
+      body = el('div', { class: 'entry-body' }, input,
+        el('div', { class: 'reason-actions' },
+          el('button', { class: 'primary', testid: 'entry-save', onclick: saveEdit }, t('reason.save')),
+          el('button', { testid: 'entry-cancel', onclick: () => { state.editing = null; render(); } },
+            t('reason.cancel'))));
+    } else if (open) {
+      body = el('div', { class: 'entry-body entry-comment', testid: 'entry-comment' }, step.comment);
+    }
+    const suffix = step.index == null ? '' : `-${step.index}`;
+    return el('div', { class: 'entry', testid: `entry-${step.kind}${suffix}` }, head, body);
   }
 
   function renderRunPanel() {

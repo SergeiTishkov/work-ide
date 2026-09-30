@@ -123,6 +123,40 @@ button.open { margin-right: 10px; color: var(--accent); border-color: var(--acce
 .row.status-rejected { border-left: 3px solid var(--rejected); }
 .row.status-bugged { border-left: 3px solid var(--bugged); }
 .row.status-expired { border-left: 3px solid var(--muted); }
+.row.status-contacted, .row.status-interview, .row.status-awaiting_final { border-left: 3px solid var(--accent); }
+.badge.status.contacted, .badge.status.interview, .badge.status.awaiting_final { color: var(--accent); }
+
+/* The funnel step comment: a large text area at the bottom of the card. */
+.step-form { margin: 10px 0 0 38px; }
+.step-form-title { font-weight: 600; margin-bottom: 4px; }
+.step-form textarea.big, .entry-body textarea {
+  width: 100%; font: inherit; padding: 8px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text); resize: vertical;
+}
+.step-form textarea.big { min-height: 8em; }
+
+/* The timeline: one line per step; the arrow opens its comment under the date. */
+.timeline { margin: 10px 0 0 38px; border-top: 1px dashed var(--border); padding-top: 6px; }
+.entry { margin: 2px 0; }
+.entry-head { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.entry-toggle {
+  width: 18px; height: 18px; padding: 0; border: none; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--accent);
+}
+.entry-toggle::before {
+  content: ''; width: 0; height: 0; border-style: solid;
+  border-width: 5px 0 5px 7px; border-color: transparent transparent transparent currentColor;
+  transition: transform .15s ease;
+}
+.entry-toggle.is-open::before { transform: rotate(90deg); }
+.entry-toggle.none { cursor: default; }
+.entry-toggle.none::before { border: none; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+.entry-date { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pencil { border: none; background: none; padding: 0 4px; color: var(--muted); cursor: pointer; font-size: 14px; }
+.pencil:hover { color: var(--accent); }
+/* Under the date: 18px arrow + 8px gap. */
+.entry-body { margin: 2px 0 6px 26px; }
+.entry-comment { white-space: pre-wrap; }
 
 .runlog { border-top: 1px solid var(--border); background: var(--surface); max-height: 32vh; display: flex; flex-direction: column; }
 .runlog-head { padding: 6px 16px; font-weight: 600; }

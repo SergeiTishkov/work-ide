@@ -30,16 +30,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 
 # 2: pipeline_runs — a new table, created by applying the schema.
-# 3: feedback status 'expired' — a CHECK constraint SQLite cannot alter, so
-#    the vacancies table is rebuilt (_migrate_to_3).
-SCHEMA_VERSION = 3
+# 3: feedback status 'expired'; 4: the application funnel (contacted,
+#    interview, awaiting_final) with a comment and a date per step. Both change
+#    the vacancies table, rebuilt by _rebuild_vacancies.
+SCHEMA_VERSION = 4
 SCHEMA_PATH = common.ROOT / "schemas" / "db.sql"
 
 # How long a writer waits for another writer's transaction before giving up.
 # The pipeline's largest transaction (saving the whole base) takes seconds.
 BUSY_TIMEOUT_MS = 60_000
 
-FEEDBACK_STATUSES = ("new", "applied", "rejected", "bugged", "expired")
+FEEDBACK_STATUSES = ("new", "applied", "rejected", "bugged", "expired",
+                     "contacted", "interview", "awaiting_final")
 
 
 class NotMigratedError(RuntimeError):
@@ -72,30 +74,39 @@ def _check_not_legacy() -> None:
         )
 
 
-def _migrate_to_3(conn: sqlite3.Connection) -> None:
-    """Allows feedback_status 'expired'. SQLite cannot change a CHECK
-    constraint, so the table is rebuilt the documented way: a new table with
-    the new constraint, the rows copied, the old one dropped, the new one
+def _table_body(ddl: str) -> str:
+    """What is between the outer parentheses of a CREATE TABLE, whitespace
+    normalised — for comparing a stored definition with the schema file."""
+    body = ddl[ddl.index("(") + 1:ddl.rindex(")")]
+    return " ".join(body.split())
+
+
+def _rebuild_vacancies(conn: sqlite3.Connection) -> None:
+    """Brings the vacancies table to its definition in schemas/db.sql.
+
+    SQLite cannot change a CHECK constraint (the allowed feedback statuses),
+    so the table is rebuilt the documented way: a new table from the schema
+    file, the shared columns copied, the old table dropped, the new one
     renamed — in one transaction, with foreign keys off so that the selection
-    rows referring to vacancies survive the swap."""
-    (ddl,) = conn.execute(
+    rows referring to vacancies survive the swap. Columns the new definition
+    adds start empty. Skipped when the table already matches."""
+    schema = SCHEMA_PATH.read_text(encoding="utf-8")
+    match = re.search(r"CREATE TABLE IF NOT EXISTS vacancies (\(.*?\n\));", schema, re.S)
+    if match is None:
+        raise SchemaVersionError("schemas/db.sql defines no vacancies table")
+    target = "CREATE TABLE vacancies_new " + match.group(1)
+    (current,) = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vacancies'").fetchone()
-    if "'expired'" in ddl:
-        return   # created by a schema that already allows it
-    old_check = "'rejected', 'bugged')"
-    if old_check not in ddl:
-        raise SchemaVersionError("unexpected vacancies table definition; cannot add 'expired'")
-    # The stored definition names the table as it was created: bare, or
-    # quoted after a rename ('CREATE TABLE "vacancies"').
-    new_ddl = re.sub(r'^CREATE TABLE\s+(["`]?)vacancies\1', "CREATE TABLE vacancies_new",
-                     ddl.replace(old_check, "'rejected', 'bugged', 'expired')", 1), count=1)
-    if not new_ddl.startswith("CREATE TABLE vacancies_new"):
-        raise SchemaVersionError("unexpected vacancies table definition; cannot add 'expired'")
+    if _table_body(current) == _table_body(target):
+        return
+    old_columns = [row[1] for row in conn.execute("PRAGMA table_info(vacancies)")]
     conn.execute("PRAGMA foreign_keys = OFF")
     try:
         with conn:
-            conn.execute(new_ddl)
-            conn.execute("INSERT INTO vacancies_new SELECT * FROM vacancies")
+            conn.execute(target)
+            new_columns = {row[1] for row in conn.execute("PRAGMA table_info(vacancies_new)")}
+            shared = ", ".join(c for c in old_columns if c in new_columns)
+            conn.execute(f"INSERT INTO vacancies_new ({shared}) SELECT {shared} FROM vacancies")
             conn.execute("DROP TABLE vacancies")
             conn.execute("ALTER TABLE vacancies_new RENAME TO vacancies")
             conn.execute("CREATE INDEX IF NOT EXISTS vacancies_feedback "
@@ -105,8 +116,10 @@ def _migrate_to_3(conn: sqlite3.Connection) -> None:
 
 
 # version reached -> the step that reaches it. Versions without a step only
-# add tables, which applying the schema already did.
-MIGRATIONS = {3: _migrate_to_3}
+# added tables, which applying the schema already did. Version 3 (status
+# 'expired') and 4 (the funnel) both change the vacancies table; one rebuild
+# to the current definition, at 4, covers both.
+MIGRATIONS = {4: _rebuild_vacancies}
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:

@@ -11,11 +11,14 @@
 -- pipeline and the app write at the same time without overwriting each other:
 --   vacancies.data, vacancies.view, companies, selections*   - the pipeline
 --   pipeline_runs                                            - the pipeline (tools/runstate.py)
---   vacancies.feedback_* (except feedback_reviewed_at)       - the app
+--   vacancies.feedback_* (except feedback_reviewed_at),
+--   applied_at and the contact/interview/final columns        - the app
 --   vacancies.feedback_reviewed_at                           - tools/feedback.py
 --
 -- VERSIONS. 1: the first schema. 2: pipeline_runs. 3: feedback status 'expired'
 -- (the vacancy was closed or its link dead — not a judgement of the pick).
+-- 4: the application funnel — contacted, interview, awaiting_final — with a
+-- comment and a date for every step.
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -31,10 +34,23 @@ CREATE TABLE IF NOT EXISTS vacancies (
   -- report.vacancy_view() as JSON: what a row in the app shows. Latest version.
   view                  TEXT,
   feedback_status       TEXT NOT NULL DEFAULT 'new'
-                        CHECK (feedback_status IN ('new', 'applied', 'rejected', 'bugged', 'expired')),
+                        CHECK (feedback_status IN ('new', 'applied', 'rejected', 'bugged',
+                                                   'expired', 'contacted', 'interview',
+                                                   'awaiting_final')),
   rejected_reason       TEXT,
   bugged_reason         TEXT,
   feedback_at           TEXT,
+  -- The application funnel, written by the app (renderer/funnel.js). Comments
+  -- on steps that happened are never NULL: '' means the step happened and the
+  -- person wrote nothing. The interviews are JSON arrays, one entry each —
+  -- their number is the number of interviews; the dates run parallel.
+  applied_at            TEXT,
+  contact_comment       TEXT,
+  contact_at            TEXT,
+  interview_comments    TEXT,
+  interview_at          TEXT,
+  final_comment         TEXT,
+  final_at              TEXT,
   -- The selection the person was looking at when they left the feedback.
   feedback_selection_id INTEGER REFERENCES selections(id),
   feedback_reviewed_at  TEXT

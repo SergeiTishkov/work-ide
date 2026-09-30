@@ -46,7 +46,8 @@ WITH baseline AS (
 base AS (
   SELECT i.vacancy_id, i.class, i.class_position, i.section_limit, i.score,
          i.eligibility_rank, v.view, v.feedback_status, v.rejected_reason,
-         v.bugged_reason, v.feedback_at,
+         v.bugged_reason, v.feedback_at, v.applied_at, v.contact_comment, v.contact_at,
+         v.interview_comments, v.interview_at, v.final_comment, v.final_at,
          CASE
            WHEN (SELECT id FROM baseline) IS NULL THEN 1
            WHEN EXISTS (SELECT 1 FROM selection_items o
@@ -76,7 +77,8 @@ ranked AS (
   FROM filtered
 )
 SELECT vacancy_id, class, score, eligibility_rank, fresh, view, feedback_status,
-       rejected_reason, bugged_reason, feedback_at
+       rejected_reason, bugged_reason, feedback_at, applied_at, contact_comment,
+       contact_at, interview_comments, interview_at, final_comment, final_at
 FROM ranked
 WHERE feedback_status <> 'new' OR rank_in_class <= section_limit
    OR instr(:expanded, ',' || class || ',') > 0
@@ -152,12 +154,58 @@ ORDER BY id DESC
 LIMIT 1;
 
 -- name: set_feedback
+-- The first answer on a vacancy. "applied" dates the start of the funnel;
+-- going back to "new" forgets everything the funnel recorded.
 UPDATE vacancies
 SET feedback_status = :status,
     rejected_reason = :rejected_reason,
     bugged_reason = :bugged_reason,
     feedback_at = :at,
-    feedback_selection_id = :selection_id
+    feedback_selection_id = :selection_id,
+    applied_at = CASE WHEN :status = 'applied' THEN :at
+                      WHEN :status = 'new' THEN NULL ELSE applied_at END,
+    contact_comment    = CASE WHEN :status = 'new' THEN NULL ELSE contact_comment END,
+    contact_at         = CASE WHEN :status = 'new' THEN NULL ELSE contact_at END,
+    interview_comments = CASE WHEN :status = 'new' THEN NULL ELSE interview_comments END,
+    interview_at       = CASE WHEN :status = 'new' THEN NULL ELSE interview_at END,
+    final_comment      = CASE WHEN :status = 'new' THEN NULL ELSE final_comment END,
+    final_at           = CASE WHEN :status = 'new' THEN NULL ELSE final_at END
+WHERE id = :id;
+
+-- name: funnel_listing
+-- THE FUNNEL (applied, contacted, interview, awaiting_final) is the person's
+-- applications, which live for weeks: its filters list every vacancy in that
+-- status, whatever the collection, selection or market — a later run must
+-- not make an application disappear. Newest step first.
+SELECT v.id AS vacancy_id,
+       json_extract(v.view, '$.classification') AS class,
+       COALESCE(json_extract(v.view, '$.score'), 0) AS score,
+       0 AS eligibility_rank, 0 AS fresh, v.view, v.feedback_status,
+       v.rejected_reason, v.bugged_reason, v.feedback_at, v.applied_at, v.contact_comment, v.contact_at, v.interview_comments, v.interview_at, v.final_comment, v.final_at
+FROM vacancies v
+WHERE v.feedback_status = :filter AND v.view IS NOT NULL
+ORDER BY v.feedback_at DESC, v.id;
+
+-- name: funnel_counts
+SELECT COALESCE(SUM(feedback_status = 'applied'), 0)        AS applied,
+       COALESCE(SUM(feedback_status = 'contacted'), 0)      AS contacted,
+       COALESCE(SUM(feedback_status = 'interview'), 0)      AS interview,
+       COALESCE(SUM(feedback_status = 'awaiting_final'), 0) AS awaiting_final
+FROM vacancies
+WHERE view IS NOT NULL;
+
+-- name: vacancy_progress
+SELECT id, feedback_status, feedback_at, rejected_reason, bugged_reason, applied_at, contact_comment, contact_at, interview_comments, interview_at, final_comment, final_at
+FROM vacancies WHERE id = :id;
+
+-- name: write_progress
+-- Written by the app only, after renderer/funnel.js worked out the step.
+UPDATE vacancies
+SET feedback_status = :status, feedback_at = :at,
+    rejected_reason = :rejected_reason, bugged_reason = :bugged_reason,
+    applied_at = :applied_at, contact_comment = :contact_comment, contact_at = :contact_at,
+    interview_comments = :interview_comments, interview_at = :interview_at,
+    final_comment = :final_comment, final_at = :final_at
 WHERE id = :id;
 
 -- name: pending_feedback_counts

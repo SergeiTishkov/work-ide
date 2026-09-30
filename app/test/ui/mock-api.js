@@ -25,6 +25,14 @@ function installMockApi(fixture) {
     return status === filter;
   }
 
+  const NOW = '2026-10-01T10:00:00+00:00';
+
+  function update(identity, id, change) {
+    for (const rows of Object.values(data.rows[identity] || {})) {
+      for (const row of rows) if (row.id === id) row.feedback = change(row.feedback);
+    }
+  }
+
   function rowsOf(identity, segment) {
     return ((data.rows[identity] || {})[segment]) || [];
   }
@@ -60,7 +68,8 @@ function installMockApi(fixture) {
     async listingCounts(identity, segment) {
       record('listingCounts', [identity, segment]);
       const counts = {};
-      for (const f of ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired']) {
+      for (const f of ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired',
+        'contacted', 'interview', 'awaiting_final']) {
         counts[f] = rowsOf(identity, segment).filter((row) => matches(row, f)).length;
       }
       return counts;
@@ -72,11 +81,29 @@ function installMockApi(fixture) {
           if (row.id !== id) continue;
           row.feedback = {
             status,
+            at: NOW,
+            appliedAt: status === 'applied' ? NOW : null,
             rejectedReason: status === 'rejected' ? reason : null,
             buggedReason: status === 'bugged' ? reason : null,
+            interviewComments: [],
+            interviewAt: [],
           };
         }
       }
+    },
+    // The funnel through the page's own rules (renderer/funnel.js), like the
+    // main process does.
+    async advance(identity, id, step, comment) {
+      record('advance', [identity, id, step, comment]);
+      update(identity, id, (fb) => window.WorkIdeFunnel.advance(fb, step, comment, NOW));
+    },
+    async stepBack(identity, id) {
+      record('stepBack', [identity, id]);
+      update(identity, id, (fb) => window.WorkIdeFunnel.stepBack(fb, NOW));
+    },
+    async editComment(identity, id, kind, index, text) {
+      record('editComment', [identity, id, kind, index, text]);
+      update(identity, id, (fb) => window.WorkIdeFunnel.editComment(fb, kind, index, text, NOW));
     },
     async pendingFeedbackCount(identity) {
       record('pendingFeedbackCount', [identity]);
@@ -138,7 +165,7 @@ function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new' } 
       posted_on: id === 'a2r' ? null : '2026-09-20', first_seen_on: '2026-09-28',
       needs_manual_review: id.endsWith('r'),
     },
-    feedback: { status, rejectedReason: null, buggedReason: null },
+    feedback: { status, at: null, rejectedReason: null, buggedReason: null, interviewComments: [], interviewAt: [] },
   };
 }
 

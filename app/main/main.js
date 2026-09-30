@@ -61,6 +61,10 @@ function registerIpc(window) {
   handle('class-totals', (identity, segment, filter) => store.classTotals(identity, segment, filter));
   handle('counts', (identity, segment) => store.counts(identity, segment));
   handle('set-feedback', (identity, id, status, reason) => store.setFeedback(identity, id, status, reason));
+  handle('advance', (identity, id, step, comment) => store.advance(identity, id, step, comment));
+  handle('step-back', (identity, id) => store.stepBack(identity, id));
+  handle('edit-comment', (identity, id, kind, index, text) =>
+    store.editComment(identity, id, kind, index, text));
   handle('pending-feedback', (identity) => store.pendingFeedback(identity));
   handle('pipeline-status', (identity) => store.pipelineStatus(identity));
   handle('run-state', () => runner.state());

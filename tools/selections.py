@@ -145,7 +145,11 @@ def load_queries() -> dict:
     return queries
 
 
-FILTERS = ("fresh_new", "all", "fresh", "applied", "rejected", "bugged", "expired")
+# The person's applications: listed across collections, selections and
+# markets, since an application lives for weeks (see funnel_listing in
+# schemas/queries.sql). The other filters look at the selection.
+FUNNEL = ("applied", "contacted", "interview", "awaiting_final")
+FILTERS = ("fresh_new", "all", "fresh", "rejected", "bugged", "expired") + FUNNEL
 
 
 def latest_selection_id(conn) -> Optional[int]:
@@ -153,14 +157,22 @@ def latest_selection_id(conn) -> Optional[int]:
     return row[0] if row and row[0] is not None else None
 
 
+def _check_filter(filter_name: str) -> None:
+    if filter_name not in FILTERS:
+        raise ValueError(f"unknown filter {filter_name!r}")
+
+
 def listing(conn, selection_id: int, segment: str, filter_name: str,
             expanded=()) -> list:
     """The rows of one market under one filter: the top of each class, and
-    every row of the classes named in `expanded`."""
-    if filter_name not in FILTERS:
-        raise ValueError(f"unknown filter {filter_name!r}")
+    every row of the classes named in `expanded`. Funnel filters list every
+    application, uncapped."""
+    _check_filter(filter_name)
     conn.row_factory = _dict_row
     try:
+        if filter_name in FUNNEL:
+            return conn.execute(load_queries()["funnel_listing"],
+                                {"filter": filter_name}).fetchall()
         return conn.execute(load_queries()["listing"], {
             "selection_id": selection_id, "segment": segment, "filter": filter_name,
             "expanded": "," + ",".join(expanded) + ",",
@@ -171,8 +183,12 @@ def listing(conn, selection_id: int, segment: str, filter_name: str,
 
 def class_totals(conn, selection_id: int, segment: str, filter_name: str) -> dict:
     """{class: how many the filter holds} — for "N more" under a capped class."""
-    if filter_name not in FILTERS:
-        raise ValueError(f"unknown filter {filter_name!r}")
+    _check_filter(filter_name)
+    if filter_name in FUNNEL:
+        totals = {}
+        for row in listing(conn, selection_id, segment, filter_name):
+            totals[row["class"]] = totals.get(row["class"], 0) + 1
+        return totals
     rows = conn.execute(load_queries()["listing_class_totals"], {
         "selection_id": selection_id, "segment": segment, "filter": filter_name,
     }).fetchall()
@@ -185,9 +201,12 @@ def listing_counts(conn, selection_id: int, segment: str) -> dict:
         row = conn.execute(load_queries()["listing_counts"], {
             "selection_id": selection_id, "segment": segment,
         }).fetchone()
+        funnel = conn.execute(load_queries()["funnel_counts"]).fetchone()
     finally:
         conn.row_factory = None
-    return {name: row[name] or 0 for name in FILTERS}
+    counts = {name: row[name] or 0 for name in FILTERS if name not in FUNNEL}
+    counts.update({name: funnel[name] or 0 for name in FUNNEL})
+    return counts
 
 
 def _dict_row(cursor, row) -> dict:

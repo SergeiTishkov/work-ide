@@ -127,6 +127,12 @@ It opens a window over the knowledge base:
   (these two with an optional reason) and **Vacancy expired** — closed at the
   source or a dead link, which says nothing about the pick. A wrong pick is a
   bug report against the filter;
+- an application then moves along a funnel — **Contact happened**, **Interview
+  scheduled** (as many as there are), **Waiting for the final word** — each
+  step with an optional comment and its date. Under the vacancy the steps
+  form a dated column: a commented step opens like an accordion, the pencil
+  edits any comment in place, and undo goes back one step. The funnel's
+  filters list every application, across runs and markets;
 - **Collect vacancies** runs `/run` for the identity in Claude Code, headless,
   with a live log; **Review feedback (N)** runs `/feedback`, which gathers the
   pending answers (`tools/feedback.py`) and fixes the filter. The agent edits
