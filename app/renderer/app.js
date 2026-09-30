@@ -61,7 +61,9 @@
     restored: null,
   };
 
-  // --- the view survives "Refresh" -------------------------------------------
+  // --- the view survives "Refresh" and a restart ----------------------------
+  // localStorage, not sessionStorage: Refresh may restart the whole app, and
+  // the tab, market and filter should come back after that too.
 
   function saveView() {
     const segments = {};
@@ -69,7 +71,7 @@
       if (info && info.activeSegment) segments[prefix] = info.activeSegment;
     }
     try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(
+      localStorage.setItem(SESSION_KEY, JSON.stringify(
         { active: state.active, segments, filters: state.filters }));
     } catch {
       // storage unavailable: a refresh starts from the defaults
@@ -78,7 +80,7 @@
 
   function restoreView() {
     try {
-      const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+      const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
       if (saved) {
         state.active = saved.active || null;
         state.filters = saved.filters || {};
@@ -89,11 +91,19 @@
     }
   }
 
-  // Reloads the whole interface — markup, styles, code — keeping the view.
-  // Useful after editing the renderer, and to re-read everything at once.
-  function refresh() {
+  // Refreshes everything, keeping the view. The main process decides how:
+  // it restarts the whole app when its own code changed since it started
+  // (a reloaded page alone would call channels the old process does not
+  // have), otherwise the page reloads — markup, styles, code.
+  async function refresh() {
     saveView();
-    window.location.reload();
+    let how = 'reload';
+    try {
+      how = await api.refresh();
+    } catch {
+      // an older main process without 'refresh': reloading is what it can do
+    }
+    if (how !== 'relaunch') window.location.reload();
   }
 
   // --- small helpers ---------------------------------------------------------
@@ -165,12 +175,16 @@
     box.textContent = t('app.error', { message: error.message || String(error) });
   }
 
+  // Every action runs through here. On failure the error is shown AND the
+  // screen redrawn from what did load: a failed request once left the start
+  // screen up, saying there were no identities (2026-09-30).
   async function guarded(fn) {
     try {
       showError(null);
       await fn();
     } catch (error) {
       showError(error);
+      render();
     }
   }
 

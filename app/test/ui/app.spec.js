@@ -291,3 +291,37 @@ test('a capped class says how many more it holds, opens and closes', async ({ pa
   await expect(page.getByTestId('show-more-hot_lead'))
     .toHaveText(ru['list.show_more'].replace('{n}', '1'));
 });
+
+test('a failing request shows the error over the real screen, not the start one', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.failClassTotals = true;   // what an outdated main process answered
+  await open(page, fixture);
+  await expect(page.getByTestId('error')).toContainText("No handler registered for 'class-totals'");
+  await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-pjoice')).toBeVisible();
+  await expect(page.getByTestId('no-identities')).toHaveCount(0);
+  await expect(page.getByTestId('run-collect')).toBeVisible();
+});
+
+test('"Refresh" leaves the reload to the app when the app restarts itself', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.refreshReply = 'relaunch';
+  await open(page, fixture);
+  await page.getByTestId('filter-all').check();
+  await page.evaluate(() => { window.__beforeRefresh = true; });
+  await page.getByTestId('refresh').click();
+  await expect.poll(() => calls(page, 'refresh')).toHaveLength(1);
+  expect(await page.evaluate(() => window.__beforeRefresh)).toBe(true);   // not reloaded here
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('work-ide-view')));
+  expect(saved.filters['kisel/full']).toBe('all');   // the restarted app picks the view up
+});
+
+test('"Refresh" still reloads against an older main process without the channel', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.withoutRefresh = true;
+  await open(page, fixture);
+  await page.evaluate(() => { window.__beforeRefresh = true; });
+  await page.getByTestId('refresh').click();
+  await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__beforeRefresh)).toBeUndefined();
+});

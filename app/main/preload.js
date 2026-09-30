@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('api', {
   getRunState: () => call('run-state'),
   startRun: (request) => call('start-run', request),
   stopRun: () => call('stop-run'),
+  refresh: () => call('refresh'),
   openExternal: (url) => call('open-external', url),
   onRunEvent: (listener) => {
     const wrapped = (_event, payload) => listener(payload);

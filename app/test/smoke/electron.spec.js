@@ -81,6 +81,15 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await expect(window.getByTestId('collect-indicator')).toHaveCount(0, { timeout: 10000 });
     await expect(window.getByTestId('run-collect')).toBeEnabled();
 
+    // Refresh through the real IPC: the main process's code has not changed
+    // since start, so the page reloads, keeps the view and works.
+    await window.getByTestId('filter-all').check();
+    await window.evaluate(() => { window.__beforeRefresh = true; });
+    await window.getByTestId('refresh').click();
+    await expect.poll(() => window.evaluate(() => window.__beforeRefresh)).toBeUndefined();
+    await expect(window.getByTestId('filter-all')).toBeChecked();
+    await expect(window.getByTestId('error')).toBeHidden();
+
     await window.getByTestId('identity-tab-pjoice').click();
     await expect(window.getByTestId('never-collected')).toBeVisible();
   } finally {

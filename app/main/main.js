@@ -8,6 +8,9 @@ const { repoRoot, schemaDir } = require('./paths');
 const { Store } = require('./store');
 const { Runner } = require('./runner');
 const { listIdentities } = require('./identities');
+const { codeStamp, refreshAction } = require('./code-stamp');
+
+const startedWithCode = codeStamp();
 
 // A separate profile folder for test instances. Two Electron processes on one
 // profile collide — the smoke test failed at random while the owner had the
@@ -67,6 +70,20 @@ function registerIpc(window) {
     return runner.start(kind, identity);
   });
   handle('stop-run', () => runner.stop());
+  // "Refresh": the page reloads itself; when the main process's own code
+  // changed since start, the whole app restarts instead — unless an agent run
+  // started from here is going, which a restart would cut off.
+  handle('refresh', () => {
+    const action = refreshAction({
+      startedWith: startedWithCode, now: codeStamp(), agentRunning: runner.state().running,
+    });
+    if (action !== 'relaunch') return action;
+    setTimeout(() => {
+      app.relaunch();
+      app.exit(0);
+    }, 50);
+    return 'relaunch';
+  });
   handle('open-external', (url) => {
     if (!/^https?:\/\//i.test(url)) throw new Error('only http(s) links open');
     return shell.openExternal(url);

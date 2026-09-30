@@ -50,6 +50,7 @@ function installMockApi(fixture) {
     },
     async classTotals(identity, segment, filter) {
       record('classTotals', [identity, segment, filter]);
+      if (data.failClassTotals) throw new Error("No handler registered for 'class-totals'");
       const totals = {};
       for (const row of rowsOf(identity, segment).filter((r) => matches(r, filter))) {
         totals[row.class] = (totals[row.class] || 0) + 1;
@@ -101,6 +102,10 @@ function installMockApi(fixture) {
       record('startRun', [request]);
       return data.startRunReply || { ok: true };
     },
+    async refresh() {
+      record('refresh', []);
+      return data.refreshReply || 'reload';
+    },
     async stopRun() {
       record('stopRun', []);
       return { ok: true };
@@ -108,6 +113,7 @@ function installMockApi(fixture) {
     async openExternal(url) {
       record('openExternal', [url]);
     },
+    ...(fixture.withoutRefresh ? { refresh: undefined } : {}),
     onRunEvent(listener) {
       listeners.push(listener);
       return () => {};
