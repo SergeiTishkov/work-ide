@@ -210,6 +210,8 @@ matching_patterns:
     patterns:
       - '\.net\b'
       - '\bdotnet\b'
+      # "Sr. Dot Net Developer", refused 2026-10-01 as "not a .NET/JS role".
+      - '\bdot[ -]net\b'
       - '\bnet framework\b'
     redundant_if: [".NET Core", ".NET Framework", "ASP.NET", "ASP.NET Core",
                    "ASP.NET MVC", "ASP.NET Web API"]

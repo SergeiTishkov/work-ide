@@ -10,6 +10,8 @@ No network here: the fetch is replaced, as everywhere else in this suite.
 """
 from __future__ import annotations
 
+import pytest
+
 import sys
 from pathlib import Path
 
@@ -255,3 +257,89 @@ def test_the_json_ld_reader_never_raises(monkeypatch):
 
     assert facts == {"description": "", "workplace_type": None,
                      "salary_raw": None, "closed": False, "employment_types": []}
+
+
+# --- the second queue: refused only because nobody read the stack ------------
+
+def _unread(first_seen, source="devitjobs", url=None, **extra):
+    record = _vacancy(0, "rejected", source=source,
+                      url=url or f"https://devitjobs.com/jobs/{'a' * 23}{first_seen[-1]}",
+                      first_seen=first_seen, **extra)
+    record["computed"]["description_wanted"] = True
+    return record
+
+
+def test_vacancies_waiting_for_their_stack_are_queued_newest_first():
+    vacancies = {
+        "old": _unread("2026-09-01T00:00:01"),
+        "new": _unread("2026-09-30T00:00:02"),
+        "mid": _unread("2026-09-15T00:00:03"),
+        "read": _unread("2026-09-30T00:00:04", description_text="has text"),
+        "unreadable": _unread("2026-09-30T00:00:05", source="4dayweek"),
+        "not_wanted": _vacancy(0, "rejected", source="devitjobs"),
+    }
+    assert enrich_descriptions.wanted_worklist(vacancies) == ["new", "mid", "old"]
+    assert enrich_descriptions.wanted_worklist(vacancies, limit=1) == ["new"]
+
+
+def test_the_shortlist_keeps_its_own_budget(monkeypatch):
+    """A shared budget would always be spent on the shortlist first and never
+    reach the second queue — the reason it has one of its own."""
+    import fetch_linkedin
+
+    monkeypatch.setattr(fetch_linkedin, "fetch_page_facts", lambda url, timeout: _facts("text"))
+    monkeypatch.setattr(enrich_descriptions, "_devitjobs_facts", lambda url, timeout: _facts("C# text"))
+    vacancies = {"h1": _vacancy(60, "hot_lead", url="https://x/1"),
+                 "h2": _vacancy(50, "hot_lead", url="https://x/2"),
+                 "u1": _unread("2026-09-30T00:00:01")}
+    stats = enrich_descriptions.enrich(vacancies, limit=2, wanted_limit=5)
+    assert stats["considered"] == 3 and stats["unread_stack"] == 1
+    assert vacancies["u1"]["description_text"] == "C# text"
+
+
+class _Response:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+def test_devitjobs_is_read_from_the_api_its_page_calls(monkeypatch):
+    import requests
+
+    asked = []
+
+    def fake_get(url, headers=None, timeout=None):
+        asked.append(url)
+        return _Response({
+            "description": "<p>We maintain an ERP.</p>",
+            "requirementsMustTextArea": "- C# and ASP.NET\n- SQL Server",
+            "requirementsNiceTextArea": "",
+            "responsibilitiesTextArea": "- Keep it running",
+            "workplace": "remote", "jobType": "Full-Time",
+            "isDisabledOrOutdated": False, "isPaused": False,
+        })
+
+    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(enrich_descriptions, "DEVITJOBS_PAUSE_SECONDS", 0)
+    facts = enrich_descriptions._devitjobs_facts(
+        "https://devitjobs.uk/jobs/6ab43e4a59a9dc5c1ffe09f7", 10)
+    assert asked == ["https://devitjobs.uk/api/job/6ab43e4a59a9dc5c1ffe09f7"]
+    assert "We maintain an ERP." in facts["description"]
+    assert "Requirements: - C# and ASP.NET" in facts["description"]
+    assert "Nice to have" not in facts["description"], "an empty section is left out"
+    assert facts["workplace_type"] == "remote"
+    assert facts["employment_types"] == ["full-time"]
+    assert facts["closed"] is False
+
+
+def test_a_devitjobs_link_of_another_shape_is_not_requested(monkeypatch):
+    import requests
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("no request expected"))
+    facts = enrich_descriptions._devitjobs_facts("https://devitjobs.com/jobs/some-slug", 10)
+    assert facts["description"] == ""

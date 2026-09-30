@@ -68,6 +68,16 @@ HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "remote_unconfirmed",
 # better than one run making 251 requests to somebody else's server.
 DEFAULT_LIMIT = 120
 
+# A second queue with a budget of its own: vacancies refused only because
+# nobody had read their stack (score.STACK_UNREAD, `description_wanted`).
+# Found 2026-10-01: 238 developer titles in a single run were refused on a
+# stack no one had seen, and this step never looked at them — it reads the
+# shortlist, and they were not in it. A queue of their own rather than a place
+# in the first one: its budget is always spent on the shortlist first, so a
+# shared one would never reach them. Newest first — a vacancy a day old is
+# worth more than one from last month.
+WANTED_LIMIT = 300
+
 # Days before an unsuccessful attempt is worth repeating. A page that gave
 # nothing today usually gives nothing tomorrow; a month later it may have
 # changed or been reposted.
@@ -106,7 +116,17 @@ def _attempted_recently(record: dict, days: int = RETRY_AFTER_DAYS) -> bool:
 # Measured 2026-09-13:
 #   remoterocketship  schema.org JobPosting with the full text and
 #                     employmentType; the card holds a two-line summary
-READABLE_SOURCES = ("linkedin", "reed", "remoterocketship")
+# Measured 2026-10-01:
+#   devitjobs     a single-page app, the page is an empty shell; the detail
+#                 API its own front end calls has the full text (_devitjobs_facts)
+#   4dayweek      the description is behind a paid "Pro" wall
+#   jobs_ch       detail links of the search API answer 404
+READABLE_SOURCES = ("linkedin", "reed", "remoterocketship", "devitjobs")
+
+_DEVITJOBS_URL = r"https://(devitjobs\.(?:com|uk))/jobs/([0-9a-f]{24})$"
+
+# Between two detail requests to devitjobs: hundreds a run go to one server.
+DEVITJOBS_PAUSE_SECONDS = 0.5
 
 
 def _json_ld_facts(url: str, timeout: int) -> dict:
@@ -167,8 +187,54 @@ def _json_ld_facts(url: str, timeout: int) -> dict:
     return facts
 
 
+def _devitjobs_facts(url: str, timeout: int) -> dict:
+    """The facts of a devitjobs vacancy, from the detail API (/api/job/<id>)
+    its own front end calls: the list the fetcher reads ("jobsLight") has no
+    text, and the page is a shell that JavaScript fills in.
+
+    The text is the description plus the requirement and responsibility
+    lists, which the board keeps in fields of their own — that is where the
+    stack usually is. `workplace` is the employer's own structured answer;
+    only "remote" is taken, as everywhere in this step."""
+    import re as _re
+    import time
+
+    import requests
+
+    facts = {"description": "", "workplace_type": None,
+             "salary_raw": None, "closed": False, "employment_types": []}
+    match = _re.match(_DEVITJOBS_URL, url or "")
+    if not match:
+        return facts
+    host, job_id = match.groups()
+    time.sleep(DEVITJOBS_PAUSE_SECONDS)
+    resp = requests.get(f"https://{host}/api/job/{job_id}",
+                        headers={"User-Agent": common.USER_AGENT}, timeout=timeout)
+    resp.raise_for_status()
+    data = resp.json()
+    parts = [
+        ("", data.get("description")),
+        ("Requirements: ", data.get("requirementsMustTextArea")),
+        ("Nice to have: ", data.get("requirementsNiceTextArea")),
+        ("Responsibilities: ", data.get("responsibilitiesTextArea")),
+    ]
+    text = "\n\n".join(label + common.strip_html(str(value)).strip()
+                       for label, value in parts if str(value or "").strip())
+    facts["description"] = text
+    if str(data.get("workplace") or "").lower() == "remote":
+        facts["workplace_type"] = "remote"
+    if data.get("jobType"):
+        import normalize
+
+        facts["employment_types"] = normalize.employment_types(data.get("jobType"))
+    facts["closed"] = bool(data.get("isDisabledOrOutdated") or data.get("isPaused"))
+    return facts
+
+
 def _reader_for(source: str):
     """The right page reader for a source, or None if there is none."""
+    if source == "devitjobs":
+        return _devitjobs_facts
     if source == "linkedin":
         import fetch_linkedin
 
@@ -218,8 +284,28 @@ def worklist(vacancies: dict, classes=HEAD_CLASSES, limit: Optional[int] = None,
     return keys[:limit] if limit else keys
 
 
+def wanted_worklist(vacancies: dict, limit: Optional[int] = WANTED_LIMIT) -> list:
+    """Vacancies whose verdict waits on their description (see WANTED_LIMIT),
+    newest first."""
+    todo = []
+    for key, record in vacancies.items():
+        if record.get("duplicate_of") or not record.get("url"):
+            continue
+        if not (record.get("computed") or {}).get("description_wanted"):
+            continue
+        if (record.get("description_text") or "").strip():
+            continue
+        if record.get("source") not in READABLE_SOURCES or _attempted_recently(record):
+            continue
+        todo.append((str(record.get("first_seen") or ""), key))
+    todo.sort(reverse=True)
+    keys = [key for _, key in todo]
+    return keys[:limit] if limit else keys
+
+
 def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT,
-           need_employment_types: bool = False) -> dict:
+           need_employment_types: bool = False,
+           wanted_limit: int = WANTED_LIMIT) -> dict:
     """Fetches the missing descriptions. Mutates `vacancies` in place.
 
     Never raises: a description is an improvement, and failing to get one must
@@ -231,6 +317,10 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT,
     stats = {"considered": 0, "fetched": 0, "empty": 0, "errors": 0,
              "closed": 0, "declared_remote": 0, "salary_found": 0}
     keys = list(worklist(vacancies, classes, limit, need_employment_types))
+    head = set(keys)
+    wanted = [key for key in wanted_worklist(vacancies, wanted_limit) if key not in head]
+    stats["unread_stack"] = len(wanted)
+    keys += wanted
     tick = progress.Progress(len(keys), "descriptions")
     for key in keys:
         tick()

@@ -376,6 +376,19 @@ def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = No
 # does not mean the vacancy is unsuitable, only that we do not know.
 REMOTE_UNCONFIRMED = "location: the employer never states this is remote"
 
+# "Nobody has read what stack this is." The stack counterpart of the two
+# "unconfirmed" objections, found 2026-10-01: of 1510 vacancies new in one
+# run, 1100 had no description at all (devitjobs, 4dayweek, LinkedIn cards,
+# Reed, jobs.ch send a title only), and "Frontend Developer" or "Software
+# Engineer" with no text was refused as "not a .NET/JS role" — a verdict on a
+# stack nobody had seen. 238 such titles in that one run.
+#
+# Unlike the other two, it stays a refusal: hundreds a day would drown the
+# shortlist. What changes is that it is not final. score_vacancy marks such a
+# vacancy `description_wanted`, enrich_descriptions fetches its text, and the
+# rescore that follows decides on what the employer actually wrote.
+STACK_UNREAD = "stack: no description yet, and the title names no technology"
+
 # Can a contractor sitting where this person sits actually take the work?
 #
 # A SEPARATE AXIS FROM THE SCORE, and the separation is the point. A vacancy
@@ -1236,6 +1249,27 @@ def _check_stack_relevance(text: str, core_hits: list, strong_hits: list, criter
     }
 
 
+def _names_technologies(text: str, names: list) -> list:
+    """Which of `names` the (normalised) text names — by substring and, for
+    the names that cannot be a safe substring (".NET"), by the vocabulary's
+    patterns, which also know the other spellings ("dotnet", "dot net")."""
+    found = _matches(text, names)
+    return found + _matches_patterns(text, _pattern_specs_for(names), found)
+
+
+def _stack_unread(vacancy: dict, criteria: dict) -> bool:
+    """The stack gate failed only because there was nothing to read: no
+    description, and neither the title nor the board's tags name any
+    technology that sets a role. A title or tag that names one ("Java",
+    "SAP") is a real answer and the refusal stands. See STACK_UNREAD."""
+    if (vacancy.get("description_text") or "").strip():
+        return False
+    named_by_board = common.normalize_for_matching(
+        " ".join([vacancy.get("title") or ""] + list(vacancy.get("tags") or [])))
+    defining = (criteria.get("title_stack_gate") or {}).get("role_defining_technologies") or []
+    return not any(common.normalize_for_matching(tech) in named_by_board for tech in defining)
+
+
 def _check_title_stack(title: str, criteria: dict, profile: dict):
     """The title names a technology the person does not have — full rejection.
 
@@ -1270,10 +1304,19 @@ def _check_title_stack(title: str, criteria: dict, profile: dict):
     # tier, and "Java Engineer" cleared the gate again. The same class of
     # error as ".NET" inside "VB.NET" and "LESS" inside "no less than".
     mine = [tech for tech in named if common.normalize_for_matching(tech) in known]
+    # The title also names the person's CORE stack: ".NET and Umbraco
+    # Developer" is a .NET role with a CMS on top, not an Umbraco role. Found
+    # 2026-10-01, refused as "outside the stack (umbraco)". The owner's stack
+    # is not in role_defining_technologies at all, so `mine` alone never saw
+    # the ".NET" beside it. Core only: with the strong tier, "Java + React
+    # Full-Stack Developer" passed on React, and a Java back end is exactly
+    # what this gate exists to keep out.
+    own_named = _names_technologies(title_norm, stack.get("core") or [])
 
-    return (not mine), {
+    return (not mine and not own_named), {
         "named_technologies": named,
         "known_among_them": mine,
+        "own_stack_named": own_named,
     }
 
 
@@ -2271,11 +2314,17 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     stack_relevant, stack_relevance_bd = _check_stack_relevance(
         text, stack_bd["core_hits"], stack_bd["strong_hits"], criteria
     )
+    title_mismatch, title_stack_bd = _check_title_stack(
+        vacancy.get("title") or "", criteria, profile
+    )
     if not stack_relevant:
-        stack_label = (criteria.get("stack_fit") or {}).get("stack_label") or "target-stack"
-        dealbreakers.append(
-            f"stack: not a {stack_label} developer role (and no tech-agnostic signal)"
-        )
+        if _stack_unread(vacancy, criteria):
+            dealbreakers.append(STACK_UNREAD)
+        else:
+            stack_label = (criteria.get("stack_fit") or {}).get("stack_label") or "target-stack"
+            dealbreakers.append(
+                f"stack: not a {stack_label} developer role (and no tech-agnostic signal)"
+            )
     stack_bd.update(stack_relevance_bd)
 
     role_irrelevant, role_relevance_bd = _score_role_relevance(
@@ -2291,9 +2340,6 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
             f"role: title suggests non-developer profession ({', '.join(named)})"
         )
 
-    title_mismatch, title_stack_bd = _check_title_stack(
-        vacancy.get("title") or "", criteria, profile
-    )
     if title_stack_bd:
         stack_bd["title_stack_gate"] = title_stack_bd
     # Data pipelines are a documented exception: Scala or Java in the title,
@@ -2505,6 +2551,16 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     eligibility, eligibility_reason = _residency_eligibility(
         rl_bd, dealbreakers, vacancy, criteria, profile)
 
+    # Reading the description could change the verdict: the unread stack is
+    # the only real objection, and the title is a developer's. The rest of
+    # the "nobody said" objections are no obstacle to reading it — the text is
+    # where they get settled too.
+    description_wanted = (
+        STACK_UNREAD in dealbreakers
+        and all(d in (STACK_UNREAD, REMOTE_UNCONFIRMED, ENGAGEMENT_UNCONFIRMED)
+                for d in dealbreakers)
+        and bool(role_relevance_bd.get("developer_override_hits")))
+
     return {
         "score": total,
         "score_breakdown": breakdown,
@@ -2516,4 +2572,6 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         # _residency_eligibility.
         "residency_eligibility": eligibility,
         "residency_eligibility_reason": eligibility_reason,
+        # enrich_descriptions fetches the text of these whatever their class.
+        "description_wanted": description_wanted,
     }
