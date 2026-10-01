@@ -6,6 +6,73 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V15 — work authorization is read in its sentence, and W-2 is US payroll, 2026-10-01
+
+**Changed:** `kisel_criteria.yaml` → `remote_location_fit`. The citizenship,
+permit, clearance and sponsorship rules left `hard_dealbreakers` (patterns and
+keywords) and `absolute_residency_phrases` ("eligible to work in", "authorized
+to work in", "residency in" and the like). They now live in a new
+`work_authorization` block that `score.py` reads one sentence at a time. If
+your local file overrides `hard_dealbreakers` or `absolute_residency_phrases`,
+compare it with this version.
+
+**Why.** Every vacancy in this identity's base that mentions citizenship, a green
+card, work authorization, a clearance, sponsorship or W-2 was read on
+2026-10-01. That is 11,714 vacancies with a description. The old rules matched
+phrases anywhere in the text, and they failed in both directions:
+
+- **missed:**
+  - "We require U.S. citizenship" (hot_lead, 56);
+  - "USC OR GC ONLY", "Visa: H1B, GC, USC";
+  - "Singapore Citizen (mandatory)";
+  - "legally entitled to work in Canada", "UK working rights required";
+  - "No visa sponsorship available";
+  - "SC Cleared" in a title (hot_lead, 51), "BPSS";
+  - "$100–$120 per hour on W-2" (worth_a_look). W-2 had no rule at all.
+- **refused nobody:**
+  - "nor will [we] require … lawful permanent residency in the U.S.". This
+    matched "residency in" and rejected nine vacancies, one of them at 69;
+  - "security clearance is preferred";
+  - "some positions require the ability to obtain a security clearance";
+  - "we do not provide visa assistance" from a company that works with
+    developers in 75+ countries. A remote contractor never needs a visa.
+
+Now a rule refuses only when nothing in the same sentence cancels it. These
+cancel a refusal: a negation; a company-wide caveat; "the country where you
+live"; an offer of help with a visa; a product for citizens; this person's own
+country. "Georgia" counts as that country only without US-state context, such as
+"Atlanta". An equal-opportunity list and a preference ("preferred",
+"prioritizing", "encouraged to apply") cancel a refusal only when they are next
+to the term they qualify. In "must be an Australian citizen … an active NV1
+clearance is preferred", the citizenship requirement still stands.
+
+New rules: **W-2** (US payroll; not a refusal when C2C or 1099 is offered as
+well, unless that offer is refused too), US work statuses ("H1B, GC, USC"), and
+US person / export control.
+
+A residency eligibility of "likely" no longer comes from the bare words
+"contractor", "freelance" or "1099". In the last selection, 36 such verdicts
+were London IR35 contracts and US staffing roles. It now needs a named
+employer-of-record platform or an explicitly international arrangement
+(`international_hiring_patterns`).
+
+An optional `owner.citizenships` list in the local profile counts like the
+country of residence.
+
+**Effect, measured before the change on this identity's base:**
+
+- 62 vacancies move to rejected:
+  - 5 from hot_lead, 8 from worth_a_look, 7 from long_shot, 42 from
+    remote_unconfirmed;
+  - each was read, and in each the employer's own sentence restricts who can
+    be hired.
+- 3 vacancies come back from wrong refusals.
+- "Software Engineer" (hot_lead, 49) stays where it was: it offers W-2 **or**
+  corp-to-corp, and nothing in its text says that a contractor abroad cannot
+  take the C2C option.
+
+Rescoring the whole base takes about 14% longer.
+
 ## V14 — a space at the edge of a keyword now means a word boundary, 2026-09-13
 
 No setting changed; two comments in `kisel_criteria.yaml` were wrong and are

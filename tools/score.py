@@ -13,6 +13,7 @@ expressed as data in the identity, and this module only applies them.
 """
 from __future__ import annotations
 
+import functools
 import re
 import sys
 from pathlib import Path
@@ -449,6 +450,178 @@ def _names_owner_country_as_a_hiring_place(text: str, criteria: dict,
     return None
 
 
+# --- Who the employer can engage: passport, permit, clearance, payroll -------
+#
+# Rewritten 2026-10-01 after a full read of every vacancy in both identities'
+# bases that mentions citizenship, a green card, work authorization, a
+# clearance, sponsorship or W-2. Two kinds of error turned up, and both are
+# errors of matching a phrase without reading the sentence around it.
+#
+# Missed refusals, sitting in the shortlist: "We require U.S. citizenship"
+# (the verb before the noun), "USC OR GC ONLY", "Visa: H1B, GC, USC",
+# "Singapore Citizen (mandatory)", "legally entitled to work in Canada", and
+# W-2 pay — a US payroll form nobody outside the US can be put on — with no
+# rule at all. "$100-$120 per hour on W-2" was in worth_a_look.
+#
+# Refusals that refused nobody: "nor will [we] require ... citizenship or
+# lawful permanent residency in the U.S." matched "residency in" and threw out
+# nine vacancies; "public trust or security clearance is preferred" and "some
+# positions require the ability to obtain a security clearance" matched the
+# bare words "security clearance"; "we do not provide visa assistance" from a
+# company that works with developers in 75+ countries matched a refusal to
+# sponsor, which a remote contractor never needs.
+#
+# So every rule now looks at ONE SENTENCE, and the same sentence can cancel
+# it: a negation, a preference, a company-wide caveat, an equal-opportunity
+# list, "the country where you live", or this person's own country.
+
+# Abbreviations whose dots are not the end of a sentence: "u.s.", "e.g.",
+# "inc.". Masked before splitting, restored after.
+_ABBREVIATION_RE = re.compile(
+    r"\b(?:[a-z]\.){2,}|\b(?:inc|ltd|llc|corp|co|no|vs|approx|jr|sr|st|dr|mr|mrs|ms|etc)\.")
+# Where one statement ends: a full stop or its kin, a semicolon, a line
+# break (normalize_for_matching keeps them, and a list item is a line), a
+# bullet, a spaced dash between list items, an HTML tag, a table bar.
+_SENTENCE_BREAK_RE = re.compile(
+    r"[.!?](?=\s|$)|[;\n\u2022\u25cf\u25aa\u00b7]|\s[-*\u2013\u2014]\s|<[^>]+>|\s\|\s")
+
+
+def _sentences(text: str) -> list:
+    """The text cut into statements, for rules that must read a requirement
+    in the sentence it was written in rather than anywhere in the posting."""
+    masked = _ABBREVIATION_RE.sub(lambda m: m.group(0).replace(".", "\x00"), text)
+    parts = (part.replace("\x00", ".").strip().lstrip("-*–— ").strip()
+             for part in _SENTENCE_BREAK_RE.split(masked))
+    return [part for part in parts if part]
+
+
+@functools.lru_cache(maxsize=None)
+def _regex(pattern: str):
+    return re.compile(pattern, re.IGNORECASE)
+
+
+def _owner_places(profile: dict) -> list:
+    """Where this person may work without anybody's permission: the country
+    they live in, and any citizenship the profile records."""
+    owner = (profile or {}).get("owner") or {}
+    places = [_owner_country(profile)] + list(owner.get("citizenships") or [])
+    return [common.normalize_for_matching(p) for p in places if p]
+
+
+def _names_owner_place(sentence: str, criteria: dict, profile: dict) -> bool:
+    """Does the sentence name this person's own country — unambiguously?
+
+    "Must be authorised to work in Georgia" refuses nobody who lives in
+    Georgia. But "based in Atlanta, Georgia" is the US state, so a place name
+    that is also somewhere else counts only when the sentence carries no
+    context of the other meaning (remote_location_fit.ambiguous_place_names)."""
+    for place in _owner_places(profile):
+        if not re.search(r"\b" + re.escape(place) + r"\b", sentence):
+            continue
+        other_meaning = False
+        for rule in (criteria.get("remote_location_fit") or {}).get("ambiguous_place_names") or []:
+            triggers = [common.normalize_for_matching(t) for t in rule.get("trigger_keywords") or []]
+            if place not in triggers:
+                continue
+            meanings = [rule.get("meaning_a") or {}, rule.get("meaning_b") or {}]
+            own = next((m for m in meanings if "person lives" in (m.get("label") or "")), meanings[0])
+            for meaning in meanings:
+                if meaning is own:
+                    continue
+                if any(common.normalize_for_matching(k) in sentence
+                       for k in meaning.get("context_keywords") or []):
+                    other_meaning = True
+        if not other_meaning:
+            return True
+    return False
+
+
+def _survives_near_guards(sentence: str, match, guards: list) -> bool:
+    """No guard of `unless_near` is found close enough to this match."""
+    for guard in guards:
+        start = max(0, match.start() - int(guard.get("before") or 0))
+        end = match.end() + int(guard.get("after") or 0)
+        if _regex(guard["pattern"]).search(sentence[start:end]):
+            return False
+    return True
+
+
+def _check_work_authorization(text: str, criteria: dict, profile: dict,
+                              international: bool):
+    """The rules of remote_location_fit.work_authorization, sentence by
+    sentence. Returns (names of the rules that refused, details).
+
+    A rule has a `pattern`, and may have:
+      trigger      a cheap regex the whole text must match first (speed: most
+                   postings mention none of these things)
+      unless       a regex that cancels the rule in the same sentence
+      unless_near  [{pattern, before, after}]: cancels one MATCH when found
+                   within `before` characters ahead of it or `after` behind.
+                   For words that qualify a single term rather than the
+                   sentence: "an active NV1 clearance is preferred" must not
+                   cancel "must be an Australian citizen" earlier in it
+      unless_anywhere / negated
+                   a regex that cancels it anywhere in the text, after the
+                   `negated` phrases are cut out ("W-2" is not a refusal when
+                   C2C or 1099 is offered too, but "No C2C" offers nothing)
+      lifted_by_international
+                   cancelled by evidence the employer engages people abroad
+                   (a named employer-of-record platform, or
+                   international_hiring_patterns)
+      ignores_owner_place
+                   the person's own country in the sentence does not cancel it
+    Every rule is also cancelled by `unless_in_sentence`, shared by all.
+    """
+    cfg = (criteria.get("remote_location_fit") or {}).get("work_authorization")
+    if not cfg:
+        return [], []
+    shared_unless = cfg.get("unless_in_sentence") or []
+    sentences = None
+    hits, details = [], []
+    for rule in cfg.get("rules") or []:
+        trigger = rule.get("trigger")
+        if trigger and not _regex(trigger).search(text):
+            continue
+        if rule.get("lifted_by_international") and international:
+            continue
+        if rule.get("unless_anywhere"):
+            cleaned = _regex(rule["negated"]).sub(" ", text) if rule.get("negated") else text
+            if _regex(rule["unless_anywhere"]).search(cleaned):
+                continue
+        if sentences is None:
+            sentences = _sentences(text)
+        pattern = _regex(rule["pattern"])
+        near = rule.get("unless_near") or []
+        for sentence in sentences:
+            if trigger and not _regex(trigger).search(sentence):
+                continue
+            if not any(_survives_near_guards(sentence, m, near) for m in pattern.finditer(sentence)):
+                continue
+            if any(_regex(u).search(sentence) for u in shared_unless):
+                continue
+            if rule.get("unless") and _regex(rule["unless"]).search(sentence):
+                continue
+            if not rule.get("ignores_owner_place") and _names_owner_place(sentence, criteria, profile):
+                continue
+            hits.append(rule["name"])
+            details.append({"rule": rule["name"], "sentence": sentence[:300]})
+            break
+    return hits, details
+
+
+def _international_hiring(text: str, criteria: dict, eor_platform_hits: list) -> list:
+    """Evidence that this employer engages people in other countries: a named
+    employer-of-record platform, or one of international_hiring_patterns
+    ("we work with developers from 75+ countries")."""
+    cfg = (criteria.get("remote_location_fit") or {}).get("work_authorization") or {}
+    found = list(eor_platform_hits or [])
+    for pattern in cfg.get("international_hiring_patterns") or []:
+        m = _regex(pattern).search(text)
+        if m:
+            found.append(m.group(0))
+    return found
+
+
 def _residency_eligibility(rl_bd: dict, dealbreakers: list, vacancy: dict,
                            criteria: dict, profile: dict):
     """(verdict, human-readable reason).
@@ -474,7 +647,12 @@ def _residency_eligibility(rl_bd: dict, dealbreakers: list, vacancy: dict,
     if worldwide:
         return ELIGIBILITY_LIKELY, f"says {', '.join(worldwide[:2])}"
 
-    contractor = rl_bd.get("eor_or_contractor_hits") or []
+    # A NAMED platform or an explicitly international arrangement, not the bare
+    # words. Measured 2026-10-01 over selection #5: 36 of the "likely" verdicts
+    # rested on "contractor", "freelance" or "1099" alone — British IR35
+    # contracts in London and Birmingham, US staffing roles in Denver, one of
+    # them "We require U.S. citizenship". A contract is not a border crossing.
+    contractor = rl_bd.get("international_hiring_hits") or []
     if contractor:
         return (ELIGIBILITY_LIKELY,
                 f"an international contractor arrangement "
@@ -826,6 +1004,31 @@ def _score_ambiguous_places(text: str, criteria: dict):
     return flagged, detail
 
 
+def _guarded_phrases(text: str, phrases: list, criteria: dict, profile: dict) -> list:
+    """`phrases` found in a sentence that the shared work_authorization guards
+    do not cancel: "must reside in the country where you are located" and
+    "must be based in Georgia" (for a person in Georgia) are not refusals."""
+    found = _matches(text, phrases)
+    if not found:
+        return found
+    shared_unless = ((criteria.get("remote_location_fit") or {}).get("work_authorization") or {}
+                     ).get("unless_in_sentence") or []
+    sentences = _sentences(text)
+    kept = []
+    for phrase in found:
+        needle = keyword_needle(phrase)
+        for sentence in sentences:
+            if needle not in sentence:
+                continue
+            if any(_regex(u).search(sentence) for u in shared_unless):
+                continue
+            if _names_owner_place(sentence, criteria, profile):
+                continue
+            kept.append(phrase)
+            break
+    return kept
+
+
 def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: dict):
     rl = criteria["remote_location_fit"]
     breakdown = {}
@@ -876,6 +1079,18 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     # vacancy in the whole shortlist resting on that override, so tightening it
     # cost nothing and fixed the top of the file that matters most.
     eor_platform_hits = _matches(text, list(profile.get("eor_platforms_signal") or []))
+    international_hits = _international_hiring(text, criteria, eor_platform_hits)
+    if international_hits:
+        breakdown["international_hiring_hits"] = international_hits
+
+    # Who the employer can engage at all: passport, permit, clearance, US
+    # payroll. Not lifted by a board's "worldwide" label — the employer's own
+    # words outrank it, as everywhere in this file. See _check_work_authorization.
+    authorization_hits, authorization_detail = _check_work_authorization(
+        text, criteria, profile, bool(international_hits))
+    if authorization_hits:
+        dealbreakers.extend(f"location: {h}" for h in authorization_hits)
+        breakdown["work_authorization"] = authorization_detail
     region_hits = _matches(text, rl["acceptable_region_signal"]["keywords"])
 
     # A hard tie to a specific region (LATAM/APAC/UK-only/US-only/…) is a
@@ -886,7 +1101,9 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     # A direct residency requirement from the employer is overridden by
     # nothing at all — not by a marketing "worldwide" in the text, and not by
     # a board's broad-brush label.
-    absolute_hits = _matches(text, rl["restrictive_region_signal"].get("absolute_residency_phrases", []))
+    absolute_hits = _guarded_phrases(
+        text, rl["restrictive_region_signal"].get("absolute_residency_phrases", []),
+        criteria, profile)
     if absolute_hits:
         dealbreakers.extend(f"location: explicit residency requirement ('{h}')" for h in absolute_hits)
         breakdown["absolute_residency_hits"] = absolute_hits

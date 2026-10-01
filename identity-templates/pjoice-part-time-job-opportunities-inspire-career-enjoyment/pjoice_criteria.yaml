@@ -265,15 +265,13 @@ remote_location_fit:
       - "must be based in"
       - "must reside in"
       - "must be a resident of"
-      - "residency in"
       - "you must live in"
       - "applicants must be based in"
       - "we can only hire in"
       - "we can only employ"
-      - "eligible to work in"
-      - "authorized to work in"
-      - "authorised to work in"
-      - "work authorization in"
+      # "eligible to work in", "authorized to work in", "residency in" moved
+      # to work_authorization on 2026-10-01: read in their sentence, with its
+      # negations ("nor will we require ... residency in the U.S.").
 
     # Written as a pattern because a region tie has too many spellings to
     # list. Measured 2026-08-12: the keywords held "remote latam" and missed
@@ -301,34 +299,170 @@ remote_location_fit:
     # exporter_avoid and excluded_practical tiers of market_tiers.yaml: the
     # direction the work flows describes the market, not a person.
     points: -12
+  # Who the employer can engage at all: passport, permit, clearance, payroll.
+  # Read by score._check_work_authorization, ONE SENTENCE AT A TIME.
+  #
+  # Rewritten 2026-10-01 from a full read of every vacancy in this identity's
+  # base that mentions citizenship, a green card, work authorization, a
+  # clearance, sponsorship or W-2 (11714 vacancies with a description). The old
+  # rules were phrases matched anywhere in the text, and they failed both ways:
+  #
+  #   missed   "We require U.S. citizenship" (hot_lead, 56), "USC OR GC ONLY",
+  #            "Visa: H1B, GC, USC", "Singapore Citizen (mandatory)", "legally
+  #            entitled to work in Canada", "$100-$120 per hour on W-2"
+  #            (worth_a_look) — W-2 had no rule at all
+  #   refused  "nor will [we] require ... lawful permanent residency in the
+  #            U.S." (nine vacancies, one at 69, on "residency in");
+  #            "security clearance is preferred"; "some positions require the
+  #            ability to obtain a security clearance"; "we do not provide visa
+  #            assistance" from a company working with developers in 75+
+  #            countries — a remote contractor never needs a visa
+  #
+  # The history of the patterns these replace (measured 2026-08-11 and
+  # 2026-08-12) is in the CHANGELOG: TCS "must be a U.S. Citizen" at 69,
+  # Thermo Fisher "Must have authorization to work in the UK" at 64, Motorola
+  # "Legal authorization to work in the U.S. indefinitely is required".
+  #
+  # A rule refuses when its `pattern` is found in a sentence that nothing
+  # below cancels. Patterns are regexes over lowercased text; see
+  # score._check_work_authorization for the optional keys.
+  work_authorization:
+    # Cancels any rule in the sentence it is found in.
+    unless_in_sentence:
+      # A negation of the requirement: "nor will we require", "clearance is
+      # not required", "does not require".
+      - '\b(nor|never)\b|\b(not|n[’'']t|no longer) (be )?(require[sd]?|needed|necessary|mandatory)\b(?!.{0,40}\b(sponsor|visa))|\b(do|does|did|will|would)(n[’'']t| not) (require|need)\b(?!.{0,40}\b(sponsor|visa))|\bno (citizenship|clearance|security clearance|sponsorship|work permit|visa) (is )?(required|needed|necessary)\b'
+      # A company-wide caveat rather than this role: "some positions require",
+      # "many of our roles may require".
+      - '\b(some|certain|many|most|several) (of (our|the) )?(positions|roles|jobs|projects)\b|\bmay (require|be required|need)\b|\bif (required|applicable|needed)\b|\bwhere (required|applicable)\b'
+      # The person's own country, whichever it is: "eligible to work in the
+      # country where you live".
+      - '\b(your|their) (country|home country|location|region)\b|\bcountry (of|where|in which) (your|you)\b|\bcountry of residence\b|\bwhere you (live|reside|are based|are located)\b|\bin which you (live|reside)\b|\bany country\b|\bwherever you\b'
+      # Help with a visa is an offer, not a demand — unless the same sentence
+      # refuses it ("we cannot support visa sponsorship").
+      - '\bwe (can|will|do|are able to|are happy to|may|offer to) (sponsor|support|help|assist)\b'
+      # ... but "no visa sponsorship available" is a refusal: measured, it
+      # cancelled three real ones (SumUp, a Columbus fintech, a UK robotics firm).
+      - '^(?!.*\bno (visa |work permit |employment )?sponsorship\b)(?!.*\bnot\b).*\b(sponsorship|visa support|visa assistance|immigration support) (is )?(available|provided|offered)\b'
+      - '^(?!.*\b(not|no|cannot|unable)\b)(?!.*n[’'']t\b).*\b(assist|help|support)\w*\W.{0,70}\b(visa|green card|h-?1b|immigration|work permit)'
+      - '^(?!.*\b(not|no|cannot|unable)\b)(?!.*n[’'']t\b).*\b(visa|green card|h-?1b|immigration|work permit)\b.{0,30}\b(filing|assistance|support)\b'
+      # Products for citizens, and documents that show who you are.
+      - '\bcitizen[- ](facing|centric|services?|experience|engagement|data|portal|app)\b|\b(for|to|serve|serving|of) (the )?citizens\b|\bcitizens (and|&) (businesses|residents|visitors|governments?)\b|\bidentification\b|\bcopy of\b'
+
+    # Evidence the employer engages people abroad. Lifts the rules marked
+    # `lifted_by_international`, and makes residency eligibility "likely" —
+    # where the bare words "contractor", "freelance" and "1099" used to, and
+    # meant a London IR35 contract or a Denver staffing role 36 times out of 36
+    # in selection #5. A named employer-of-record platform counts as well.
+    international_hiring_patterns:
+      - '\b(work|working|partner|collaborate)s? with (developers|engineers|people|talent|contractors|specialists|experts|freelancers) (from|in|across) (over )?\d+\+? countries\b'
+      - '\b(hire|hiring|recruit\w*|open to|accept\w*|engag\w*) .{0,30}\b(worldwide|globally|from anywhere|from any country|internationally|across the globe|around the world|in any country)\b'
+      - '\b(international|global|worldwide|overseas|offshore) (contractors?|freelancers?)\b'
+      - '\b(contractors?|freelancers?) (from|in|across|around) (any|all|many|other|different|over \d+|\d+\+?) (countries|country)\b'
+
+    # Guards that qualify ONE TERM rather than the sentence (unless_near on
+    # a rule): an equal-opportunity list before "citizenship", a preference
+    # right after the term. Found by the before/after measurement: "must be an
+    # Australian citizen ... an active NV1 clearance is preferred" — the
+    # preference belongs to the clearance, and the citizenship still stands;
+    # "US citizens/GC holders encouraged to apply we do not offer
+    # sponsorship" — the encouragement belongs to the citizens, and the
+    # refusal still stands.
+    term_guards: &term_guards
+      # An equal-opportunity list: "without regard to race, ... citizenship".
+      - pattern: '\b(without regard|regardless of|irrespective of|discriminat\w*|protected (status|class|characteristics?|veterans?)|equal (employment )?opportunit\w*)\b'
+        before: 250
+      - pattern: '\be-?verify\b|citizenship and immigration services'
+        before: 150
+        after: 60
+      # A preference is not a requirement: "Singapore Citizens and PRs
+      # preferred", "public trust or security clearance is preferred".
+      - &preference
+        pattern: '\b(preferred|priorit\w*|is a plus|are a plus|a big plus|an advantage|advantageous|desirable|nice to have|would be a bonus|is a bonus|encouraged to apply)\b'
+        before: 60
+        after: 45
+    preference_guard: &preference_guard
+      - *preference
+
+    rules:
+      # "Must be a U.S. citizen", "We require U.S. citizenship", "Singapore
+      # Citizen (mandatory)", "open to candidates who are Singapore Citizens",
+      # "You are a US citizen or hold a valid Green Card", and a requirements
+      # bullet that says only "U.S. citizenship".
+      - name: "citizenship required"
+        unless_near: *term_guards
+        trigger: 'citizen|\bnationals\b|\bnationality\b'
+        pattern: '\b(must|shall|need to|needs to|required to|have to|has to) (be|hold|have|possess|obtain)\b.{0,40}\b(citizens?|citizenship|nationals|nationality)\b|\b(citizens?|citizenship|nationals|nationality)\b.{0,25}\b(required|mandatory|is a must|needed|essential|only)\b|\b(require[sd]?|requirement|need)\b.{0,35}\bcitizenship\b|\b(open|available|limited|restricted|offered) (only )?to\b.{0,40}\bcitizens\b|\b(candidates?|applicants?|you)( that| who| which)? (has|have|hold|holds|are|is|must be)\b.{0,30}\bcitizen(s|ship)?\b|^(u\.s\.|us|usa|united states|american|uk|british|eu|european|canadian|australian|singapore|singaporean|new zealand|swiss|norwegian|israeli|irish|german|french|dutch|indian|japanese|emirati|saudi|qatari|danish|swedish|finnish|polish|austrian|belgian) (citizen|citizenship|citizens)( only| required)?$'
+      # "U.S. citizen or permanent resident", "USC OR GC ONLY", "GC holders only".
+      - name: "green card or permanent residency required"
+        unless_near: *term_guards
+        trigger: 'green[- ]card|permanent resident|\bgc\b'
+        pattern: '\b(must|required|require[sd]?|requirement|need|needs|only|mandatory)\b.{0,45}\b(green[- ]card|permanent resident\w*)\b|\b(green[- ]card|permanent resident\w*)( holders?| status)?\b.{0,25}\b(only|required|mandatory)\b|\b(usc|citizens?)\b.{0,20}\bgc\b|\bgc\b.{0,20}\b(usc|citizens?)\b|\b(usc|gc)( holders?| candidates?)? only\b'
+      # "Visa: H1B, GC, USC", "Work Authorization: GC, USC, H1B", lists of US
+      # visa categories (H-1B, H4-EAD, L2-EAD...).
+      - name: "US work status listed"
+        unless_near: *term_guards
+        trigger: '\b(usc|gc|h-?1b|ead|opt)\b'
+        pattern: '\b(visa|visa status|work authori[sz]ation|work status|authori[sz]ation|eligibility|status)\s*:\s*.{0,80}\b(usc|gc|green[- ]card|u\.?s\.? citizens?|h-?1b|ead)\b|\b(h-?1b|opt-ead|gc-ead|h4-ead|l2-ead)\s*(,|/|or|and|&)\s*(h-?1b|[a-z0-9]+-ead|ead|usc|gc|green card|u\.?s\.? citizens?|opt|cpt|tn|l2|h4)\b'
+      # ITAR / export control: "Must meet Export Control requirements as a
+      # U.S. Person", "ITAR: must be a U.S. person".
+      - name: "US person (export control) required"
+        unless_near: *term_guards
+        trigger: 'u\.?s\.? person|\bitar\b|export control'
+        pattern: '\b(must|required|requires?|need|needs|be|as a|qualify as|only)\b.{0,40}\bu\.?s\.? persons?\b|\bu\.?s\.? persons?\b.{0,30}\b(only|required|status|as defined)\b|\b(itar|export control\w*)\b.{0,80}\b(u\.?s\.? persons?|citizen\w*)\b|\b(must|required to|need to) (meet|satisfy|comply with|pass)\b.{0,20}\b(itar|export control)'
+      # The right to work somewhere: "must be authorized to work in the U.S.",
+      # "legally entitled to work in Canada", "Eligibility to work in the UK",
+      # "EU work authorisation", "authorized to work ... without sponsorship".
+      # "Able to work in a team" and "the right to work from home" are not.
+      - name: "work authorization in another country required"
+        unless_near: *preference_guard
+        trigger: 'to work\b|work authori|work(ing)? rights?|work permit|work visa|sponsorship'
+        pattern: '\b(legally |lawfully )?(authori[sz]ed|eligible|entitled|permitted) to (live and )?work (in|for|within)\b|\blegally able to work\b|\b(authori[sz]ed|eligible|entitled|permitted) to work\b.{0,40}\bin (the )?(location|country|uk|us|u\.s\.|usa|united states|united kingdom|canada|australia|eu|europe|[a-z]+ (state|province))\b|\beligibility to work\b|\b(authori[sz]ation|right|rights|permission|permit) to work (in|for|within)\b|\b(unrestricted|legal|valid|existing|full|current) right to work\b|^(the )?right to work( status| documentation)?$|\bwork(ing)? rights? (in|for)\b|\b(eu|european|uk|british|us|u\.s\.|american|canadian|australian|swiss|singapore|new zealand|irish|danish|german|dutch) work(ing)? (authori[sz]ation|permit|rights?|visa)\b|\b(eu|uk|us|u\.s\.|australian|canadian|swiss|irish|singapore) right to work\b|\bwork authori[sz]ation (in|for|to)\b|\b(hold|have|possess\w*|valid|existing|current)\b.{0,20}\bwork (permit|visa)\b|\bwithout (the need for |requiring |needing |any )?(current or future |visa |employer |company |work )?sponsorship\b'
+      # A refusal to sponsor. Lifted for an employer who plainly engages people
+      # abroad: a remote contractor never needs a visa.
+      - name: "visa sponsorship refused"
+        # "TikTok will be prioritizing applicants who ... do not require TikTok
+        # sponsorship" ranks, it does not refuse. Narrower than the preference
+        # guard on purpose: "US citizens/GC holders encouraged to apply we do
+        # not offer sponsorship" still refuses.
+        unless_near:
+          - pattern: '\bpriorit\w*'
+            before: 80
+        trigger: 'sponsor|visa'
+        lifted_by_international: true
+        pattern: '\bno (visa |work permit |employment |h-?1b |immigration )?sponsorship\b|\bsponsorship\b.{0,30}\b(not available|unavailable|not offered|not provided|not possible|cannot be (provided|offered))\b|\b(cannot|can not|can[’'']t|unable to|not able to|will not|won[’'']t|do not|don[’'']t|does not|doesn[’'']t|are not|is not)\b.{0,25}\b(sponsor|provide (visa|sponsorship)|offer (visa|sponsorship)|transfer (visa|h-?1b)|support (visa|sponsorship))|\b(cannot|can not|can[’'']t|unable to|not able to|will not|won[’'']t)\b (consider|accept|hire|employ)\b.{0,80}\b(require|need)\w*\b.{0,30}\bsponsor|\bonly\b.{0,50}\b(do not|don[’'']t|does not|doesn[’'']t|will not|won[’'']t|never) (require|need)\b.{0,30}\bsponsor'
+        unless: '\b(outside of|other than|not guaranteed|except|for roles outside)\b'
+      # Clearances go only to citizens or long-term residents: "active NV1",
+      # "SC Cleared", "DoD Secret clearance", "TS/SCI with polygraph",
+      # "eligible to obtain eDV clearance".
+      - name: "security clearance required"
+        unless_near: *preference_guard
+        trigger: 'clearance|cleared|vetting|polygraph|\bnv ?[12]\b|\bbpss\b|public trust|ts/sci'
+        pattern: '\bsecurity clearance\b|\b(sc|dv|edv|ctc|tssci|ts/sci|ts|top secret|secret|baseline|nato secret|dod secret|government|federal|active|current) (security )?(clearance|cleared)\b|\bclearance (level|required|is required|eligibility)\b|\b(security|negative|positive) vetting\b|\bnv ?[12]\b|\bbpss\b|\bts/sci\b|\bpolygraph\b|\b(obtain|maintain|hold|have|active|current|eligible for|eligibility for)\b.{0,20}\bpublic trust\b'
+      # "This role requires residency in Colorado", "US tax residency
+      # required", "must be a resident of", "UAE residency required".
+      - name: "residency required"
+        unless_near: *preference_guard
+        trigger: 'residen'
+        pattern: '\b(require[sd]?|requires|requiring|must (have|maintain|hold|establish|keep)|need|needs|mandatory)\b.{0,30}\bresiden(cy|ce|t)\b.{0,10}\b(in|within|of)\b|\b(tax |legal |permanent )?residen(cy|ce) (in|within) .{0,40}\b(required|mandatory|is a must|needed)\b|\b[a-z.]+ (tax )?residency (is )?required\b|\bmust be (a |an )?(legal |permanent |tax )?residents? (of|in)\b|\bmust be (a |an )?[a-z.]{2,15} residents?\b|\b(only|exclusively) (open to |for |accepting )?residents (of|in)\b|\bresidents (of|in) .{0,30} only\b|\b(only|exclusively)\b.{0,25}\b(hire|employ|engage|consider|accept)\b.{0,30}\bresidents?\b|\bresidents only\b'
+        unless: '\b(salary|pay range|base pay|compensation|privacy|notice)\b'
+      # W-2 is a US payroll form: an employer paying "on W-2" can only put on
+      # it somebody with a US social security number and the right to work
+      # there. Not a refusal when C2C, corp-to-corp or 1099 is offered as well
+      # ("W-2, 1099, C2C") — unless that is refused too ("No C2C, ONLY W2") —
+      # nor where W-2 is a document ("paystubs, W-2s, bank statements").
+      - name: "US payroll only (W-2)"
+        trigger: '\bw-?2\b'
+        lifted_by_international: true
+        unless_anywhere: '\b(c2c|corp[- ]to[- ]corp|1099|independent contractors?|international contractors?)\b'
+        negated: '\b(no|not|non|without|excluding|unable to accommodate|not accepting|cannot accept|can[’'']t accept|does not accept|not open to)\b[^.;]{0,30}\b(c2c|corp[- ]to[- ]corp|1099)\b(\s*(or|and|/|,)\s*(c2c|corp[- ]to[- ]corp|1099|third[- ]party))*'
+        pattern: '\b(on|in) (a |the )?(competitive )?w-?2\b|(\d|/|per |an? )\s?(hour|hr|h)\.? ?w-?2\b|\bw-?2[- ](only|role|position|contract|contractors?|employment|employees?|consultants?|basis|arrangement|candidates?|benefits|pay|hourly|rate|salary|opportunity|tax|engagement|employer|long[- ]term|terms|status|payroll)\b|\b(direct|full[- ]time|part[- ]time|contract|only|strictly|exclusively|hourly) \(?w-?2\b|\bw-?2\)|\bemployment type\s*:\s*w-?2\b'
+
   hard_dealbreakers:
     points: -1000  # in effect removes the vacancy from the "hot" categories
-    # Written as regexes because a work-authorization requirement has no single
-    # spelling. Measured 2026-08-11 over 13605 vacancies: 32 say "U.S. Citizen"
-    # with the dots, 6 say "US Citizen" without them, 43 refuse sponsorship, 31
-    # demand existing authorization. The substring list caught none of those
-    # forms, and five of them were in the head of the shortlist — "Dotnet Senior
-    # Engineer" @ Tata Consultancy Services stood second at 69 while its own text
-    # said the person hired must be a U.S. Citizen or Green Card holder.
-    #
-    # Every pattern below requires the REQUIRING context ("must be", "required",
-    # "only"). A vacancy that merely mentions citizenship in an equal-opportunity
-    # footer is not refusing anybody, and must not be thrown away for it.
+    # Work-authorization requirements (citizenship, permits, clearance,
+    # sponsorship, W-2) live in work_authorization, read sentence by sentence.
     patterns:
-      - name: "must be a US citizen"
-        pattern: "must be (a |an )?(u\\.?s\\.?|united states) citizen"
-      - name: "US citizenship required"
-        pattern: "(u\\.?s\\.?|american|united states) citizenship (is )?(a )?(required|mandatory|must)"
-      - name: "US citizens only"
-        pattern: "(u\\.?s\\.?|united states) citizens? (only|or green card|and green card|/ *green card)"
-      - name: "green card or citizenship required"
-        pattern: "(must be|required to be|only) [^.]{0,40}(green card holder|permanent resident)"
-      - name: "no visa sponsorship"
-        pattern: "(cannot|can not|unable to|do not|does not|will not|no) (currently )?(provide|offer|sponsor)[^.]{0,30}(sponsor|visa|h-?1b)"
-      - name: "existing work authorization required"
-        pattern: "must (be|already be) (legally )?(authoriz|authoris)ed to work"
-      - name: "security clearance required"
-        pattern: "(must (have|possess|hold|be able to obtain)|require[sd]?) [^.]{0,40}security clearance"
     # "Hybrid" as an arrangement, never as a technology. The distinction is the
     # whole difficulty, and it was measured rather than assumed on 2026-08-11:
     # across the base, 58 vacancies use "hybrid cloud", "hybrid architecture",
@@ -345,15 +479,6 @@ remote_location_fit:
     #   "we've adopted a hybrid approach, with teams in the office four days a week"
       - name: "hybrid work arrangement"
         pattern: "hybrid (work|working|workplace|schedule|arrangement|setup|policy|office|onsite|on-site)"
-      # Hybrid inside brackets with something else in there too. The narrow
-      # "(hybrid)" rule missed a real title in the shortlist:
-      #   "Backend Developer (C# - SSIS) - (hybrid, 36-40k)"  scored 38
-      # Two negative guards, both measured. Technology words, because
-      # "(hybrid cloud)" is not a commute; and "remote", because one real
-      # posting says "(hybrid and options for remote work)" — which offers
-      # remote rather than refusing it. 61 matches across the base, every one
-      # about a place of work.
-      # Work authorization stated as a NOUN. The patterns added on 2026-08-11
       # all wanted the verb — "must be authorized to work" — and every real
       # posting found on 2026-08-12 used the other form:
       #
@@ -369,25 +494,24 @@ remote_location_fit:
       # 43 postings in the base use it. Requiring the demand ("must have",
       # "is required") keeps an OFFER of sponsorship — which is a plus rather
       # than a refusal — out of the match.
-      - name: "work authorization demanded"
-        pattern: "(must (have|possess|hold)|required to (have|hold)|is required|are required)[^.]{0,60}authoris?z\\w* to work"
-      # The window steps over a dot only when it belongs to an abbreviation
       # ("U.S."), never over a full stop. Without that the Motorola posting
       # — "Legal authorization to work in the U.S. indefinitely is required"
       # — slips through; with a plain "any character" window instead, the
       # pattern would happily span two sentences and reject "authorization to
       # work in Germany. A driving licence is required."
-      - name: "work authorization required"
-        pattern: "(legal |valid |existing )?authoris?z\\w* to work (in|for)(?:[^.]|\\b[a-z]\\.){0,60}(is |are )?(required|mandatory|essential|a must)"
-      - name: "sponsorship explicitly unavailable"
-        pattern: "(sponsorship|work permit|visa)[^.]{0,40}(is|are) not (available|offered|provided|possible)"
-      - name: "will not sponsor a visa"
-        pattern: "(not able to|unable to|cannot|can not|will not|do not|does not) (sponsor|transfer)[^.]{0,30}(visa|sponsorship|work permit)"
       # "Remote within the United States" and its family. 31 in the base; not
       # one of them reached the shortlist, because something else caught each
       # — but relying on that is luck rather than a rule.
       - name: "remote within one country"
         pattern: "remote (with)?in (the )?(us|usa|united states|uk|united kingdom|canada|europe|eu|india|australia|germany|france|spain|netherlands|poland|brazil|mexico|singapore)\\b"
+      # Hybrid inside brackets with something else in there too. The narrow
+      # "(hybrid)" rule missed a real title in the shortlist:
+      #   "Backend Developer (C# - SSIS) - (hybrid, 36-40k)"  scored 38
+      # Two negative guards, both measured. Technology words, because
+      # "(hybrid cloud)" is not a commute; and "remote", because one real
+      # posting says "(hybrid and options for remote work)" — which offers
+      # remote rather than refusing it. 61 matches across the base, every one
+      # about a place of work.
       - name: "hybrid named in brackets"
         pattern: "\\((?![^)]*\\b(cloud|architecture|deployment|app|apps|mobile|encryption|search|model|integration|remote)\\b)[^)]{0,40}\\bhybrid\\b[^)]{0,40}\\)"
       - name: "listed as hybrid"
@@ -446,15 +570,6 @@ remote_location_fit:
       - "office-based role"
       - "days in the office"
       - "days from the office"
-      - "security clearance"
-      - "us citizen required"
-      - "us citizenship required"
-      - "must be a us citizen"
-      - "eu citizenship required"
-      - "must be eu resident"
-      - "eu work permit required"
-      - "israeli citizenship required"
-      - "uae residency required"
       # A real bug found (2026-07-30): the Rangeview vacancy literally said
       # "ONSITE" (without "required") and "ITAR: must be a U.S. person" —
       # neither of which the old list caught.

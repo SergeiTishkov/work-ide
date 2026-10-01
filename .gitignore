@@ -41,3 +41,7 @@ __pycache__/
 
 # --- Temporary files
 *.tmp
+
+# --- The owner's backlog of ideas: personal notes on what could be done next,
+# --- not a shared plan.
+/BACKLOG.md

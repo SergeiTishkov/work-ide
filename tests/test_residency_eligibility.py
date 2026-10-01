@@ -103,9 +103,25 @@ def test_an_explicitly_worldwide_posting_is_likely():
     assert verdict == score.ELIGIBILITY_LIKELY, r["residency_eligibility_reason"]
 
 
-def test_a_contractor_arrangement_is_likely():
-    """An employer engaging contractors rather than payrolled staff is the
-    arrangement that makes a border crossable at all."""
+def test_an_international_contractor_arrangement_is_likely():
+    """An employer engaging contractors ACROSS BORDERS is the arrangement that
+    makes a border crossable at all."""
+    verdict, r = _verdict(
+        title="Senior .NET Developer",
+        location_raw="Remote",
+        description_text=(
+            "We work with international contractors, invoiced monthly. Legacy "
+            "C#, ASP.NET and SQL Server."
+        ),
+    )
+    assert verdict == score.ELIGIBILITY_LIKELY, r["residency_eligibility_reason"]
+
+
+def test_the_word_contractor_alone_says_nothing_about_borders():
+    """Revised 2026-10-01: in selection #5, 36 "likely" verdicts rested on
+    "contractor", "freelance" or "1099" alone — London IR35 contracts and US
+    staffing roles, one of them requiring U.S. citizenship. A contract is not
+    a border crossing; the bare word now leaves the question open."""
     verdict, r = _verdict(
         title="Senior .NET Developer",
         location_raw="Remote",
@@ -114,7 +130,7 @@ def test_a_contractor_arrangement_is_likely():
             "C#, ASP.NET and SQL Server."
         ),
     )
-    assert verdict == score.ELIGIBILITY_LIKELY, r["residency_eligibility_reason"]
+    assert verdict == score.ELIGIBILITY_UNKNOWN, r["residency_eligibility_reason"]
 
 
 # --- UNKNOWN: remote, but from where? --------------------------------------
