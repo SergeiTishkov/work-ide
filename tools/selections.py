@@ -176,7 +176,7 @@ def load_queries() -> dict:
 # The person's applications: listed across collections, selections and
 # markets, since an application lives for weeks (see funnel_listing in
 # schemas/queries.sql). The other filters look at the selection.
-FUNNEL = ("applied", "contacted", "interview", "awaiting_final")
+FUNNEL = ("applied", "contacted", "interview", "awaiting_final", "awaiting_offer", "declined")
 FILTERS = ("fresh_new", "all", "fresh", "rejected", "bugged", "expired") + FUNNEL
 
 

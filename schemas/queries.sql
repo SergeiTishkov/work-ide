@@ -48,6 +48,7 @@ base AS (
          i.eligibility_rank, v.view, v.views, v.feedback_status, v.rejected_reason,
          v.bugged_reason, v.feedback_at, v.applied_at, v.contact_comment, v.contact_at,
          v.interview_comments, v.interview_at, v.final_comment, v.final_at,
+         v.awaiting_offer_comment, v.awaiting_offer_at, v.declined_comment, v.declined_at,
          CASE
            WHEN (SELECT id FROM baseline) IS NULL THEN 1
            WHEN EXISTS (SELECT 1 FROM selection_items o
@@ -78,7 +79,8 @@ ranked AS (
 )
 SELECT vacancy_id, class, score, eligibility_rank, fresh, view, views, feedback_status,
        rejected_reason, bugged_reason, feedback_at, applied_at, contact_comment,
-       contact_at, interview_comments, interview_at, final_comment, final_at
+       contact_at, interview_comments, interview_at, final_comment, final_at,
+       awaiting_offer_comment, awaiting_offer_at, declined_comment, declined_at
 FROM ranked
 WHERE feedback_status <> 'new' OR rank_in_class <= section_limit
    OR instr(:expanded, ',' || class || ',') > 0
@@ -169,11 +171,16 @@ SET feedback_status = :status,
     interview_comments = CASE WHEN :status = 'new' THEN NULL ELSE interview_comments END,
     interview_at       = CASE WHEN :status = 'new' THEN NULL ELSE interview_at END,
     final_comment      = CASE WHEN :status = 'new' THEN NULL ELSE final_comment END,
-    final_at           = CASE WHEN :status = 'new' THEN NULL ELSE final_at END
+    final_at           = CASE WHEN :status = 'new' THEN NULL ELSE final_at END,
+    awaiting_offer_comment = CASE WHEN :status = 'new' THEN NULL ELSE awaiting_offer_comment END,
+    awaiting_offer_at  = CASE WHEN :status = 'new' THEN NULL ELSE awaiting_offer_at END,
+    declined_comment   = CASE WHEN :status = 'new' THEN NULL ELSE declined_comment END,
+    declined_at        = CASE WHEN :status = 'new' THEN NULL ELSE declined_at END
 WHERE id = :id;
 
 -- name: funnel_listing
--- THE FUNNEL (applied, contacted, interview, awaiting_final) is the person's
+-- THE FUNNEL (applied, contacted, interview, awaiting_final, awaiting_offer,
+-- declined) is the person's
 -- applications, which live for weeks: its filters list every vacancy in that
 -- status, whatever the collection, selection or market — a later run must
 -- not make an application disappear. Newest step first.
@@ -181,7 +188,8 @@ SELECT v.id AS vacancy_id,
        json_extract(v.view, '$.classification') AS class,
        COALESCE(json_extract(v.view, '$.score'), 0) AS score,
        0 AS eligibility_rank, 0 AS fresh, v.view, v.views, v.feedback_status,
-       v.rejected_reason, v.bugged_reason, v.feedback_at, v.applied_at, v.contact_comment, v.contact_at, v.interview_comments, v.interview_at, v.final_comment, v.final_at
+       v.rejected_reason, v.bugged_reason, v.feedback_at, v.applied_at, v.contact_comment, v.contact_at, v.interview_comments, v.interview_at, v.final_comment, v.final_at,
+       v.awaiting_offer_comment, v.awaiting_offer_at, v.declined_comment, v.declined_at
 FROM vacancies v
 WHERE v.feedback_status = :filter AND v.view IS NOT NULL
 ORDER BY v.feedback_at DESC, v.id;
@@ -190,12 +198,15 @@ ORDER BY v.feedback_at DESC, v.id;
 SELECT COALESCE(SUM(feedback_status = 'applied'), 0)        AS applied,
        COALESCE(SUM(feedback_status = 'contacted'), 0)      AS contacted,
        COALESCE(SUM(feedback_status = 'interview'), 0)      AS interview,
-       COALESCE(SUM(feedback_status = 'awaiting_final'), 0) AS awaiting_final
+       COALESCE(SUM(feedback_status = 'awaiting_final'), 0) AS awaiting_final,
+       COALESCE(SUM(feedback_status = 'awaiting_offer'), 0) AS awaiting_offer,
+       COALESCE(SUM(feedback_status = 'declined'), 0)       AS declined
 FROM vacancies
 WHERE view IS NOT NULL;
 
 -- name: vacancy_progress
-SELECT id, feedback_status, feedback_at, rejected_reason, bugged_reason, applied_at, contact_comment, contact_at, interview_comments, interview_at, final_comment, final_at
+SELECT id, feedback_status, feedback_at, rejected_reason, bugged_reason, applied_at, contact_comment, contact_at, interview_comments, interview_at, final_comment, final_at,
+       awaiting_offer_comment, awaiting_offer_at, declined_comment, declined_at
 FROM vacancies WHERE id = :id;
 
 -- name: write_progress
@@ -205,7 +216,9 @@ SET feedback_status = :status, feedback_at = :at,
     rejected_reason = :rejected_reason, bugged_reason = :bugged_reason,
     applied_at = :applied_at, contact_comment = :contact_comment, contact_at = :contact_at,
     interview_comments = :interview_comments, interview_at = :interview_at,
-    final_comment = :final_comment, final_at = :final_at
+    final_comment = :final_comment, final_at = :final_at,
+    awaiting_offer_comment = :awaiting_offer_comment, awaiting_offer_at = :awaiting_offer_at,
+    declined_comment = :declined_comment, declined_at = :declined_at
 WHERE id = :id;
 
 -- name: pending_feedback_counts

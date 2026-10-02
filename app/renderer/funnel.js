@@ -6,7 +6,8 @@
 // A record is the feedback of one vacancy:
 //   { status, at, rejectedReason, buggedReason, appliedAt,
 //     contactComment, contactAt, interviewComments[], interviewAt[],
-//     finalComment, finalAt }
+//     finalComment, finalAt, offerComment, offerAt,
+//     declinedComment, declinedAt }
 // A step that happened keeps a comment that is never null: '' means it
 // happened and nothing was written about it.
 (function (root, factory) {
@@ -14,16 +15,22 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.WorkIdeFunnel = value;
 }(typeof self !== 'undefined' ? self : this, () => {
-  const FUNNEL = ['applied', 'contacted', 'interview', 'awaiting_final'];
+  const FUNNEL = ['applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'declined'];
+  // "declined" is the employer's no. It can come at any step while an
+  // application is alive, and it ends the application: nothing follows it.
   const NEXT = {
-    applied: ['contacted'],
-    // Straight to the final word is allowed: a test task can take the place
-    // of an interview.
-    contacted: ['interview', 'awaiting_final'],
-    interview: ['interview', 'awaiting_final'],
-    awaiting_final: [],
+    applied: ['contacted', 'declined'],
+    // Straight to the final resolution is allowed: a test task can take the
+    // place of an interview.
+    contacted: ['interview', 'awaiting_final', 'declined'],
+    interview: ['interview', 'awaiting_final', 'declined'],
+    // Approved, but the offer itself can take a week or more to arrive.
+    awaiting_final: ['awaiting_offer', 'declined'],
+    // An offer can still fall through.
+    awaiting_offer: ['declined'],
+    declined: [],
   };
-  const POSITIVE_KINDS = ['contact', 'interview', 'final'];
+  const POSITIVE_KINDS = ['contact', 'interview', 'final', 'offer', 'declined'];
   const NEGATIVE_KINDS = ['rejected', 'bugged'];
 
   function nextSteps(status) {
@@ -56,14 +63,39 @@
     } else if (step === 'awaiting_final') {
       next.finalComment = text;
       next.finalAt = now;
+    } else if (step === 'awaiting_offer') {
+      next.offerComment = text;
+      next.offerAt = now;
+    } else if (step === 'declined') {
+      next.declinedComment = text;
+      next.declinedAt = now;
     }
     return next;
+  }
+
+  // Where an application stood before its latest step, from what it recorded.
+  function stageBefore(record) {
+    if (record.offerAt) return 'awaiting_offer';
+    if (record.finalAt) return 'awaiting_final';
+    if ((record.interviewComments || []).length) return 'interview';
+    if (record.contactAt) return 'contacted';
+    return 'applied';
   }
 
   // "Undo": one step back, forgetting what that step recorded.
   function stepBack(record, now) {
     const back = copy(record);
     switch (record.status) {
+      case 'declined':
+        back.declinedComment = null;
+        back.declinedAt = null;
+        back.status = stageBefore(back);
+        break;
+      case 'awaiting_offer':
+        back.offerComment = null;
+        back.offerAt = null;
+        back.status = 'awaiting_final';
+        break;
       case 'awaiting_final':
         back.finalComment = null;
         back.finalAt = null;
@@ -96,6 +128,8 @@
     const value = text == null ? '' : String(text);
     if (kind === 'contact') next.contactComment = value;
     else if (kind === 'final') next.finalComment = value;
+    else if (kind === 'offer') next.offerComment = value;
+    else if (kind === 'declined') next.declinedComment = value;
     else if (kind === 'interview') {
       if (!(index >= 0 && index < next.interviewComments.length)) {
         throw new Error(`no interview ${index}`);
@@ -130,6 +164,12 @@
     });
     if (record.finalAt) {
       steps.push({ kind: 'final', at: record.finalAt, comment: record.finalComment ?? '', editable: true });
+    }
+    if (record.offerAt) {
+      steps.push({ kind: 'offer', at: record.offerAt, comment: record.offerComment ?? '', editable: true });
+    }
+    if (record.declinedAt) {
+      steps.push({ kind: 'declined', at: record.declinedAt, comment: record.declinedComment ?? '', editable: true });
     }
     if (record.status === 'rejected' || record.status === 'bugged') {
       const reason = record.status === 'rejected' ? record.rejectedReason : record.buggedReason;

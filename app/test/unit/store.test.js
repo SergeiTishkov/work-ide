@@ -194,17 +194,42 @@ test('the funnel is written step by step, arrays and dates included', () => {
   store.advance('test', 'new0', 'interview', '');
   store.advance('test', 'new0', 'awaiting_final', 'answer by Friday');
   assert.throws(() => store.advance('test', 'new0', 'contacted', ''), /cannot go/);
+  store.advance('test', 'new0', 'awaiting_offer', 'within two weeks');
+  store.advance('test', 'new0', 'declined', '');
   store.closeAll();
 
   const db = new DatabaseSync(file);
   const row = db.prepare('SELECT * FROM vacancies WHERE id = ?').get('new0');
   db.close();
-  assert.equal(row.feedback_status, 'awaiting_final');
+  assert.equal(row.feedback_status, 'declined');
   assert.equal(row.applied_at, '2026-10-01T10:00:00+00:00');
   assert.equal(row.contact_comment, '', 'an empty comment is "", not NULL');
   assert.equal(row.interview_comments, '["tech round",""]');
   assert.equal(row.interview_at, '["2026-10-03T10:00:00+00:00","2026-10-04T10:00:00+00:00"]');
   assert.equal(row.final_comment, 'answer by Friday');
+  assert.equal(row.awaiting_offer_comment, 'within two weeks');
+  assert.equal(row.awaiting_offer_at, '2026-10-07T10:00:00+00:00');   // the refused step took a tick too
+  assert.equal(row.declined_comment, '', 'the employer\'s no, nothing written: "" not NULL');
+  assert.equal(row.declined_at, '2026-10-08T10:00:00+00:00');
+});
+
+test('the new funnel filters count and list applications across markets', () => {
+  const { store } = setup();
+  store.setFeedback('test', 'old00', 'applied');
+  store.advance('test', 'old00', 'declined', 'not enough Azure');
+  store.setFeedback('test', 'old01', 'applied');
+  store.advance('test', 'old01', 'contacted', '');
+  store.advance('test', 'old01', 'awaiting_final', '');
+  store.advance('test', 'old01', 'awaiting_offer', '');
+  const counts = store.counts('test', 'uk');
+  assert.equal(counts.declined, 1);
+  assert.equal(counts.awaiting_offer, 1);
+  const [declined] = store.listing('test', 'uk', 'declined');
+  assert.equal(declined.feedback.declinedComment, 'not enough Azure');
+  assert.deepEqual(store.listing('test', 'uk', 'awaiting_offer').map((r) => r.id), ['old01']);
+  store.stepBack('test', 'old00');
+  assert.equal(store.listing('test', 'uk', 'applied')[0].id, 'old00', 'undo returns to applied');
+  store.closeAll();
 });
 
 test('funnel filters list applications in every market, and undo steps back', () => {

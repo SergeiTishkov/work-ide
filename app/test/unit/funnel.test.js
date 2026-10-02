@@ -17,10 +17,12 @@ function applied() {
 }
 
 test('what can follow what', () => {
-  assert.deepEqual(F.nextSteps('applied'), ['contacted']);
-  assert.deepEqual(F.nextSteps('contacted'), ['interview', 'awaiting_final']);
-  assert.deepEqual(F.nextSteps('interview'), ['interview', 'awaiting_final']);
-  assert.deepEqual(F.nextSteps('awaiting_final'), []);
+  assert.deepEqual(F.nextSteps('applied'), ['contacted', 'declined']);
+  assert.deepEqual(F.nextSteps('contacted'), ['interview', 'awaiting_final', 'declined']);
+  assert.deepEqual(F.nextSteps('interview'), ['interview', 'awaiting_final', 'declined']);
+  assert.deepEqual(F.nextSteps('awaiting_final'), ['awaiting_offer', 'declined']);
+  assert.deepEqual(F.nextSteps('awaiting_offer'), ['declined']);
+  assert.deepEqual(F.nextSteps('declined'), []);
   assert.deepEqual(F.nextSteps('new'), []);
   assert.deepEqual(F.nextSteps('rejected'), []);
 });
@@ -118,4 +120,56 @@ test('the timeline shows a negative answer with its reason, and nothing for a ne
   // Applied before the funnel had dates: the answer's own date stands in.
   assert.deepEqual(F.timeline({ status: 'applied', at: T2 }),
     [{ kind: 'applied', at: T2, comment: null, editable: false }]);
+});
+
+test('after the final resolution, the offer; and a no can come at any step', () => {
+  const waiting = F.advance(F.advance(applied(), 'contacted', '', T2), 'awaiting_final', '', T3);
+  const offer = F.advance(waiting, 'awaiting_offer', 'HR said within two weeks', T4);
+  assert.equal(offer.status, 'awaiting_offer');
+  assert.equal(offer.offerComment, 'HR said within two weeks');
+  assert.equal(offer.offerAt, T4);
+
+  const fellThrough = F.advance(offer, 'declined', null, T4);
+  assert.equal(fellThrough.status, 'declined');
+  assert.equal(fellThrough.declinedComment, '', 'a step that happened: empty, never null');
+  assert.equal(fellThrough.offerComment, 'HR said within two weeks', 'what came before stays');
+
+  const early = F.advance(applied(), 'declined', 'not enough Azure', T2);
+  assert.equal(early.declinedComment, 'not enough Azure');
+  assert.deepEqual(F.nextSteps(early.status), [], 'nothing follows a no');
+  assert.throws(() => F.advance({ ...applied(), status: 'rejected' }, 'declined', '', T2),
+    'a "not for me" answer is not an application');
+});
+
+test('undo on a no goes back to where the application stood', () => {
+  const at = (r) => F.stepBack(F.advance(r, 'declined', 'x', T4), T4);
+  assert.equal(at(applied()).status, 'applied');
+  const contacted = F.advance(applied(), 'contacted', 'c', T2);
+  assert.equal(at(contacted).status, 'contacted');
+  const interviewed = F.advance(contacted, 'interview', 'i', T3);
+  assert.equal(at(interviewed).status, 'interview');
+  const waiting = F.advance(interviewed, 'awaiting_final', 'f', T3);
+  assert.equal(at(waiting).status, 'awaiting_final');
+  const offer = F.advance(waiting, 'awaiting_offer', 'o', T4);
+  const back = at(offer);
+  assert.equal(back.status, 'awaiting_offer');
+  assert.equal(back.declinedComment, null);
+  assert.equal(back.declinedAt, null);
+  assert.equal(F.stepBack(offer, T4).status, 'awaiting_final');
+  assert.equal(F.stepBack(offer, T4).offerAt, null);
+});
+
+test('the timeline ends with the offer and the no, each editable', () => {
+  let r = F.advance(applied(), 'contacted', '', T2);
+  r = F.advance(r, 'awaiting_final', '', T3);
+  r = F.advance(r, 'awaiting_offer', 'soon', T3);
+  r = F.advance(r, 'declined', '', T4);
+  assert.deepEqual(F.timeline(r).slice(-2), [
+    { kind: 'offer', at: T3, comment: 'soon', editable: true },
+    { kind: 'declined', at: T4, comment: '', editable: true },
+  ]);
+  r = F.editComment(r, 'declined', null, 'budget frozen', T4);
+  assert.equal(r.declinedComment, 'budget frozen');
+  r = F.editComment(r, 'offer', null, '', T4);
+  assert.equal(r.offerComment, '', 'a positive comment may become empty');
 });

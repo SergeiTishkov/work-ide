@@ -205,5 +205,48 @@ test('funnel filters are among the filters, with their counts', async ({ page })
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'awaiting_final']);
   await expect(byId(page, 'p1').getByTestId('entry-final').getByTestId('entry-label'))
     .toHaveText(ru['timeline.final']);
-  await expect(byId(page, 'p1').locator('[data-testid^="btn-step-"]')).toHaveCount(0);
+  // After the final resolution: the offer, or a no.
+  await expect(byId(page, 'p1').getByTestId('btn-step-awaiting_offer')).toHaveText(ru['step.awaiting_offer']);
+  await expect(byId(page, 'p1').getByTestId('btn-step-declined')).toHaveText(ru['step.declined']);
+});
+
+
+test('"Rejected" can close an application at any step, with an optional comment', async ({ page }) => {
+  const fixture = standardFixture();
+  inFunnel(fixture, 'p1', { status: 'applied', at: APPLIED_AT, appliedAt: APPLIED_AT });
+  await open(page, fixture);
+  await page.getByTestId('filter-applied').check();
+  const card = byId(page, 'p1');
+  await expect(card.getByTestId('btn-step-declined')).toHaveText(ru['step.declined']);
+  await card.getByTestId('btn-step-declined').click();
+  await expect(card.getByTestId('step-input')).toHaveAttribute('placeholder', ru['step.hint.declined']);
+  await card.getByTestId('step-input').fill('not enough Azure');
+  await card.getByTestId('step-save').click();
+  expect(await calls(page, 'advance')).toEqual([['kisel', 'p1', 'declined', 'not enough Azure']]);
+
+  await page.getByTestId('filter-declined').check();
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'declined']);
+  const closed = byId(page, 'p1');
+  await expect(closed.getByTestId('status-badge')).toHaveText(ru['status.declined']);
+  await expect(closed.getByTestId('entry-declined').getByTestId('entry-label'))
+    .toHaveText(ru['timeline.declined']);
+  await expect(closed.locator('[data-testid^="btn-step-"]')).toHaveCount(0);   // nothing follows a no
+});
+
+test('waiting for the offer comes after the final resolution and shows in the timeline', async ({ page }) => {
+  const fixture = standardFixture();
+  inFunnel(fixture, 'p1', {
+    status: 'awaiting_offer', at: CONTACT_AT, appliedAt: APPLIED_AT, contactAt: CONTACT_AT,
+    contactComment: '', finalAt: CONTACT_AT, finalComment: '', offerAt: CONTACT_AT,
+    offerComment: 'within two weeks',
+  });
+  await open(page, fixture);
+  await expect(page.getByTestId('filter-count-awaiting_offer')).toHaveText('(1)');
+  await page.getByTestId('filter-awaiting_offer').check();
+  const card = byId(page, 'p1');
+  await expect(card.getByTestId('entry-offer').getByTestId('entry-label')).toHaveText(ru['timeline.offer']);
+  await card.getByTestId('entry-offer').getByTestId('entry-toggle').click();
+  await expect(card.getByTestId('entry-offer').getByTestId('entry-comment')).toHaveText('within two weeks');
+  await expect(card.getByTestId('btn-step-declined')).toBeVisible();
+  await expect(card.getByTestId('btn-step-awaiting_offer')).toHaveCount(0);
 });

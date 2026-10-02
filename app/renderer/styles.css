@@ -141,8 +141,12 @@ button.open { margin-right: 10px; color: var(--accent); border-color: var(--acce
 .row.status-rejected { border-left: 3px solid var(--rejected); }
 .row.status-bugged { border-left: 3px solid var(--bugged); }
 .row.status-expired { border-left: 3px solid var(--muted); }
-.row.status-contacted, .row.status-interview, .row.status-awaiting_final { border-left: 3px solid var(--accent); }
-.badge.status.contacted, .badge.status.interview, .badge.status.awaiting_final { color: var(--accent); }
+.row.status-contacted, .row.status-interview, .row.status-awaiting_final,
+.row.status-awaiting_offer { border-left: 3px solid var(--accent); }
+.badge.status.contacted, .badge.status.interview, .badge.status.awaiting_final,
+.badge.status.awaiting_offer { color: var(--accent); }
+.row.status-declined { border-left: 3px solid var(--muted); }
+.badge.status.declined { color: var(--danger); }
 
 /* The funnel step comment: a large text area at the bottom of the card. */
 .step-form { margin: 10px 0 0 38px; }

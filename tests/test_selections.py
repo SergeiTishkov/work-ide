@@ -312,6 +312,8 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
             "contact_comment": "", "contact_at": "2026-10-01T12:00:00+00:00",
             "interview_comments": '["went well"]', "interview_at": '["2026-10-02T10:00:00+00:00"]',
             "final_comment": None, "final_at": None,
+            "awaiting_offer_comment": None, "awaiting_offer_at": None,
+            "declined_comment": "budget frozen", "declined_at": "2026-10-02T11:00:00+00:00",
         })
         conn.row_factory = selections._dict_row
         row = conn.execute(selections.load_queries()["vacancy_progress"], {"id": "a"}).fetchone()
@@ -325,6 +327,7 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
         row = conn.execute(selections.load_queries()["vacancy_progress"], {"id": "a"}).fetchone()
     assert row["applied_at"] is None and row["contact_at"] is None
     assert row["interview_comments"] is None and row["final_comment"] is None
+    assert row["declined_comment"] is None and row["declined_at"] is None
 
 
 def test_every_language_of_the_app_gets_its_row_and_view_keeps_the_identitys(isolated_data_dir):

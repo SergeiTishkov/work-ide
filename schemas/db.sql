@@ -18,7 +18,9 @@
 -- VERSIONS. 1: the first schema. 2: pipeline_runs. 3: feedback status 'expired'
 -- (the vacancy was closed or its link dead — not a judgement of the pick).
 -- 4: the application funnel — contacted, interview, awaiting_final — with a
--- comment and a date for every step.
+-- comment and a date for every step. 5: views, the display row in every
+-- language. 6: two more funnel steps — awaiting_offer after the final
+-- resolution, and declined: the employer said no, at any step from applied on.
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -40,7 +42,8 @@ CREATE TABLE IF NOT EXISTS vacancies (
   feedback_status       TEXT NOT NULL DEFAULT 'new'
                         CHECK (feedback_status IN ('new', 'applied', 'rejected', 'bugged',
                                                    'expired', 'contacted', 'interview',
-                                                   'awaiting_final')),
+                                                   'awaiting_final', 'awaiting_offer',
+                                                   'declined')),
   rejected_reason       TEXT,
   bugged_reason         TEXT,
   feedback_at           TEXT,
@@ -55,6 +58,12 @@ CREATE TABLE IF NOT EXISTS vacancies (
   interview_at          TEXT,
   final_comment         TEXT,
   final_at              TEXT,
+  awaiting_offer_comment TEXT,
+  awaiting_offer_at     TEXT,
+  -- The employer's no. NOT the person's "rejected" (not for me) above: that
+  -- one judges the vacancy, this one closes an application.
+  declined_comment      TEXT,
+  declined_at           TEXT,
   -- The selection the person was looking at when they left the feedback.
   feedback_selection_id INTEGER REFERENCES selections(id),
   feedback_reviewed_at  TEXT

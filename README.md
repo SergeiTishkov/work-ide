@@ -128,8 +128,10 @@ It opens a window over the knowledge base:
   source or a dead link, which says nothing about the pick. A wrong pick is a
   bug report against the filter;
 - an application then moves along a funnel — **Contact happened**, **Interview
-  scheduled** (as many as there are), **Waiting for the final word** — each
-  step with an optional comment and its date. Under the vacancy the steps
+  scheduled** (as many as there are), **Waiting for final resolution**,
+  **Waiting for the offer** — and **Rejected** closes it at any step: the
+  employer's no, not the person's "not for me". Each step takes an optional
+  comment and its date. Under the vacancy the steps
   form a dated column: a commented step opens like an accordion, the pencil
   edits any comment in place, and undo goes back one step. The funnel's
   filters list every application, across runs and markets;

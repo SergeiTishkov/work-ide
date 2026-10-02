@@ -7,7 +7,7 @@
   const api = window.api;
 
   const FILTERS = ['fresh_new', 'all', 'fresh', 'rejected', 'bugged', 'expired',
-    'applied', 'contacted', 'interview', 'awaiting_final'];
+    'applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'declined'];
   const DEFAULT_FILTER = 'fresh_new';
   const CLASS_KEYS = {
     hot_lead: 'class.hot_lead',
@@ -28,6 +28,8 @@
     contacted: 'filter.contacted',
     interview: 'filter.interview',
     awaiting_final: 'filter.awaiting_final',
+    awaiting_offer: 'filter.awaiting_offer',
+    declined: 'filter.declined',
   };
   const STATUS_KEYS = {
     applied: 'status.applied',
@@ -37,6 +39,8 @@
     contacted: 'status.contacted',
     interview: 'status.interview',
     awaiting_final: 'status.awaiting_final',
+    awaiting_offer: 'status.awaiting_offer',
+    declined: 'status.declined',
   };
   // The funnel: the buttons that move an application on, what each step
   // asks for, and how the timeline under a vacancy names its entries.
@@ -45,17 +49,23 @@
     contacted: 'step.contacted',
     interview: 'step.interview',
     awaiting_final: 'step.awaiting_final',
+    awaiting_offer: 'step.awaiting_offer',
+    declined: 'step.declined',
   };
   const STEP_HINT_KEYS = {
     contacted: 'step.hint.contacted',
     interview: 'step.hint.interview',
     awaiting_final: 'step.hint.awaiting_final',
+    awaiting_offer: 'step.hint.awaiting_offer',
+    declined: 'step.hint.declined',
   };
   const TIMELINE_KEYS = {
     applied: 'timeline.applied',
     contact: 'timeline.contact',
     interview: 'timeline.interview',
     final: 'timeline.final',
+    offer: 'timeline.offer',
+    declined: 'timeline.declined',
     rejected: 'timeline.rejected',
     bugged: 'timeline.bugged',
     expired: 'timeline.expired',
