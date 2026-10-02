@@ -129,9 +129,9 @@ It opens a window over the knowledge base:
   bug report against the filter;
 - an application then moves along a funnel — **Contact happened**, **Interview
   scheduled** (as many as there are), **Waiting for final resolution**,
-  **Waiting for the offer** — and **Rejected** closes it at any step: the
-  employer's no, not the person's "not for me". Each step takes an optional
-  comment and its date. Under the vacancy the steps
+  **Waiting for the offer**, **Offer**, **Started working** — and **Rejected**
+  closes it at any step up to the offer: the employer's no, not the person's
+  "not for me". Each step takes an optional comment and its date. Under the vacancy the steps
   form a dated column: a commented step opens like an accordion, the pencil
   edits any comment in place, and undo goes back one step. The funnel's
   filters list every application, across runs and markets;

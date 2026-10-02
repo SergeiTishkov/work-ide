@@ -21,7 +21,9 @@ test('what can follow what', () => {
   assert.deepEqual(F.nextSteps('contacted'), ['interview', 'awaiting_final', 'declined']);
   assert.deepEqual(F.nextSteps('interview'), ['interview', 'awaiting_final', 'declined']);
   assert.deepEqual(F.nextSteps('awaiting_final'), ['awaiting_offer', 'declined']);
-  assert.deepEqual(F.nextSteps('awaiting_offer'), ['declined']);
+  assert.deepEqual(F.nextSteps('awaiting_offer'), ['offered', 'declined']);
+  assert.deepEqual(F.nextSteps('offered'), ['started']);
+  assert.deepEqual(F.nextSteps('started'), []);
   assert.deepEqual(F.nextSteps('declined'), []);
   assert.deepEqual(F.nextSteps('new'), []);
   assert.deepEqual(F.nextSteps('rejected'), []);
@@ -172,4 +174,27 @@ test('the timeline ends with the offer and the no, each editable', () => {
   assert.equal(r.declinedComment, 'budget frozen');
   r = F.editComment(r, 'offer', null, '', T4);
   assert.equal(r.offerComment, '', 'a positive comment may become empty');
+});
+
+test('the offer comes only after waiting for it, and work starts only after the offer', () => {
+  let r = F.advance(F.advance(applied(), 'contacted', '', T2), 'awaiting_final', '', T3);
+  assert.throws(() => F.advance(r, 'offered', '', T3));
+  r = F.advance(r, 'awaiting_offer', '', T3);
+  assert.throws(() => F.advance(r, 'started', '', T3));
+  r = F.advance(r, 'offered', '$7k a month, from November', T4);
+  assert.equal(r.status, 'offered');
+  assert.equal(r.offeredComment, '$7k a month, from November');
+  r = F.advance(r, 'started', null, T4);
+  assert.equal(r.status, 'started');
+  assert.equal(r.startedComment, '');
+  assert.deepEqual(F.timeline(r).slice(-2), [
+    { kind: 'offered', at: T4, comment: '$7k a month, from November', editable: true },
+    { kind: 'started', at: T4, comment: '', editable: true },
+  ]);
+  r = F.stepBack(r, T4);
+  assert.equal(r.status, 'offered');
+  assert.equal(r.startedAt, null);
+  r = F.stepBack(r, T4);
+  assert.equal(r.status, 'awaiting_offer');
+  assert.equal(r.offeredComment, null);
 });

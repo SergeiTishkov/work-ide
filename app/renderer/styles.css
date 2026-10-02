@@ -146,6 +146,8 @@ button.open { margin-right: 10px; color: var(--accent); border-color: var(--acce
 .badge.status.contacted, .badge.status.interview, .badge.status.awaiting_final,
 .badge.status.awaiting_offer { color: var(--accent); }
 .row.status-declined { border-left: 3px solid var(--muted); }
+.row.status-offered, .row.status-started { border-left: 3px solid var(--applied); }
+.badge.status.offered, .badge.status.started { color: var(--applied); }
 .badge.status.declined { color: var(--danger); }
 
 /* The funnel step comment: a large text area at the bottom of the card. */

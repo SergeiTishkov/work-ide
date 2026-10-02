@@ -313,6 +313,7 @@ def test_version_4_gains_views_in_every_language_keeping_the_rest(isolated_data_
                             ).fetchone()[0] == str(db.SCHEMA_VERSION)
         columns = {row[1] for row in conn.execute("PRAGMA table_info(vacancies)")}
         assert {"awaiting_offer_comment", "declined_at"} <= columns, "version 6 too"
+        assert {"offered_comment", "started_at"} <= columns, "version 7 too"
         conn.execute("UPDATE vacancies SET feedback_status = 'declined', "
                      "declined_comment = '' WHERE id = 'a'")
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []

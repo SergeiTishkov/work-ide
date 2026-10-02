@@ -314,6 +314,8 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
             "final_comment": None, "final_at": None,
             "awaiting_offer_comment": None, "awaiting_offer_at": None,
             "declined_comment": "budget frozen", "declined_at": "2026-10-02T11:00:00+00:00",
+            "offered_comment": None, "offered_at": None,
+            "started_comment": None, "started_at": None,
         })
         conn.row_factory = selections._dict_row
         row = conn.execute(selections.load_queries()["vacancy_progress"], {"id": "a"}).fetchone()

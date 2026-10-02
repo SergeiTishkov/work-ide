@@ -21,6 +21,7 @@
 -- comment and a date for every step. 5: views, the display row in every
 -- language. 6: two more funnel steps — awaiting_offer after the final
 -- resolution, and declined: the employer said no, at any step from applied on.
+-- 7: offered (the offer arrived) and started (the person started working).
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -43,7 +44,7 @@ CREATE TABLE IF NOT EXISTS vacancies (
                         CHECK (feedback_status IN ('new', 'applied', 'rejected', 'bugged',
                                                    'expired', 'contacted', 'interview',
                                                    'awaiting_final', 'awaiting_offer',
-                                                   'declined')),
+                                                   'declined', 'offered', 'started')),
   rejected_reason       TEXT,
   bugged_reason         TEXT,
   feedback_at           TEXT,
@@ -64,6 +65,10 @@ CREATE TABLE IF NOT EXISTS vacancies (
   -- one judges the vacancy, this one closes an application.
   declined_comment      TEXT,
   declined_at           TEXT,
+  offered_comment       TEXT,
+  offered_at            TEXT,
+  started_comment       TEXT,
+  started_at            TEXT,
   -- The selection the person was looking at when they left the feedback.
   feedback_selection_id INTEGER REFERENCES selections(id),
   feedback_reviewed_at  TEXT

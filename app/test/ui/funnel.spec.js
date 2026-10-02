@@ -249,4 +249,28 @@ test('waiting for the offer comes after the final resolution and shows in the ti
   await expect(card.getByTestId('entry-offer').getByTestId('entry-comment')).toHaveText('within two weeks');
   await expect(card.getByTestId('btn-step-declined')).toBeVisible();
   await expect(card.getByTestId('btn-step-awaiting_offer')).toHaveCount(0);
+  await expect(card.getByTestId('btn-step-offered')).toHaveText(ru['step.offered']);
+  await expect(card.getByTestId('btn-step-started')).toHaveCount(0);   // only after the offer
+});
+
+test('"Started working" follows only the offer, and closes the funnel', async ({ page }) => {
+  const fixture = standardFixture();
+  inFunnel(fixture, 'p1', {
+    status: 'offered', at: CONTACT_AT, appliedAt: APPLIED_AT, contactAt: CONTACT_AT,
+    contactComment: '', finalAt: CONTACT_AT, finalComment: '', offerAt: CONTACT_AT, offerComment: '',
+    offeredAt: CONTACT_AT, offeredComment: '$7k a month',
+  });
+  await open(page, fixture);
+  await expect(page.getByTestId('filter-count-offered')).toHaveText('(1)');
+  await page.getByTestId('filter-offered').check();
+  const card = byId(page, 'p1');
+  await expect(card.getByTestId('entry-offered').getByTestId('entry-label')).toHaveText(ru['timeline.offered']);
+  await expect(card.locator('[data-testid^="btn-step-"]')).toHaveCount(1);
+  await card.getByTestId('btn-step-started').click();
+  await expect(card.getByTestId('step-input')).toHaveAttribute('placeholder', ru['step.hint.started']);
+  await card.getByTestId('step-save').click();
+  expect(await calls(page, 'advance')).toEqual([['kisel', 'p1', 'started', '']]);
+  await page.getByTestId('filter-started').check();
+  await expect(byId(page, 'p1').getByTestId('status-badge')).toHaveText(ru['status.started']);
+  await expect(byId(page, 'p1').locator('[data-testid^="btn-step-"]')).toHaveCount(0);
 });

@@ -281,3 +281,21 @@ test('a row carries its lines in every language, and in funnel filters too', () 
   assert.deepEqual(store.listing('test', 'full', 'applied')[0].views, views);
   store.closeAll();
 });
+
+test('an offer and the first day are written to their own columns', () => {
+  const { store, file } = setup();
+  store.setFeedback('test', 'new1', 'applied');
+  for (const step of ['contacted', 'awaiting_final', 'awaiting_offer']) store.advance('test', 'new1', step, '');
+  store.advance('test', 'new1', 'offered', 'from November');
+  store.advance('test', 'new1', 'started', '');
+  assert.deepEqual(store.listing('test', 'uk', 'started').map((r) => r.id), ['new1']);
+  assert.equal(store.counts('test', 'uk').started, 1);
+  store.closeAll();
+  const db = new DatabaseSync(file);
+  const row = db.prepare('SELECT * FROM vacancies WHERE id = ?').get('new1');
+  db.close();
+  assert.equal(row.feedback_status, 'started');
+  assert.equal(row.offered_comment, 'from November');
+  assert.equal(row.started_comment, '');
+  assert.ok(row.offered_at && row.started_at);
+});

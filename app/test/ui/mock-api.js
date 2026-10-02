@@ -69,7 +69,8 @@ function installMockApi(fixture) {
       record('listingCounts', [identity, segment]);
       const counts = {};
       for (const f of ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired',
-        'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'declined']) {
+        'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered', 'started',
+        'declined']) {
         counts[f] = rowsOf(identity, segment).filter((row) => matches(row, f)).length;
       }
       return counts;

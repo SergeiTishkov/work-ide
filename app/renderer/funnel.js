@@ -7,7 +7,9 @@
 //   { status, at, rejectedReason, buggedReason, appliedAt,
 //     contactComment, contactAt, interviewComments[], interviewAt[],
 //     finalComment, finalAt, offerComment, offerAt,
+//     offeredComment, offeredAt, startedComment, startedAt,
 //     declinedComment, declinedAt }
+// ("offer" is the wait for the offer; "offered" is the offer itself.)
 // A step that happened keeps a comment that is never null: '' means it
 // happened and nothing was written about it.
 (function (root, factory) {
@@ -15,7 +17,8 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.WorkIdeFunnel = value;
 }(typeof self !== 'undefined' ? self : this, () => {
-  const FUNNEL = ['applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'declined'];
+  const FUNNEL = ['applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer',
+    'offered', 'started', 'declined'];
   // "declined" is the employer's no. It can come at any step while an
   // application is alive, and it ends the application: nothing follows it.
   const NEXT = {
@@ -27,10 +30,12 @@
     // Approved, but the offer itself can take a week or more to arrive.
     awaiting_final: ['awaiting_offer', 'declined'],
     // An offer can still fall through.
-    awaiting_offer: ['declined'],
+    awaiting_offer: ['offered', 'declined'],
+    offered: ['started'],
+    started: [],
     declined: [],
   };
-  const POSITIVE_KINDS = ['contact', 'interview', 'final', 'offer', 'declined'];
+  const POSITIVE_KINDS = ['contact', 'interview', 'final', 'offer', 'offered', 'started', 'declined'];
   const NEGATIVE_KINDS = ['rejected', 'bugged'];
 
   function nextSteps(status) {
@@ -66,6 +71,12 @@
     } else if (step === 'awaiting_offer') {
       next.offerComment = text;
       next.offerAt = now;
+    } else if (step === 'offered') {
+      next.offeredComment = text;
+      next.offeredAt = now;
+    } else if (step === 'started') {
+      next.startedComment = text;
+      next.startedAt = now;
     } else if (step === 'declined') {
       next.declinedComment = text;
       next.declinedAt = now;
@@ -86,6 +97,16 @@
   function stepBack(record, now) {
     const back = copy(record);
     switch (record.status) {
+      case 'started':
+        back.startedComment = null;
+        back.startedAt = null;
+        back.status = 'offered';
+        break;
+      case 'offered':
+        back.offeredComment = null;
+        back.offeredAt = null;
+        back.status = 'awaiting_offer';
+        break;
       case 'declined':
         back.declinedComment = null;
         back.declinedAt = null;
@@ -129,6 +150,8 @@
     if (kind === 'contact') next.contactComment = value;
     else if (kind === 'final') next.finalComment = value;
     else if (kind === 'offer') next.offerComment = value;
+    else if (kind === 'offered') next.offeredComment = value;
+    else if (kind === 'started') next.startedComment = value;
     else if (kind === 'declined') next.declinedComment = value;
     else if (kind === 'interview') {
       if (!(index >= 0 && index < next.interviewComments.length)) {
@@ -167,6 +190,12 @@
     }
     if (record.offerAt) {
       steps.push({ kind: 'offer', at: record.offerAt, comment: record.offerComment ?? '', editable: true });
+    }
+    if (record.offeredAt) {
+      steps.push({ kind: 'offered', at: record.offeredAt, comment: record.offeredComment ?? '', editable: true });
+    }
+    if (record.startedAt) {
+      steps.push({ kind: 'started', at: record.startedAt, comment: record.startedComment ?? '', editable: true });
     }
     if (record.declinedAt) {
       steps.push({ kind: 'declined', at: record.declinedAt, comment: record.declinedComment ?? '', editable: true });

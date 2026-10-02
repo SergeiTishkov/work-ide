@@ -10,7 +10,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { loadQueries } = require('./queries');
 const funnel = require('../renderer/funnel.js');
 
-const SCHEMA_VERSION = '6';
+const SCHEMA_VERSION = '7';
 // The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
 // beaten for this long is gone, whatever its row still says.
 const STALE_AFTER_MS = 45000;
@@ -64,6 +64,10 @@ function recordOf(row) {
     offerAt: row.awaiting_offer_at,
     declinedComment: row.declined_comment,
     declinedAt: row.declined_at,
+    offeredComment: row.offered_comment,
+    offeredAt: row.offered_at,
+    startedComment: row.started_comment,
+    startedAt: row.started_at,
   };
 }
 
@@ -237,11 +241,16 @@ class Store {
       awaiting_offer_at: record.offerAt ?? null,
       declined_comment: record.declinedComment ?? null,
       declined_at: record.declinedAt ?? null,
+      offered_comment: record.offeredComment ?? null,
+      offered_at: record.offeredAt ?? null,
+      started_comment: record.startedComment ?? null,
+      started_at: record.startedAt ?? null,
     });
   }
 
   // One step forward: contacted, interview (again and again), awaiting_final,
-  // awaiting_offer — or declined, from any of them.
+  // awaiting_offer, offered, started — or declined, from any of them up to
+  // the offer.
   advance(identity, vacancyId, step, comment) {
     const { db, record } = this.record(identity, vacancyId);
     this.write(db, vacancyId, funnel.advance(record, step, comment, this.clock()));
