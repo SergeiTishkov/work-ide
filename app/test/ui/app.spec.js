@@ -26,7 +26,7 @@ test('opens on the first identity, its default market, fresh without feedback', 
   await open(page);
   await expect(page.getByTestId('identity-tab-kisel')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('segment-tab-full')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByTestId('filter-fresh_new')).toBeChecked();
+  await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
   expect((await calls(page, 'loadListing'))[0]).toEqual(['kisel', 'full', 'fresh_new']);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(3);   // a1, a2r, b1
   await expect(byId(page, 'a3')).toHaveCount(0);   // not fresh
@@ -128,9 +128,9 @@ test('"Applied" is recorded at once, with no reason form', async ({ page }) => {
 
 test('filters ask for their own list and show their counts', async ({ page }) => {
   await open(page);
-  await expect(page.getByTestId('filter-count-all')).toHaveText('(5)');
-  await expect(page.getByTestId('filter-count-bugged')).toHaveText('(1)');
-  await page.getByTestId('filter-bugged').check();
+  await expect(page.getByTestId('filter-option-all')).toContainText('(5)');
+  await expect(page.getByTestId('filter-option-bugged')).toContainText('(1)');
+  await page.getByTestId('filter').selectOption('bugged');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'bugged']);
   await expect(byId(page, 'x1')).toBeVisible();
   await expect(byId(page, 'x1').getByTestId('status-badge')).toHaveText(ru['status.bugged']);
@@ -141,30 +141,30 @@ test('filters ask for their own list and show their counts', async ({ page }) =>
 
 test('each market of each identity keeps its own filter', async ({ page }) => {
   await open(page);
-  await page.getByTestId('filter-all').check();
+  await page.getByTestId('filter').selectOption('all');
   await page.getByTestId('segment-tab-uk').click();
-  await expect(page.getByTestId('filter-fresh_new')).toBeChecked();
+  await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'uk', 'fresh_new']);
 
   await page.getByTestId('segment-tab-full').click();
-  await expect(page.getByTestId('filter-all')).toBeChecked();
+  await expect(page.getByTestId('filter')).toHaveValue('all');
 
   await page.getByTestId('identity-tab-pjoice').click();
-  await expect(page.getByTestId('filter-fresh_new')).toBeChecked();
-  await page.getByTestId('filter-applied').check();
+  await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
+  await page.getByTestId('filter').selectOption('applied');
 
   await page.getByTestId('identity-tab-kisel').click();
   await expect(page.getByTestId('segment-tab-full')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByTestId('filter-all')).toBeChecked();
+  await expect(page.getByTestId('filter')).toHaveValue('all');
   await page.getByTestId('identity-tab-pjoice').click();
-  await expect(page.getByTestId('filter-applied')).toBeChecked();
+  await expect(page.getByTestId('filter')).toHaveValue('applied');
 });
 
 test('changing the filter clears stubs', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('btn-applied').click();
   await expect(page.getByTestId('stub-a1')).toBeVisible();
-  await page.getByTestId('filter-all').check();
+  await page.getByTestId('filter').selectOption('all');
   await expect(page.getByTestId('stub-a1')).toHaveCount(0);
   await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(ru['status.applied']);
 });
@@ -225,7 +225,7 @@ test('"Open the vacancy link" hands the URL to the system browser, marked or not
   expect(await calls(page, 'openExternal')).toEqual([['https://example.test/a1']]);
   expect(await calls(page, 'setFeedback')).toEqual([]);   // opening is not an answer
 
-  await page.getByTestId('filter-bugged').check();
+  await page.getByTestId('filter').selectOption('bugged');
   await byId(page, 'x1').getByTestId('btn-open').click();
   expect((await calls(page, 'openExternal')).at(-1)).toEqual(['https://example.test/x1']);
 });
@@ -262,14 +262,14 @@ test('"Refresh" reloads the interface and keeps the tab, market and filter', asy
   await open(page);
   await page.getByTestId('identity-tab-kisel').click();
   await page.getByTestId('segment-tab-uk').click();
-  await page.getByTestId('filter-all').check();
+  await page.getByTestId('filter').selectOption('all');
   await expect(page.getByTestId('refresh')).toHaveText(ru['app.refresh']);
   await page.evaluate(() => { window.__beforeRefresh = true; });
 
   await page.getByTestId('refresh').click();
   await expect(page.getByTestId('segment-tab-uk')).toHaveAttribute('aria-selected', 'true');
   expect(await page.evaluate(() => window.__beforeRefresh)).toBeUndefined();   // a new page
-  await expect(page.getByTestId('filter-all')).toBeChecked();
+  await expect(page.getByTestId('filter')).toHaveValue('all');
   expect((await calls(page, 'loadListing'))[0]).toEqual(['kisel', 'uk', 'all']);
 });
 
@@ -278,7 +278,7 @@ test('a capped class says how many more it holds, opens and closes', async ({ pa
   fixture.limit = 1;   // a1 and a2r are fresh hot leads: one shown, one more
   await open(page, fixture);
   await expect(page.getByTestId('section-count-hot_lead')).toHaveText(' (2)');
-  await expect(page.getByTestId('filter-count-fresh_new')).toHaveText('(3)');   // whole numbers
+  await expect(page.getByTestId('filter-option-fresh_new')).toContainText('(3)');   // whole numbers
   await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(1);
 
   await page.getByTestId('show-more-hot_lead').click();
@@ -307,7 +307,7 @@ test('"Refresh" leaves the reload to the app when the app restarts itself', asyn
   const fixture = standardFixture();
   fixture.refreshReply = 'relaunch';
   await open(page, fixture);
-  await page.getByTestId('filter-all').check();
+  await page.getByTestId('filter').selectOption('all');
   await page.evaluate(() => { window.__beforeRefresh = true; });
   await page.getByTestId('refresh').click();
   await expect.poll(() => calls(page, 'refresh')).toHaveLength(1);
@@ -335,9 +335,9 @@ test('"Vacancy expired" is recorded at once, with no reason, and has its own fil
   await expect(page.getByTestId('reason-form')).toHaveCount(0);
   await expect(page.getByTestId('stub-a1'))
     .toContainText(ru['stub.marked'].replace('{status}', ru['status.expired']));
-  await expect(page.getByTestId('filter-count-expired')).toHaveText('(1)');
+  await expect(page.getByTestId('filter-option-expired')).toContainText('(1)');
 
-  await page.getByTestId('filter-expired').check();
+  await page.getByTestId('filter').selectOption('expired');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'expired']);
   await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(ru['status.expired']);
   await byId(page, 'a1').getByTestId('btn-undo').click();

@@ -57,7 +57,7 @@ test('choosing English re-draws the whole interface in English', async ({ page }
   expect(await flagOf(page.getByTestId('language-button'))).toEqual({ src: 'flags/en.svg', loaded: true });
   await expect(page.getByTestId('run-collect')).toHaveText(en['run.collect']);
   await expect(page.getByTestId('refresh')).toHaveText(en['app.refresh']);
-  await expect(page.getByTestId('filters').locator('legend')).toHaveText(en['filter.legend']);
+  await expect(page.getByTestId('filter-label')).toHaveText(en['filter.legend']);
   await expect(page.locator('[data-testid^="vacancy-"]').first().getByTestId('btn-applied'))
     .toHaveText(en['action.applied']);
   // Dates are written the English way.

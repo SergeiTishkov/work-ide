@@ -37,7 +37,7 @@ test('an application moves on: "Contact happened" opens a large optional comment
   const fixture = standardFixture();
   inFunnel(fixture, 'p1', { status: 'applied', at: APPLIED_AT, appliedAt: APPLIED_AT });
   await open(page, fixture);
-  await page.getByTestId('filter-applied').check();
+  await page.getByTestId('filter').selectOption('applied');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('btn-step-contacted')).toHaveText(ru['step.contacted']);
   await expect(card.getByTestId('btn-step-interview')).toHaveCount(0);
@@ -66,7 +66,7 @@ test('a step saved without a comment sends an empty string, never null', async (
     status: 'contacted', at: CONTACT_AT, appliedAt: APPLIED_AT, contactAt: CONTACT_AT, contactComment: '',
   });
   await open(page, fixture);
-  await page.getByTestId('filter-contacted').check();
+  await page.getByTestId('filter').selectOption('contacted');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('btn-step-interview')).toHaveText(ru['step.interview']);
   await expect(card.getByTestId('btn-step-awaiting_final')).toHaveText(ru['step.awaiting_final']);
@@ -82,7 +82,7 @@ test('after an interview: another interview, or waiting for the final word', asy
     interviewComments: [''], interviewAt: [CONTACT_AT],
   });
   await open(page, fixture);
-  await page.getByTestId('filter-interview').check();
+  await page.getByTestId('filter').selectOption('interview');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('btn-step-interview')).toBeVisible();
   await card.getByTestId('btn-step-awaiting_final').click();
@@ -101,7 +101,7 @@ test('the timeline: dated steps, empty ones plain, commented ones accordions', a
     interviewAt: ['2026-10-03T09:00:00+00:00', '2026-10-05T09:00:00+00:00'],
   });
   await open(page, fixture);
-  await page.getByTestId('filter-interview').check();
+  await page.getByTestId('filter').selectOption('interview');
   const card = byId(page, 'p1');
 
   const applied = card.getByTestId('entry-applied');
@@ -134,7 +134,7 @@ test('the pencil edits in place: an empty step becomes an open accordion', async
     status: 'contacted', at: CONTACT_AT, appliedAt: APPLIED_AT, contactAt: CONTACT_AT, contactComment: '',
   });
   await open(page, fixture);
-  await page.getByTestId('filter-contacted').check();
+  await page.getByTestId('filter').selectOption('contacted');
   const contact = byId(page, 'p1').getByTestId('entry-contact');
   await contact.getByTestId('entry-edit').click();
   await expect(contact.getByTestId('entry-input')).toHaveValue('');
@@ -154,7 +154,7 @@ test('editing an open comment turns its text into a text area', async ({ page })
     interviewComments: ['went well'], interviewAt: ['2026-10-03T09:00:00+00:00'],
   });
   await open(page, fixture);
-  await page.getByTestId('filter-interview').check();
+  await page.getByTestId('filter').selectOption('interview');
   const entry = byId(page, 'p1').getByTestId('entry-interview-0');
   await entry.getByTestId('entry-toggle').click();
   await expect(entry.getByTestId('entry-comment')).toHaveText('went well');
@@ -175,7 +175,7 @@ test('the pencil opens a closed accordion straight into editing', async ({ page 
     interviewComments: ['went well'], interviewAt: ['2026-10-03T09:00:00+00:00'],
   });
   await open(page, fixture);
-  await page.getByTestId('filter-interview').check();
+  await page.getByTestId('filter').selectOption('interview');
   const entry = byId(page, 'p1').getByTestId('entry-interview-0');
   await entry.getByTestId('entry-edit').click();
   await expect(entry.getByTestId('entry-toggle')).toHaveAttribute('aria-expanded', 'true');
@@ -187,7 +187,7 @@ test('the pencil opens a closed accordion straight into editing', async ({ page 
 
 test('a negative answer shows in the timeline, its reason editable', async ({ page }) => {
   await open(page);
-  await page.getByTestId('filter-bugged').check();
+  await page.getByTestId('filter').selectOption('bugged');
   const card = byId(page, 'x1');
   const entry = card.getByTestId('entry-bugged');
   await expect(entry.getByTestId('entry-label')).toHaveText(ru['timeline.bugged']);
@@ -200,8 +200,8 @@ test('funnel filters are among the filters, with their counts', async ({ page })
   inFunnel(fixture, 'p1', { status: 'awaiting_final', at: CONTACT_AT, appliedAt: APPLIED_AT,
     contactAt: CONTACT_AT, contactComment: '', finalAt: CONTACT_AT, finalComment: '' });
   await open(page, fixture);
-  await expect(page.getByTestId('filter-count-awaiting_final')).toHaveText('(1)');
-  await page.getByTestId('filter-awaiting_final').check();
+  await expect(page.getByTestId('filter-option-awaiting_final')).toContainText('(1)');
+  await page.getByTestId('filter').selectOption('awaiting_final');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'awaiting_final']);
   await expect(byId(page, 'p1').getByTestId('entry-final').getByTestId('entry-label'))
     .toHaveText(ru['timeline.final']);
@@ -215,7 +215,7 @@ test('"Rejected" can close an application at any step, with an optional comment'
   const fixture = standardFixture();
   inFunnel(fixture, 'p1', { status: 'applied', at: APPLIED_AT, appliedAt: APPLIED_AT });
   await open(page, fixture);
-  await page.getByTestId('filter-applied').check();
+  await page.getByTestId('filter').selectOption('applied');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('btn-step-declined')).toHaveText(ru['step.declined']);
   await card.getByTestId('btn-step-declined').click();
@@ -224,7 +224,7 @@ test('"Rejected" can close an application at any step, with an optional comment'
   await card.getByTestId('step-save').click();
   expect(await calls(page, 'advance')).toEqual([['kisel', 'p1', 'declined', 'not enough Azure']]);
 
-  await page.getByTestId('filter-declined').check();
+  await page.getByTestId('filter').selectOption('declined');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'declined']);
   const closed = byId(page, 'p1');
   await expect(closed.getByTestId('status-badge')).toHaveText(ru['status.declined']);
@@ -241,8 +241,8 @@ test('waiting for the offer comes after the final resolution and shows in the ti
     offerComment: 'within two weeks',
   });
   await open(page, fixture);
-  await expect(page.getByTestId('filter-count-awaiting_offer')).toHaveText('(1)');
-  await page.getByTestId('filter-awaiting_offer').check();
+  await expect(page.getByTestId('filter-option-awaiting_offer')).toContainText('(1)');
+  await page.getByTestId('filter').selectOption('awaiting_offer');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('entry-offer').getByTestId('entry-label')).toHaveText(ru['timeline.offer']);
   await card.getByTestId('entry-offer').getByTestId('entry-toggle').click();
@@ -261,8 +261,8 @@ test('"Started working" follows only the offer, and closes the funnel', async ({
     offeredAt: CONTACT_AT, offeredComment: '$7k a month',
   });
   await open(page, fixture);
-  await expect(page.getByTestId('filter-count-offered')).toHaveText('(1)');
-  await page.getByTestId('filter-offered').check();
+  await expect(page.getByTestId('filter-option-offered')).toContainText('(1)');
+  await page.getByTestId('filter').selectOption('offered');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('entry-offered').getByTestId('entry-label')).toHaveText(ru['timeline.offered']);
   await expect(card.locator('[data-testid^="btn-step-"]')).toHaveCount(1);
@@ -270,7 +270,7 @@ test('"Started working" follows only the offer, and closes the funnel', async ({
   await expect(card.getByTestId('step-input')).toHaveAttribute('placeholder', ru['step.hint.started']);
   await card.getByTestId('step-save').click();
   expect(await calls(page, 'advance')).toEqual([['kisel', 'p1', 'started', '']]);
-  await page.getByTestId('filter-started').check();
+  await page.getByTestId('filter').selectOption('started');
   await expect(byId(page, 'p1').getByTestId('status-badge')).toHaveText(ru['status.started']);
   await expect(byId(page, 'p1').locator('[data-testid^="btn-step-"]')).toHaveCount(0);
 });

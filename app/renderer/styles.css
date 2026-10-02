@@ -93,11 +93,13 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .identity-heading h1 { font-size: 18px; margin: 0 0 2px; }
 .actions { display: flex; gap: 8px; }
 
-.filters { border: none; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.filters legend { float: left; margin-right: 6px; color: var(--muted); }
-.filter { border: 1px solid var(--border); border-radius: 14px; padding: 3px 10px; background: var(--surface); cursor: pointer; }
-.filter.active { border-color: var(--accent); background: var(--accent-soft); }
-.filter .count { color: var(--muted); }
+.filters { margin: 0 0 12px; display: flex; gap: 8px; align-items: center; }
+.filters label { color: var(--muted); }
+.filters select {
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; min-width: 280px;
+}
+.filters select:focus { outline: none; border-color: var(--accent); }
 
 .class-section h2 { font-size: 15px; margin: 18px 0 8px; }
 .class-section h2 .count { color: var(--muted); font-weight: 400; }

@@ -10,6 +10,15 @@
     'applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered', 'started',
     'declined'];
   const DEFAULT_FILTER = 'fresh_new';
+  // The drop-down's sections: what the selection holds, the person's own
+  // answers about the pick, and their applications.
+  const FILTER_GROUPS = [
+    { key: 'filter.group.selection', filters: ['fresh_new', 'all', 'fresh'] },
+    { key: 'filter.group.answers', filters: ['rejected', 'bugged', 'expired'] },
+    { key: 'filter.group.applications',
+      filters: ['applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered',
+        'started', 'declined'] },
+  ];
   const CLASS_KEYS = {
     hot_lead: 'class.hot_lead',
     worth_a_look: 'class.worth_a_look',
@@ -617,20 +626,19 @@
       }, segment.name)));
   }
 
+  // One drop-down, its options grouped, each with how many it holds.
   function renderFilters() {
     const active = currentFilter();
-    const group = `filter-${state.active}-${current().activeSegment}`;
-    return el('fieldset', { class: 'filters', testid: 'filters' },
-      el('legend', {}, t('filter.legend')),
-      FILTERS.map((name) => el('label', { class: `filter${name === active ? ' active' : ''}` },
-        el('input', {
-          type: 'radio', name: group, value: name, testid: `filter-${name}`,
-          checked: name === active,
-          onchange: () => selectFilter(name),
-        }),
-        ` ${t(FILTER_KEYS[name])} `,
-        el('span', { class: 'count', testid: `filter-count-${name}` },
-          t('filter.count', { n: state.counts[name] || 0 })))));
+    const option = (name) => el('option', {
+      value: name, testid: `filter-option-${name}`, selected: name === active,
+    }, `${t(FILTER_KEYS[name])} ${t('filter.count', { n: state.counts[name] || 0 })}`);
+    return el('div', { class: 'filters', testid: 'filters' },
+      el('label', { for: 'filter-select', testid: 'filter-label' }, t('filter.legend')),
+      el('select', {
+        id: 'filter-select', testid: 'filter',
+        onchange: (event) => selectFilter(event.target.value),
+      }, FILTER_GROUPS.map((group) => el('optgroup', { label: t(group.key) },
+        group.filters.map(option)))));
   }
 
   function renderList() {

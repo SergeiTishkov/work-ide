@@ -54,7 +54,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await window.getByTestId('vacancy-new0').getByTestId('reason-input').fill('onsite in fact');
     await window.getByTestId('vacancy-new0').getByTestId('reason-save').click();
     await expect(window.getByTestId('stub-new0')).toBeVisible();
-    await expect(window.getByTestId('filter-count-bugged')).toHaveText('(1)');
+    await expect(window.getByTestId('filter-option-bugged')).toContainText('(1)');
 
     const db = new DatabaseSync(repo.database);
     const row = db.prepare('SELECT feedback_status, bugged_reason FROM vacancies WHERE id = ?').get('new0');
@@ -83,11 +83,11 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
 
     // Refresh through the real IPC: the main process's code has not changed
     // since start, so the page reloads, keeps the view and works.
-    await window.getByTestId('filter-all').check();
+    await window.getByTestId('filter').selectOption('all');
     await window.evaluate(() => { window.__beforeRefresh = true; });
     await window.getByTestId('refresh').click();
     await expect.poll(() => window.evaluate(() => window.__beforeRefresh)).toBeUndefined();
-    await expect(window.getByTestId('filter-all')).toBeChecked();
+    await expect(window.getByTestId('filter')).toHaveValue('all');
     await expect(window.getByTestId('error')).toBeHidden();
 
     await window.getByTestId('identity-tab-pjoice').click();

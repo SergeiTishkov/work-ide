@@ -41,6 +41,9 @@
   'run.log_title': 'Run log',
 
   'filter.legend': 'Show',
+  'filter.group.selection': 'The selection',
+  'filter.group.answers': 'My answers',
+  'filter.group.applications': 'Applications',
   'filter.fresh_new': 'Fresh, no feedback',
   'filter.all': 'All',
   'filter.fresh': 'All fresh',

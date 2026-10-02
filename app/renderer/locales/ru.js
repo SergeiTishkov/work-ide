@@ -44,6 +44,9 @@
   'run.log_title': 'Лог запуска',
 
   'filter.legend': 'Показать',
+  'filter.group.selection': 'Подборка',
+  'filter.group.answers': 'Мои ответы',
+  'filter.group.applications': 'Отклики',
   'filter.fresh_new': 'Свежие без фидбека',
   'filter.all': 'Все',
   'filter.fresh': 'Все свежие',
