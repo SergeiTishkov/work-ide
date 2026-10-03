@@ -26,12 +26,28 @@ the skeleton, plus the parts most often skipped.
    "Not now" is a perfectly good answer: the pinned version keeps working and
    the shortlist does not move. Do not ask again in the same session.
 
-3. `python tools/pipeline.py --identity <p>` — collection, scoring, report.
-4. **Work through `docs/VACANCY_CHECKLIST.md` for every candidate at long_shot
+3. **Check that the sources still answer as their fetchers expect:**
+   `python tools/source_contract.py --identity <p>`
+
+   It checks, live, the sources this identity has enabled that carry a
+   contract. Act on each status:
+   - `broken` — the source changed under its fetcher. Repair it first with the
+     `source-doctor` skill (`/source-doctor <source>`), then continue here: a
+     source repaired now is fetched in this same run. The doctor publishes the
+     repair only when a maintainer runs it; otherwise the fix stays local, and
+     that is fine.
+   - `blocked` — the source refuses anonymous requests. Never work around it
+     (CLAUDE.md §5); tell the person in the final summary and carry on.
+   - `unreachable` — today's network; carry on.
+
+4. `python tools/pipeline.py --identity <p> --skip-contracts` — collection,
+   scoring, report. (Without `--skip-contracts` the pipeline checks the
+   contracts itself; it is skipped only because step 3 just did.)
+5. **Work through `docs/VACANCY_CHECKLIST.md` for every candidate at long_shot
    and above — this is a mandatory step, not a recommendation.** Read the full
    `description_text` from the base, not only the score breakdown:
    `python tools/kb.py --identity <p> dump --min-class long_shot`.
-5. **Close out the reputation of the shortlist companies — also mandatory.**
+6. **Close out the reputation of the shortlist companies — also mandatory.**
 
    ```
    python tools/reputation.py worklist --identity <p>
@@ -54,11 +70,11 @@ the skeleton, plus the parts most often skipped.
    The list has to end up empty. To check:
    `python tools/reputation.py coverage --identity <p>` → "NOT CHECKED: 0".
 
-6. The report is `reports/<p>_latest.md`. The "Company reputation checks"
-   section must have nothing unchecked left in it — if it does, step 5 is not
+7. The report is `reports/<p>_latest.md`. The "Company reputation checks"
+   section must have nothing unchecked left in it — if it does, step 6 is not
    finished.
 
-## Why step 4 cannot be skipped
+## Why step 5 cannot be skipped
 
 Keyword scoring finds only what somebody put on a list in advance, and the
 wordings in job postings are endlessly varied. Every run of the checklist so far
@@ -89,7 +105,9 @@ Nobody is there to answer, so:
   summary that the template moved ahead and what changed, and leave the update
   to the person.
 - **Do not commit.** Edit code, criteria and tests as usual and run pytest;
-  the person reviews the changes.
+  the person reviews the changes. The one exception is a source repair:
+  `tools/source_doctor.py publish` decides by itself whether to commit (only
+  for a maintainer) — leave that decision to it.
 - The app shows your text as a live log, so say briefly what each step is
   doing as you go.
 

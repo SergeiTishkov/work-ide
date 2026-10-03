@@ -1,0 +1,22 @@
+# =============================================================================
+#  MAINTAINERS — who publishes automatic fixes
+# =============================================================================
+#  /source-doctor repairs a fetcher when its source changed under it. Whether
+#  the repair is then committed and pushed depends on WHO is running it:
+#
+#    * a maintainer: the fix is committed and pushed, so every copy of the
+#      project gets it;
+#    * anybody else: the fix stays in their working copy. Their collection
+#      works today, and they can offer the change as a pull request.
+#
+#  This is a switch of behaviour, not a security boundary — GitHub decides who
+#  may push. It exists so that an agent running for somebody without push
+#  rights does not stall on a push that was always going to fail.
+#
+#  Matched against `git config user.email`, case-insensitively.
+# =============================================================================
+
+maintainers:
+  - name: Sergei Tishkov
+    emails:
+      - tishkovsergei92@gmail.com

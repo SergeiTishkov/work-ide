@@ -14,8 +14,11 @@ const KINDS = {
 };
 
 // What a run from the app may do without asking: run the project's Python
-// and tests, read and edit files, search the web. Committing is deliberately
-// not on the list — changes wait for the person to review them.
+// and tests, read and edit files, search the web, use the project's skills
+// (source-doctor repairs a source that changed under its fetcher). Committing
+// is deliberately not on the list — changes wait for the person to review
+// them. The one exception is not a tool: tools/source_doctor.py publishes a
+// source repair itself, and only when a maintainer runs it.
 const ALLOWED_TOOLS = [
   'Bash(python:*)',
   'Bash(.venv/Scripts/python.exe:*)',
@@ -26,6 +29,7 @@ const ALLOWED_TOOLS = [
   'Bash(git log:*)',
   'Read', 'Edit', 'Write', 'Glob', 'Grep',
   'WebSearch', 'WebFetch',
+  'Skill',
 ];
 
 // The same rule as identity.PREFIX_RE. The identity goes into a prompt, so

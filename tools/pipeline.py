@@ -325,7 +325,34 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
     return str(written.get("") or next(iter(written.values())))
 
 
-def run_pipeline(include_manual_placeholder_note: bool = True) -> dict:
+def check_source_contracts(names: list) -> dict:
+    """The live contract of every source about to be fetched that has one.
+
+    A source can change under its fetcher without breaking it — a shorter page,
+    a filter that stopped filtering — and then the only symptom is a thinner
+    shortlist. Checked before the fetch, so the log says which source to
+    repair (/source-doctor <source>) instead of leaving it to be guessed from
+    the numbers. A broken source is still fetched: part of a harvest is better
+    than none, and the fetcher's own defences keep rubbish out.
+    """
+    import source_contract
+
+    results = {}
+    with progress.stage("check source contracts") as st:
+        for name in names:
+            if source_contract.contract_of(name) is None:
+                continue
+            result = source_contract.check_source(name)
+            results[name] = result
+            progress.log(f"   {'ok' if result['status'] == 'ok' else '!!'} {name}: "
+                         f"{result['status']}"
+                         + (f" - {result['detail'][:200]}" if result.get("detail") else ""))
+        st.note = ", ".join(f"{n} {r['status']}" for n, r in results.items()) or "none to check"
+    return results
+
+
+def run_pipeline(include_manual_placeholder_note: bool = True,
+                 check_contracts: bool = False) -> dict:
     common.ensure_dirs()
     sources_cfg = load_sources_config()
     criteria = score.load_criteria()
@@ -342,6 +369,8 @@ def run_pipeline(include_manual_placeholder_note: bool = True) -> dict:
     enabled = [s for s in sources_cfg
                if s.get("enabled", True) and s.get("kind") != "manual_ingest"
                and FETCHERS.get(s.get("name")) is not None]
+    contracts = (check_source_contracts([s.get("name") for s in enabled])
+                 if check_contracts else {})
     progress.log(f">> fetch {len(enabled)} sources: "
                  + ", ".join(s.get("name") for s in enabled))
     fetch_started = time.monotonic()
@@ -377,6 +406,9 @@ def run_pipeline(include_manual_placeholder_note: bool = True) -> dict:
         src_state["last_attempt_at"] = kb.now_iso()
         if not fetch_failed:
             src_state["last_success"] = kb.now_iso()
+        if name in contracts:
+            src_state["contract"] = {key: contracts[name].get(key)
+                                     for key in ("status", "detail", "checked_at")}
 
         for rec in normalized:
             computed = score.score_vacancy(rec, criteria, profile)
@@ -412,6 +444,7 @@ def run_pipeline(include_manual_placeholder_note: bool = True) -> dict:
         "updated_vacancies": updated_count,
         "total_in_kb": len(vacancies),
         "report_path": report_path,
+        "source_contracts": {name: r["status"] for name, r in contracts.items()},
     }
 
 
@@ -420,6 +453,9 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="The full Work IDE research cycle")
     identity_mod.add_identity_arg(parser)
+    parser.add_argument("--skip-contracts", action="store_true",
+                        help="do not check the sources' live contracts before fetching "
+                             "(when they were just checked with tools/source_contract.py)")
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
 
@@ -433,7 +469,7 @@ def main() -> None:
         # Marks the run as going in the database (the app's indicator), and
         # refuses to start while another run of this identity is alive.
         with runstate.PipelineRun(log_path=log_path):
-            result = run_pipeline()
+            result = run_pipeline(check_contracts=not args.skip_contracts)
     except runstate.AlreadyRunningError as exc:
         progress.log(f"!! not started: {exc}")
         progress.close_log()
@@ -444,6 +480,17 @@ def main() -> None:
     print("Pipeline finished:")
     for k, v in result.items():
         print(f"  {k}: {v}")
+    # Same idea as the feedback reminder below: what needs a repair is said in
+    # the output, with the command that repairs it.
+    statuses = result.get("source_contracts") or {}
+    broken = [n for n, status in statuses.items() if status == "broken"]
+    blocked = [n for n, status in statuses.items() if status == "blocked"]
+    if broken:
+        print(f"  sources answering differently than their fetchers expect: {', '.join(broken)}"
+              f" — repair with /source-doctor <source>")
+    if blocked:
+        print(f"  sources now refusing anonymous requests: {', '.join(blocked)}"
+              f" — not to be worked around (CLAUDE.md §5); tell the owner")
     # A reminder that lives in the output rather than in somebody's memory:
     # feedback left in the app is a bug report against the filter.
     import feedback

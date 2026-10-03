@@ -121,3 +121,29 @@ def _no_test_writes_into_real_folders():
         + (f". Cleared automatically: {cleaned}." if cleaned else ".")
         + " Isolate both DATA_ROOT and REPORTS_ROOT — see tests/test_identity_isolation.py"
     )
+
+
+# ---------------------------------------------------------------------------
+# Live tests: the ones that talk to real sources.
+#
+# Skipped by default — an ordinary test run must not depend on the network or
+# put load on somebody else's server. `pytest --live` (or WORK_IDE_LIVE_TESTS=1)
+# runs them; that is how a source contract is checked from the test suite.
+# ---------------------------------------------------------------------------
+
+def pytest_addoption(parser):
+    parser.addoption("--live", action="store_true",
+                     help="also run the tests that talk to real sources")
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "live: talks to a real source; runs only with --live")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--live") or os.environ.get("WORK_IDE_LIVE_TESTS") == "1":
+        return
+    skip = pytest.mark.skip(reason="talks to a real source: run with --live")
+    for item in items:
+        if "live" in item.keywords:
+            item.add_marker(skip)

@@ -147,8 +147,11 @@ An earlier version of this document asserted that LinkedIn was unreachable. That
 was true of the main site and of the official API (closed behind a partner
 programme since 2015, and it does not serve job search at all), but nobody had
 checked the guest endpoint
-`jobs-guest/jobs/api/seeMoreJobPostings/search`. It answers 200, returns 30
-cards per page and supports pagination.
+`jobs-guest/jobs/api/seeMoreJobPostings/search`. It answers 200, returns ten
+cards per page and supports pagination. What the fetcher depends on, the live
+contract that checks it, and the history of changes are in
+[sources/linkedin.md](sources/linkedin.md); the contract/test/doctor scheme
+for every source is in [sources/README.md](sources/README.md).
 
 Geographically it is the project's main source: one fetcher covers Israel, the
 UAE, Saudi Arabia, Singapore, Switzerland, Germany and the Netherlands — markets
