@@ -119,6 +119,8 @@ class Progress:
         self.label = label
         self.every = PROGRESS_EVERY if every is None else every
         self.done = 0
+        # Set by the loop to say what it has found so far; shown after the count.
+        self.note = ""
         self.started = time.monotonic()
         self.last_report = self.started
         self.done_at_last_report = 0
@@ -144,4 +146,4 @@ class Progress:
         left = (self.total - self.done) / rate if rate else 0
         share = 100 * self.done // self.total if self.total else 100
         log(f"   {self.label}: {number(self.done)}/{number(self.total)} ({share}%), "
-            f"~{duration(left)} left")
+            f"~{duration(left)} left" + (f" - {self.note}" if self.note else ""))

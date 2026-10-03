@@ -48,8 +48,16 @@ sources:
       keywords: ["part time .NET developer", "freelance C# developer",
                  "part-time software engineer", "contract .NET developer",
                  "fractional software engineer"]
-      max_pages: 2
-      enrich_limit: 150
+      # Every page of every (word x country) pair, postings of the last week
+      # (measured 2026-10-03: ten cards a page and at most 100 per query to an
+      # anonymous request; a query that reaches that ceiling is split by the
+      # fetcher into "remote ..." and regional queries). A full walk takes an
+      # hour or more, and it reports its progress in the run log.
+      posted_within_days: 7
+      # Descriptions are read after scoring (tools/enrich_descriptions.py),
+      # only for vacancies whose verdict depends on the text. Reading here
+      # took the first N cards by title, before anything was known about them.
+      enrich_limit: 0
 
   # --- Broad remote boards: hours come from the text -------------------------
 

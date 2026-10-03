@@ -57,8 +57,8 @@ sources:
     enabled: true
     params:
       # Each word is multiplied by each country from the market tiers, so the
-      # list is deliberately short: 3 words x 26 countries x up to 4 pages is
-      # already hundreds of requests. Start from the core of the stack.
+      # list is deliberately short: 6 words x 28 countries is 168 queries
+      # before any is split. Start from the core of the stack.
       # The basis is the stack: it finds what the person can actually do.
       # Plus a few queries along the INTENSITY AXIS: measured 2026-08-05, calm
       # part-time work barely turns up if you search by stack alone and filter
@@ -68,11 +68,16 @@ sources:
       keywords: [".NET developer", "C# developer", "ASP.NET",
                  "part-time .NET developer", "contract C# developer",
                  "fractional software engineer"]
-      max_pages: 2
-      # Fetching descriptions from vacancy pages: a search card has no text,
-      # and without it the stack gate rejects three quarters of what was found.
-      # Each fetch is a separate request, hence the cap.
-      enrich_limit: 150
+      # Every page of every (word x country) pair, postings of the last week
+      # (measured 2026-10-03: ten cards a page and at most 100 per query to an
+      # anonymous request; a query that reaches that ceiling is split by the
+      # fetcher into "remote ..." and regional queries). A full walk takes an
+      # hour or more, and it reports its progress in the run log.
+      posted_within_days: 7
+      # Descriptions are read after scoring (tools/enrich_descriptions.py),
+      # only for vacancies whose verdict depends on the text. Reading here
+      # took the first N cards by title, before anything was known about them.
+      enrich_limit: 0
     # Locations are not set: they come from profile.target_markets (the market
     # tiers). That way the country list lives in one place and does not drift.
 

@@ -133,9 +133,19 @@ sources:
     params_schema:
       keywords: "a list of keywords; each is multiplied by each country"
       locations: "a list of countries; by default the tiers from profile.target_markets"
-      max_pages: "how many pages of 25 cards to take per pair (4 by default)"
+      max_pages: "at most how many pages to read per query (100 by default, past any list the search serves); a query ends sooner when its list does"
+      posted_within_days: "only vacancies posted within N days, LinkedIn's f_TPR (7 by default; 0 for any age)"
+      split_at_ceiling: "split a query that reaches the 100-result ceiling into a \"remote ...\" query and regional ones (true by default)"
+      enrich_limit: "how many vacancy pages to read for a description while fetching (0 in the templates: tools/enrich_descriptions.py reads them after scoring)"
     yield_notes: >
-      Measured 2026-08-04: 30 cards per page, pagination start=0,25,50 works.
+      Measured 2026-10-02: TEN cards per page, the next page at start=10, 20...
+      (an earlier note here said 30 and start=0,25,50 — the fetcher believed
+      it and read one page per pair). f_TPR is honoured; f_WT, f_JT and sortBy
+      are ignored. An anonymous request is served at most 100 results per
+      query (start=100 comes back empty however long the list: 736 UK
+      postings of a week, 100 served); the fetcher splits a query at that
+      ceiling into "remote ..." and regional ones (UK: 100 became 322).
+      The live contract and the history are in docs/sources/linkedin.md.
       It covers Israel, the UAE, Saudi Arabia, Singapore, Switzerland, Germany
       and the Netherlands at once — markets whose own boards are closed
       (Bayt/GulfTalent/Drushim/NodeFlair answer 403/404).

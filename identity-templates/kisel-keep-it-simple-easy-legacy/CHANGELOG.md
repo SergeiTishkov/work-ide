@@ -6,6 +6,30 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V16 — LinkedIn is read to the end of every list, 2026-10-03
+
+**Changed:** `kisel_sources.yaml` → `linkedin`. `max_pages: 2` is gone (the
+fetcher's own bound applies), `posted_within_days: 7` is new, and
+`enrich_limit` went from 150 to 0. If your local file overrides the LinkedIn
+parameters, compare it with this version.
+
+**Why.** The fetcher read ONE page per (word x country) pair. It stepped by an
+assumed 25 cards and stopped when fewer came — and LinkedIn serves ten a page,
+so every pair ended after its first. A POC on 2026-10-02/03 with this
+identity's words and countries:
+
+| | before | every page, last week |
+|---|---|---|
+| unique vacancies | 1 007 | 4 946 |
+| new to the base | 168 | 4 741 |
+| requests / time | ~170 / 6 min | 1 389 / 53 min |
+
+The anonymous search also stops at 100 results per query; a query that
+reaches it is now split into "remote ..." and regional queries (in the UK, one
+query at the ceiling became 322 vacancies). Descriptions are read after
+scoring, by verdict, instead of by title before it. Details:
+`docs/sources/linkedin.md`.
+
 ## V15 — work authorization is read in its sentence, and W-2 is US payroll, 2026-10-01
 
 **Changed:** `kisel_criteria.yaml` → `remote_location_fit`. The citizenship,

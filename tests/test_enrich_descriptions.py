@@ -20,6 +20,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 import enrich_descriptions  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def pauses(monkeypatch):
+    """The pause between two LinkedIn pages is real time; here it is recorded
+    instead of slept, so a test can check it was made."""
+    made = []
+    monkeypatch.setattr(enrich_descriptions.time, "sleep", made.append)
+    return made
+
+
 def _facts(description, workplace_type=None, salary_raw=None, closed=False):
     """What fetch_page_facts returns — one request, four facts."""
     return {"description": description, "workplace_type": workplace_type,
@@ -343,3 +352,31 @@ def test_a_devitjobs_link_of_another_shape_is_not_requested(monkeypatch):
     monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("no request expected"))
     facts = enrich_descriptions._devitjobs_facts("https://devitjobs.com/jobs/some-slug", 10)
     assert facts["description"] == ""
+
+
+def test_linkedin_pages_are_read_with_a_pause_between_them(monkeypatch, pauses):
+    """A full walk of LinkedIn's search leaves a thousand vacancies to read;
+    a reader without a pause would ask for them back to back (2026-10-03)."""
+    import fetch_linkedin
+
+    monkeypatch.setattr(fetch_linkedin, "fetch_page_facts",
+                        lambda url, timeout: _facts("C# and ASP.NET."))
+    vacancies = {k: _vacancy(60, "hot_lead", url=f"https://x/{k}") for k in "abc"}
+    enrich_descriptions.enrich(vacancies)
+    assert pauses == [enrich_descriptions.READ_PAUSE_SECONDS["linkedin"]] * 3
+
+
+def test_a_board_read_once_a_vacancy_gets_no_pause(monkeypatch, pauses):
+    """The pause is for a search walked page by page, not every board."""
+    monkeypatch.setattr(enrich_descriptions, "_json_ld_facts",
+                        lambda url, timeout: _facts("C# and ASP.NET."))
+    vacancies = {"a": _vacancy(60, "hot_lead", source="reed")}
+    assert enrich_descriptions.enrich(vacancies)["fetched"] == 1
+    assert pauses == []
+
+
+def test_the_budgets_cover_a_full_linkedin_walk():
+    """Raised on 2026-10-03 with the LinkedIn walk: the old 120 and 300 left
+    most of five thousand new vacancies scored without their text."""
+    assert enrich_descriptions.DEFAULT_LIMIT >= 300
+    assert enrich_descriptions.WANTED_LIMIT >= 1000

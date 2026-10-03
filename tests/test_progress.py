@@ -28,6 +28,15 @@ def test_progress_reports_counts_and_stays_quiet_at_the_end(capsys):
         "   rescore: 1/4 (25%)", "   rescore: 2/4 (50%)", "   rescore: 3/4 (75%)"]
 
 
+def test_progress_says_what_the_loop_has_found(capsys):
+    """A walk of hours reports its haul, not only its count: pages, vacancies,
+    rate limits — what a person watching the log wants to know."""
+    tick = progress.Progress(3, "linkedin pairs", every=0)
+    tick.note = "4 pages, 37 vacancies"
+    tick()
+    assert capsys.readouterr().err.rstrip().endswith("left - 4 pages, 37 vacancies")
+
+
 def test_progress_is_rate_limited(capsys):
     tick = progress.Progress(1000, "rescore", every=3600)
     for _ in range(999):

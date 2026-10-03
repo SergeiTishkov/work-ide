@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import html as _html
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -66,7 +67,10 @@ HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "remote_unconfirmed",
 # How many descriptions to fetch per run. A bound rather than a target: 251
 # were outstanding on the first run, and clearing them over a few runs is
 # better than one run making 251 requests to somebody else's server.
-DEFAULT_LIMIT = 120
+# Raised from 120 on 2026-10-03: LinkedIn is now walked to the end of every
+# list (five times the vacancies), and its fetcher no longer reads pages by
+# title before scoring — this queue, which reads by verdict, does it instead.
+DEFAULT_LIMIT = 300
 
 # A second queue with a budget of its own: vacancies refused only because
 # nobody had read their stack (score.STACK_UNREAD, `description_wanted`).
@@ -76,7 +80,9 @@ DEFAULT_LIMIT = 120
 # in the first one: its budget is always spent on the shortlist first, so a
 # shared one would never reach them. Newest first — a vacancy a day old is
 # worth more than one from last month.
-WANTED_LIMIT = 300
+# Raised from 300 on 2026-10-03 for the same reason as DEFAULT_LIMIT: the POC
+# of the full LinkedIn walk left 1 985 new vacancies waiting on their stack.
+WANTED_LIMIT = 1000
 
 # Days before an unsuccessful attempt is worth repeating. A page that gave
 # nothing today usually gives nothing tomorrow; a month later it may have
@@ -127,6 +133,11 @@ _DEVITJOBS_URL = r"https://(devitjobs\.(?:com|uk))/jobs/([0-9a-f]{24})$"
 
 # Between two detail requests to devitjobs: hundreds a run go to one server.
 DEVITJOBS_PAUSE_SECONDS = 0.5
+
+# Between two vacancy pages of a source whose reader does not pause itself.
+# LinkedIn's had none: harmless at a hundred pages a run, not at the thousand
+# a full walk of its search brings (2026-10-03). The same pause as its fetcher.
+READ_PAUSE_SECONDS = {"linkedin": 1.5}
 
 
 def _json_ld_facts(url: str, timeout: int) -> dict:
@@ -334,6 +345,8 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT,
                 facts = reader(record["url"], common.DEFAULT_TIMEOUT)
         except Exception:  # noqa: BLE001 — one page must not stop the rest
             stats["errors"] += 1
+        if reader is not None and READ_PAUSE_SECONDS.get(record.get("source")):
+            time.sleep(READ_PAUSE_SECONDS[record["source"]])
         text = facts.get("description") or ""
         record["description_fetch"] = {
             "attempted_at": _now(),
