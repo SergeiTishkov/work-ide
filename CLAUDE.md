@@ -185,35 +185,6 @@ The project is succeeding if:
   LinkedIn or Glassdoor with its own tools (WebSearch/WebFetch), and writing the
   conclusions back into the knowledge base through `tools/kb.py` and
   `tools/ingest_manual.py`.
-- **Parsers, yes. Circumventing protection, no.** The boundary runs here, and it
-  was clarified by a direct question from the user (2026-07-31), so it is
-  recorded explicitly to avoid working it out again:
-  - **Done freely**: parsers of any source that serves its data to an ordinary
-    GET request — JSON API, RSS, HTML. The project already has more than a dozen
-    (`fetch_*.py`, `company_intel.py`, `link_check.py`), including pulling a
-    company's site out of an HTML description with a regex in `fetch_wwr.py`.
-    The presence or absence of terms of service is not decisive in itself: ToS
-    is contract law rather than criminal law, and the case law on public data
-    (hiQ v. LinkedIn, Van Buren, Meta v. Bright Data) leans towards parsing. The
-    user's specific legal circumstances are unknown to the project and are not
-    recorded in it.
-  - **Never done**: circumventing active technical protection that explicitly
-    says "no bots" — faking a browser fingerprint, rotating
-    fingerprints or proxies to get past a block, solving CAPTCHAs, or running a
-    headless browser specifically to fool a bot detector. Measured 2026-07-31:
-    Glassdoor, Trustpilot, Indeed, levels.fyi and Reddit's JSON all answer 403
-    to an ordinary request, and the official Glassdoor API is 410 Gone. Getting
-    in by script would take ONLY impersonation — so we do not go. This is a
-    limit on the agent, independent of the user's jurisdiction.
-  - **What is done instead**: the agent gathers data from closed sites through
-    ordinary web search — search engines index their public pages, which is how
-    the Glassdoor ratings for Proxify, Lemon.io and Mindrift were obtained — and
-    enters it through `kb.py set-company-reputation` or `ingest_manual.py`. It
-    works, it is legitimate, and it is already in the project.
-  - **Politeness by default** (not morality, just ordinary engineering): an
-    honest User-Agent carrying a contact, pauses between requests, caching
-    (`link_check` does not re-check a link more than once in 12 hours,
-    `company_intel` more than once in 30 days), no personal data.
 - **A test fixture leaves no trace in the real folders.** The tests run under a
   frozen fixture, and a test that forgets to isolate its paths writes into the
   real `reports/` and `data/` — the only places a person actually looks. Such
