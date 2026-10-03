@@ -2635,6 +2635,15 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     elif engagement == "unconfirmed" and engagement_policy != "accept":
         dealbreakers.append(ENGAGEMENT_UNCONFIRMED)
 
+    # A board the person cannot apply through, whatever the vacancy says. The
+    # vacancies already in the base go too: turning the board off in
+    # <p>_sources.yaml only stops new ones. Added 2026-10-04 on the owner's
+    # feedback: mycareersfuture.gov.sg wants a Singpass login to apply, and
+    # Singpass is for Singapore residents.
+    closed_source = (criteria.get("closed_sources") or {}).get(vacancy.get("source"))
+    if closed_source:
+        dealbreakers.append(f"source: {closed_source}")
+
     raw_total = (
         rl_points
         + stack_points

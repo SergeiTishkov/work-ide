@@ -93,7 +93,10 @@ sources:
       pages: 5
 
   - name: mycareersfuture
-    enabled: true
+    # Off since 2026-10-04: applying needs a Singpass login, which is for
+    # Singapore residents. Its vacancies are rejected through closed_sources
+    # in kisel_criteria.yaml.
+    enabled: false
     params:
       queries: ["software engineer", "backend developer", ".NET developer"]
 

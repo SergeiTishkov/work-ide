@@ -6,6 +6,18 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V17 — mycareersfuture is closed: applying needs a Singapore ID, 2026-10-04
+
+**Changed:**
+- `kisel_criteria.yaml`: new `closed_sources`, boards the person cannot apply
+  through. Every vacancy from one is rejected with the reason as its
+  dealbreaker, including those already in the base.
+- `kisel_sources.yaml`: `mycareersfuture` is off.
+
+**Why.** The owner's feedback: mycareersfuture.gov.sg wants a Singpass login
+to apply, and Singpass is for Singapore residents. Turning the board off only
+stops new vacancies; 1 175 were already in the base, 14 of them as hot leads.
+
 ## V16 — LinkedIn is read to the end of every list, 2026-10-03
 
 **Changed:** `kisel_sources.yaml` → `linkedin`. `max_pages: 2` is gone (the

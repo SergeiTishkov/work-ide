@@ -2016,3 +2016,12 @@ mobile_role_gate:
     - "mobile application"
     - "native app"
     - "mobile app"
+
+# Boards the person cannot apply through, whatever the vacancy: source name ->
+# the reason, shown as the vacancy's dealbreaker. Every vacancy from such a
+# board is rejected, including those already in the base; turning the board
+# off in the sources file only stops new ones.
+closed_sources:
+  # 2026-10-04, the owner's feedback: applying needs a Singpass login, and
+  # Singpass is for Singapore residents.
+  mycareersfuture: "applying needs a Singpass login (Singapore residents only)"

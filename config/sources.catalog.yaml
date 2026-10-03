@@ -184,7 +184,11 @@ sources:
       queries: "search queries"
       pages: "pages per query, 100 records each"
     yield_notes: "Measured 2026-08-04: 384 records. Singapore's government portal."
-    caveats: "A national portal: remoteness comes from the text rather than a flag."
+    caveats: >
+      A national portal: remoteness comes from the text rather than a flag.
+      Applying needs a Singpass login, and Singpass is for Singapore residents
+      (2026-10-04): useless to anyone applying from abroad. Off in both
+      templates, and their criteria reject its vacancies (closed_sources).
 
   - name: landing_jobs
     kind: json_api

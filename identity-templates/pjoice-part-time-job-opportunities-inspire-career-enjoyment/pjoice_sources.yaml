@@ -103,6 +103,8 @@ sources:
     enabled: false
 
   - name: mycareersfuture
+    # Applying needs a Singpass login, for Singapore residents only
+    # (2026-10-04); closed_sources in pjoice_criteria.yaml rejects its vacancies.
     enabled: false
 
   - name: landing_jobs

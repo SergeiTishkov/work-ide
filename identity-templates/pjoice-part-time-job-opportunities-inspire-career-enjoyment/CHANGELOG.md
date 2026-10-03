@@ -6,6 +6,18 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V8 — mycareersfuture is closed: applying needs a Singapore ID, 2026-10-04
+
+**Changed:**
+- `pjoice_criteria.yaml`: new `closed_sources`, boards the person cannot apply
+  through. Every vacancy from one is rejected with the reason as its
+  dealbreaker, including those already in the base.
+- `pjoice_sources.yaml`: `mycareersfuture` was already off; a comment says why.
+
+**Why.** The owner's feedback: mycareersfuture.gov.sg wants a Singpass login
+to apply, and Singpass is for Singapore residents. Turning the board off only
+stops new vacancies; for this identity the base had none, so the rule only guards against the board being turned back on.
+
 ## V7 — LinkedIn is read to the end of every list, 2026-10-03
 
 **Changed:** `pjoice_sources.yaml` → `linkedin`. `max_pages: 2` is gone (the
