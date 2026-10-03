@@ -40,6 +40,13 @@ function installMockApi(fixture) {
   window.api = {
     async listIdentities() {
       record('listIdentities', []);
+      // holdIdentities: the answer waits for window.__releaseIdentities(), so
+      // a test can see what the window shows before it arrives
+      if (data.holdIdentities) {
+        await new Promise((resolve) => { window.__releaseIdentities = resolve; });
+        data.holdIdentities = false;
+      }
+      if (data.failIdentities) throw new Error('listIdentities failed');
       return data.identities;
     },
     async loadSegments(identity) {

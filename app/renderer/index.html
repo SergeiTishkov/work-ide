@@ -14,7 +14,8 @@
     <div class="language" data-testid="language-picker"></div>
   </header>
   <div class="error" data-testid="error" hidden></div>
-  <main class="panel" data-testid="panel"></main>
+  <!-- A spinner from the first paint: app.js replaces it once it knows more. -->
+  <main class="panel" data-testid="panel"><div class="loading"><span class="spinner"></span></div></main>
   <section class="runlog" data-testid="run-panel" hidden>
     <div class="runlog-head">
       <span class="runlog-title" data-testid="run-status"></span>

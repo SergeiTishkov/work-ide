@@ -99,6 +99,9 @@
 
   const state = {
     identities: [],
+    // false until the first answer of listIdentities: an empty list before it
+    // is "not known yet", not "there are none"
+    booted: false,
     active: null,
     // prefix -> { loaded, selection, segments, activeSegment, pending }
     byIdentity: {},
@@ -261,6 +264,7 @@
 
   async function loadIdentities() {
     state.identities = await api.listIdentities();
+    state.booted = true;
     if (!state.identities.some((i) => i.prefix === state.active)) {
       state.active = state.identities.length ? state.identities[0].prefix : null;
     }
@@ -551,15 +555,24 @@
     }));
   }
 
+  function renderLoading() {
+    return el('div', { class: 'loading', role: 'status', testid: 'loading' },
+      el('span', { class: 'spinner' }), el('span', {}, t('app.loading')));
+  }
+
   function renderPanel() {
     const panel = document.querySelector('[data-testid="panel"]');
+    if (!state.booted) {
+      panel.replaceChildren(renderLoading());
+      return;
+    }
     if (!state.identities.length) {
       panel.replaceChildren(el('p', { class: 'empty', testid: 'no-identities' }, t('app.no_identities')));
       return;
     }
     const info = current();
     if (!info) {
-      panel.replaceChildren(el('p', { class: 'empty' }, t('app.loading')));
+      panel.replaceChildren(renderLoading());
       return;
     }
     const identity = state.identities.find((i) => i.prefix === state.active);
@@ -939,7 +952,12 @@
       state.runStatus = () => t('run.running', { kind: t(RUN_KIND_KEYS[run.kind]), identity: run.identity });
     }
     render();
-    await loadIdentities();
+    try {
+      await loadIdentities();
+    } finally {
+      // a failed first load shows its error, not a spinner that never stops
+      state.booted = true;
+    }
     await pollPipelines();
     render();
     setInterval(() => { pollPipelines(); }, POLL_MS);

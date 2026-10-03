@@ -303,6 +303,43 @@ test('a failing request shows the error over the real screen, not the start one'
   await expect(page.getByTestId('run-collect')).toBeVisible();
 });
 
+test('until the identities arrive the window shows a spinner, not "no identities"', async ({ page }) => {
+  // Reported 2026-10-03: after a reload the start screen ("No identities yet,
+  // see docs/ONBOARDING.md") flashed for a second before the tabs appeared.
+  const fixture = standardFixture();
+  fixture.holdIdentities = true;
+  await page.addInitScript(installMockApi, fixture);
+  await page.goto(PAGE);
+  await expect(page.getByTestId('loading')).toBeVisible();
+  await expect(page.getByTestId('loading')).toContainText(ru['app.loading']);
+  await expect(page.getByTestId('no-identities')).toHaveCount(0);
+  await page.evaluate(() => window.__releaseIdentities());
+  await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
+  await expect(page.getByTestId('loading')).toHaveCount(0);
+  await expect(page.getByTestId('no-identities')).toHaveCount(0);
+});
+
+test('with no identities the start screen comes once the answer says so', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.identities = [];
+  fixture.holdIdentities = true;
+  await page.addInitScript(installMockApi, fixture);
+  await page.goto(PAGE);
+  await expect(page.getByTestId('loading')).toBeVisible();
+  await page.evaluate(() => window.__releaseIdentities());
+  await expect(page.getByTestId('no-identities')).toBeVisible();
+  await expect(page.getByTestId('loading')).toHaveCount(0);
+});
+
+test('a failed first load shows its error, not a spinner that never stops', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.failIdentities = true;
+  await page.addInitScript(installMockApi, fixture);
+  await page.goto(PAGE);
+  await expect(page.getByTestId('error')).toContainText('listIdentities failed');
+  await expect(page.getByTestId('loading')).toHaveCount(0);
+});
+
 test('"Refresh" leaves the reload to the app when the app restarts itself', async ({ page }) => {
   const fixture = standardFixture();
   fixture.refreshReply = 'relaunch';

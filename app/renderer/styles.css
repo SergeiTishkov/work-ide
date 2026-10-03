@@ -52,6 +52,14 @@ button.collecting { display: inline-flex; align-items: center; gap: 8px; opacity
   animation: spin .9s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.loading {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 64px 0; color: var(--muted);
+}
+.loading .spinner {
+  width: 18px; height: 18px;
+  border-color: var(--accent-soft); border-top-color: var(--accent);
+}
 .tab-dot {
   display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%;
   background: var(--accent); vertical-align: middle; animation: pulse 1.4s ease-in-out infinite;
