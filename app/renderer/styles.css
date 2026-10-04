@@ -103,6 +103,7 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 
 .filters { margin: 0 0 12px; display: flex; gap: 8px; align-items: center; }
 .filters label { color: var(--muted); }
+.source-filter { display: inline-flex; gap: 8px; align-items: center; margin-left: 16px; }
 .filters select {
   font: inherit; color: var(--text); background: var(--surface);
   border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; min-width: 280px;

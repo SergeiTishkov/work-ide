@@ -541,6 +541,8 @@ def vacancy_view(v: dict) -> dict:
         # the vacancy up at the source, and when it first entered our base.
         "posted_on": calendar_date(v.get("posted_at")),
         "first_seen_on": calendar_date(v.get("first_seen")),
+        # The board it came from: the app's "Source" filter reads it here.
+        "source": v.get("source"),
     }
 
 

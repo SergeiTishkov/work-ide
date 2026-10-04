@@ -49,7 +49,7 @@ function createDatabase(file, { vacancies, selections, segments, displayName = '
     'remote_unconfirmed', 'engagement_unconfirmed'];
   const insertVacancy = db.prepare('INSERT INTO vacancies (id, data, view) VALUES (?, ?, ?)');
   for (const v of vacancies) {
-    insertVacancy.run(v.id, JSON.stringify({ id: v.id, title: `data ${v.id}` }),
+    insertVacancy.run(v.id, JSON.stringify({ id: v.id, title: `data ${v.id}`, source: v.source || 'linkedin' }),
       JSON.stringify(view(v.id, { score: v.score, classification: v.class })));
   }
   for (const [index, selection] of selections.entries()) {
@@ -78,7 +78,8 @@ function tempDir(prefix = 'work-ide-app-') {
 }
 
 // A standard two-run fixture: 20 hot leads seen in run 1, plus fresh ones in
-// run 2 (hot and worth_a_look), split over two markets.
+// run 2 (hot and worth_a_look), split over two markets. The old ones came from
+// linkedin, the new ones from devitjobs.
 function standardDatabase(file) {
   const vacancies = [];
   for (let i = 0; i < 20; i += 1) {
@@ -86,7 +87,8 @@ function standardDatabase(file) {
       segments: ['full', i % 2 ? 'uk' : 'worldwide'] });
   }
   for (let i = 0; i < 3; i += 1) {
-    vacancies.push({ id: `new${i}`, score: 40 - i, class: 'worth_a_look', segments: ['full', 'uk'] });
+    vacancies.push({ id: `new${i}`, score: 40 - i, class: 'worth_a_look', segments: ['full', 'uk'],
+      source: 'devitjobs' });
   }
   const old = vacancies.filter((v) => v.id.startsWith('old')).map((v) => v.id);
   return createDatabase(file, {

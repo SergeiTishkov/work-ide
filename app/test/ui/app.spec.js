@@ -380,3 +380,55 @@ test('"Vacancy expired" is recorded at once, with no reason, and has its own fil
   await byId(page, 'a1').getByTestId('btn-undo').click();
   expect((await calls(page, 'stepBack')).at(-1)).toEqual(['kisel', 'a1']);
 });
+
+// --- the source filter (the owner, 2026-10-04) --------------------------------
+
+test('"Source" lists the boards of the current filter, each with its count', async ({ page }) => {
+  await open(page);
+  await expect(page.getByTestId('source-label')).toHaveText(ru['filter.source_legend']);
+  await expect(page.getByTestId('source-filter')).toHaveValue('');
+  await expect(page.getByTestId('source-option-all')).toHaveText(`${ru['filter.source_all']} (3)`);
+  await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin (2)');
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs (1)');
+  expect(await calls(page, 'listSources')).toContainEqual(['kisel', 'full', 'fresh_new']);
+});
+
+test('choosing a source lists only its vacancies, and the filter counts follow it', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('source-filter').selectOption('devitjobs');
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(1);
+  await expect(byId(page, 'b1')).toBeVisible();
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'fresh_new', [], 'devitjobs']);
+  expect((await calls(page, 'listingCounts')).at(-1)).toEqual(['kisel', 'full', 'devitjobs']);
+  await expect(page.getByTestId('filter-option-bugged')).toContainText('(1)');
+  await expect(page.getByTestId('filter-option-all')).toContainText('(2)');
+});
+
+test('the status filter and the source apply together', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('source-filter').selectOption('linkedin');
+  await page.getByTestId('filter').selectOption('bugged');
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'bugged', [], 'linkedin']);
+  // the chosen board stays on the list with nothing in it; the others follow the filter
+  await expect(page.getByTestId('source-filter')).toHaveValue('linkedin');
+  await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin (0)');
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs (1)');
+  await page.getByTestId('source-filter').selectOption('devitjobs');
+  await expect(byId(page, 'x1')).toBeVisible();
+  await page.getByTestId('source-filter').selectOption('');
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'bugged']);
+});
+
+test('each market keeps its own source, and a refresh brings it back', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('source-filter').selectOption('devitjobs');
+  await page.getByTestId('segment-tab-uk').click();
+  await expect(page.getByTestId('source-filter')).toHaveValue('');
+  await page.getByTestId('segment-tab-full').click();
+  await expect(page.getByTestId('source-filter')).toHaveValue('devitjobs');
+  await page.getByTestId('refresh').click();
+  await expect(page.getByTestId('source-filter')).toHaveValue('devitjobs');
+  await expect(byId(page, 'b1')).toBeVisible();
+  await expect(byId(page, 'a1')).toHaveCount(0);
+});

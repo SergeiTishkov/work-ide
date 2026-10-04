@@ -107,6 +107,11 @@
     byIdentity: {},
     // "identity/segment" -> filter; every market remembers its own choice
     filters: {},
+    // "identity/segment" -> source ('' or missing: every board), applied
+    // together with the filter above
+    sourceFilters: {},
+    // [{ source, total }]: the boards the current filter holds in this market
+    sources: [],
     listing: [],
     counts: {},
     // vacancy id -> { class, index, status }: rows marked out of the current
@@ -141,7 +146,7 @@
     }
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(
-        { active: state.active, segments, filters: state.filters }));
+        { active: state.active, segments, filters: state.filters, sources: state.sourceFilters }));
     } catch {
       // storage unavailable: a refresh starts from the defaults
     }
@@ -153,6 +158,7 @@
       if (saved) {
         state.active = saved.active || null;
         state.filters = saved.filters || {};
+        state.sourceFilters = saved.sources || {};
         state.restored = saved;
       }
     } catch {
@@ -236,6 +242,12 @@
     return state.filters[filterKey(state.active, info.activeSegment)] || DEFAULT_FILTER;
   }
 
+  function currentSource() {
+    const info = current();
+    if (!info || !info.activeSegment) return '';
+    return state.sourceFilters[filterKey(state.active, info.activeSegment)] || '';
+  }
+
   function showError(error) {
     const box = document.querySelector('[data-testid="error"]');
     if (!error) {
@@ -299,21 +311,31 @@
     if (!info || !info.activeSegment) {
       state.listing = [];
       state.counts = {};
+      state.sources = [];
       render();
       return;
     }
     const expanded = [...state.expanded];
-    const [listing, counts, totals, pending] = await Promise.all([
-      expanded.length
-        ? api.loadListing(state.active, info.activeSegment, currentFilter(), expanded)
-        : api.loadListing(state.active, info.activeSegment, currentFilter()),
-      api.listingCounts(state.active, info.activeSegment),
-      api.classTotals(state.active, info.activeSegment, currentFilter()),
+    const segment = info.activeSegment;
+    const filter = currentFilter();
+    // The source travels only when one is chosen: without it every call is
+    // what it was before the source filter existed.
+    const source = currentSource();
+    const listingArgs = [state.active, segment, filter];
+    if (expanded.length || source) listingArgs.push(expanded);
+    if (source) listingArgs.push(source);
+    const [listing, counts, totals, pending, sources] = await Promise.all([
+      api.loadListing(...listingArgs),
+      source ? api.listingCounts(state.active, segment, source) : api.listingCounts(state.active, segment),
+      source ? api.classTotals(state.active, segment, filter, source)
+        : api.classTotals(state.active, segment, filter),
       api.pendingFeedbackCount(state.active),
+      api.listSources(state.active, segment, filter),
     ]);
     state.listing = listing;
     state.counts = counts;
     state.classTotals = totals;
+    state.sources = sources;
     info.pending = pending;
     render();
   }
@@ -365,6 +387,16 @@
     return guarded(async () => {
       resetView();
       state.filters[filterKey(state.active, info.activeSegment)] = name;
+      await loadList();
+    });
+  }
+
+  function selectSource(source) {
+    const info = current();
+    if (!info || !info.activeSegment) return;
+    return guarded(async () => {
+      resetView();
+      state.sourceFilters[filterKey(state.active, info.activeSegment)] = source;
       await loadList();
     });
   }
@@ -651,7 +683,27 @@
         id: 'filter-select', testid: 'filter',
         onchange: (event) => selectFilter(event.target.value),
       }, FILTER_GROUPS.map((group) => el('optgroup', { label: t(group.key) },
-        group.filters.map(option)))));
+        group.filters.map(option)))),
+      renderSourceFilter());
+  }
+
+  // The boards the current filter holds, each with how many; the chosen one
+  // stays on the list even when the filter leaves nothing from it.
+  function renderSourceFilter() {
+    const active = currentSource();
+    const sources = [...state.sources];
+    if (active && !sources.some((s) => s.source === active)) sources.push({ source: active, total: 0 });
+    const all = state.sources.reduce((sum, s) => sum + s.total, 0);
+    const option = (value, label, n) => el('option', {
+      value, testid: `source-option-${value || 'all'}`, selected: value === active,
+    }, `${label} ${t('filter.count', { n })}`);
+    return el('span', { class: 'source-filter' },
+      el('label', { for: 'source-select', testid: 'source-label' }, t('filter.source_legend')),
+      el('select', {
+        id: 'source-select', testid: 'source-filter',
+        onchange: (event) => selectSource(event.target.value),
+      }, option('', t('filter.source_all'), all),
+      sources.filter((s) => s.source).map((s) => option(s.source, s.source, s.total))));
   }
 
   function renderList() {

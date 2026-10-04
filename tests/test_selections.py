@@ -356,3 +356,68 @@ def test_refresh_views_renders_shown_rows_again_without_a_selection(isolated_dat
     with db.session() as conn:
         assert conn.execute("SELECT COUNT(*) FROM selections").fetchone()[0] == 1
         assert conn.execute("SELECT view FROM vacancies WHERE id = 'b'").fetchone()[0] is None
+
+
+# --- the source filter -------------------------------------------------------
+# The owner, 2026-10-04: a "Source" drop-down next to "Show", the two applied
+# together.
+
+def _by_source():
+    vacancies = {}
+    for i in range(6):
+        vacancies[f"l{i}"] = _vacancy(f"l{i}", score=90 - i, source="linkedin")
+    for i in range(3):
+        vacancies[f"d{i}"] = _vacancy(f"d{i}", score=50 - i, source="devitjobs",
+                                      classification="worth_a_look")
+    return vacancies
+
+
+def test_the_source_narrows_the_listing_and_works_with_the_status_filter(isolated_data_dir):
+    sel = _store(_by_source())
+    _set_feedback("l0", "rejected", selection_id=sel)
+    _set_feedback("d0", "rejected", selection_id=sel)
+    with db.session() as conn:
+        def ids(name, source):
+            return set(_ids(selections.listing(conn, sel, "full", name, source=source)))
+        assert ids("fresh_new", "devitjobs") == {"d1", "d2"}
+        assert ids("rejected", "linkedin") == {"l0"}
+        assert ids("rejected", "devitjobs") == {"d0"}
+        assert ids("all", "") == set(_by_source())
+        assert ids("all", "nowhere") == set()
+
+
+def test_counts_and_totals_follow_the_source(isolated_data_dir):
+    sel = _store(_by_source())
+    _set_feedback("l0", "applied", selection_id=sel)
+    with db.session() as conn:
+        for source in ("", "linkedin", "devitjobs"):
+            counts = selections.listing_counts(conn, sel, "full", source)
+            for name in selections.FILTERS:
+                rows = selections.listing(conn, sel, "full", name,
+                                          expanded=_all_classes(), source=source)
+                totals = selections.class_totals(conn, sel, "full", name, source)
+                assert counts[name] == len(rows) == sum(totals.values()), (source, name)
+        assert selections.listing_counts(conn, sel, "full", "devitjobs")["applied"] == 0
+        assert selections.listing_counts(conn, sel, "full", "linkedin")["applied"] == 1
+
+
+def test_the_source_list_counts_under_the_status_filter(isolated_data_dir):
+    sel = _store(_by_source())
+    _set_feedback("d0", "rejected", selection_id=sel)
+    _set_feedback("l0", "applied", selection_id=sel)
+    with db.session() as conn:
+        assert selections.listing_sources(conn, sel, "full", "all") == {"linkedin": 6, "devitjobs": 3}
+        assert list(selections.listing_sources(conn, sel, "full", "all")) == ["linkedin", "devitjobs"]
+        assert selections.listing_sources(conn, sel, "full", "fresh_new") == {"linkedin": 5, "devitjobs": 2}
+        assert selections.listing_sources(conn, sel, "full", "rejected") == {"devitjobs": 1}
+        assert selections.listing_sources(conn, sel, "full", "applied") == {"linkedin": 1}
+
+
+def test_a_view_written_before_it_carried_the_source_is_still_filtered(isolated_data_dir):
+    """Views recorded before 2026-10-04 have no "source": the record's is read."""
+    sel = _store(_by_source())
+    with db.session() as conn:
+        conn.execute("UPDATE vacancies SET view = json_remove(view, '$.source')")
+    with db.session() as conn:
+        assert set(_ids(selections.listing(conn, sel, "full", "all", source="devitjobs"))) == {"d0", "d1", "d2"}
+        assert selections.listing_sources(conn, sel, "full", "all") == {"linkedin": 6, "devitjobs": 3}

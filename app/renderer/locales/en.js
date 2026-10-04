@@ -41,6 +41,8 @@
   'run.log_title': 'Run log',
 
   'filter.legend': 'Show',
+  'filter.source_legend': 'Source',
+  'filter.source_all': 'All sources',
   'filter.group.selection': 'The selection',
   'filter.group.answers': 'My answers',
   'filter.group.applications': 'Applications',

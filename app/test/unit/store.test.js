@@ -299,3 +299,32 @@ test('an offer and the first day are written to their own columns', () => {
   assert.equal(row.started_comment, '');
   assert.ok(row.offered_at && row.started_at);
 });
+
+// The owner, 2026-10-04: a "Source" drop-down next to the filter, both applied
+// at once.
+test('the source narrows the listing, the counts and the class totals', () => {
+  const { store } = setup();
+  assert.deepEqual(store.listing('test', 'full', 'all', [], 'devitjobs').map((r) => r.id),
+    ['new0', 'new1', 'new2']);
+  assert.equal(store.listing('test', 'full', 'all', [], 'linkedin').length, 15, 'still capped per class');
+  assert.equal(store.counts('test', 'full', 'linkedin').all, 20);
+  assert.equal(store.counts('test', 'full', 'devitjobs').fresh_new, 3);
+  assert.equal(store.counts('test', 'full', 'linkedin').fresh_new, 0);
+  assert.deepEqual(store.classTotals('test', 'full', 'all', 'devitjobs'), { worth_a_look: 3 });
+  assert.equal(store.counts('test', 'full').all, 23, 'no source: every board');
+  store.closeAll();
+});
+
+test('the source list counts each board under the status filter', () => {
+  const { store } = setup();
+  assert.deepEqual(store.sources('test', 'full', 'all'),
+    [{ source: 'linkedin', total: 20 }, { source: 'devitjobs', total: 3 }]);
+  assert.deepEqual(store.sources('test', 'full', 'fresh_new'), [{ source: 'devitjobs', total: 3 }]);
+  store.setFeedback('test', 'old00', 'applied');
+  assert.deepEqual(store.sources('test', 'full', 'applied'), [{ source: 'linkedin', total: 1 }]);
+  assert.deepEqual(store.listing('test', 'full', 'applied', [], 'devitjobs'), []);
+  assert.equal(store.counts('test', 'full', 'linkedin').applied, 1);
+  assert.equal(store.counts('test', 'full', 'devitjobs').applied, 0);
+  assert.deepEqual(store.sources('other', 'full', 'all'), []);
+  store.closeAll();
+});

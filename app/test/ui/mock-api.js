@@ -33,8 +33,9 @@ function installMockApi(fixture) {
     }
   }
 
-  function rowsOf(identity, segment) {
-    return ((data.rows[identity] || {})[segment]) || [];
+  function rowsOf(identity, segment, source) {
+    const rows = ((data.rows[identity] || {})[segment]) || [];
+    return source ? rows.filter((row) => row.view.source === source) : rows;
   }
 
   window.api = {
@@ -53,34 +54,46 @@ function installMockApi(fixture) {
       record('loadSegments', [identity]);
       return data.segments[identity] || { selection: null, displayName: null, segments: [] };
     },
-    async loadListing(identity, segment, filter, expanded) {
-      record('loadListing', expanded ? [identity, segment, filter, expanded] : [identity, segment, filter]);
+    async loadListing(identity, segment, filter, expanded, source) {
+      const args = [identity, segment, filter];
+      if (expanded) args.push(expanded);
+      if (source) args.push(source);
+      record('loadListing', args);
       const limit = data.limit || 1000;
       const seen = {};
-      return rowsOf(identity, segment).filter((row) => matches(row, filter)).filter((row) => {
+      return rowsOf(identity, segment, source).filter((row) => matches(row, filter)).filter((row) => {
         if (row.feedback.status !== 'new' || (expanded || []).includes(row.class)) return true;
         seen[row.class] = (seen[row.class] || 0) + 1;
         return seen[row.class] <= limit;
       });
     },
-    async classTotals(identity, segment, filter) {
-      record('classTotals', [identity, segment, filter]);
+    async classTotals(identity, segment, filter, source) {
+      record('classTotals', source ? [identity, segment, filter, source] : [identity, segment, filter]);
       if (data.failClassTotals) throw new Error("No handler registered for 'class-totals'");
       const totals = {};
-      for (const row of rowsOf(identity, segment).filter((r) => matches(r, filter))) {
+      for (const row of rowsOf(identity, segment, source).filter((r) => matches(r, filter))) {
         totals[row.class] = (totals[row.class] || 0) + 1;
       }
       return totals;
     },
-    async listingCounts(identity, segment) {
-      record('listingCounts', [identity, segment]);
+    async listingCounts(identity, segment, source) {
+      record('listingCounts', source ? [identity, segment, source] : [identity, segment]);
       const counts = {};
       for (const f of ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired',
         'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered', 'started',
         'declined']) {
-        counts[f] = rowsOf(identity, segment).filter((row) => matches(row, f)).length;
+        counts[f] = rowsOf(identity, segment, source).filter((row) => matches(row, f)).length;
       }
       return counts;
+    },
+    async listSources(identity, segment, filter) {
+      record('listSources', [identity, segment, filter]);
+      const totals = new Map();
+      for (const row of rowsOf(identity, segment).filter((r) => matches(r, filter))) {
+        totals.set(row.view.source, (totals.get(row.view.source) || 0) + 1);
+      }
+      return [...totals].map(([source, total]) => ({ source, total }))
+        .sort((a, b) => b.total - a.total || a.source.localeCompare(b.source));
     },
     async setFeedback(identity, id, status, reason) {
       record('setFeedback', [identity, id, status, reason]);
@@ -156,7 +169,7 @@ function installMockApi(fixture) {
   };
 }
 
-function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new' } = {}) {
+function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new', source = 'linkedin' } = {}) {
   return {
     id,
     class: cls,
@@ -172,6 +185,7 @@ function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new' } 
       hiring_country: 'United Kingdom', company_age: null, note: null,
       posted_on: id === 'a2r' ? null : '2026-09-20', first_seen_on: '2026-09-28',
       needs_manual_review: id.endsWith('r'),
+      source,
     },
     feedback: { status, at: null, rejectedReason: null, buggedReason: null, interviewComments: [], interviewAt: [] },
   };
@@ -182,8 +196,8 @@ function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new' } 
 function standardFixture() {
   const full = [
     row('a1', { score: 80 }), row('a2r', { score: 70 }), row('a3', { score: 50, fresh: false }),
-    row('b1', { cls: 'worth_a_look', score: 45 }),
-    row('x1', { score: 40, status: 'bugged' }),
+    row('b1', { cls: 'worth_a_look', score: 45, source: 'devitjobs' }),
+    row('x1', { score: 40, status: 'bugged', source: 'devitjobs' }),
   ];
   const selection = { id: 7, run: 55, created_at: '2026-09-29T10:00:00+00:00', kind: 'run' };
   return {

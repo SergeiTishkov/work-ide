@@ -192,45 +192,60 @@ def _check_filter(filter_name: str) -> None:
 
 
 def listing(conn, selection_id: int, segment: str, filter_name: str,
-            expanded=()) -> list:
+            expanded=(), source: str = "") -> list:
     """The rows of one market under one filter: the top of each class, and
     every row of the classes named in `expanded`. Funnel filters list every
-    application, uncapped."""
+    application, uncapped. `source` narrows it to one board ("" for all)."""
     _check_filter(filter_name)
     conn.row_factory = _dict_row
     try:
         if filter_name in FUNNEL:
             return conn.execute(load_queries()["funnel_listing"],
-                                {"filter": filter_name}).fetchall()
+                                {"filter": filter_name, "source": source}).fetchall()
         return conn.execute(load_queries()["listing"], {
             "selection_id": selection_id, "segment": segment, "filter": filter_name,
-            "expanded": "," + ",".join(expanded) + ",",
+            "expanded": "," + ",".join(expanded) + ",", "source": source,
         }).fetchall()
     finally:
         conn.row_factory = None
 
 
-def class_totals(conn, selection_id: int, segment: str, filter_name: str) -> dict:
+def class_totals(conn, selection_id: int, segment: str, filter_name: str,
+                 source: str = "") -> dict:
     """{class: how many the filter holds} — for "N more" under a capped class."""
     _check_filter(filter_name)
     if filter_name in FUNNEL:
         totals = {}
-        for row in listing(conn, selection_id, segment, filter_name):
+        for row in listing(conn, selection_id, segment, filter_name, source=source):
             totals[row["class"]] = totals.get(row["class"], 0) + 1
         return totals
     rows = conn.execute(load_queries()["listing_class_totals"], {
         "selection_id": selection_id, "segment": segment, "filter": filter_name,
+        "source": source,
     }).fetchall()
     return {cls: total for cls, total in rows}
 
 
-def listing_counts(conn, selection_id: int, segment: str) -> dict:
+def listing_sources(conn, selection_id: int, segment: str, filter_name: str) -> dict:
+    """{board: how many the status filter holds from it}, largest first —
+    the app's "Source" drop-down. The source filter itself does not apply."""
+    _check_filter(filter_name)
+    if filter_name in FUNNEL:
+        rows = conn.execute(load_queries()["funnel_sources"], {"filter": filter_name})
+    else:
+        rows = conn.execute(load_queries()["listing_sources"], {
+            "selection_id": selection_id, "segment": segment, "filter": filter_name,
+        })
+    return {source: total for source, total in rows.fetchall()}
+
+
+def listing_counts(conn, selection_id: int, segment: str, source: str = "") -> dict:
     conn.row_factory = _dict_row
     try:
         row = conn.execute(load_queries()["listing_counts"], {
-            "selection_id": selection_id, "segment": segment,
+            "selection_id": selection_id, "segment": segment, "source": source,
         }).fetchone()
-        funnel = conn.execute(load_queries()["funnel_counts"]).fetchone()
+        funnel = conn.execute(load_queries()["funnel_counts"], {"source": source}).fetchone()
     finally:
         conn.row_factory = None
     counts = {name: row[name] or 0 for name in FILTERS if name not in FUNNEL}

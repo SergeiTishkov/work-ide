@@ -44,6 +44,8 @@
   'run.log_title': 'Лог запуска',
 
   'filter.legend': 'Показать',
+  'filter.source_legend': 'Источник',
+  'filter.source_all': 'Все источники',
   'filter.group.selection': 'Подборка',
   'filter.group.answers': 'Мои ответы',
   'filter.group.applications': 'Отклики',
