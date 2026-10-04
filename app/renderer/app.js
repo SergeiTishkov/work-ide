@@ -852,10 +852,28 @@
     if (view.url) guarded(() => api.openExternal(view.url));
   }
 
+  // "Open", and beside it a small "Copy URL" (the owner, 2026-10-04: the link
+  // is sometimes wanted elsewhere). The copy says so on the button for a
+  // moment, since nothing else on screen changes.
   function openButton(view) {
-    return el('button', {
-      class: 'open', testid: 'btn-open', disabled: !view.url, onclick: () => openLink(view),
-    }, t('action.open'));
+    return [
+      el('button', {
+        class: 'open', testid: 'btn-open', disabled: !view.url, onclick: () => openLink(view),
+      }, t('action.open')),
+      el('button', {
+        class: 'copy', testid: 'btn-copy-url', disabled: !view.url,
+        onclick: (event) => copyLink(view, event.currentTarget),
+      }, t('action.copy_url')),
+    ];
+  }
+
+  function copyLink(view, button) {
+    if (!view.url) return;
+    guarded(async () => {
+      await api.copyText(view.url);
+      button.textContent = t('action.copied');
+      setTimeout(() => { button.textContent = t('action.copy_url'); }, 1500);
+    });
   }
 
   // One click opens the reason; a second one on the same button within a

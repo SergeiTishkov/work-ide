@@ -126,7 +126,8 @@ button.more { display: block; margin: 0 auto 8px; color: var(--accent); }
 .details summary { cursor: pointer; color: var(--accent); }
 .details ul { margin: 4px 0; padding-left: 18px; }
 .answers, .marked { display: flex; gap: 6px; align-items: center; margin: 8px 0 0 38px; }
-button.open { margin-right: 10px; color: var(--accent); border-color: var(--accent); }
+button.open { margin-right: 6px; color: var(--accent); border-color: var(--accent); }
+button.copy { margin-right: 10px; padding: 2px 8px; font-size: 0.85em; color: var(--muted); }
 .reason { margin: 6px 0 0 38px; }
 .reason textarea { width: 100%; max-width: 640px; font: inherit; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
 .reason-actions { display: flex; gap: 6px; margin-top: 4px; }

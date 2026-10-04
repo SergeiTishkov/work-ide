@@ -3,7 +3,7 @@
 // (main/preload.js). All data access and process control lives here; the
 // renderer only asks.
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, clipboard, ipcMain, shell } = require('electron');
 const { repoRoot, schemaDir } = require('./paths');
 const { Store } = require('./store');
 const { Runner } = require('./runner');
@@ -93,6 +93,9 @@ function registerIpc(window) {
   handle('open-external', (url) => {
     if (!/^https?:\/\//i.test(url)) throw new Error('only http(s) links open');
     return shell.openExternal(url);
+  });
+  handle('copy-text', (text) => {
+    clipboard.writeText(String(text));
   });
 
   runner.onEvent((event) => {

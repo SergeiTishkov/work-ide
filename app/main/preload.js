@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('api', {
   stopRun: () => call('stop-run'),
   refresh: () => call('refresh'),
   openExternal: (url) => call('open-external', url),
+  copyText: (text) => call('copy-text', text),
   onRunEvent: (listener) => {
     const wrapped = (_event, payload) => listener(payload);
     ipcRenderer.on('run-event', wrapped);

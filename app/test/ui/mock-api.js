@@ -162,6 +162,9 @@ function installMockApi(fixture) {
     async openExternal(url) {
       record('openExternal', [url]);
     },
+    async copyText(text) {
+      record('copyText', [text]);
+    },
     ...(fixture.withoutRefresh ? { refresh: undefined } : {}),
     onRunEvent(listener) {
       listeners.push(listener);

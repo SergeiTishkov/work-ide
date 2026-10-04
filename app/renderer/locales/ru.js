@@ -94,6 +94,8 @@
   'badge.manual_review': 'нужна ручная проверка',
 
   'action.open': '🔗 Открыть ссылку на вакансию',
+  'action.copy_url': 'Копировать URL',
+  'action.copied': 'Скопировано ✓',
   'action.applied': 'Откликнулся',
   'action.rejected': 'Не подходит',
   'action.bugged': 'Ошибка подборки',

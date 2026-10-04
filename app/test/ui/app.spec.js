@@ -216,6 +216,19 @@ test('an identity never collected says so and offers to collect', async ({ page 
   expect(await calls(page, 'startRun')).toEqual([[{ identity: 'newbie', kind: 'collect' }]]);
 });
 
+test('"Copy URL" beside "Open" copies the link and says so', async ({ page }) => {
+  await open(page);
+  const row = byId(page, 'a1');
+  const buttons = row.locator('.answers button');
+  await expect(buttons.nth(0)).toHaveAttribute('data-testid', 'btn-open');
+  await expect(buttons.nth(1)).toHaveAttribute('data-testid', 'btn-copy-url');
+  await row.getByTestId('btn-copy-url').click();
+  expect(await calls(page, 'copyText')).toEqual([['https://example.test/a1']]);
+  expect(await calls(page, 'openExternal')).toEqual([]);
+  await expect(row.getByTestId('btn-copy-url')).toHaveText(ru['action.copied']);
+  await expect(row.getByTestId('btn-copy-url')).toHaveText(ru['action.copy_url']);
+});
+
 test('a vacancy title opens in the browser, not in the app', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('title').click();

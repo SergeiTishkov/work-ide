@@ -91,6 +91,8 @@
   'badge.manual_review': 'needs a manual check',
 
   'action.open': '🔗 Open the vacancy link',
+  'action.copy_url': 'Copy URL',
+  'action.copied': 'Copied ✓',
   'action.applied': 'Applied',
   'action.rejected': 'Not for me',
   'action.bugged': 'Wrong pick',
