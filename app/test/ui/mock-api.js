@@ -92,7 +92,8 @@ function installMockApi(fixture) {
       for (const row of rowsOf(identity, segment).filter((r) => matches(r, filter))) {
         totals.set(row.view.source, (totals.get(row.view.source) || 0) + 1);
       }
-      return [...totals].map(([source, total]) => ({ source, total }))
+      const sites = { linkedin: 'linkedin.com', devitjobs: 'devitjobs.uk, devitjobs.com' };
+      return [...totals].map(([source, total]) => ({ source, site: sites[source] || null, total }))
         .sort((a, b) => b.total - a.total || a.source.localeCompare(b.source));
     },
     async setFeedback(identity, id, status, reason) {

@@ -379,6 +379,17 @@ def load_sources() -> list:
     return merged
 
 
+def source_sites() -> dict:
+    """{source name: its website} from the catalogue — what a person calls
+    the board (`site`), where the code calls it by its name."""
+    catalog_path = shared_config("sources.catalog.yaml")
+    if not catalog_path.exists():
+        return {}
+    catalog = load_yaml(catalog_path) or {}
+    return {s["name"]: s["site"] for s in (catalog.get("sources") or [])
+            if s.get("name") and s.get("site")}
+
+
 def ensure_dirs() -> None:
     require_identity()
     for d in (DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, REPORTS_ARCHIVE_DIR):

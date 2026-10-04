@@ -195,7 +195,20 @@ class Store {
     const rows = FUNNEL.includes(filter)
       ? db.prepare(this.queries.funnel_sources).all({ filter })
       : db.prepare(this.queries.listing_sources).all({ selection_id: selection.id, segment, filter });
-    return rows.map((r) => ({ source: r.source, total: r.total }));
+    const sites = this.sourceSites(db);
+    return rows.map((r) => ({ source: r.source, site: sites[r.source] || null, total: r.total }));
+  }
+
+  // { source: website } — a database collected before 2026-10-04 has none,
+  // and the drop-down shows the source's own name.
+  sourceSites(db) {
+    const row = db.prepare(this.queries.source_sites).get();
+    if (!row || !row.value) return {};
+    try {
+      return JSON.parse(row.value);
+    } catch {
+      return {};
+    }
   }
 
   counts(identity, segment, source = '') {

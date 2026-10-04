@@ -388,8 +388,8 @@ test('"Source" lists the boards of the current filter, each with its count', asy
   await expect(page.getByTestId('source-label')).toHaveText(ru['filter.source_legend']);
   await expect(page.getByTestId('source-filter')).toHaveValue('');
   await expect(page.getByTestId('source-option-all')).toHaveText(`${ru['filter.source_all']} (3)`);
-  await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin (2)');
-  await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs (1)');
+  await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (2)');
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs.uk, devitjobs.com (1)');
   expect(await calls(page, 'listSources')).toContainEqual(['kisel', 'full', 'fresh_new']);
 });
 
@@ -412,8 +412,8 @@ test('the status filter and the source apply together', async ({ page }) => {
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'bugged', [], 'linkedin']);
   // the chosen board stays on the list with nothing in it; the others follow the filter
   await expect(page.getByTestId('source-filter')).toHaveValue('linkedin');
-  await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin (0)');
-  await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs (1)');
+  await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (0)');
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs.uk, devitjobs.com (1)');
   await page.getByTestId('source-filter').selectOption('devitjobs');
   await expect(byId(page, 'x1')).toBeVisible();
   await page.getByTestId('source-filter').selectOption('');

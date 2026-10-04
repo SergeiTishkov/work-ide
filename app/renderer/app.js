@@ -336,6 +336,9 @@
     state.counts = counts;
     state.classTotals = totals;
     state.sources = sources;
+    // a chosen board the filter has emptied keeps its website on the list
+    state.sourceSites = state.sourceSites || {};
+    for (const s of sources) if (s.site) state.sourceSites[s.source] = s.site;
     info.pending = pending;
     render();
   }
@@ -692,7 +695,10 @@
   function renderSourceFilter() {
     const active = currentSource();
     const sources = [...state.sources];
-    if (active && !sources.some((s) => s.source === active)) sources.push({ source: active, total: 0 });
+    if (active && !sources.some((s) => s.source === active)) {
+      const known = (state.sourceSites || {})[active];
+      sources.push({ source: active, site: known || null, total: 0 });
+    }
     const all = state.sources.reduce((sum, s) => sum + s.total, 0);
     const option = (value, label, n) => el('option', {
       value, testid: `source-option-${value || 'all'}`, selected: value === active,
@@ -703,7 +709,7 @@
         id: 'source-select', testid: 'source-filter',
         onchange: (event) => selectSource(event.target.value),
       }, option('', t('filter.source_all'), all),
-      sources.filter((s) => s.source).map((s) => option(s.source, s.source, s.total))));
+      sources.filter((s) => s.source).map((s) => option(s.source, s.site || s.source, s.total))));
   }
 
   function renderList() {

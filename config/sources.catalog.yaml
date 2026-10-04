@@ -14,6 +14,9 @@
 #  An identity CANNOT override url/kind/remote_only: those are properties of
 #  the board rather than settings. It can override enabled and params.
 #
+#  `site` is the website the vacancies come from, as a person knows it: the
+#  app's "Source" drop-down shows it instead of the source's code name.
+#
 #  How to read params_schema: it lists the parameters the fetcher accepts from
 #  an identity, with their type and meaning. The full description for building
 #  your own identity is in docs/BUILDING_BLOCKS.md.
@@ -23,6 +26,7 @@ schema_version: 1
 
 sources:
   - name: weworkremotely
+    site: "weworkremotely.com"
     kind: rss_multi
     remote_only: true
     urls:
@@ -45,6 +49,7 @@ sources:
       from the "Headquarters/URL" block so that you can apply directly.
 
   - name: remoteok
+    site: "remoteok.com"
     kind: json_api
     remote_only: true
     url: "https://remoteok.com/api"
@@ -58,6 +63,7 @@ sources:
       count as a number of vacancies.
 
   - name: remotive
+    site: "remotive.com"
     kind: json_api
     remote_only: true
     url: "https://remotive.com/api/remote-jobs?limit=200"
@@ -69,6 +75,7 @@ sources:
     caveats: "The limit/search/category parameters are ignored in practice — we take what is given."
 
   - name: jobicy
+    site: "jobicy.com"
     kind: json_api
     remote_only: true
     url: "https://jobicy.com/api/v2/remote-jobs?count=100&industry=dev"
@@ -80,6 +87,7 @@ sources:
     caveats: "The tag= parameter returns nothing; using it is pointless."
 
   - name: himalayas
+    site: "himalayas.app"
     kind: json_api
     remote_only: true
     url: "https://himalayas.app/jobs/api?limit=100"
@@ -102,6 +110,7 @@ sources:
     caveats: "The plain feed is few and arbitrary; the search mode is what makes it useful."
 
   - name: remoterocketship
+    site: "remoterocketship.com"
     kind: html_page_data
     remote_only: false
     # No `url` on purpose: the listing is built from slug and employment type
@@ -128,6 +137,7 @@ sources:
       page's schema.org JobPosting has the full text.
 
   - name: linkedin
+    site: "linkedin.com"
     kind: html_guest_search
     remote_only: false
     params_schema:
@@ -159,6 +169,7 @@ sources:
 
 
   - name: devitjobs
+    site: "devitjobs.uk, devitjobs.com"
     kind: json_api
     remote_only: false
     params_schema:
@@ -169,6 +180,7 @@ sources:
       structured fields. The gates that read a description work blind here.
 
   - name: jobs_ch
+    site: "jobs.ch"
     kind: json_api
     remote_only: false
     params_schema:
@@ -178,6 +190,7 @@ sources:
     caveats: "A national board: most vacancies are local and in German."
 
   - name: mycareersfuture
+    site: "mycareersfuture.gov.sg"
     kind: json_api
     remote_only: false
     params_schema:
@@ -191,17 +204,20 @@ sources:
       templates, and their criteria reject its vacancies (closed_sources).
 
   - name: landing_jobs
+    site: "landing.jobs"
     kind: json_api
     remote_only: false
     yield_notes: "Measured 2026-08-04: 50 records. It has a remote flag and a pay range."
     caveats: "Some vacancies are posted anonymously — the company is recovered from the URL."
 
   - name: workingnomads
+    site: "workingnomads.com"
     kind: json_api
     remote_only: true
     yield_notes: "Measured 2026-08-04: 28 records. A curated selection."
 
   - name: rss_boards
+    site: "berlinstartupjobs.com, jobspresso.co"
     kind: rss
     remote_only: false
     params_schema:
@@ -211,6 +227,7 @@ sources:
 
 
   - name: 4dayweek
+    site: "4dayweek.io"
     kind: json_api
     remote_only: false
     params_schema:
@@ -228,6 +245,7 @@ sources:
 
 
   - name: ats
+    site: "greenhouse.io, lever.co, ashbyhq.com, recruitee.com"
     kind: ats_boards
     remote_only: false
     params_schema:
@@ -247,6 +265,7 @@ sources:
       employers.
 
   - name: hn_whoishiring
+    site: "news.ycombinator.com"
     kind: hn_algolia
     remote_only: false
     url: "http://hn.algolia.com/api/v1/search"
@@ -262,6 +281,7 @@ sources:
     caveats: "Free-form and noisy; company and location are parsed heuristically."
 
   - name: arbeitnow
+    site: "arbeitnow.com"
     kind: json_api
     remote_only: false
     url: "https://www.arbeitnow.com/api/job-board-api"
@@ -277,6 +297,7 @@ sources:
       willing to tolerate a low yield.
 
   - name: contractoruk
+    site: "contractoruk.com"
     kind: html_search
     remote_only: false
     params_schema:
@@ -295,6 +316,7 @@ sources:
       the card carries a ~200-character summary rather than a description.
 
   - name: reed
+    site: "reed.co.uk"
     kind: html_search
     remote_only: false
     params_schema:
@@ -313,6 +335,7 @@ sources:
       JobPosting.
 
   - name: jobserve
+    site: "jobserve.com"
     kind: html_form_search
     remote_only: false
     params_schema:
@@ -330,6 +353,7 @@ sources:
       empty on one run in three.
 
   - name: outside_ir35
+    site: "outsideir35jobs.com"
     kind: html_search
     remote_only: false
     params_schema:

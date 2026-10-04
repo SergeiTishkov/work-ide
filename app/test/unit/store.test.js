@@ -318,13 +318,24 @@ test('the source narrows the listing, the counts and the class totals', () => {
 test('the source list counts each board under the status filter', () => {
   const { store } = setup();
   assert.deepEqual(store.sources('test', 'full', 'all'),
-    [{ source: 'linkedin', total: 20 }, { source: 'devitjobs', total: 3 }]);
-  assert.deepEqual(store.sources('test', 'full', 'fresh_new'), [{ source: 'devitjobs', total: 3 }]);
+    [{ source: 'linkedin', site: null, total: 20 }, { source: 'devitjobs', site: null, total: 3 }]);
+  assert.deepEqual(store.sources('test', 'full', 'fresh_new'), [{ source: 'devitjobs', site: null, total: 3 }]);
   store.setFeedback('test', 'old00', 'applied');
-  assert.deepEqual(store.sources('test', 'full', 'applied'), [{ source: 'linkedin', total: 1 }]);
+  assert.deepEqual(store.sources('test', 'full', 'applied'), [{ source: 'linkedin', site: null, total: 1 }]);
   assert.deepEqual(store.listing('test', 'full', 'applied', [], 'devitjobs'), []);
   assert.equal(store.counts('test', 'full', 'linkedin').applied, 1);
   assert.equal(store.counts('test', 'full', 'devitjobs').applied, 0);
   assert.deepEqual(store.sources('other', 'full', 'all'), []);
+  store.closeAll();
+});
+
+test('each board comes with its website when the selection recorded them', () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  db.prepare("INSERT INTO meta (key, value) VALUES ('source_sites', ?)")
+    .run(JSON.stringify({ linkedin: 'linkedin.com' }));
+  db.close();
+  assert.deepEqual(store.sources('test', 'full', 'all'),
+    [{ source: 'linkedin', site: 'linkedin.com', total: 20 }, { source: 'devitjobs', site: null, total: 3 }]);
   store.closeAll();
 });

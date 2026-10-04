@@ -45,6 +45,11 @@ ORDER BY position;
 -- name: display_name
 SELECT value FROM meta WHERE key = 'display_name';
 
+-- name: source_sites
+-- {source name: website} as JSON, from config/sources.catalog.yaml, written
+-- with every selection (selections.write_source_sites).
+SELECT value FROM meta WHERE key = 'source_sites';
+
 -- name: listing
 WITH baseline AS (
   SELECT MAX(id) AS id FROM selections WHERE kind = 'run' AND id <= :selection_id

@@ -421,3 +421,23 @@ def test_a_view_written_before_it_carried_the_source_is_still_filtered(isolated_
     with db.session() as conn:
         assert set(_ids(selections.listing(conn, sel, "full", "all", source="devitjobs"))) == {"d0", "d1", "d2"}
         assert selections.listing_sources(conn, sel, "full", "all") == {"linkedin": 6, "devitjobs": 3}
+
+
+def test_a_selection_carries_the_websites_of_the_sources(isolated_data_dir):
+    """The app shows "linkedin.com", not "linkedin" (the owner, 2026-10-04);
+    it reads the database only, so the catalogue's sites travel in meta."""
+    _store(_by_source())
+    with db.session() as conn:
+        (value,) = conn.execute(selections.load_queries()["source_sites"]).fetchone()
+    sites = json.loads(value)
+    assert sites["linkedin"] == "linkedin.com"
+    assert sites["mycareersfuture"] == "mycareersfuture.gov.sg"
+
+
+def test_every_automatic_source_in_the_catalogue_names_its_website():
+    import common
+
+    catalog = common.load_yaml(common.shared_config("sources.catalog.yaml"))
+    missing = [s["name"] for s in catalog["sources"]
+               if s.get("kind") != "manual_ingest" and not s.get("site")]
+    assert missing == []

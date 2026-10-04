@@ -24,6 +24,7 @@ person marks one, the next one by score has to move up without a new run.
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Optional
@@ -145,7 +146,18 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (_display_name(),),
         )
+        write_source_sites(conn)
     return selection_id
+
+
+def write_source_sites(conn) -> None:
+    """The catalogue's websites, for the app's "Source" drop-down: the app
+    reads the database only, never the YAML."""
+    conn.execute(
+        "INSERT INTO meta (key, value) VALUES ('source_sites', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (json.dumps(common.source_sites(), ensure_ascii=False, sort_keys=True),),
+    )
 
 
 def _display_name() -> str:
