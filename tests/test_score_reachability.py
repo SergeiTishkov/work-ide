@@ -38,7 +38,7 @@ STACK = (" Maintain a legacy ASP.NET and SQL Server platform in C#, with .NET Co
          " services and Entity Framework.")
 
 
-def _criteria(points=None, policy=None):
+def _criteria(points=None):
     rl = dict(CRITERIA["remote_location_fit"])
     wa = dict(rl["work_authorization"])
     wa["rules"] = list(wa["rules"]) + [r for r in KISEL_RL["work_authorization"]["rules"]
@@ -52,8 +52,6 @@ def _criteria(points=None, policy=None):
     rl["residency_eligibility"] = {
         **(rl.get("residency_eligibility") or {}),
         "points": KISEL_RL["residency_eligibility"]["points"] if points is None else points}
-    rl["restricted_location_policy"] = (KISEL_RL["restricted_location_policy"]
-                                        if policy is None else policy)
     return {**CRITERIA, "remote_location_fit": rl}
 
 
@@ -140,8 +138,9 @@ def test_a_contract_with_the_persons_own_business_counts_as_engaging_abroad():
     assert result["residency_eligibility"] == score.ELIGIBILITY_LIKELY
 
 
-def test_a_board_saying_place_only_is_rejected_under_the_reject_policy():
+def test_a_board_saying_place_only_is_rejected():
     fields = dict(location_raw="United States only", source="himalayas")
-    assert _score("Fully remote.", **fields)["classification"] == "rejected"
-    kept = _score("Fully remote.", criteria=_criteria(policy="national_market"), **fields)
-    assert kept["classification"] == "national_market"
+    result = _score("Fully remote.", **fields)
+    assert result["classification"] == "rejected"
+    assert any(d.startswith("location: source restricts hiring to")
+               for d in result["dealbreakers"])

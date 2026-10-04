@@ -45,7 +45,7 @@ function createDatabase(file, { vacancies, selections, segments, displayName = '
   db.exec(fs.readFileSync(path.join(SCHEMA_DIR, 'db.sql'), 'utf8'));
   db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', '7')").run();
   db.prepare("INSERT INTO meta (key, value) VALUES ('display_name', ?)").run(displayName);
-  const classOrder = ['hot_lead', 'worth_a_look', 'long_shot', 'national_market',
+  const classOrder = ['hot_lead', 'worth_a_look', 'long_shot',
     'remote_unconfirmed', 'engagement_unconfirmed'];
   const insertVacancy = db.prepare('INSERT INTO vacancies (id, data, view) VALUES (?, ?, ?)');
   for (const v of vacancies) {

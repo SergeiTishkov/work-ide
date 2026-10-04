@@ -74,12 +74,12 @@ def test_reachability_breaks_a_tie_and_nothing_more():
 
 def test_every_section_is_sorted_the_same_way():
     vacancies = {}
-    for cls in ("worth_a_look", "long_shot", "remote_unconfirmed", "national_market"):
+    for cls in ("worth_a_look", "long_shot", "remote_unconfirmed"):
         for n, (score, eligibility) in enumerate([(12, "confirmed"), (31, "unknown"), (25, "likely")]):
             vid = f"{cls}{n}"
             vacancies[vid] = _vacancy(vid, score, eligibility, cls)
     text = _build(vacancies)
-    for cls in ("worth_a_look", "long_shot", "remote_unconfirmed", "national_market"):
+    for cls in ("worth_a_look", "long_shot", "remote_unconfirmed"):
         assert _scores_in(text, cls) == [31, 25, 12], cls
 
 

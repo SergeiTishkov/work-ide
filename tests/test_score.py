@@ -1937,8 +1937,8 @@ def test_explicit_only_wording_is_still_a_hard_rejection():
 
     A location field of "Canada" is the board's guess: the vacancy may well be
     open to a contractor outside it. The wording "Canada only" is the employer's
-    own words, and it is unambiguous. The first lands in national_market and
-    stays in view; the second is rejected outright."""
+    own words, and it is unambiguous. The first stays in view; the second is
+    rejected outright."""
     guess = make_vacancy(location_raw="Canada",
                          description_text="C# ASP.NET SQL Server developer role.")
     stated = make_vacancy(location_raw="Canada only",

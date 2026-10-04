@@ -2731,31 +2731,13 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
 
     thresholds = criteria["classification_thresholds"]
 
-    # A vacancy whose ONLY objection is a country in the structured location
-    # field is not dropped silently but placed in its own class.
-    #
-    # Why this rather than a rejection, revised 2026-08-05 after the owner
-    # objected. Measured: 501 vacancies with .NET in the title were rejected
-    # for exactly this reason and no other, and ALL 501 were marked remote by
-    # their source. Of the 78 that had a description, the employer restricts
-    # the right to work in only 16 — in the other 62 the rejection rests on
-    # the guess that a vacancy in country N is for residents of N.
-    #
-    # The guess is usually right, and these must not be mixed into the main
-    # shortlist: there are hundreds of them and they would drown a dozen real
-    # candidates. But deciding on someone's behalf that a B2B contract with a
-    # Dutch company is out of reach is not the system's call either. Hence a
-    # separate class and a separate section of the report.
-    # Per identity since 2026-10-05: "reject" treats the board's "<place> only"
-    # like any other stated restriction (KISEL); the default keeps the class.
-    restricted_policy = (criteria.get("remote_location_fit") or {}).get(
-        "restricted_location_policy", "national_market")
-    country_only = restricted_policy != "reject" and bool(dealbreakers) and all(
-        d.startswith("location: source restricts hiring to") for d in dealbreakers
-    )
+    # A vacancy whose only objection is the board's "<place> only" is rejected
+    # like any other stated restriction. From 2026-08-05 to 2026-10-05 it went
+    # to its own class, national_market, with its own report section and app
+    # filter; the owner removed the class on 2026-10-05.
 
-    # A vacancy nobody ever called remote. Same shape as the class above, and
-    # for the same reason — the objection is about our knowledge rather than
+    # A vacancy nobody ever called remote. Its own class rather than a
+    # rejection, because the objection is about our knowledge rather than
     # about the job — but it is a per-identity choice, because it is only an
     # objection at all for somebody who cannot commute. An identity looking
     # for onsite work sets "accept" and never sees the class.
@@ -2777,7 +2759,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     unconfirmed_only = bool(dealbreakers) and all(
         d in for_a_person for d in dealbreakers)
 
-    # A vacancy parked for a person — national market, remote or hours not
+    # A vacancy parked for a person — remote or hours not
     # confirmed — whose role the complexity gate has already ruled out. Confirming
     # the missing fact would only move it to low_priority, so showing it to a
     # person asks them to check something that cannot change the outcome.
@@ -2788,12 +2770,10 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     # "agentic" in a consultancy's boilerplate gates an ordinary ".NET
     # Developer", it would hide 51 vacancies on a thin signal — measured before
     # this was written — so KISEL keeps the old order.
-    parked = country_only or unconfirmed_only
+    parked = unconfirmed_only
     complexity_cfg = criteria.get("role_complexity_signal") or {}
     if parked and complexity_gate and complexity_cfg.get("applies_to_unconfirmed"):
         classification = "low_priority"
-    elif country_only:
-        classification = "national_market"
     elif unconfirmed_only:
         # The score is deliberately NOT reduced — a 70 here is the same 70 it
         # would have been in hot_lead. Only the certainty differs, and that is

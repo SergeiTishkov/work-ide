@@ -156,7 +156,7 @@ def test_no_country_is_worldwide_not_an_empty_restriction():
         assert rr._to_common_schema(job)["location_raw"] == "Worldwide", location
 
 
-def test_a_restricted_remote_record_is_parked_as_a_national_market():
+def test_a_restricted_remote_record_is_rejected():
     """End to end through the scoring: a Brazil-only contract must not wait in
     a section asking a person to check its hours."""
     import score
@@ -167,7 +167,7 @@ def test_a_restricted_remote_record_is_parked_as_a_national_market():
     rec = normalize.normalize_record(rr._to_common_schema(job))
     result = score.score_vacancy(rec, CRITERIA, PROFILE)
     assert any(d.startswith("location: source restricts hiring to") for d in result["dealbreakers"])
-    assert result["classification"] in ("national_market", "rejected")
+    assert result["classification"] == "rejected"
 
 
 def test_the_tech_stack_and_summary_reach_the_text_the_gates_read():

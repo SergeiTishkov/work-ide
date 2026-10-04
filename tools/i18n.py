@@ -61,8 +61,6 @@ CATALOGUES = {
         "Worth a look": "Worth a look",
         "Long shot (low priority, but not impossible)":
             "Long shot (низкий приоритет, но не исключено)",
-        "National markets — strong vacancies tied to a country":
-            "Национальные рынки — сильные вакансии, привязанные к стране",
         "eligibility: confirmed": "допуск подтверждён работодателем",
         "eligibility: likely": "допуск вероятен",
         "eligibility: not stated": "про допуск ничего не сказано",
@@ -225,8 +223,6 @@ CATALOGUES = {
         'Full score breakdown for any vacancy': 'Полная разбивка score по вакансии',
         'Showing': 'Показано',
         'best of': 'лучших из',
-        'These vacancies have no objection against them except one: the board named a country. Almost always that means remote within that country, and then it is a miss. But not always: some employers happily sign a B2B contract with a contractor abroad, and the text of the vacancy does not show it.':
-            'Здесь вакансии, к которым нет НИКАКИХ претензий, кроме одной: площадка указала страну. Почти всегда это значит «удалённо, но в пределах этой страны» — и тогда мимо. Но не всегда: часть работодателей спокойно оформляет контракт B2B с подрядчиком снаружи, и по тексту вакансии этого не видно.',
         'These are vacancies the automation is unsure about — most often ':
             'Это вакансии, где автоматика не уверена в оценке — чаще всего ',
         'or it is unclear whether the company will hire someone from your country. Worth re-checking with a web search and, if needed, updating the record through `tools/kb.py`.':

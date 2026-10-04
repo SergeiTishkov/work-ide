@@ -71,7 +71,6 @@
   'class.hot_lead': '🔥 Горячие — смотреть в первую очередь',
   'class.worth_a_look': '👀 Стоит посмотреть',
   'class.long_shot': '🕰️ Дальний прицел',
-  'class.national_market': '🌍 Национальные рынки',
   'class.remote_unconfirmed': '🏢 Удалёнка не подтверждена',
   'class.engagement_unconfirmed': '⏱️ Часы не подтверждены',
 

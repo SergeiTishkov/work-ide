@@ -21,8 +21,8 @@ settings: what changed, where and why.
   hybrid", "hybrid as a separate item", "work in a hybrid environment",
   "remote within one country, said at length", "based in one country", "must
   live in a named place".
-- New `restricted_location_policy: reject`: a board's "<place> only" is a
-  rejection; the national_market class stays empty.
+- A board's "<place> only" is a rejection: the national_market class was
+  removed from the code for every identity.
 
 **Why.** The owner, 2026-10-05: the top is full of vacancies that cannot be
 taken from abroad. Measured on the 373 unanswered vacancies in view: the

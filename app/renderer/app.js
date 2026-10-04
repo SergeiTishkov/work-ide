@@ -23,7 +23,6 @@
     hot_lead: 'class.hot_lead',
     worth_a_look: 'class.worth_a_look',
     long_shot: 'class.long_shot',
-    national_market: 'class.national_market',
     remote_unconfirmed: 'class.remote_unconfirmed',
     engagement_unconfirmed: 'class.engagement_unconfirmed',
   };

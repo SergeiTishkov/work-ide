@@ -27,7 +27,7 @@ TOP_N_PER_SECTION = 15
 
 # The classes a person actually reads. Everything else is in the database for
 # the record, not in the report for a decision.
-LISTED_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "national_market",
+LISTED_CLASSES = ("hot_lead", "worth_a_look", "long_shot",
                   "remote_unconfirmed", "engagement_unconfirmed")
 
 
@@ -595,10 +595,10 @@ def _fmt_vacancy_line(v: dict) -> str:
     return "\n".join(lines)
 
 
-# How many national-market vacancies to show. There are hundreds; the point of
-# the section is to let a person see that the market exists, not to page
-# through all of it.
-NATIONAL_MARKET_LIMIT = 25
+# How many vacancies a section of parked ones (remote or hours not confirmed)
+# shows. There are hundreds; the point is to show the best of them, not to
+# page through all of it.
+PARKED_SECTION_LIMIT = 25
 
 
 def _section(title: str, items: list) -> str:
@@ -880,22 +880,15 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
     hot = by_class("hot_lead")
     worth = by_class("worth_a_look")
     long_shot = by_class("long_shot")
-    # Vacancies whose only objection is the country in the location field. Not
-    # in the main shortlist — there are hundreds and they would drown a dozen
-    # live candidates — but not thrown away either: the guess "a vacancy in
-    # country N is for residents of N" is not always right, and whether to
-    # apply is the person's decision rather than the system's. The top of them
-    # by score is shown, grouped by country.
-    national = by_class("national_market")[:NATIONAL_MARKET_LIMIT]
     # Vacancies whose only objection is that nobody ever said they were
     # remote. Their own section, their own decision — and their score
     # untouched, at the owner's explicit direction (2026-08-11).
-    unconfirmed = by_class("remote_unconfirmed")[:NATIONAL_MARKET_LIMIT]
+    unconfirmed = by_class("remote_unconfirmed")[:PARKED_SECTION_LIMIT]
     # The same for the hours, in a search that has an engagement gate at all
     # (score._check_engagement). A search that does not care about hours never
     # sees the section: an empty heading in every report would be noise.
     all_engagement_unconfirmed = by_class("engagement_unconfirmed")
-    engagement_unconfirmed = all_engagement_unconfirmed[:NATIONAL_MARKET_LIMIT]
+    engagement_unconfirmed = all_engagement_unconfirmed[:PARKED_SECTION_LIMIT]
     engagement_block = []
     if (criteria or {}).get("engagement_fit") or engagement_unconfirmed:
         engagement_block = [
@@ -979,17 +972,6 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         f"## 🕰️ {t('Long shot (low priority, but not impossible)')}",
         "",
         _section("long_shot", long_shot),
-        f"## 🌍 {t('National markets — strong vacancies tied to a country')}",
-        "",
-        t("These vacancies have no objection against them except one: the "
-        "board named a country. Almost always that means remote within that "
-        "country, and then it is a miss. But not always: some employers "
-        "happily sign a B2B contract with a contractor abroad, and the text "
-        "of the vacancy does not show it.") + " " +
-        f"{t('Showing')} {len(national)} {t('best of')} "
-        f"{class_counts.get('national_market', 0)}.",
-        "",
-        _section("national_market", national),
         f"## 🏢 {t('Work arrangement not confirmed — check by hand')}",
         "",
         t("Nobody ever called these remote — neither the employer nor the "

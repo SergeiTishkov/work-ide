@@ -68,7 +68,6 @@
   'class.hot_lead': '🔥 Hot leads — look at these first',
   'class.worth_a_look': '👀 Worth a look',
   'class.long_shot': '🕰️ Long shots',
-  'class.national_market': '🌍 National markets',
   'class.remote_unconfirmed': '🏢 Remote not confirmed',
   'class.engagement_unconfirmed': '⏱️ Hours not confirmed',
 

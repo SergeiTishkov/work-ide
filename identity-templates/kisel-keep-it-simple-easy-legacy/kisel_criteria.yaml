@@ -92,13 +92,6 @@ remote_location_fit:
       - "payroll in"
       - "entities in"
 
-  # What to do with a vacancy whose only objection is the board's location
-  # field ("United States only", "Asia Only"): its own class national_market,
-  # or a rejection. KISEL rejects since V20 (2026-10-05): the 13 in the class
-  # were all an explicit "<place> only" from Himalayas or WeWorkRemotely,
-  # which the owner called the same as any other stated restriction.
-  restricted_location_policy: reject
-
   # The board's own structured location field — see
   # _check_location_field_arrangement in tools/score.py for the measurement.
   # Short and functional, so a word here is never about technology.
