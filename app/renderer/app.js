@@ -406,9 +406,13 @@
 
   // After an answer: reload, and when the row left the current filter leave
   // a one-line stub in its place (with undo) until the view changes.
+  //
+  // The place is counted among everything the section shows, stubs included:
+  // counted among rows only, each new stub landed above the ones before it
+  // (the owner, 2026-10-04: the last vacancy marked jumped to the top).
   async function answered(item, status) {
-    const sameClass = state.listing.filter((row) => row.class === item.class);
-    const index = sameClass.findIndex((row) => row.id === item.id);
+    const shown = arranged().byClass.get(item.class) || [];
+    const index = shown.findIndex((entry) => entry.kind === 'row' && entry.row.id === item.id);
     await loadList();
     if (status !== 'new' && !state.listing.some((row) => row.id === item.id)) {
       state.stubs.set(item.id, { class: item.class, index, status });
@@ -712,8 +716,10 @@
       sources.filter((s) => s.source).map((s) => option(s.source, s.site || s.source, s.total))));
   }
 
-  function renderList() {
-    // Rows arrive ordered by class, then score; stubs go back where they were.
+  // Rows arrive ordered by class, then score; stubs go back where they were.
+  // Each stub's index is its place in the section as shown when it was made,
+  // so putting them back from the top down rebuilds that same order.
+  function arranged() {
     const sections = [];
     const byClass = new Map();
     for (const row of state.listing) {
@@ -723,7 +729,8 @@
       }
       byClass.get(row.class).push({ kind: 'row', row });
     }
-    for (const [id, stub] of state.stubs) {
+    const stubs = [...state.stubs].sort((a, b) => a[1].index - b[1].index);
+    for (const [id, stub] of stubs) {
       if (!byClass.has(stub.class)) {
         byClass.set(stub.class, []);
         sections.push(stub.class);
@@ -733,6 +740,11 @@
     }
     const order = Object.keys(CLASS_KEYS);
     sections.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    return { sections, byClass };
+  }
+
+  function renderList() {
+    const { sections, byClass } = arranged();
     if (!sections.length) {
       return el('p', { class: 'empty', testid: 'list-empty' }, t('list.empty'));
     }

@@ -179,6 +179,26 @@ test('each market of each identity keeps its own filter', async ({ page }) => {
   await expect(page.getByTestId('filter')).toHaveValue('applied');
 });
 
+test('marked vacancies keep their places, whatever order they are marked in', async ({ page }) => {
+  const order = () => page.getByTestId('section-hot_lead').locator('article, .stub')
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
+  await open(page);
+  expect(await order()).toEqual(['vacancy-a1', 'vacancy-a2r']);
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await expect(page.getByTestId('stub-a1')).toBeVisible();
+  await byId(page, 'a2r').getByTestId('btn-expired').click();
+  await expect(page.getByTestId('stub-a2r')).toBeVisible();
+  expect(await order()).toEqual(['stub-a1', 'stub-a2r']);
+
+  await page.getByTestId('stub-a1').getByTestId('btn-undo').click();
+  await page.getByTestId('stub-a2r').getByTestId('btn-undo').click();
+  await byId(page, 'a2r').getByTestId('btn-expired').click();
+  await expect(page.getByTestId('stub-a2r')).toBeVisible();
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await expect(page.getByTestId('stub-a1')).toBeVisible();
+  expect(await order()).toEqual(['stub-a1', 'stub-a2r']);
+});
+
 test('changing the filter clears stubs', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('btn-applied').click();
