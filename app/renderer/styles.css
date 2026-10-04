@@ -116,19 +116,20 @@ button.more { display: block; margin: 0 auto 8px; color: var(--accent); }
 .row { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 12px; margin-bottom: 8px; }
 .row.stub { color: var(--muted); padding: 6px 12px; display: flex; align-items: center; }
 /* The ring drains from full to empty over the stub's life (app.js,
-   STUB_LIFETIME_MS); the tooltip shows the seconds left. */
+   STUB_LIFETIME_MS), clockwise from the top, 10px right of "undo"; the
+   tooltip shows the seconds left. */
 @property --stub-left { syntax: '<percentage>'; inherits: false; initial-value: 100%; }
 @keyframes stub-drain { from { --stub-left: 100%; } to { --stub-left: 0%; } }
-.stub-timer { position: relative; margin-left: auto; display: inline-flex; padding: 2px; cursor: default; }
+.stub-timer { position: relative; margin-left: 10px; display: inline-flex; padding: 2px; cursor: default; }
 .stub-timer .ring {
   width: 16px; height: 16px; border-radius: 50%;
-  background: conic-gradient(var(--accent) var(--stub-left), var(--border) 0);
+  background: conic-gradient(var(--border) calc(100% - var(--stub-left)), var(--accent) 0);
   -webkit-mask: radial-gradient(circle, transparent 4px, #000 5px);
   mask: radial-gradient(circle, transparent 4px, #000 5px);
   animation-name: stub-drain; animation-timing-function: linear; animation-fill-mode: forwards;
 }
 .stub-timer .tip {
-  display: none; position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%);
+  display: none; position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%);
   white-space: nowrap;
   background: var(--surface); color: var(--text); border: 1px solid var(--border);
   border-radius: 6px; padding: 4px 8px; font-size: 12px; z-index: 10;
