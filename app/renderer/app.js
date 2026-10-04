@@ -6,14 +6,14 @@
 (function () {
   const api = window.api;
 
-  const FILTERS = ['fresh_new', 'all', 'fresh', 'rejected', 'bugged', 'expired',
+  const FILTERS = ['fresh_new', 'no_feedback', 'all', 'fresh', 'rejected', 'bugged', 'expired',
     'applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered', 'started',
     'declined'];
   const DEFAULT_FILTER = 'fresh_new';
   // The drop-down's sections: what the selection holds, the person's own
   // answers about the pick, and their applications.
   const FILTER_GROUPS = [
-    { key: 'filter.group.selection', filters: ['fresh_new', 'all', 'fresh'] },
+    { key: 'filter.group.selection', filters: ['fresh_new', 'no_feedback', 'all', 'fresh'] },
     { key: 'filter.group.answers', filters: ['rejected', 'bugged', 'expired'] },
     { key: 'filter.group.applications',
       filters: ['applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered',
@@ -29,6 +29,7 @@
   };
   const FILTER_KEYS = {
     fresh_new: 'filter.fresh_new',
+    no_feedback: 'filter.no_feedback',
     all: 'filter.all',
     fresh: 'filter.fresh',
     applied: 'filter.applied',

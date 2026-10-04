@@ -29,7 +29,7 @@ const BUSY_TIMEOUT_MS = 60000;
 // The funnel filters list the person's applications across collections and
 // markets (funnel_listing); the others look at the latest selection.
 const FUNNEL = funnel.FUNNEL;
-const FILTERS = ['fresh_new', 'all', 'fresh', 'rejected', 'bugged', 'expired', ...FUNNEL];
+const FILTERS = ['fresh_new', 'no_feedback', 'all', 'fresh', 'rejected', 'bugged', 'expired', ...FUNNEL];
 // The first answers, set directly; the funnel beyond "applied" is reached
 // only step by step (advance).
 const STATUSES = ['new', 'applied', 'rejected', 'bugged', 'expired'];

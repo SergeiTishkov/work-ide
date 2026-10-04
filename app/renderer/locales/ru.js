@@ -52,6 +52,7 @@
   'filter.group.answers': 'Мои ответы',
   'filter.group.applications': 'Отклики',
   'filter.fresh_new': 'Свежие без фидбека',
+  'filter.no_feedback': 'Все без фидбека',
   'filter.all': 'Все',
   'filter.fresh': 'Все свежие',
   'filter.applied': 'Откликнулся',

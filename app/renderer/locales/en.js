@@ -49,6 +49,7 @@
   'filter.group.answers': 'My answers',
   'filter.group.applications': 'Applications',
   'filter.fresh_new': 'Fresh, no feedback',
+  'filter.no_feedback': 'All without feedback',
   'filter.all': 'All',
   'filter.fresh': 'All fresh',
   'filter.applied': 'Applied',

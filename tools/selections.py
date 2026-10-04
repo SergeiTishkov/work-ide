@@ -190,7 +190,7 @@ def load_queries() -> dict:
 # schemas/queries.sql). The other filters look at the selection.
 FUNNEL = ("applied", "contacted", "interview", "awaiting_final", "awaiting_offer", "offered",
           "started", "declined")
-FILTERS = ("fresh_new", "all", "fresh", "rejected", "bugged", "expired") + FUNNEL
+FILTERS = ("fresh_new", "no_feedback", "all", "fresh", "rejected", "bugged", "expired") + FUNNEL
 
 
 def latest_selection_id(conn) -> Optional[int]:

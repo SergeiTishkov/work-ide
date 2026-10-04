@@ -20,6 +20,7 @@ function installMockApi(fixture) {
   function matches(row, filter) {
     const status = row.feedback.status;
     if (filter === 'fresh_new') return row.fresh && status === 'new';
+    if (filter === 'no_feedback') return status === 'new';
     if (filter === 'all') return true;
     if (filter === 'fresh') return row.fresh;
     return status === filter;
@@ -83,7 +84,7 @@ function installMockApi(fixture) {
       if (fit) args.push(fit);
       record('listingCounts', args);
       const counts = {};
-      for (const f of ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired',
+      for (const f of ['fresh_new', 'no_feedback', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired',
         'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered', 'started',
         'declined']) {
         counts[f] = rowsOf(identity, segment, source, fit).filter((row) => matches(row, f)).length;

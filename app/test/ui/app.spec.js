@@ -404,6 +404,20 @@ function manyHotLeads(n) {
 const fill = (text, values) => Object.entries(values)
   .reduce((s, [k, v]) => s.split(`{${k}}`).join(String(v)), text);
 
+test('"All without feedback" lists every unanswered vacancy, fresh or not', async ({ page }) => {
+  await open(page);
+  await expect(page.getByTestId('filter-option-no_feedback'))
+    .toHaveText(`${ru['filter.no_feedback']} (4)`);   // a1, a2r, a3, b1; not x1
+  await page.getByTestId('filter').selectOption('no_feedback');
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'no_feedback']);
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(4);
+  await expect(byId(page, 'a3')).toBeVisible();   // not fresh
+  await expect(byId(page, 'x1')).toHaveCount(0);   // has feedback
+  const options = await page.getByTestId('filter').locator('optgroup').first().locator('option')
+    .evaluateAll((nodes) => nodes.map((n) => n.value));
+  expect(options).toEqual(['fresh_new', 'no_feedback', 'all', 'fresh']);
+});
+
 test('a capped class says how much is shown and brings ten more at a time', async ({ page }) => {
   await open(page, manyHotLeads(30));
   const section = page.getByTestId('section-hot_lead');

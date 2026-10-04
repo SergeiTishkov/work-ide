@@ -155,6 +155,7 @@ def test_every_filter_returns_exactly_its_own_set(isolated_data_dir):
         return set(_ids(_listing(sel, filter_name=name)))
 
     assert ids("fresh_new") == {"new"}
+    assert ids("no_feedback") == {"old_new", "new"}
     assert ids("all") == {"old_new", "old_applied", "new", "applied", "rejected", "bugged"}
     assert ids("fresh") == {"new", "applied", "rejected", "bugged"}
     assert ids("applied") == {"old_applied", "applied"}

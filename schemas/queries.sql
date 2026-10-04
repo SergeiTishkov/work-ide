@@ -86,6 +86,7 @@ filtered AS (
   SELECT * FROM base
   WHERE CASE :filter
           WHEN 'fresh_new' THEN fresh = 1 AND feedback_status = 'new'
+          WHEN 'no_feedback' THEN feedback_status = 'new'
           WHEN 'all'       THEN 1
           WHEN 'fresh'     THEN fresh = 1
           ELSE feedback_status = :filter
@@ -131,6 +132,7 @@ base AS (
     AND (:fit = '' OR i.class = :fit)
 )
 SELECT COALESCE(SUM(fresh = 1 AND feedback_status = 'new'), 0) AS fresh_new,
+       COALESCE(SUM(feedback_status = 'new'), 0)               AS no_feedback,
        COUNT(*)                                                AS "all",
        COALESCE(SUM(fresh = 1), 0)                             AS fresh,
        COALESCE(SUM(feedback_status = 'applied'), 0)           AS applied,
@@ -165,6 +167,7 @@ SELECT class, COUNT(*) AS total
 FROM base
 WHERE CASE :filter
         WHEN 'fresh_new' THEN fresh = 1 AND feedback_status = 'new'
+        WHEN 'no_feedback' THEN feedback_status = 'new'
         WHEN 'all'       THEN 1
         WHEN 'fresh'     THEN fresh = 1
         ELSE feedback_status = :filter
@@ -198,6 +201,7 @@ SELECT source, COUNT(*) AS total
 FROM base
 WHERE CASE :filter
         WHEN 'fresh_new' THEN fresh = 1 AND feedback_status = 'new'
+        WHEN 'no_feedback' THEN feedback_status = 'new'
         WHEN 'all'       THEN 1
         WHEN 'fresh'     THEN fresh = 1
         ELSE feedback_status = :filter
