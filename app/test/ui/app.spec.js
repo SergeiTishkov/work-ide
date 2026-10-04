@@ -415,7 +415,7 @@ test('"All without feedback" lists every unanswered vacancy, fresh or not', asyn
   await expect(byId(page, 'x1')).toHaveCount(0);   // has feedback
   const options = await page.getByTestId('filter').locator('optgroup').first().locator('option')
     .evaluateAll((nodes) => nodes.map((n) => n.value));
-  expect(options).toEqual(['fresh_new', 'no_feedback', 'all', 'fresh']);
+  expect(options).toEqual(['fresh_new', 'no_feedback', 'fresh', 'all']);
 });
 
 test('a capped class says how much is shown and brings ten more at a time', async ({ page }) => {

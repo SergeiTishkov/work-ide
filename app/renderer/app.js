@@ -13,7 +13,7 @@
   // The drop-down's sections: what the selection holds, the person's own
   // answers about the pick, and their applications.
   const FILTER_GROUPS = [
-    { key: 'filter.group.selection', filters: ['fresh_new', 'no_feedback', 'all', 'fresh'] },
+    { key: 'filter.group.selection', filters: ['fresh_new', 'no_feedback', 'fresh', 'all'] },
     { key: 'filter.group.answers', filters: ['rejected', 'bugged', 'expired'] },
     { key: 'filter.group.applications',
       filters: ['applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered',
