@@ -669,6 +669,15 @@ def _residency_eligibility(rl_bd: dict, dealbreakers: list, vacancy: dict,
     if worldwide:
         return ELIGIBILITY_LIKELY, f"says {', '.join(worldwide[:2])}"
 
+    # The board's own location field: "Anywhere in the World", "Worldwide",
+    # nearly every continent listed. Until 2026-10-05 only the text counted
+    # here, so a WeWorkRemotely posting filed under "Anywhere in the World"
+    # whose text never repeated it stayed "unknown". A restriction in the
+    # employer's words has already returned NO above.
+    structured = rl_bd.get("structured_location") or {}
+    if structured.get("verdict") in ("worldwide", "worldwide_by_continents"):
+        return ELIGIBILITY_LIKELY, f"the board files it under '{structured.get('value')}'"
+
     # A NAMED platform or an explicitly international arrangement, not the bare
     # words. Measured 2026-10-01 over selection #5: 36 of the "likely" verdicts
     # rested on "contractor", "freelance" or "1099" alone — British IR35
@@ -2693,8 +2702,18 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     if closed_source:
         dealbreakers.append(f"source: {closed_source}")
 
+    # Reachability as points: see residency_eligibility.points in the
+    # criteria. Decided here rather than after the classification, because the
+    # bonus has to be in the score the classes are cut from.
+    eligibility, eligibility_reason = _residency_eligibility(
+        rl_bd, dealbreakers, vacancy, criteria, profile)
+    reach_cfg = ((criteria.get("remote_location_fit") or {})
+                 .get("residency_eligibility") or {}).get("points") or {}
+    reach_points = int(reach_cfg.get(eligibility) or 0)
+
     raw_total = (
         rl_points
+        + reach_points
         + stack_points
         + legacy_points
         + intensity_points
@@ -2727,7 +2746,11 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     # candidates. But deciding on someone's behalf that a B2B contract with a
     # Dutch company is out of reach is not the system's call either. Hence a
     # separate class and a separate section of the report.
-    country_only = bool(dealbreakers) and all(
+    # Per identity since 2026-10-05: "reject" treats the board's "<place> only"
+    # like any other stated restriction (KISEL); the default keeps the class.
+    restricted_policy = (criteria.get("remote_location_fit") or {}).get(
+        "restricted_location_policy", "national_market")
+    country_only = restricted_policy != "reject" and bool(dealbreakers) and all(
         d.startswith("location: source restricts hiring to") for d in dealbreakers
     )
 
@@ -2820,11 +2843,9 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "personal_market_bonus": market_bd,
         "personal_tech_bonus": tech_bd,
         "title_role_penalty": title_penalty_bd,
+        "reachability_bonus": {"points": reach_points, "eligibility": eligibility},
         "raw_total_before_clamp": raw_total,
     }
-
-    eligibility, eligibility_reason = _residency_eligibility(
-        rl_bd, dealbreakers, vacancy, criteria, profile)
 
     # Reading the description could change the verdict: the unread stack is
     # the only real objection, and the title is a developer's. The rest of

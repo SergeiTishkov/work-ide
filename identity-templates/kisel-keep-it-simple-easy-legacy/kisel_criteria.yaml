@@ -47,6 +47,26 @@ remote_location_fit:
   # is a US state as well as a country, and "Atlanta, Georgia" is not an offer
   # to hire in Tbilisi. So the name has to appear NEAR one of these.
   residency_eligibility:
+    # Points added to the score by the verdict. The list is ordered by score
+    # alone (report.py, by_class: the owner read "46, 40, then 60" in a
+    # reach-first order on 2026-09-13 and asked for it sorted), so a vacancy
+    # that can be taken from abroad has to rise through its score.
+    #
+    # Measured 2026-10-05 on KISEL's 373 unanswered vacancies in view: the
+    # location axis gave 0-8 points and contractor_friendliness 0-5, while the
+    # stack and personal technologies gave up to ~37. 22 had an explicit
+    # signal that the employer engages people abroad; they sat among 300+
+    # country-tied ones at the same scores. The owner chose a bonus over
+    # a reach-first order or a separate section.
+    #
+    # Why 30: rescored in memory over the whole base, +20 put 22 open
+    # vacancies in hot_lead but only 3 of them among its first twenty, which
+    # stayed country-tied at 52-64. +30: 33, 16 of them in the first twenty,
+    # and 5 with a stack score under 10 lifted to hot. +40: 40 and 26, but 12
+    # weak ones lifted. The owner chose +30.
+    points:
+      confirmed: 30
+      likely: 30
     context_window_chars: 120
     hiring_context_phrases:
       - "we hire"
@@ -71,6 +91,13 @@ remote_location_fit:
       - "employees in"
       - "payroll in"
       - "entities in"
+
+  # What to do with a vacancy whose only objection is the board's location
+  # field ("United States only", "Asia Only"): its own class national_market,
+  # or a rejection. KISEL rejects since V20 (2026-10-05): the 13 in the class
+  # were all an explicit "<place> only" from Himalayas or WeWorkRemotely,
+  # which the owner called the same as any other stated restriction.
+  restricted_location_policy: reject
 
   # The board's own structured location field — see
   # _check_location_field_arrangement in tools/score.py for the measurement.
@@ -359,6 +386,11 @@ remote_location_fit:
       - '\b(hire|hiring|recruit\w*|open to|accept\w*|engag\w*) .{0,30}\b(worldwide|globally|from anywhere|from any country|internationally|across the globe|around the world|in any country)\b'
       - '\b(international|global|worldwide|overseas|offshore) (contractors?|freelancers?)\b'
       - '\b(contractors?|freelancers?) (from|in|across|around) (any|all|many|other|different|over \d+|\d+\+?) (countries|country)\b'
+      # A contract with the person's own business, in the wording of the
+      # staff-augmentation vendors that place contractors with large clients:
+      # "You need to have an IE (individual entrepreneur), or LLC registered
+      # to cooperate with us" (Jimmy Technologies, Prague, 2026-10-05).
+      - '\bindividual entrepreneur\b|\bsole proprietor(ship)?\b|\b(ie|llc) (or|/) (ie|llc)\b'
 
     # Guards that qualify ONE TERM rather than the sentence (unless_near on
     # a rule): an equal-opportunity list before "citizenship", a preference
@@ -417,7 +449,7 @@ remote_location_fit:
       - name: "work authorization in another country required"
         unless_near: *preference_guard
         trigger: 'to work\b|work authori|work(ing)? rights?|work permit|work visa|sponsorship'
-        pattern: '\b(legally |lawfully )?(authori[sz]ed|eligible|entitled|permitted) to (live and )?work (in|for|within)\b|\blegally able to work\b|\b(authori[sz]ed|eligible|entitled|permitted) to work\b.{0,40}\bin (the )?(location|country|uk|us|u\.s\.|usa|united states|united kingdom|canada|australia|eu|europe|[a-z]+ (state|province))\b|\beligibility to work\b|\b(authori[sz]ation|right|rights|permission|permit) to work (in|for|within)\b|\b(unrestricted|legal|valid|existing|full|current) right to work\b|^(the )?right to work( status| documentation)?$|\bwork(ing)? rights? (in|for)\b|\b(eu|european|uk|british|us|u\.s\.|american|canadian|australian|swiss|singapore|new zealand|irish|danish|german|dutch) work(ing)? (authori[sz]ation|permit|rights?|visa)\b|\b(eu|uk|us|u\.s\.|australian|canadian|swiss|irish|singapore) right to work\b|\bwork authori[sz]ation (in|for|to)\b|\b(hold|have|possess\w*|valid|existing|current)\b.{0,20}\bwork (permit|visa)\b|\bwithout (the need for |requiring |needing |any )?(current or future |visa |employer |company |work )?sponsorship\b'
+        pattern: '\b(legally |lawfully )?(authori[sz]ed|eligible|entitled|permitted) to (live and )?work (in|for|within)\b|\blegally able to work\b|\bable to work legally (in|within)\b|\b(authori[sz]ed|eligible|entitled|permitted) to work\b.{0,40}\bin (the )?(location|country|uk|us|u\.s\.|usa|united states|united kingdom|canada|australia|eu|europe|[a-z]+ (state|province))\b|\beligibility to work\b|\b(authori[sz]ation|right|rights|permission|permit) to work (in|for|within)\b|\b(unrestricted|legal|valid|existing|full|current) right to work\b|^(the )?right to work( status| documentation)?$|\bwork(ing)? rights? (in|for)\b|\b(eu|european|uk|british|us|u\.s\.|american|canadian|australian|swiss|singapore|new zealand|irish|danish|german|dutch) work(ing)? (authori[sz]ation|permit|rights?|visa)\b|\b(eu|uk|us|u\.s\.|australian|canadian|swiss|irish|singapore) right to work\b|\bwork authori[sz]ation (in|for|to)\b|\b(hold|have|possess\w*|valid|existing|current)\b.{0,20}\bwork (permit|visa)\b|\bwithout (the need for |requiring |needing |any )?(current or future |visa |employer |company |work )?sponsorship\b'
       # A refusal to sponsor. Lifted for an employer who plainly engages people
       # abroad: a remote contractor never needs a visa.
       - name: "visa sponsorship refused"
@@ -457,6 +489,19 @@ remote_location_fit:
         unless_anywhere: '\b(c2c|corp[- ]to[- ]corp|1099|independent contractors?|international contractors?)\b'
         negated: '\b(no|not|non|without|excluding|unable to accommodate|not accepting|cannot accept|can[’'']t accept|does not accept|not open to)\b[^.;]{0,30}\b(c2c|corp[- ]to[- ]corp|1099)\b(\s*(or|and|/|,)\s*(c2c|corp[- ]to[- ]corp|1099|third[- ]party))*'
         pattern: '\b(on|in) (a |the )?(competitive )?w-?2\b|(\d|/|per |an? )\s?(hour|hr|h)\.? ?w-?2\b|\bw-?2[- ](only|role|position|contract|contractors?|employment|employees?|consultants?|basis|arrangement|candidates?|benefits|pay|hourly|rate|salary|opportunity|tax|engagement|employer|long[- ]term|terms|status|payroll)\b|\b(direct|full[- ]time|part[- ]time|contract|only|strictly|exclusively|hourly) \(?w-?2\b|\bw-?2\)|\bemployment type\s*:\s*w-?2\b'
+      # A US or Canadian retirement plan among the benefits: 401(k), 403(b),
+      # RRSP, DPSP. Only somebody on that country's payroll has one. Measured
+      # 2026-10-05: 50 of KISEL's hot leads and 1992 vacancies across the base
+      # name one — Kforce, Randstad Digital, Actalent, Paychex, Experian... —
+      # in an employee benefits list, and none of the hot leads said anything
+      # about engaging people abroad. Lifted for an employer that does, and
+      # cancelled where the sentence limits the plan to its US or Canadian staff.
+      - name: "US or Canadian payroll benefits (401(k), RRSP)"
+        trigger: '\b40[13]\s?\(?[kb]\b|\brrsp\b|\bdpsp\b'
+        lifted_by_international: true
+        ignores_owner_place: true
+        pattern: '\b40[13]\s?\(?[kb]\b|\brrsp\b|\bdpsp\b'
+        unless: '\b(us|u\.s\.|usa|american|canadian|canada)[- ]?(based )?(employees|team members|staff|hires)\b|\bfor (our )?(us|u\.s\.|canadian) (employees|team|staff)\b'
 
   hard_dealbreakers:
     points: -1000  # in effect removes the vacancy from the "hot" categories
@@ -530,6 +575,37 @@ remote_location_fit:
         pattern: "\\b(\\d+|one|two|three|four|five)\\s*(\\+)?\\s*days?[^.]{0,25}\\b(in|at|from)\\s+(the\\s+)?office"
       - name: "office days per week"
         pattern: "\\b(in|at|from)\\s+(the\\s+)?office[^.]{0,25}\\b(\\d+|one|two|three|four|five)\\s*(\\+)?\\s*days?"
+      # The forms the rules above missed, quoted from KISEL's hot leads on
+      # 2026-10-05; each pattern was run over the whole base first and every
+      # match read in a sample. "Hybrid or remote" and "hybrid / remote" offer
+      # a choice and match none of them.
+      #   "a hybrid remote role based in Verdun, QC", "listed as hybrid remote",
+      #   "flexible hybrid remote work options" — 73 in the base, 17 in view
+      - name: "hybrid remote"
+        pattern: "\\bhybrid[- ]remote\\b"
+      #   "Mode of work: Hybrid", "Location Type: hybrid (ATL)" — 37 in the base
+      - name: "work mode field says hybrid"
+        pattern: "(mode of work|work mode|working mode|location type|workplace type|working model|work location)\\s*[:\\-]\\s*hybrid"
+      #   "- Hybrid - Outside IR35", "Central London | Hybrid | FTSE250",
+      #   "Edinburgh, Hybrid." — 263 in the base. Not before "remote" or a
+      #   technology word: "on-prem, hybrid, cloud deployments" is not a commute.
+      - name: "hybrid as a separate item"
+        pattern: "[,|/\u2013-]\\s*hybrid\\s*(?=[,.|\u2013(-])(?![^.]{0,3}remote)(?![^.]{0,30}\\b(cloud|on-?prem\\w*|deployments?|infrastructure|environments?|architectures?|apps?|solutions?|systems?)\\b)"
+      #   "Work in a hybrid environment with opportunities for remote collaboration"
+      - name: "work in a hybrid environment"
+        pattern: "\\bwork(ing)? in a hybrid (environment|model|setting)\\b"
+      # Remote with the country fence a few words later: "the option to work
+      # anywhere within the United States", "a remote work arrangement within
+      # the US", "fully remote, within Canada". 52 in the base, 8 in view.
+      - name: "remote within one country, said at length"
+        pattern: "\\b(remote|anywhere|distributed|work from home|wfh|telework)\\b[^.]{0,40}\\bwithin (the )?(continental )?(us|u\\.s\\.|usa|united states|uk|united kingdom|canada)\\b"
+      # "Remote (UK-based)", "You MUST be UK based to be considered". 24.
+      - name: "based in one country"
+        pattern: "\\bremote \\((us|u\\.s\\.|uk|eu|canada)[- ]based\\)|\\bmust be (uk|us|u\\.s\\.|eu|canada|london)[- ]based\\b"
+      # "Must reside within the United States", "must live within the
+      # continental U.S.", "Must live in Houston, TX". 53.
+      - name: "must live in a named place"
+        pattern: "\\bmust (live|reside) (in|within|near)\\b"
     keywords:
       - "must relocate"
       - "on-site required"

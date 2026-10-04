@@ -6,6 +6,31 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V20 — reachability from abroad weighs in the score, 2026-10-05
+
+**Changed** (`kisel_criteria.yaml` → `remote_location_fit`):
+- `residency_eligibility.points`: +30 to the score when the verdict is
+  `confirmed` or `likely`. A board location of "Anywhere in the World" /
+  "Worldwide" now makes the verdict `likely` too.
+- `work_authorization.rules`: new "US or Canadian payroll benefits (401(k),
+  RRSP)"; "work authorization in another country required" also reads "able
+  to work legally within".
+- `work_authorization.international_hiring_patterns`: "individual
+  entrepreneur", "sole proprietor", "IE or LLC".
+- `hard_dealbreakers.patterns`: "hybrid remote", "work mode field says
+  hybrid", "hybrid as a separate item", "work in a hybrid environment",
+  "remote within one country, said at length", "based in one country", "must
+  live in a named place".
+- New `restricted_location_policy: reject`: a board's "<place> only" is a
+  rejection; the national_market class stays empty.
+
+**Why.** The owner, 2026-10-05: the top is full of vacancies that cannot be
+taken from abroad. Measured on the 373 unanswered vacancies in view: the
+location axis gave 0-8 points against ~37 for the stack, so explicitly open
+vacancies sat among country-tied ones; 50 hot leads offered a 401(k) or RRSP
+and no rule read it; "hybrid remote", "anywhere within the United States",
+"Must live in Houston" and similar passed every existing pattern.
+
 ## V19 — devitjobs.uk closed, 2026-10-04
 
 **Changed:**
