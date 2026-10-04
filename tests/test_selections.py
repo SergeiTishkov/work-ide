@@ -235,6 +235,47 @@ def test_an_expanded_class_shows_every_row(isolated_data_dir):
         assert len(selections.listing(conn, sel, "full", "all", expanded=("long_shot",))) == limit
 
 
+def test_shown_raises_the_limit_of_one_class(isolated_data_dir):
+    """"Show more" and the scroll ask ten more rows of a class at a time
+    (the owner, 2026-10-04)."""
+    limit = report.TOP_N_PER_SECTION
+    vacancies = {f"v{i:02}": _vacancy(f"v{i:02}", score=100 - i) for i in range(limit + 20)}
+    vacancies.update({f"w{i}": _vacancy(f"w{i}", score=40 - i, classification="worth_a_look")
+                      for i in range(limit + 5)})
+    sel = _store(vacancies)
+    _set_feedback("v00", "applied", selection_id=sel)
+    with db.session() as conn:
+        def count(cls, **kw):
+            return sum(r["class"] == cls for r in selections.listing(conn, sel, "full", "all", **kw))
+        assert count("hot_lead", shown={"hot_lead": limit + 10}) == 1 + limit + 10, "feedback rows uncapped"
+        assert count("worth_a_look", shown={"hot_lead": limit + 10}) == limit
+        assert count("hot_lead", shown={"hot_lead": 1000}) == limit + 20
+        rows = selections.listing(conn, sel, "full", "all", shown={"hot_lead": limit + 1})
+        assert _ids(rows)[:3] == ["v00", "v01", "v02"], "the order stays"
+
+
+def test_fit_narrows_the_listing_counts_and_sources_to_one_class(isolated_data_dir):
+    """The third drop-down: one class, together with the status and the source."""
+    sel = _store(_by_source())
+    _set_feedback("l0", "applied", selection_id=sel)
+    _set_feedback("d0", "rejected", selection_id=sel)
+    with db.session() as conn:
+        for fit in ("hot_lead", "worth_a_look"):
+            counts = selections.listing_counts(conn, sel, "full", fit=fit)
+            totals = selections.class_totals(conn, sel, "full", "all")
+            for name in selections.FILTERS:
+                rows = selections.listing(conn, sel, "full", name, expanded=_all_classes(), fit=fit)
+                assert {r["class"] for r in rows} <= {fit}, (fit, name)
+                assert counts[name] == len(rows), (fit, name)
+            assert counts["all"] == totals[fit]
+        assert selections.listing_sources(conn, sel, "full", "all", fit="worth_a_look") == {"devitjobs": 3}
+        assert selections.listing_sources(conn, sel, "full", "applied", fit="worth_a_look") == {}
+        assert selections.listing_sources(conn, sel, "full", "applied", fit="hot_lead") == {"linkedin": 1}
+        assert _ids(selections.listing(conn, sel, "full", "rejected", source="devitjobs",
+                                       fit="worth_a_look")) == ["d0"]
+        assert selections.listing(conn, sel, "full", "rejected", source="linkedin", fit="worth_a_look") == []
+
+
 def test_row_view_is_the_one_the_report_renders(isolated_data_dir):
     v = _vacancy("a", "London, United Kingdom")
     sel = _store({"a": v})

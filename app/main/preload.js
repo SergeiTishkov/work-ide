@@ -13,12 +13,13 @@ async function call(channel, ...args) {
 contextBridge.exposeInMainWorld('api', {
   listIdentities: () => call('identities'),
   loadSegments: (identity) => call('segments', identity),
-  loadListing: (identity, segment, filter, expanded, source) =>
-    call('listing', identity, segment, filter, expanded || [], source || ''),
+  // view: { shown: { class: rows }, fit: class }
+  loadListing: (identity, segment, filter, expanded, source, view) =>
+    call('listing', identity, segment, filter, expanded || [], source || '', view || {}),
   classTotals: (identity, segment, filter, source) =>
     call('class-totals', identity, segment, filter, source || ''),
-  listingCounts: (identity, segment, source) => call('counts', identity, segment, source || ''),
-  listSources: (identity, segment, filter) => call('sources', identity, segment, filter),
+  listingCounts: (identity, segment, source, fit) => call('counts', identity, segment, source || '', fit || ''),
+  listSources: (identity, segment, filter, fit) => call('sources', identity, segment, filter, fit || ''),
   setFeedback: (identity, id, status, reason) => call('set-feedback', identity, id, status, reason ?? null),
   advance: (identity, id, step, comment) => call('advance', identity, id, step, comment ?? ''),
   stepBack: (identity, id) => call('step-back', identity, id),

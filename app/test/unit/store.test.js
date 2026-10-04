@@ -170,6 +170,29 @@ test('counts are whole numbers; the list is capped unless a class is expanded', 
   store.closeAll();
 });
 
+test('"shown" raises one class\'s limit; "fit" narrows the list, the counts and the sources', () => {
+  const { store } = setup();
+  const hot = (rows) => rows.filter((r) => r.class === 'hot_lead').length;
+  assert.equal(hot(store.listing('test', 'full', 'all', [], '', { shown: { hot_lead: 17 } })), 17);
+  assert.equal(hot(store.listing('test', 'full', 'all', [], '', { shown: { worth_a_look: 17 } })), 15);
+
+  const worth = store.listing('test', 'full', 'all', [], '', { fit: 'worth_a_look' });
+  assert.deepEqual(worth.map((r) => r.class), ['worth_a_look', 'worth_a_look', 'worth_a_look']);
+  assert.equal(store.counts('test', 'full', '', 'worth_a_look').all, 3);
+  assert.deepEqual(store.sources('test', 'full', 'all', 'worth_a_look').map((s) => [s.source, s.total]),
+    [['devitjobs', 3]]);
+  assert.deepEqual(store.classTotals('test', 'full', 'all'), { hot_lead: 20, worth_a_look: 3 });
+
+  // the funnel reads the class from the view
+  store.setFeedback('test', 'old00', 'applied');
+  assert.equal(store.listing('test', 'full', 'applied', [], '', { fit: 'hot_lead' }).length, 1);
+  assert.equal(store.listing('test', 'full', 'applied', [], '', { fit: 'worth_a_look' }).length, 0);
+  assert.equal(store.counts('test', 'full', '', 'worth_a_look').applied, 0);
+  assert.equal(store.counts('test', 'full', '', 'hot_lead').applied, 1);
+  assert.deepEqual(store.sources('test', 'full', 'applied', 'worth_a_look'), []);
+  store.closeAll();
+});
+
 test('"expired" is a status of its own: no reason, out of the list, not pending review', () => {
   const { store } = setup();
   store.setFeedback('test', 'new0', 'expired', 'ignored');

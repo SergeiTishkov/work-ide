@@ -128,6 +128,26 @@ test('the timeline: dated steps, empty ones plain, commented ones accordions', a
   await expect(second.getByTestId('entry-toggle')).toHaveCount(0);
 });
 
+test('Ctrl+Enter saves a step comment and an edited one, as "Save" does', async ({ page }) => {
+  const fixture = standardFixture();
+  inFunnel(fixture, 'p1', {
+    status: 'contacted', at: CONTACT_AT, appliedAt: APPLIED_AT, contactAt: CONTACT_AT, contactComment: '',
+  });
+  await open(page, fixture);
+  await page.getByTestId('filter').selectOption('contacted');
+  const card = byId(page, 'p1');
+  await card.getByTestId('entry-contact').getByTestId('entry-edit').click();
+  await card.getByTestId('entry-input').fill('recruiter wrote on LinkedIn');
+  await card.getByTestId('entry-input').press('Control+Enter');
+  expect(await calls(page, 'editComment')).toEqual(
+    [['kisel', 'p1', 'contact', null, 'recruiter wrote on LinkedIn']]);
+
+  await card.getByTestId('btn-step-interview').click();
+  await card.getByTestId('step-input').fill('a call with the team lead');
+  await card.getByTestId('step-input').press('Control+Enter');
+  expect(await calls(page, 'advance')).toEqual([['kisel', 'p1', 'interview', 'a call with the team lead']]);
+});
+
 test('the pencil edits in place: an empty step becomes an open accordion', async ({ page }) => {
   const fixture = standardFixture();
   inFunnel(fixture, 'p1', {

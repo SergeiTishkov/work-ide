@@ -43,6 +43,8 @@
   'filter.legend': 'Show',
   'filter.source_legend': 'Source',
   'filter.source_all': 'All sources',
+  'filter.fit_legend': 'Fit',
+  'filter.fit_all': 'Every fit',
   'filter.group.selection': 'The selection',
   'filter.group.answers': 'My answers',
   'filter.group.applications': 'Applications',
@@ -72,6 +74,9 @@
   'list.empty': 'Nothing here.',
   'list.show_more': 'Show {n} more',
   'list.show_less': 'Show less',
+  'list.shown_of': 'Shown {shown} of {total}. Press "{button}" below to see {n} more',
+  'list.shown_scroll': 'Shown {shown} of {total}. Scroll down to load {n} more',
+  'list.shown_all': 'All {n} shown',
 
   'row.details': 'Details',
   'row.posted_on': '📅 Posted: {date}',

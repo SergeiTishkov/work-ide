@@ -204,19 +204,22 @@ def _check_filter(filter_name: str) -> None:
 
 
 def listing(conn, selection_id: int, segment: str, filter_name: str,
-            expanded=(), source: str = "") -> list:
-    """The rows of one market under one filter: the top of each class, and
-    every row of the classes named in `expanded`. Funnel filters list every
-    application, uncapped. `source` narrows it to one board ("" for all)."""
+            expanded=(), source: str = "", shown=None, fit: str = "") -> list:
+    """The rows of one market under one filter: the top of each class, as many
+    as `shown` asks for a class ({"hot_lead": 25}), and every row of the
+    classes named in `expanded`. Funnel filters list every application,
+    uncapped. `source` narrows it to one board, `fit` to one class ("" for
+    all)."""
     _check_filter(filter_name)
     conn.row_factory = _dict_row
     try:
         if filter_name in FUNNEL:
             return conn.execute(load_queries()["funnel_listing"],
-                                {"filter": filter_name, "source": source}).fetchall()
+                                {"filter": filter_name, "source": source, "fit": fit}).fetchall()
         return conn.execute(load_queries()["listing"], {
             "selection_id": selection_id, "segment": segment, "filter": filter_name,
             "expanded": "," + ",".join(expanded) + ",", "source": source,
+            "shown": json.dumps(shown or {}), "fit": fit,
         }).fetchall()
     finally:
         conn.row_factory = None
@@ -238,26 +241,31 @@ def class_totals(conn, selection_id: int, segment: str, filter_name: str,
     return {cls: total for cls, total in rows}
 
 
-def listing_sources(conn, selection_id: int, segment: str, filter_name: str) -> dict:
+def listing_sources(conn, selection_id: int, segment: str, filter_name: str,
+                    fit: str = "") -> dict:
     """{board: how many the status filter holds from it}, largest first —
-    the app's "Source" drop-down. The source filter itself does not apply."""
+    the app's "Source" drop-down. The source filter itself does not apply;
+    the class (`fit`) does."""
     _check_filter(filter_name)
     if filter_name in FUNNEL:
-        rows = conn.execute(load_queries()["funnel_sources"], {"filter": filter_name})
+        rows = conn.execute(load_queries()["funnel_sources"], {"filter": filter_name, "fit": fit})
     else:
         rows = conn.execute(load_queries()["listing_sources"], {
             "selection_id": selection_id, "segment": segment, "filter": filter_name,
+            "fit": fit,
         })
     return {source: total for source, total in rows.fetchall()}
 
 
-def listing_counts(conn, selection_id: int, segment: str, source: str = "") -> dict:
+def listing_counts(conn, selection_id: int, segment: str, source: str = "",
+                   fit: str = "") -> dict:
     conn.row_factory = _dict_row
     try:
         row = conn.execute(load_queries()["listing_counts"], {
-            "selection_id": selection_id, "segment": segment, "source": source,
+            "selection_id": selection_id, "segment": segment, "source": source, "fit": fit,
         }).fetchone()
-        funnel = conn.execute(load_queries()["funnel_counts"], {"source": source}).fetchone()
+        funnel = conn.execute(load_queries()["funnel_counts"],
+                              {"source": source, "fit": fit}).fetchone()
     finally:
         conn.row_factory = None
     counts = {name: row[name] or 0 for name in FILTERS if name not in FUNNEL}

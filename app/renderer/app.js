@@ -110,6 +110,9 @@
     // "identity/segment" -> source ('' or missing: every board), applied
     // together with the filter above
     sourceFilters: {},
+    // "identity/segment" -> class ('' or missing: every class), the third
+    // drop-down, applied together with the two above
+    fitFilters: {},
     // [{ source, total }]: the boards the current filter holds in this market
     sources: [],
     listing: [],
@@ -125,7 +128,9 @@
     stepFor: null,     // { id, step, draft } while a funnel step's comment is written
     editing: null,     // { key, id, kind, index, draft } while a timeline comment is edited
     openEntries: new Set(),   // timeline entries shown opened, by key
-    expanded: new Set(),   // classes showing all their rows in this view
+    shown: {},             // class -> rows without feedback asked for ("Show more")
+    stalled: new Set(),    // classes where "more" brought nothing: the scroll stops asking
+    loadingMore: false,
     classTotals: {},       // class -> how many the current filter holds
     run: { running: false },
     // a function, so the status follows a change of language
@@ -150,7 +155,10 @@
     }
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(
-        { active: state.active, segments, filters: state.filters, sources: state.sourceFilters }));
+        {
+          active: state.active, segments, filters: state.filters, sources: state.sourceFilters,
+          fits: state.fitFilters,
+        }));
     } catch {
       // storage unavailable: a refresh starts from the defaults
     }
@@ -163,6 +171,7 @@
         state.active = saved.active || null;
         state.filters = saved.filters || {};
         state.sourceFilters = saved.sources || {};
+        state.fitFilters = saved.fits || {};
         state.restored = saved;
       }
     } catch {
@@ -252,6 +261,12 @@
     return state.sourceFilters[filterKey(state.active, info.activeSegment)] || '';
   }
 
+  function currentFit() {
+    const info = current();
+    if (!info || !info.activeSegment) return '';
+    return state.fitFilters[filterKey(state.active, info.activeSegment)] || '';
+  }
+
   function showError(error) {
     const box = document.querySelector('[data-testid="error"]');
     if (!error) {
@@ -319,22 +334,28 @@
       render();
       return;
     }
-    const expanded = [...state.expanded];
     const segment = info.activeSegment;
     const filter = currentFilter();
-    // The source travels only when one is chosen: without it every call is
-    // what it was before the source filter existed.
+    // The source, the class and the rows asked for travel only when set:
+    // without them every call is what it was before they existed.
     const source = currentSource();
+    const fit = currentFit();
+    const view = {};
+    if (Object.keys(state.shown).length) view.shown = { ...state.shown };
+    if (fit) view.fit = fit;
     const listingArgs = [state.active, segment, filter];
-    if (expanded.length || source) listingArgs.push(expanded);
-    if (source) listingArgs.push(source);
+    if (source || fit || view.shown) listingArgs.push([], source);
+    if (fit || view.shown) listingArgs.push(view);
+    const countArgs = [state.active, segment];
+    if (source || fit) countArgs.push(source);
+    if (fit) countArgs.push(fit);
     const [listing, counts, totals, pending, sources] = await Promise.all([
       api.loadListing(...listingArgs),
-      source ? api.listingCounts(state.active, segment, source) : api.listingCounts(state.active, segment),
+      api.listingCounts(...countArgs),
       source ? api.classTotals(state.active, segment, filter, source)
         : api.classTotals(state.active, segment, filter),
       api.pendingFeedbackCount(state.active),
-      api.listSources(state.active, segment, filter),
+      fit ? api.listSources(state.active, segment, filter, fit) : api.listSources(state.active, segment, filter),
     ]);
     state.listing = listing;
     state.counts = counts;
@@ -353,17 +374,54 @@
     state.reasonFor = null;
     state.stepFor = null;
     state.editing = null;
-    state.expanded.clear();
+    state.shown = {};
+    state.stalled.clear();
   }
 
-  // A class shows its top rows; "N more" opens the rest of it, "Collapse"
-  // closes it again. Counts above are always the whole number.
-  function toggleClass(cls) {
+  // A class shows its top rows; "Show more" (and, with one class chosen, the
+  // scroll) brings PAGE more each time, "Show less" goes back to the top
+  // (the owner, 2026-10-04: "ten at a time is enough").
+  const PAGE = 10;
+
+  function loadedIn(cls) {
+    return state.listing.filter((row) => row.class === cls);
+  }
+
+  function showMore(cls) {
+    if (state.loadingMore) return null;
+    state.loadingMore = true;
+    const before = loadedIn(cls).length;
     return guarded(async () => {
-      if (state.expanded.has(cls)) state.expanded.delete(cls);
-      else state.expanded.add(cls);
+      const waiting = loadedIn(cls).filter((row) => row.feedback.status === 'new').length;
+      state.shown[cls] = waiting + PAGE;
+      await loadList();
+      if (loadedIn(cls).length <= before) {
+        state.stalled.add(cls);
+        render();
+      }
+    }).finally(() => { state.loadingMore = false; });
+  }
+
+  function showLess(cls) {
+    return guarded(async () => {
+      delete state.shown[cls];
+      state.stalled.delete(cls);
       await loadList();
     });
+  }
+
+  // With one class chosen, reaching the end of the list loads the next PAGE.
+  let scrollWatcher = null;
+
+  function watchScroll() {
+    if (scrollWatcher) scrollWatcher.disconnect();
+    scrollWatcher = null;
+    const sentinel = document.querySelector('[data-scroll-more]');
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+    scrollWatcher = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) showMore(sentinel.dataset.scrollMore);
+    }, { rootMargin: '200px' });
+    scrollWatcher.observe(sentinel);
   }
 
   // --- actions ---------------------------------------------------------------
@@ -405,6 +463,16 @@
     return guarded(async () => {
       resetView();
       state.sourceFilters[filterKey(state.active, info.activeSegment)] = source;
+      await loadList();
+    });
+  }
+
+  function selectFit(cls) {
+    const info = current();
+    if (!info || !info.activeSegment) return;
+    return guarded(async () => {
+      resetView();
+      state.fitFilters[filterKey(state.active, info.activeSegment)] = cls;
       await loadList();
     });
   }
@@ -575,6 +643,7 @@
     renderIdentityTabs();
     renderPanel();
     renderRunPanel();
+    watchScroll();
   }
 
   // --- the language: a small drop-down of flags --------------------------------
@@ -733,7 +802,29 @@
         onchange: (event) => selectFilter(event.target.value),
       }, FILTER_GROUPS.map((group) => el('optgroup', { label: t(group.key) },
         group.filters.map(option)))),
-      renderSourceFilter());
+      renderSourceFilter(),
+      renderFitFilter());
+  }
+
+  // The classes ("Hot leads", "Worth a look", ...) under the other two
+  // filters, each with how many; the chosen one stays even when empty.
+  function renderFitFilter() {
+    const active = currentFit();
+    const totals = state.classTotals;
+    const order = Object.keys(CLASS_KEYS);
+    const classes = [...order, ...Object.keys(totals).filter((cls) => !order.includes(cls))]
+      .filter((cls) => totals[cls] || cls === active);
+    const all = Object.values(totals).reduce((sum, n) => sum + n, 0);
+    const option = (value, label, n) => el('option', {
+      value, testid: `fit-option-${value || 'all'}`, selected: value === active,
+    }, `${label} ${t('filter.count', { n })}`);
+    return el('span', { class: 'source-filter' },
+      el('label', { for: 'fit-select', testid: 'fit-label' }, t('filter.fit_legend')),
+      el('select', {
+        id: 'fit-select', testid: 'fit-filter',
+        onchange: (event) => selectFit(event.target.value),
+      }, option('', t('filter.fit_all'), all),
+      classes.map((cls) => option(cls, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls, totals[cls] || 0))));
   }
 
   // The boards the current filter holds, each with how many; the chosen one
@@ -796,22 +887,50 @@
       class: 'class-section', testid: `section-${cls}`,
     },
     el('h2', {}, el('span', { class: 'section-title' }, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls),
-      el('span', { class: 'count', testid: `section-count-${cls}` }, ` ${t('filter.count', {
-        n: state.classTotals[cls] || byClass.get(cls).filter((i) => i.kind === 'row').length,
-      })}`)),
+      el('span', { class: 'count', testid: `section-count-${cls}` }, sectionCount(cls))),
     byClass.get(cls).map((item) => (item.kind === 'row' ? renderRow(item.row) : renderStub(item.id, item.stub))),
-    renderMore(cls, byClass.get(cls).filter((i) => i.kind === 'row').length))));
+    renderMore(cls))));
   }
 
-  function renderMore(cls, shown) {
-    const hidden = (state.classTotals[cls] || 0) - shown;
-    if (state.expanded.has(cls)) {
-      return el('button', { class: 'more', testid: `show-less-${cls}`, onclick: () => toggleClass(cls) },
-        t('list.show_less'));
-    }
-    if (hidden <= 0) return null;
-    return el('button', { class: 'more', testid: `show-more-${cls}`, onclick: () => toggleClass(cls) },
-      t('list.show_more', { n: hidden }));
+  // How much of a class is on screen, and how to see the rest (the owner,
+  // 2026-10-04: a grey "(80)" went unnoticed, and so did the button under it).
+  // Counted on what the listing brought, so a folded row is still "shown".
+  function hiddenIn(cls) {
+    return Math.max(0, (state.classTotals[cls] || 0) - loadedIn(cls).length);
+  }
+
+  function sectionCount(cls) {
+    const shown = loadedIn(cls).length;
+    const total = Math.max(state.classTotals[cls] || 0, shown);
+    const hidden = hiddenIn(cls);
+    if (!hidden) return t('list.shown_all', { n: total });
+    const n = Math.min(PAGE, hidden);
+    if (currentFit() === cls && !state.stalled.has(cls)) return t('list.shown_scroll', { shown, total, n });
+    return t('list.shown_of', { shown, total, n, button: t('list.show_more', { n }) });
+  }
+
+  function renderMore(cls) {
+    const hidden = hiddenIn(cls);
+    const more = hidden > 0 && el('button', {
+      class: 'more', testid: `show-more-${cls}`, onclick: () => showMore(cls),
+    }, t('list.show_more', { n: Math.min(PAGE, hidden) }));
+    const less = state.shown[cls] && el('button', {
+      class: 'more', testid: `show-less-${cls}`, onclick: () => showLess(cls),
+    }, t('list.show_less'));
+    const scroll = hidden > 0 && currentFit() === cls && !state.stalled.has(cls)
+      && el('div', { class: 'scroll-more', testid: `scroll-more-${cls}`, 'data-scroll-more': cls });
+    if (!more && !less) return null;
+    return el('div', { class: 'more-bar' }, more, less, scroll);
+  }
+
+  // Ctrl+Enter in a comment saves it, as its Save button does.
+  function saveOnCtrlEnter(save) {
+    return (event) => {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        save();
+      }
+    };
   }
 
   function renderStub(id, stub) {
@@ -969,6 +1088,7 @@
     const input = el('textarea', {
       testid: 'reason-input', rows: '2', placeholder: t(REASON_KEYS[open]),
       oninput: (event) => { state.reasonFor.draft = event.target.value; },
+      onkeydown: saveOnCtrlEnter(() => mark(item, open, input.value)),
     });
     input.value = state.reasonFor.draft || '';
     const form = el('div', { class: 'reason', testid: 'reason-form' },
@@ -1009,6 +1129,7 @@
     const input = el('textarea', {
       class: 'big', testid: 'step-input', rows: '6', placeholder: t(STEP_HINT_KEYS[form.step]),
       oninput: (event) => { form.draft = event.target.value; },
+      onkeydown: saveOnCtrlEnter(() => advance(item, form.step, input.value)),
     });
     input.value = form.draft || '';
     setTimeout(() => { if (document.activeElement !== input) input.focus(); }, 0);
@@ -1054,6 +1175,7 @@
       const input = el('textarea', {
         testid: 'entry-input', rows: '4', placeholder: t('timeline.edit_hint'),
         oninput: (event) => { state.editing.draft = event.target.value; },
+        onkeydown: saveOnCtrlEnter(saveEdit),
       });
       input.value = state.editing.draft;
       setTimeout(() => { if (document.activeElement !== input) input.focus(); }, 0);

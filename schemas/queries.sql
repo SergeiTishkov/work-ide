@@ -17,8 +17,10 @@
 --
 -- LIMIT. The LIST shows vacancies without feedback up to section_limit per
 -- class, ranked AFTER the filter, so "fresh without feedback" shows the top of
--- the fresh ones; a class the person expanded (:expanded, ",hot_lead,...,")
--- shows all of them. Vacancies with feedback are never capped. The COUNTS are
+-- the fresh ones. :shown ('{"hot_lead": 25}') raises a class's limit: "Show
+-- more" and the scroll add ten at a time (the owner, 2026-10-04). A class the
+-- person expanded (:expanded, ",hot_lead,...,") shows all of them. Vacancies
+-- with feedback are never capped. The COUNTS are
 -- never capped either: a count is how many there are, not how many rows are
 -- on screen — capped counts did not add up across markets (the owner,
 -- 2026-09-30: UK 40 + ANZ 15 > "everything" 54), and the list says "N more"
@@ -29,6 +31,10 @@
 -- (the owner, 2026-10-04: "both work at the same time"). It is read from the
 -- view, where report.vacancy_view puts it, and from the record for views
 -- written before that.
+--
+-- FIT. The listing, the counts and the source list take :fit, one class
+-- ('' for all of them): the third drop-down next to "Show" and "Source".
+-- The class totals do not: they are that drop-down's own numbers.
 
 -- name: latest_selection
 SELECT MAX(id) AS id FROM selections;
@@ -74,6 +80,7 @@ base AS (
     AND (v.feedback_status = 'new'
          OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
     AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(v.data, '$.source')) = :source)
+    AND (:fit = '' OR i.class = :fit)
 ),
 filtered AS (
   SELECT * FROM base
@@ -96,7 +103,8 @@ SELECT vacancy_id, class, score, eligibility_rank, fresh, view, views, feedback_
        awaiting_offer_comment, awaiting_offer_at, declined_comment, declined_at,
        offered_comment, offered_at, started_comment, started_at
 FROM ranked
-WHERE feedback_status <> 'new' OR rank_in_class <= section_limit
+WHERE feedback_status <> 'new'
+   OR rank_in_class <= COALESCE(json_extract(:shown, '$.' || class), section_limit)
    OR instr(:expanded, ',' || class || ',') > 0
 ORDER BY class_position, score DESC, eligibility_rank, vacancy_id;
 
@@ -120,6 +128,7 @@ base AS (
     AND (v.feedback_status = 'new'
          OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
     AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(v.data, '$.source')) = :source)
+    AND (:fit = '' OR i.class = :fit)
 )
 SELECT COALESCE(SUM(fresh = 1 AND feedback_status = 'new'), 0) AS fresh_new,
        COUNT(*)                                                AS "all",
@@ -183,6 +192,7 @@ base AS (
   WHERE i.selection_id = :selection_id AND i.segment = :segment
     AND (v.feedback_status = 'new'
          OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
+    AND (:fit = '' OR i.class = :fit)
 )
 SELECT source, COUNT(*) AS total
 FROM base
@@ -247,6 +257,7 @@ SELECT v.id AS vacancy_id,
 FROM vacancies v
 WHERE v.feedback_status = :filter AND v.view IS NOT NULL
   AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(v.data, '$.source')) = :source)
+  AND (:fit = '' OR json_extract(v.view, '$.classification') = :fit)
 ORDER BY v.feedback_at DESC, v.id;
 
 -- name: funnel_counts
@@ -263,7 +274,8 @@ WHERE v.view IS NOT NULL
   -- only the funnel's rows: the source below reads JSON, not over the whole base
   AND v.feedback_status IN ('applied', 'contacted', 'interview', 'awaiting_final',
                             'awaiting_offer', 'declined', 'offered', 'started')
-  AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(v.data, '$.source')) = :source);
+  AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(v.data, '$.source')) = :source)
+  AND (:fit = '' OR json_extract(v.view, '$.classification') = :fit);
 
 -- name: funnel_sources
 -- The "Source" drop-down under a funnel filter: every application in that
@@ -271,6 +283,7 @@ WHERE v.view IS NOT NULL
 SELECT COALESCE(json_extract(v.view, '$.source'), json_extract(v.data, '$.source')) AS source, COUNT(*) AS total
 FROM vacancies v
 WHERE v.feedback_status = :filter AND v.view IS NOT NULL
+  AND (:fit = '' OR json_extract(v.view, '$.classification') = :fit)
 GROUP BY source
 ORDER BY total DESC, source;
 

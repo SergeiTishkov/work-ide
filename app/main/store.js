@@ -142,18 +142,20 @@ class Store {
     return { selection, displayName: name ? name.value : null, segments };
   }
 
-  // The top of each class, and every row of the classes in `expanded`; the
+  // The top of each class — as many as `shown` asks for a class
+  // ({ hot_lead: 25 }) — and every row of the classes in `expanded`; the
   // funnel filters list every application, uncapped. `source` narrows any of
-  // them to one board ('' for every board).
-  listing(identity, segment, filter, expanded = [], source = '') {
+  // them to one board, `fit` to one class ('' for all).
+  listing(identity, segment, filter, expanded = [], source = '', { shown = {}, fit = '' } = {}) {
     if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db);
     if (!selection) return [];
     const rows = FUNNEL.includes(filter)
-      ? db.prepare(this.queries.funnel_listing).all({ filter, source })
+      ? db.prepare(this.queries.funnel_listing).all({ filter, source, fit })
       : db.prepare(this.queries.listing).all({
         selection_id: selection.id, segment, filter, expanded: `,${expanded.join(',')},`, source,
+        shown: JSON.stringify(shown), fit,
       });
     return rows.map((row) => ({
       id: row.vacancy_id,
@@ -186,15 +188,16 @@ class Store {
   }
 
   // [{ source, total }], largest first: the boards the status filter holds in
-  // this market — the "Source" drop-down. The source filter does not apply.
-  sources(identity, segment, filter) {
+  // this market — the "Source" drop-down. The source filter does not apply;
+  // the class (`fit`) does.
+  sources(identity, segment, filter, fit = '') {
     if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db);
     if (!selection) return [];
     const rows = FUNNEL.includes(filter)
-      ? db.prepare(this.queries.funnel_sources).all({ filter })
-      : db.prepare(this.queries.listing_sources).all({ selection_id: selection.id, segment, filter });
+      ? db.prepare(this.queries.funnel_sources).all({ filter, fit })
+      : db.prepare(this.queries.listing_sources).all({ selection_id: selection.id, segment, filter, fit });
     const sites = this.sourceSites(db);
     return rows.map((r) => ({ source: r.source, site: sites[r.source] || null, total: r.total }));
   }
@@ -211,14 +214,14 @@ class Store {
     }
   }
 
-  counts(identity, segment, source = '') {
+  counts(identity, segment, source = '', fit = '') {
     const empty = Object.fromEntries(FILTERS.map((f) => [f, 0]));
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db);
     if (!selection) return empty;
     const row = db.prepare(this.queries.listing_counts)
-      .get({ selection_id: selection.id, segment, source });
-    const inFunnel = db.prepare(this.queries.funnel_counts).get({ source });
+      .get({ selection_id: selection.id, segment, source, fit });
+    const inFunnel = db.prepare(this.queries.funnel_counts).get({ source, fit });
     return Object.fromEntries(FILTERS.map((f) => [f, (FUNNEL.includes(f) ? inFunnel[f] : row[f]) || 0]));
   }
 

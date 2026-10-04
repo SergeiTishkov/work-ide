@@ -46,6 +46,8 @@
   'filter.legend': 'Показать',
   'filter.source_legend': 'Источник',
   'filter.source_all': 'Все источники',
+  'filter.fit_legend': 'Подходящесть',
+  'filter.fit_all': 'Любая',
   'filter.group.selection': 'Подборка',
   'filter.group.answers': 'Мои ответы',
   'filter.group.applications': 'Отклики',
@@ -75,6 +77,9 @@
   'list.empty': 'Здесь пусто.',
   'list.show_more': 'Показать ещё {n}',
   'list.show_less': 'Свернуть',
+  'list.shown_of': 'Показано {shown} из {total}. Нажми «{button}» внизу, чтобы увидеть ещё {n}',
+  'list.shown_scroll': 'Показано {shown} из {total}. Прокрути вниз, подгрузятся ещё {n}',
+  'list.shown_all': 'Показаны все {n}',
 
   'row.details': 'Подробнее',
   'row.posted_on': '📅 Опубликована: {date}',

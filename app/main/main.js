@@ -56,12 +56,12 @@ function registerIpc(window) {
     return identities.map(({ prefix, displayName, hasDatabase }) => ({ prefix, displayName, hasDatabase }));
   });
   handle('segments', (identity) => store.segments(identity));
-  handle('listing', (identity, segment, filter, expanded, source) =>
-    store.listing(identity, segment, filter, expanded || [], source || ''));
+  handle('listing', (identity, segment, filter, expanded, source, view) =>
+    store.listing(identity, segment, filter, expanded || [], source || '', view || {}));
   handle('class-totals', (identity, segment, filter, source) =>
     store.classTotals(identity, segment, filter, source || ''));
-  handle('counts', (identity, segment, source) => store.counts(identity, segment, source || ''));
-  handle('sources', (identity, segment, filter) => store.sources(identity, segment, filter));
+  handle('counts', (identity, segment, source, fit) => store.counts(identity, segment, source || '', fit || ''));
+  handle('sources', (identity, segment, filter, fit) => store.sources(identity, segment, filter, fit || ''));
   handle('set-feedback', (identity, id, status, reason) => store.setFeedback(identity, id, status, reason));
   handle('advance', (identity, id, step, comment) => store.advance(identity, id, step, comment));
   handle('step-back', (identity, id) => store.stepBack(identity, id));

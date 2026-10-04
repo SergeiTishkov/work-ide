@@ -33,9 +33,9 @@ function installMockApi(fixture) {
     }
   }
 
-  function rowsOf(identity, segment, source) {
+  function rowsOf(identity, segment, source, fit) {
     const rows = ((data.rows[identity] || {})[segment]) || [];
-    return source ? rows.filter((row) => row.view.source === source) : rows;
+    return rows.filter((row) => (!source || row.view.source === source) && (!fit || row.class === fit));
   }
 
   window.api = {
@@ -54,17 +54,18 @@ function installMockApi(fixture) {
       record('loadSegments', [identity]);
       return data.segments[identity] || { selection: null, displayName: null, segments: [] };
     },
-    async loadListing(identity, segment, filter, expanded, source) {
+    async loadListing(identity, segment, filter, expanded, source, view) {
       const args = [identity, segment, filter];
       if (expanded) args.push(expanded);
-      if (source) args.push(source);
+      if (source !== undefined) args.push(source);
+      if (view) args.push(view);
       record('loadListing', args);
-      const limit = data.limit || 1000;
+      const { shown = {}, fit = '' } = view || {};
       const seen = {};
-      return rowsOf(identity, segment, source).filter((row) => matches(row, filter)).filter((row) => {
+      return rowsOf(identity, segment, source, fit).filter((row) => matches(row, filter)).filter((row) => {
         if (row.feedback.status !== 'new' || (expanded || []).includes(row.class)) return true;
         seen[row.class] = (seen[row.class] || 0) + 1;
-        return seen[row.class] <= limit;
+        return seen[row.class] <= (shown[row.class] || data.limit || 1000);
       });
     },
     async classTotals(identity, segment, filter, source) {
@@ -76,20 +77,23 @@ function installMockApi(fixture) {
       }
       return totals;
     },
-    async listingCounts(identity, segment, source) {
-      record('listingCounts', source ? [identity, segment, source] : [identity, segment]);
+    async listingCounts(identity, segment, source, fit) {
+      const args = [identity, segment];
+      if (source !== undefined) args.push(source);
+      if (fit) args.push(fit);
+      record('listingCounts', args);
       const counts = {};
       for (const f of ['fresh_new', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired',
         'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered', 'started',
         'declined']) {
-        counts[f] = rowsOf(identity, segment, source).filter((row) => matches(row, f)).length;
+        counts[f] = rowsOf(identity, segment, source, fit).filter((row) => matches(row, f)).length;
       }
       return counts;
     },
-    async listSources(identity, segment, filter) {
-      record('listSources', [identity, segment, filter]);
+    async listSources(identity, segment, filter, fit) {
+      record('listSources', fit ? [identity, segment, filter, fit] : [identity, segment, filter]);
       const totals = new Map();
-      for (const row of rowsOf(identity, segment).filter((r) => matches(r, filter))) {
+      for (const row of rowsOf(identity, segment, '', fit).filter((r) => matches(r, filter))) {
         totals.set(row.view.source, (totals.get(row.view.source) || 0) + 1);
       }
       const sites = { linkedin: 'linkedin.com', devitjobs: 'devitjobs.uk, devitjobs.com' };

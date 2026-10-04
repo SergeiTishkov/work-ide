@@ -5,7 +5,7 @@
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test, expect } = require('@playwright/test');
-const { installMockApi, standardFixture } = require('./mock-api');
+const { installMockApi, standardFixture, row } = require('./mock-api');
 const ru = require('../../renderer/locales/ru.js');
 
 const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.html')).href;
@@ -390,23 +390,111 @@ test('"Refresh" reloads the interface and keeps the tab, market and filter', asy
   expect((await calls(page, 'loadListing'))[0]).toEqual(['kisel', 'uk', 'all']);
 });
 
-test('a capped class says how many more it holds, opens and closes', async ({ page }) => {
+// n fresh hot leads h00..h<n-1>, best first, and the worth-a-look b1
+function manyHotLeads(n) {
   const fixture = standardFixture();
-  fixture.limit = 1;   // a1 and a2r are fresh hot leads: one shown, one more
-  await open(page, fixture);
-  await expect(page.getByTestId('section-count-hot_lead')).toHaveText(' (2)');
-  await expect(page.getByTestId('filter-option-fresh_new')).toContainText('(3)');   // whole numbers
-  await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(1);
+  fixture.limit = 15;   // section_limit
+  fixture.rows.kisel.full = [
+    ...Array.from({ length: n }, (_, i) => row(`h${String(i).padStart(2, '0')}`, { score: 99 - i })),
+    row('b1', { cls: 'worth_a_look', score: 45, source: 'devitjobs' }),
+  ];
+  return fixture;
+}
+
+const fill = (text, values) => Object.entries(values)
+  .reduce((s, [k, v]) => s.split(`{${k}}`).join(String(v)), text);
+
+test('a capped class says how much is shown and brings ten more at a time', async ({ page }) => {
+  await open(page, manyHotLeads(30));
+  const section = page.getByTestId('section-hot_lead');
+  const count = page.getByTestId('section-count-hot_lead');
+  const more = ru['list.show_more'].replace('{n}', '10');
+  await expect(count).toHaveText(fill(ru['list.shown_of'], { shown: 15, total: 30, n: 10, button: more }));
+  await expect(page.getByTestId('show-more-hot_lead')).toHaveText(more);
+  await expect(section.locator('article')).toHaveCount(15);
+  await expect(page.getByTestId('scroll-more-hot_lead')).toHaveCount(0);   // every class: buttons only
 
   await page.getByTestId('show-more-hot_lead').click();
+  expect((await calls(page, 'loadListing')).at(-1))
+    .toEqual(['kisel', 'full', 'fresh_new', [], '', { shown: { hot_lead: 25 } }]);
+  await expect(section.locator('article')).toHaveCount(25);
+  const five = ru['list.show_more'].replace('{n}', '5');
+  await expect(count).toHaveText(fill(ru['list.shown_of'], { shown: 25, total: 30, n: 5, button: five }));
+
+  await page.getByTestId('show-more-hot_lead').click();
+  await expect(section.locator('article')).toHaveCount(30);
+  await expect(count).toHaveText(fill(ru['list.shown_all'], { n: 30 }));
   await expect(page.getByTestId('show-more-hot_lead')).toHaveCount(0);
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'fresh_new', ['hot_lead']]);
-  await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(2);
 
   await page.getByTestId('show-less-hot_lead').click();
-  await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(1);
-  await expect(page.getByTestId('show-more-hot_lead'))
-    .toHaveText(ru['list.show_more'].replace('{n}', '1'));
+  await expect(section.locator('article')).toHaveCount(15);
+  await expect(page.getByTestId('show-less-hot_lead')).toHaveCount(0);
+  await expect(page.getByTestId('section-count-worth_a_look')).toHaveText(fill(ru['list.shown_all'], { n: 1 }));
+});
+
+test('"Fit" narrows the list to one class, and the other filters count within it', async ({ page }) => {
+  await open(page);
+  await expect(page.getByTestId('fit-label')).toHaveText(ru['filter.fit_legend']);
+  await expect(page.getByTestId('fit-filter')).toHaveValue('');
+  await expect(page.getByTestId('fit-option-all')).toHaveText(`${ru['filter.fit_all']} (3)`);
+  await expect(page.getByTestId('fit-option-hot_lead')).toHaveText(`${ru['class.hot_lead']} (2)`);
+  await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${ru['class.worth_a_look']} (1)`);
+
+  await page.getByTestId('fit-filter').selectOption('hot_lead');
+  await expect(page.getByTestId('section-worth_a_look')).toHaveCount(0);
+  await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(2);
+  expect((await calls(page, 'loadListing')).at(-1))
+    .toEqual(['kisel', 'full', 'fresh_new', [], '', { fit: 'hot_lead' }]);
+  expect((await calls(page, 'listingCounts')).at(-1)).toEqual(['kisel', 'full', '', 'hot_lead']);
+  expect((await calls(page, 'listSources')).at(-1)).toEqual(['kisel', 'full', 'fresh_new', 'hot_lead']);
+  await expect(page.getByTestId('filter-option-fresh_new')).toContainText('(2)');
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveCount(0);   // b1 is worth a look
+  await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${ru['class.worth_a_look']} (1)`);
+
+  // with the status filter: "All" adds a3 (not fresh) and x1 (a wrong pick)
+  await page.getByTestId('filter').selectOption('all');
+  await expect(page.getByTestId('fit-filter')).toHaveValue('hot_lead');
+  await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(4);
+  // and with the source
+  await page.getByTestId('source-filter').selectOption('devitjobs');
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(1);   // x1
+  await expect(byId(page, 'x1')).toBeVisible();
+
+  await page.getByTestId('refresh').click();
+  await expect(page.getByTestId('fit-filter')).toHaveValue('hot_lead');
+});
+
+test('one class chosen: the scroll brings ten more at a time', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await open(page, manyHotLeads(40));
+  await page.getByTestId('fit-filter').selectOption('hot_lead');
+  const section = page.getByTestId('section-hot_lead');
+  await expect(section.locator('article')).toHaveCount(15);
+  await expect(page.getByTestId('section-count-hot_lead'))
+    .toHaveText(fill(ru['list.shown_scroll'], { shown: 15, total: 40, n: 10 }));
+  await expect(page.getByTestId('show-more-hot_lead')).toBeVisible();   // the button still works
+
+  for (const shown of [25, 35, 40]) {
+    await page.getByTestId('scroll-more-hot_lead').scrollIntoViewIfNeeded();
+    await expect(section.locator('article')).toHaveCount(shown);
+  }
+  await expect(page.getByTestId('scroll-more-hot_lead')).toHaveCount(0);
+  await expect(page.getByTestId('section-count-hot_lead')).toHaveText(fill(ru['list.shown_all'], { n: 40 }));
+  const asked = (await calls(page, 'loadListing')).map((args) => args[5] && args[5].shown)
+    .filter(Boolean).map((shown) => shown.hot_lead);
+  expect(asked).toEqual([25, 35, 45]);
+});
+
+test('Ctrl+Enter in a reason saves it, as "Save" does', async ({ page }) => {
+  await open(page);
+  const row = byId(page, 'a1');
+  await row.getByTestId('btn-bugged').click();
+  await row.getByTestId('reason-input').fill('Java, not .NET');
+  await row.getByTestId('reason-input').press('Enter');   // a new line, not a save
+  expect(await calls(page, 'setFeedback')).toEqual([]);
+  await row.getByTestId('reason-input').press('Control+Enter');
+  expect(await calls(page, 'setFeedback')).toEqual([['kisel', 'a1', 'bugged', 'Java, not .NET\n']]);
+  await expect(page.getByTestId('stub-a1')).toBeVisible();
 });
 
 test('a failing request shows the error over the real screen, not the start one', async ({ page }) => {
