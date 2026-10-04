@@ -846,6 +846,24 @@
     }, t('action.open'));
   }
 
+  // One click opens the reason; a second one on the same button within a
+  // double-click's time saves at once, with whatever reason is typed (the
+  // owner, 2026-10-04: a double click skips "Save"). Timed by hand rather than
+  // with dblclick: the first click re-renders the row, and the second lands on
+  // a new button.
+  const DOUBLE_CLICK_MS = 500;
+
+  function askReason(item, status) {
+    const open = state.reasonFor;
+    if (open && open.id === item.id && open.status === status
+        && Date.now() - open.at < DOUBLE_CLICK_MS) {
+      return mark(item, status, open.draft || '');
+    }
+    const same = open && open.id === item.id && open.status === status;
+    state.reasonFor = { id: item.id, status, at: Date.now(), draft: same ? open.draft : undefined };
+    render();
+  }
+
   function renderAnswers(item) {
     const open = state.reasonFor && state.reasonFor.id === item.id ? state.reasonFor.status : null;
     const answers = el('div', { class: 'answers' },
@@ -853,11 +871,11 @@
       el('button', { testid: 'btn-applied', onclick: () => mark(item, 'applied', null) }, t('action.applied')),
       el('button', {
         testid: 'btn-rejected', class: open === 'rejected' ? 'pressed' : null,
-        onclick: () => { state.reasonFor = { id: item.id, status: 'rejected' }; render(); },
+        onclick: () => askReason(item, 'rejected'),
       }, t('action.rejected')),
       el('button', {
         testid: 'btn-bugged', class: open === 'bugged' ? 'pressed' : null,
-        onclick: () => { state.reasonFor = { id: item.id, status: 'bugged' }; render(); },
+        onclick: () => askReason(item, 'bugged'),
       }, t('action.bugged')),
       // Closed at the source or a dead link: recorded at once, no reason —
       // it says nothing about the pick.

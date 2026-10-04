@@ -110,6 +110,25 @@ test('"Not for me" with an empty reason is saved without one', async ({ page }) 
   expect(await calls(page, 'setFeedback')).toEqual([['kisel', 'a2r', 'rejected', '']]);
 });
 
+test('a double click on "Not for me" or "Wrong pick" saves without "Save"', async ({ page }) => {
+  await open(page);
+  await byId(page, 'a2r').getByTestId('btn-rejected').dblclick();
+  expect(await calls(page, 'setFeedback')).toEqual([['kisel', 'a2r', 'rejected', '']]);
+  await byId(page, 'a1').getByTestId('btn-bugged').dblclick();
+  expect((await calls(page, 'setFeedback')).at(-1)).toEqual(['kisel', 'a1', 'bugged', '']);
+});
+
+test('two slow clicks only open the reason, and a typed reason survives', async ({ page }) => {
+  await open(page);
+  const row = byId(page, 'a1');
+  await row.getByTestId('btn-rejected').click();
+  await row.getByTestId('reason-input').fill('Too far');
+  await page.waitForTimeout(600);
+  await row.getByTestId('btn-rejected').click();
+  expect(await calls(page, 'setFeedback')).toEqual([]);
+  await expect(row.getByTestId('reason-input')).toHaveValue('Too far');
+});
+
 test('cancelling the reason form saves nothing', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('btn-rejected').click();
