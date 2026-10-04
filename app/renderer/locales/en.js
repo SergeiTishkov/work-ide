@@ -145,4 +145,5 @@
   'timeline.edit': 'Edit the comment',
   'timeline.edit_hint': 'Comment',
   'stub.marked': 'Marked: {status}',
+  'stub.removed_in': '{n} s until this line is removed',
 })));

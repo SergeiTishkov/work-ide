@@ -114,7 +114,26 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .class-section h2 .count { color: var(--muted); font-weight: 400; }
 button.more { display: block; margin: 0 auto 8px; color: var(--accent); }
 .row { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 12px; margin-bottom: 8px; }
-.row.stub { color: var(--muted); padding: 6px 12px; }
+.row.stub { color: var(--muted); padding: 6px 12px; display: flex; align-items: center; }
+/* The ring drains from full to empty over the stub's life (app.js,
+   STUB_LIFETIME_MS); the tooltip shows the seconds left. */
+@property --stub-left { syntax: '<percentage>'; inherits: false; initial-value: 100%; }
+@keyframes stub-drain { from { --stub-left: 100%; } to { --stub-left: 0%; } }
+.stub-timer { position: relative; margin-left: auto; display: inline-flex; padding: 2px; cursor: default; }
+.stub-timer .ring {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: conic-gradient(var(--accent) var(--stub-left), var(--border) 0);
+  -webkit-mask: radial-gradient(circle, transparent 4px, #000 5px);
+  mask: radial-gradient(circle, transparent 4px, #000 5px);
+  animation-name: stub-drain; animation-timing-function: linear; animation-fill-mode: forwards;
+}
+.stub-timer .tip {
+  display: none; position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%);
+  white-space: nowrap;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px; font-size: 12px; z-index: 10;
+}
+.stub-timer:hover .tip { display: block; }
 .row-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .score { font-weight: 700; min-width: 28px; color: var(--accent); }
 .title { font-weight: 600; color: var(--text); text-decoration: none; }
@@ -127,7 +146,7 @@ button.more { display: block; margin: 0 auto 8px; color: var(--accent); }
 .details ul { margin: 4px 0; padding-left: 18px; }
 .answers, .marked { display: flex; gap: 6px; align-items: center; margin: 8px 0 0 38px; }
 button.open { margin-right: 6px; color: var(--accent); border-color: var(--accent); }
-button.copy { margin-right: 10px; padding: 2px 8px; font-size: 0.85em; color: var(--muted); }
+button.copy { margin-right: 10px; padding: 2px 8px; font-size: 0.85em; color: var(--muted); white-space: nowrap; }
 .reason { margin: 6px 0 0 38px; }
 .reason textarea { width: 100%; max-width: 640px; font: inherit; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
 .reason-actions { display: flex; gap: 6px; margin-top: 4px; }

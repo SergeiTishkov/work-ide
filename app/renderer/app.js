@@ -415,8 +415,38 @@
     const index = shown.findIndex((entry) => entry.kind === 'row' && entry.row.id === item.id);
     await loadList();
     if (status !== 'new' && !state.listing.some((row) => row.id === item.id)) {
-      state.stubs.set(item.id, { class: item.class, index, status });
+      const stub = { class: item.class, index, status, expires: Date.now() + STUB_LIFETIME_MS };
+      state.stubs.set(item.id, stub);
+      setTimeout(() => expireStub(item.id, stub), STUB_LIFETIME_MS);
       render();
+    }
+  }
+
+  // A stub lives 30 seconds, then goes (the owner, 2026-10-04: a column of
+  // "Marked" lines piled up). A ring on its right drains over that time; its
+  // tooltip counts the seconds down.
+  const STUB_LIFETIME_MS = 30000;
+
+  function expireStub(id, stub) {
+    // undone, or cleared by a change of view, in the meantime
+    if (state.stubs.get(id) !== stub) return;
+    state.stubs.delete(id);
+    // The stubs below it move up one: their places count this one.
+    for (const other of state.stubs.values()) {
+      if (other.class === stub.class && other.index > stub.index) other.index -= 1;
+    }
+    render();
+  }
+
+  function secondsLeft(expires) {
+    return Math.max(0, Math.ceil((expires - Date.now()) / 1000));
+  }
+
+  // The tooltips change every second without a render: a render would
+  // rebuild the list under the cursor.
+  function tickStubTimers() {
+    for (const tip of document.querySelectorAll('[data-expires]')) {
+      tip.textContent = t('stub.removed_in', { n: secondsLeft(Number(tip.dataset.expires)) });
     }
   }
 
@@ -771,9 +801,18 @@
   }
 
   function renderStub(id, stub) {
+    // A negative delay starts the drain where it stands, so a render half way
+    // through does not refill the ring.
+    const elapsed = STUB_LIFETIME_MS - Math.max(0, stub.expires - Date.now());
     return el('div', { class: 'row stub', testid: `stub-${id}` },
-      t('stub.marked', { status: t(STATUS_KEYS[stub.status]) }), ' · ',
-      el('button', { class: 'link', testid: 'btn-undo', onclick: () => undo(id) }, t('action.undo')));
+      el('span', {}, t('stub.marked', { status: t(STATUS_KEYS[stub.status]) }), ' · ',
+        el('button', { class: 'link', testid: 'btn-undo', onclick: () => undo(id) }, t('action.undo'))),
+      el('span', { class: 'stub-timer', testid: 'stub-timer' },
+        el('span', {
+          class: 'ring', style: `animation-duration: ${STUB_LIFETIME_MS}ms; animation-delay: -${elapsed}ms`,
+        }),
+        el('span', { class: 'tip', role: 'tooltip', testid: 'stub-timer-tip', 'data-expires': String(stub.expires) },
+          t('stub.removed_in', { n: secondsLeft(stub.expires) }))));
   }
 
   // The vacancy's lines in the interface language. The pipeline renders them
@@ -1074,5 +1113,6 @@
     await pollPipelines();
     render();
     setInterval(() => { pollPipelines(); }, POLL_MS);
+    setInterval(tickStubTimers, 1000);
   });
 }());

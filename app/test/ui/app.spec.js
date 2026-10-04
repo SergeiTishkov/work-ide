@@ -199,6 +199,51 @@ test('marked vacancies keep their places, whatever order they are marked in', as
   expect(await order()).toEqual(['stub-a1', 'stub-a2r']);
 });
 
+test('a stub drains for 30 seconds, counts down on hover, then goes', async ({ page }) => {
+  await page.clock.install();
+  await open(page);
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  const stub = page.getByTestId('stub-a1');
+  await expect(stub).toBeVisible();
+  const tip = stub.getByTestId('stub-timer-tip');
+  await expect(tip).toBeHidden();
+  await stub.getByTestId('stub-timer').hover();
+  await expect(tip).toBeVisible();
+  await expect(tip).toHaveText(ru['stub.removed_in'].replace('{n}', '30'));
+  await page.clock.runFor(10000);
+  await expect(tip).toHaveText(ru['stub.removed_in'].replace('{n}', '20'));
+  await page.clock.runFor(20000);
+  await expect(stub).toHaveCount(0);
+});
+
+test('a stub that goes lets the ones below keep their order', async ({ page }) => {
+  await page.clock.install();
+  const order = () => page.getByTestId('section-hot_lead').locator('article, .stub')
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
+  await open(page);
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await expect(page.getByTestId('stub-a1')).toBeVisible();
+  await page.clock.runFor(15000);
+  await byId(page, 'a2r').getByTestId('btn-expired').click();
+  await expect(page.getByTestId('stub-a2r')).toBeVisible();
+  await page.clock.runFor(15000);
+  await expect(page.getByTestId('stub-a1')).toHaveCount(0);
+  expect(await order()).toEqual(['stub-a2r']);
+  await page.clock.runFor(15000);
+  await expect(page.getByTestId('stub-a2r')).toHaveCount(0);
+});
+
+test('an undone stub is not removed again by its timer', async ({ page }) => {
+  await page.clock.install();
+  await open(page);
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await page.getByTestId('stub-a1').getByTestId('btn-undo').click();
+  await expect(byId(page, 'a1')).toBeVisible();
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await page.clock.runFor(29000);
+  await expect(page.getByTestId('stub-a1')).toBeVisible();
+});
+
 test('changing the filter clears stubs', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('btn-applied').click();

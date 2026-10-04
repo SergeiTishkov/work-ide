@@ -148,4 +148,5 @@
   'timeline.edit': 'Редактировать комментарий',
   'timeline.edit_hint': 'Комментарий',
   'stub.marked': 'Отмечено: {status}',
+  'stub.removed_in': '{n} с до того, как эта строка будет убрана',
 })));
