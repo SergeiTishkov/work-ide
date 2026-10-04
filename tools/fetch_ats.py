@@ -4,8 +4,7 @@ Fetches vacancies straight from company careers pages via their ATS.
 Greenhouse / Lever / Ashby / Recruitee are hiring-management systems in which
 companies run their own careers pages. All of them have OFFICIAL public JSON
 endpoints meant precisely to be read — the vacancy widgets on company sites
-run off them. No authorisation, no anti-bot protection, nothing to circumvent:
-an ordinary GET, HTTP 200 (measured 2026-07-31: Greenhouse Stripe 546
+run off them. No authorisation: a plain GET, HTTP 200 (measured 2026-07-31: Greenhouse Stripe 546
 vacancies, Cloudflare 284, GitLab 185; Ashby Notion 111, Ramp 126).
 
 Value to the project: these are vacancies FIRST-HAND, bypassing the job
@@ -30,9 +29,8 @@ import common  # noqa: E402
 
 SOURCE_NAME = "ats"
 
-# The pause between requests to one provider is ordinary politeness towards
-# somebody else's server rather than a requirement of the board.
-POLITE_DELAY_SEC = 0.3
+# The pause between requests to one provider; not a requirement of the board.
+REQUEST_DELAY_SEC = 0.3
 
 
 def _endpoint(provider: str, token: str) -> Optional[str]:
@@ -262,7 +260,7 @@ def fetch(targets: Optional[list] = None, timeout: int = common.DEFAULT_TIMEOUT)
             records.extend(parser(payload, company, token))
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{company}: {type(exc).__name__}")
-        time.sleep(POLITE_DELAY_SEC)
+        time.sleep(REQUEST_DELAY_SEC)
 
     error = "; ".join(errors[:8]) if errors else None
     if errors and len(errors) > 8:

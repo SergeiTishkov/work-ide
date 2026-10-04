@@ -74,9 +74,8 @@ A board token can be checked with one request:
 
 ## Manual enrichment of the base
 
-Not automated on principle — the sources sit behind anti-bot protection the
-project will not circumvent (see the constitution). The agent gathers it by
-ordinary web search, as a person would.
+Not automated: the sources answer 403 to a plain request. The agent gathers it
+by web search.
 
 ```bash
 # employer reputation (Glassdoor and the like)

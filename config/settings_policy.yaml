@@ -34,11 +34,6 @@ frozen:
     reports/ and data/ — exactly the litter the safety net in
     tests/conftest.py exists to prevent.
 
-  scraping.bypass_bot_protection: >
-    Circumventing active anti-bot protection is forbidden by the constitution
-    (§5, the boundary of what is allowed) and is not a user preference. The
-    key is frozen in advance, before anybody thinks to introduce it.
-
   privacy.allow_personal_data_in_git: >
     Personal data does not reach the shared repository. That is not a search
     setting but a promise made to a person: the repository can be shown to

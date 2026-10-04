@@ -353,5 +353,5 @@ sources:
       finds obtained by ordinary web search — above all from Indeed, Dice and
       companies' careers pages.
     caveats: >
-      The one legitimate way to use sites that cannot be read programmatically
-      (403 behind anti-bot protection). See docs/SOURCES.md.
+      The way to use sites the fetchers do not read (they answer 403). See
+      docs/SOURCES.md.

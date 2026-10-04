@@ -58,8 +58,7 @@ file can override anything. For preferences that is true. For boundaries it is
 not.
 
 `config/settings_policy.yaml` lists the keys the upper layers cannot change: the
-marker of a test fixture, the ban on circumventing anti-bot protection, the ban
-on personal data in git. An attempt to set them **fails the load with an
+marker of a test fixture and the ban on personal data in git. An attempt to set them **fails the load with an
 explanation** rather than being ignored silently: silent ignoring is worse than
 a refusal, because the person goes on believing their setting works.
 

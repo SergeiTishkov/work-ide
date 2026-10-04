@@ -107,11 +107,11 @@ the final word.** For every vacancy at `long_shot` and above (including
    checklist finds something new (see `data/<p>/knowledge/<p>_insights.md`).
 4. Only vacancies that pass the checklist in full count as confirmed finds.
 
-## Step 2 — manual extension (what the scripts cannot legitimately do)
+## Step 2 — manual extension (what the scripts do not read)
 
-The automation deliberately stays out of Indeed, Dice and Glassdoor (see
-[docs/SOURCES.md](docs/SOURCES.md), which explains why). Here the agent works
-itself, with its own tools (WebSearch/WebFetch), as a person would:
+The fetchers do not read Indeed, Dice and Glassdoor (see
+[docs/SOURCES.md](docs/SOURCES.md)). Here the agent works itself, with its own
+tools (WebSearch/WebFetch):
 
 1. Read `reports/<p>_latest.md` — the "🔎 Needs a manual check" section. For
    each such vacancy: resolve the ambiguity (is "Georgia" the country or the US

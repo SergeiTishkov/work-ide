@@ -25,7 +25,7 @@ source's own `docs/sources/<source>.md`.
 | `ok` | answers as the fetcher expects | nobody |
 | `broken` | answers, but not as expected | the doctor repairs the fetcher |
 | `unreachable` | network, timeout, 429, 5xx | nobody: it is today's network |
-| `blocked` | 401/403/999, a login wall | the owner decides; never worked around (CLAUDE.md §5) |
+| `blocked` | 401/403/999, a login wall | the owner decides |
 | `no_contract` | the fetcher has no `contract()` yet | whoever touches the source next |
 
 ## Who publishes a repair

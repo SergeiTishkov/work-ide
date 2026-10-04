@@ -537,11 +537,8 @@ convenience, especially for a project that should `pip install` without trouble
 years from now.
 
 ### Scraping LinkedIn's main site, Indeed or Glassdoor
-Deliberately not done in any form — not through requests plus BeautifulSoup, not
-through a headless browser, not by circumventing anti-bot protection or
-CAPTCHAs. Those sites answer 403 to an ordinary request, and getting in would
-take impersonation. See `docs/SOURCES.md`. (LinkedIn's guest job-search
-endpoint is a different matter: it answers 200 to an ordinary GET, and
+Not done: those sites answer 403 to a plain request. See `docs/SOURCES.md`.
+(LinkedIn's guest job-search endpoint answers 200, and
 `tools/fetch_linkedin.py` reads it.)
 
 ### An override layer instead of full config copies (2026-07-31)
@@ -587,8 +584,7 @@ process is exactly the constraint wanted.
 
 ## Further development (candidates for the next cycle)
 
-- Add Dice.com as a source (RSS or public search), if a legitimate public
-  endpoint exists that needs no circumvention.
+- Add Dice.com as a source (RSS or public search), if a usable endpoint exists.
 - ~~A gate for "not a simple" role (Principal Scientist/Agentic/R&D)~~ — done
   2026-07-30, see `role_complexity_signal` above.
 - ~~A hard regional tie as a dealbreaker~~ — done 2026-07-30, see

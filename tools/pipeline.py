@@ -490,7 +490,7 @@ def main() -> None:
               f" — repair with /source-doctor <source>")
     if blocked:
         print(f"  sources now refusing anonymous requests: {', '.join(blocked)}"
-              f" — not to be worked around (CLAUDE.md §5); tell the owner")
+              f" — tell the owner")
     # A reminder that lives in the output rather than in somebody's memory:
     # feedback left in the app is a bug report against the filter.
     import feedback

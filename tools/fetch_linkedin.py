@@ -1,17 +1,12 @@
 """
 Fetches LinkedIn through its guest job-search endpoint.
 
-WHY THIS IS WITHIN THE PROJECT'S BOUNDS
----------------------------------------
+THE ENDPOINT
+------------
 Measured 2026-08-04: `linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search`
-answers HTTP 200 to an ordinary GET carrying the project's honest User-Agent —
-no authorisation, no CAPTCHA, no anti-bot block. It is the same endpoint
+answers HTTP 200 to a plain GET with no authorisation. It is the same endpoint
 LinkedIn's own guest interface uses when a logged-out person opens the page.
-
-The project's boundary (CLAUDE.md §5): "parsers of anything served to an
-ordinary GET — yes; circumventing active protection — no". This is the former.
 For contrast, the same request on the same day: Indeed 403, Glassdoor 403.
-Those are genuinely closed, and the project does not go there.
 
 WHY THIS IS THE PROJECT'S MAIN SOURCE
 -------------------------------------
@@ -72,9 +67,8 @@ POSTED_WITHIN_DAYS = 7
 # 2026-10-03: "C# developer" in the UK has 736 postings this week by
 # LinkedIn's own count, and start=100..290 are all empty; the same in
 # Germany (540) and Canada; adding geoId, position or pageNum changes nothing.
-# A browser is served up to 1000, but the page marks this fetcher
-# data-is-bot="true", and posing as a browser to get past that is exactly what
-# CLAUDE.md §5 rules out. So a query that reaches the ceiling is SPLIT into
+# A browser is served up to 1000; the page marks this fetcher
+# data-is-bot="true". So a query that reaches the ceiling is SPLIT into
 # narrower queries, each with a ceiling of its own — see SPLIT_REGIONS.
 RESULTS_CEILING = 100
 
@@ -110,14 +104,14 @@ SPLIT_REGIONS = {
 # How many cards per run to enrich with a full description. A card carries no
 # description — only title, company and location. Without one, the stack gate
 # rejects three quarters of what was found (measured: 447 of 621), because it
-# sees no familiar language. The vacancy page opens to the same ordinary GET
+# sees no familiar language. The vacancy page opens to the same plain GET
 # and returns the full text, but that is one request per vacancy — hence a cap.
 ENRICH_LIMIT = 120
 # Pages per query. A bound, not a target: a query ends on its own at the
 # ceiling (ten pages) or sooner. Higher than the ceiling on purpose — should
 # LinkedIn ever serve an anonymous request deeper, the walk follows.
 MAX_PAGES = 100
-PAUSE_SECONDS = 1.5     # politeness: do not hammer somebody else's server
+PAUSE_SECONDS = 1.5     # between pages; faster runs into 429s
 RATE_LIMIT_PAUSE_SECONDS = 30   # after a 429, before the one retry
 
 _CARD_RE = re.compile(r"<li>(.*?)</li>", re.S)
@@ -186,8 +180,8 @@ def _card_to_common_schema(card_html: str, location_query: str,
         # "remote" only where the employer declares it. The on-site/hybrid
         # badge a logged-in person sees is NOT served to an anonymous request
         # — checked three ways on 2026-08-11: absent from the search results,
-        # from the guest jobPosting fragment, and from the page HTML. Reading
-        # it would take a logged-in session, which is over the line in §5.
+        # from the guest jobPosting fragment, and from the page HTML. It
+        # renders only for a logged-in session.
         "workplace_type": None,
         "tags": [f"market:{market}"],
         "description_text": "",  # a card has none; only the vacancy page does
@@ -371,7 +365,7 @@ def _fetch_description(url: str, timeout: int) -> str:
     return fetch_page_facts(url, timeout)["description"]
 
 
-def _fetch_page_politely(keyword: str, location: str, start: int, timeout: int,
+def _fetch_search_page(keyword: str, location: str, start: int, timeout: int,
                          posted_within_days: Optional[int], counts: Optional[dict] = None) -> str:
     """One search page; on a 429 or a dropped connection it waits and asks
     once more. A long walk meets both now and then (2026-10-03: one
@@ -419,7 +413,7 @@ class _Walk:
         holes = 0
         for _ in range(self.max_pages):
             try:
-                page_html = _fetch_page_politely(keyword, location, start, self.timeout,
+                page_html = _fetch_search_page(keyword, location, start, self.timeout,
                                                  self.posted_within_days, self.counts)
             except Exception as exc:  # noqa: BLE001
                 self.errors.append(f"{keyword}/{location}: {type(exc).__name__}")

@@ -21,8 +21,7 @@ identity:
   created_at: "<YYYY-MM-DD>"
 
 contact:
-  # Where a site's owner can write if they want to get in touch (an honest
-  # User-Agent is an engineering commitment of the project).
+  # The contact in the User-Agent.
   #   "you@mail.com" -> right here (it will reach the shared repository!)
   #   null           -> no contact (doctor will warn)
   #

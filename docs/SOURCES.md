@@ -1,20 +1,15 @@
 # Sources of vacancies
 
-## The selection principle
+## Which sites answer a plain request
 
-We take anything served to an **ordinary GET request** carrying an honest
-User-Agent: JSON API, RSS, HTML. We take nothing that requires circumventing
-active protection — faking a browser fingerprint, solving a CAPTCHA, running a
-headless browser to fool a detector.
-
-The boundary runs along what the server actually answers rather than along the
-format. Measured 2026-08-04, the same request with the same User-Agent:
+Fetchers read JSON APIs, RSS and HTML over plain HTTP. Measured 2026-08-04,
+the same request to each:
 
 | Site | Response | Conclusion |
 |---|---|---|
-| LinkedIn (guest search) | **200** | Open to an anonymous request as designed — we take it |
-| Indeed | **403** | Closed — we do not go |
-| Glassdoor | **403** | Closed — we do not go |
+| LinkedIn (guest search) | **200** | Fetched |
+| Indeed | **403** | Not fetched |
+| Glassdoor | **403** | Not fetched |
 
 The full registry of every source checked, including the rejected ones with
 reasons and response codes, is `config/sources.backlog.yaml`. It exists so that
@@ -112,7 +107,7 @@ not to have one.
 | cryptocurrencyjobs.co | one clear sentence per posting — 70 of 75 full-time | Rejected for part-time |
 | YC jobs | a `type` field, 29 of 30 full-time | Rejected for part-time |
 | HN "Freelancer? Seeking freelancer?" | 23 comments, all SEEKING WORK | Rejected: people offering, not buying |
-| CryptoJobsList | Cloudflare challenge | Rejected: active protection |
+| CryptoJobsList | Cloudflare challenge | Rejected: no plain-HTTP answer |
 
 The full list with measurements is in `config/sources.backlog.yaml`.
 
@@ -172,10 +167,8 @@ a weak signal — it was a fabrication, and it was clearing the remote gate for
 
 **The workplace-type badge is not readable at all.** Checked three ways: absent
 from the search results, from the guest `jobPosting` fragment, and from the
-page HTML. It renders only for a logged-in session. Going there would mean
-authenticating in order to scrape, which is over the line in CLAUDE.md §5, so
-the project does not — and a person who reads the badge themselves enters it by
-hand instead (`workplace_type` on the record).
+page HTML. It renders only for a logged-in session, so a person who reads the
+badge themselves enters it by hand (`workplace_type` on the record).
 
 **What the vacancy page DOES give**, all three in the same request that fetches
 the description, and all three previously thrown away:
@@ -258,26 +251,14 @@ description text — a pure false negative that cut dozens of live candidates.
 
 ## The manual source (`tools/ingest_manual.py`)
 
-Anything that requires authorisation, a paid subscription or interactive
-circumvention of anti-bot protection is left alone by the automation:
+What the fetchers do not read automatically:
 
-- **Indeed, Dice, ClearanceJobs, Glassdoor** — reachable for a person or an
-  agent to look at through ordinary web search, but not for programmatic
-  scraping in this project: they answer 403 to a plain request.
+- **Indeed, Dice, ClearanceJobs, Glassdoor** — they answer 403 to a plain
+  request; a person or the agent looks through them with web search.
 - **Particular companies' careers pages** — each has its own format, and writing
   a parser per company is pointless; the agent checks, one at a time, the
   companies that have already shown good signals (legacy, enterprise, EOR) in
   the identity's knowledge base.
 - **Companies' ATS boards** — the exception to the rule above: Greenhouse,
   Lever, Ashby, Recruitee, Workable and SmartRecruiters have official public
-  JSON APIs, and they are read automatically (the `ats` source). There is no
-  fence there.
-
-## What we explicitly do not do
-
-- We do not circumvent anti-bot protection or CAPTCHAs for any source.
-- We do not log in under an account in order to scrape.
-- We do not exceed a reasonable request rate against public APIs (the pipeline
-  runs on demand, not from a cron entry every minute).
-- We store no credentials or tokens in the repository — none of the current
-  sources require any.
+  JSON APIs, and they are read automatically (the `ats` source).

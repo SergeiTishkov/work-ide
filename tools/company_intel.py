@@ -11,11 +11,9 @@ What is used, and why exactly this (measured 2026-07-31):
     facts: year founded (P571), employee count (P1128).
   * Reputation sites (Glassdoor, Trustpilot, Indeed, levels.fyi) and even the
     official Glassdoor API are unreachable programmatically: 403 behind
-    Cloudflare and 410 Gone respectively. Getting in by script would take
-    impersonating a live browser, which this project does not do (see
-    CLAUDE.md, the boundary of what is allowed). Ratings and reviews from
-    there are gathered by the agent through ordinary web search and entered
-    via `tools/kb.py set-company-reputation` — that works, and is legal.
+    Cloudflare and 410 Gone respectively. Ratings and reviews from there are
+    gathered by the agent through web search and entered via
+    `tools/kb.py set-company-reputation`.
 
 Small companies are usually absent from Wikidata, and that is fine: it is
 precisely the large, mature enterprises we want that are represented there.

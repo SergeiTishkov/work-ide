@@ -139,8 +139,8 @@ Put the CV in `local-identities/<prefix>-<expansion>/documents/`, under its own
 name. The whole folder is outside git.
 
 If the person has an email address to use in the User-Agent, put it in their
-`<prefix>_profile.yaml` under `contact.user_agent_contact`. That keeps the
-User-Agent honest while the address stays outside the shared repository.
+`<prefix>_profile.yaml` under `contact.user_agent_contact`. The address stays
+outside the shared repository.
 
 ## Step 6. Check
 

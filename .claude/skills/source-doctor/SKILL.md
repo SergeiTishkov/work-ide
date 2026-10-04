@@ -24,7 +24,7 @@ Act on the status, and only on `broken`:
 |---|---|---|
 | `ok` | answers as the fetcher expects | nothing to repair — say so and stop |
 | `unreachable` | network, timeout, 429, 5xx | nothing to repair — it is today's network, not the code. Stop |
-| `blocked` | 401/403/999 or a login wall | **do not repair and never work around it** (CLAUDE.md §5). Tell the person the source closed its door; disabling it is their decision |
+| `blocked` | 401/403/999 or a login wall | not a fetcher bug — stop. Tell the person the source closed its door; what to do with it is their decision |
 | `broken` | answers, but not as expected | continue |
 | `no_contract` | the fetcher has no `contract()` yet | write one first (step 4 describes what it checks), then come back to step 0 |
 
@@ -63,7 +63,7 @@ Ask the source directly, with small probes: one request per question. Save a
 raw response in the scratchpad and read it. Typical questions — the source's
 doc lists the ones that matter for it:
 
-- does the endpoint still answer an ordinary GET, at the same URL?
+- does the endpoint still answer, at the same URL?
 - what does one card look like now; where did the field go?
 - how many items per page; does the next page start where we think?
 - is each filter we send still honoured (compare filtered and unfiltered)?

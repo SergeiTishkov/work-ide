@@ -21,8 +21,7 @@ base — 100% of them — was clearing the remote gate on a fabrication.
 
 The badge itself is not readable: checked three ways, it is absent from the
 search results, from the guest jobPosting fragment and from the page HTML. It
-renders only for a logged-in session, and going there would cross the line in
-CLAUDE.md §5. What the page DOES give is schema.org `jobLocationType`, which
+renders only for a logged-in session. What the page DOES give is schema.org `jobLocationType`, which
 says TELECOMMUTE for a declared-remote posting and nothing at all otherwise.
 
 SO THE RULE HAS TWO HALVES, AND THE SPLIT IS THE POINT

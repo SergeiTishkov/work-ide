@@ -8,8 +8,8 @@ contracts: a day rate, a duration, and an IR35 status. For somebody invoicing
 from outside the UK that is the shape of work that can actually be taken, and
 the rate is stated on the card rather than hidden behind "competitive".
 
-Measured 2026-09-08: HTTP 200 to an ordinary GET with the project's honest
-User-Agent, 20 cards per page, `&page=N` pagination.
+Measured 2026-09-08: HTTP 200 to a plain GET, 20 cards per page, `&page=N`
+pagination.
 
 A TRAP WORTH RECORDING
 ----------------------
@@ -78,7 +78,7 @@ PAGES_PER_QUERY = 3          # 20 cards a page; three is plenty per keyword
 # link marked "next page" is `page=1`. Starting the loop at 1 silently skips
 # the best-matching page, which is the one a relevance sort puts first.
 FIRST_PAGE = 0
-PAUSE_SECONDS = 1.5          # politeness, as everywhere else in this project
+PAUSE_SECONDS = 1.5          # between pages, as in the other fetchers
 
 # The company is genuinely absent from the board, not merely unparsed. Kept as
 # a constant so the report and the tests agree about the wording.

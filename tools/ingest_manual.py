@@ -2,10 +2,9 @@
 Manual entry of findings into the Work IDE knowledge base.
 
 Why this is needed: some of the best sources (LinkedIn Jobs, Indeed, Dice,
-particular companies' careers pages) CANNOT be parsed by script dependably and
-within the project's bounds without authorisation (see CLAUDE.md,
-docs/SOURCES.md). Instead, the agent in an interactive session uses its own
-tools (WebSearch/WebFetch) the way a person would, and enters what it finds
+particular companies' careers pages) are not read dependably by the fetchers
+(see docs/SOURCES.md). Instead, the agent in an interactive session uses its own
+tools (WebSearch/WebFetch), and enters what it finds
 here — where it goes through the same normalize + score + report path as the
 automatic sources.
 

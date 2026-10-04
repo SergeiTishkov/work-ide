@@ -295,12 +295,10 @@ def load_profile(prefix: Optional[str] = None) -> dict:
 
 
 def _build_user_agent(prefix: str, profile: dict) -> str:
-    """An honest User-Agent carrying a contact — an engineering commitment of
-    the project (see the constitution, on politeness towards other people's
-    servers).
+    """The User-Agent, with the identity's contact when it has one.
 
-    The contact comes from the identity's own profile, which is outside git, so
-    there is nowhere left to hide it from. An empty value is not an error: the
+    The contact comes from the identity's own profile, which is outside git.
+    An empty value is not an error: the
     project runs without a contact and doctor warns about it.
     """
     contact = ((profile.get("contact") or {}).get("user_agent_contact") or "").strip()

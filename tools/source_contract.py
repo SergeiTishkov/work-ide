@@ -3,7 +3,7 @@ Source contracts: does each source still answer the way its fetcher expects,
 today.
 
 A fetcher is built on a handful of facts about somebody else's server — the
-endpoint answers an ordinary GET, a card has these fields, the next page starts
+endpoint answers, a card has these fields, the next page starts
 here, this filter is honoured. Any of them can change without notice, and the
 fetcher's own defences only catch the loudest case (cards arrive, none parse).
 The quiet cases — a page that got shorter, a filter that stopped filtering —
@@ -26,8 +26,7 @@ Four outcomes, and they call for different things:
                this is what /source-doctor is for
   unreachable  network error, timeout, 429, 5xx: transient, nothing to fix
   blocked      401/403/999 or a login wall: the source closed the door to
-               anonymous requests. Not fixable within CLAUDE.md §5 — it goes
-               to the owner, never around the block
+               anonymous requests. Not a fetcher bug — it goes to the owner
 
 Exit code 1 when any checked source is broken or blocked, 0 otherwise: an
 unreachable source is the network's problem today, not the code's.
@@ -65,7 +64,7 @@ class Blocked(Exception):
 
 
 class ContractRun:
-    """What a fetcher's contract() is handed: a polite HTTP getter that sorts
+    """What a fetcher's contract() is handed: an HTTP getter that sorts
     failures into unreachable/blocked, and a place to record expectations.
 
     `expect` is a fact the fetcher depends on — one false expectation makes
@@ -200,8 +199,7 @@ def format_result(result: dict) -> str:
     if result["status"] == BROKEN:
         lines.append(f"      -> the fetcher needs fixing: /source-doctor {result['source']}")
     elif result["status"] == BLOCKED:
-        lines.append("      -> the source refuses anonymous requests; not to be worked "
-                     "around (CLAUDE.md §5) — tell the owner")
+        lines.append("      -> the source refuses anonymous requests; tell the owner")
     return "\n".join(lines)
 
 

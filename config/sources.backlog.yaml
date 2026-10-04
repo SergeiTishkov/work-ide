@@ -15,8 +15,7 @@
 #  the search profile. Whether a particular identity has it ENABLED is that
 #  identity's business, see <prefix>_sources.yaml.
 #
-#  Measurements use live requests with the project's honest User-Agent. The
-#  date is mandatory: boards change endpoints more often than one would like
+#  Measurements use live requests. The date is mandatory: boards change endpoints more often than one would like
 #  (a real case, 2026-08-04: Himalayas began returning "name" in companyName).
 # =============================================================================
 
@@ -99,10 +98,9 @@ sources:
     measured: "HTTP 200, 30 cards per page, pagination start=0,25,50 works"
     geo_coverage: [israel, uae, saudi_arabia, singapore, switzerland, germany, netherlands, eu, us]
     note: >
-      The guest endpoint, served to an anonymous request as designed — the same
-      one LinkedIn's own guest interface uses. This is NOT circumventing
-      protection: the same request gets 403 from Indeed and 403 from Glassdoor.
-      The project's main lever: one fetcher covers every country of interest at
+      The guest endpoint, served to an anonymous request — the same one
+      LinkedIn's own guest interface uses (the same request gets 403 from
+      Indeed and 403 from Glassdoor). The project's main lever: one fetcher covers every country of interest at
       once, whereas the country boards (Bayt, GulfTalent, Drushim) are shut.
       THE PRICE: undocumented HTML. The parser must return 0 when the markup
       changes, not broken records.
@@ -228,8 +226,8 @@ sources:
   # --- Queued: UK sources, checked with live requests 2026-09-08 -------------
   #
   # Asked for by the owner, who wants the UK covered properly. Every one below
-  # was probed with the project's honest User-Agent — no fingerprint games —
-  # and the response is recorded whichever way it went.
+  # was probed with a plain request, and the response is recorded whichever
+  # way it went.
 
   - name: contractoruk
     status: implemented
@@ -286,8 +284,7 @@ sources:
       The home page answers 200, and every page that actually holds vacancies
       drops the connection — ConnectionError and ReadTimeout on /jobs/... at
       both 30 and 60 seconds, from an IP that reaches the rest of the site.
-      That is bot management (the host resolves into Akamai), and the only way
-      past it is to impersonate a browser. CLAUDE.md section 5 says no.
+      That is bot management (the host resolves into Akamai).
 
   - name: cv_library
     status: rejected
@@ -415,8 +412,7 @@ sources:
     status: rejected
     checked: "2026-08-04"
     reason: >
-      HTTP 403 to an ordinary request. Getting in would take impersonating a
-      browser — circumventing active protection, which we do not do (CLAUDE.md §5).
+      HTTP 403 to a plain request.
 
   - name: glassdoor
     status: rejected
@@ -461,7 +457,7 @@ sources:
     checked: "2026-09-13"
     reason: >
       HTTP 403 with a Cloudflare "Just a moment..." challenge on both the page
-      and the RSS. Active protection; we do not go past it (CLAUDE.md §5).
+      and the RSS.
 
   - name: cryptojobs_com
     status: rejected

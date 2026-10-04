@@ -21,13 +21,8 @@ identity:
     legacy, well paid, little competition" — exactly what is wanted.
 
 contact:
-  # The contact in the User-Agent is an engineering commitment of the project:
-  # our requests should be recognisable, and a site's administrator should have
-  # a way to write to a live person (see the constitution, §5, "politeness by
-  # default").
-  #
-  # The template sets no value: an address is personal. It is filled in in the
-  # local identity, which is outside git, so there is nobody left to hide it from.
+  # The contact in the User-Agent. The template sets no value: an address is
+  # personal. It is filled in in the local identity, which is outside git.
   user_agent_contact: ""
 
 # ==== PERSONAL: the values live in the local identity, outside git ====

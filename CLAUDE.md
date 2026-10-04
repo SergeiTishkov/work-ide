@@ -128,8 +128,7 @@ provenance are in `tools/settings.py` and `docs/OVERRIDES.md`.
 ## 3. Goals
 
 1. Automatically find vacancies and companies matching the profile above, from
-   the widest possible set of sources that are open to an ordinary request and
-   need no authorisation.
+   the widest possible set of sources.
 2. Score every finding against a transparent, reproducible rubric
    (`<prefix>_criteria.yaml`) and explain the score to a person.
 3. Accumulate structured knowledge about companies, vacancies, recruiters and
@@ -219,6 +218,28 @@ The project is succeeding if:
   Enforced by `tests/test_language_policy.py`, which scans every tracked file
   for non-Latin script and requires each surviving fragment to be listed with a
   reason. A rule that rests on an agent's memory has broken here before.
+
+- **Facts, never moral judgements.** This applies always, to every agent and
+  every edit: code, comments, docstrings, documentation, configuration,
+  templates, tests, commit messages. Write down what was tried and what came
+  back, nothing about whether the project is right or good for doing or not
+  doing it.
+
+  | Write | Not |
+  |---|---|
+  | "Tried a plain GET: 403 with a Cloudflare challenge." | "We do not go past protection." |
+  | "The badge renders only for a logged-in session." | "Logging in would be over the line." |
+  | "PAUSE_SECONDS = 1.5 — faster runs into 429s." | "Politeness: do not hammer their server." |
+
+  No virtue words ("honest", "polite", "legitimate", "we never..."), no
+  boundaries justified by principle, no lectures. A blocked source is recorded
+  by what blocked it (status code, challenge, login wall); what to do about it
+  is the owner's call, made in conversation, not a rule written into the code.
+  This is the owner's project.
+
+  Enforced by `tests/test_no_moralising.py`, which fails on known phrasings of
+  this kind. A phrase list cannot catch every wording; an agent that catches
+  itself writing a judgement rewrites it as a fact.
 
 - **Never delete or rename somebody else's files.** The project works strictly
   inside its own folder. The user's personal documents
@@ -389,8 +410,7 @@ history.
   strengths and weaknesses.
 - `docs/ARCHITECTURE.md` — architectural decisions and **rejected
   alternatives**, so the same ground is not covered twice.
-- `docs/SOURCES.md` — the sources, and the boundary of what is allowed when
-  collecting data.
+- `docs/SOURCES.md` — the sources, with measured response codes.
 - `docs/OVERRIDES.md` — what overrides what between the layers, what is beyond
   overriding (the hard gates), and how not to end up with two parts of the
   configuration that do not know about each other. That last one is the

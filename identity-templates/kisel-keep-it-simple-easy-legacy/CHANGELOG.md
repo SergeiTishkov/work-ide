@@ -369,8 +369,7 @@ sets for remote and on-site were identical. It was not a weak signal, it was a
 fabrication — and it cleared the remote gate for 100% of the LinkedIn base.
 
 The badge itself cannot be read: absent from the search results, from the guest
-job fragment and from the page HTML. It renders only for a logged-in session,
-and that is over the line this project does not cross.
+job fragment and from the page HTML. It renders only for a logged-in session.
 
 **What changed, in two halves.** The split is the whole design:
 

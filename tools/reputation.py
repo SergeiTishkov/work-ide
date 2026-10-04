@@ -36,12 +36,10 @@ WHY COLLECTION IS NOT FULLY AUTOMATIC
 -------------------------------------
 Review sites are closed to scripts: Glassdoor, Indeed, Trustpilot and levels.fyi
 answer 403 behind Cloudflare, and the official Glassdoor API is 410 Gone
-(measured 2026-07-31). Getting in would require impersonating a browser, which
-the constitution forbids (§5, the boundary of what is allowed).
+(measured 2026-07-31).
 
-So what is collected automatically is what is given honestly — company age and
-size from Wikidata — while ratings are searched for by the agent, exactly as a
-person would search for them. The automation is elsewhere: the system computes
+So what is collected automatically is what open APIs give — company age and
+size from Wikidata — while ratings are searched for by the agent. The automation is elsewhere: the system computes
 the worklist itself, records the outcome of every attempt itself, and complains
 by itself while the list is not empty. None of that rests on an agent
 remembering; rules of that kind have broken here before.

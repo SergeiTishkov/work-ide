@@ -2,9 +2,8 @@
 
 `tools/fetch_linkedin.py` reads the search LinkedIn serves to a visitor who is
 not logged in: `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search`.
-It answers an ordinary request with HTML cards. No login, no browser, no
-pretending to be one (CLAUDE.md §5): if this ever stops being open to an
-anonymous request, the source is `blocked`, and that is where it ends.
+It answers a plain request with HTML cards, no login needed. If it ever stops
+answering an anonymous request, the contract reports the source as `blocked`.
 
 ## What the fetcher depends on
 
@@ -50,9 +49,8 @@ against the 100 served:
 | C# developer, Germany | 540 | 100 |
 | .NET developer, United States | 4 000+ | 100 (once deeper, likely an IP warmed by a person's own browsing; not reproducible) |
 
-A browser session gets further, and that is exactly what the fetcher must not
-pretend to be. A 24-hour window does not help either: big pairs reach 100
-within a day.
+A browser session gets further. A 24-hour window does not help: big pairs
+reach 100 within a day.
 
 **Splitting at the ceiling.** A query that reaches 100 is asked again in
 narrower forms, each with a ceiling of its own:

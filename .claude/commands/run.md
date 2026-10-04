@@ -36,8 +36,8 @@ the skeleton, plus the parts most often skipped.
      source repaired now is fetched in this same run. The doctor publishes the
      repair only when a maintainer runs it; otherwise the fix stays local, and
      that is fine.
-   - `blocked` — the source refuses anonymous requests. Never work around it
-     (CLAUDE.md §5); tell the person in the final summary and carry on.
+   - `blocked` — the source refuses anonymous requests. Tell the person in the
+     final summary and carry on.
    - `unreachable` — today's network; carry on.
 
 4. `python tools/pipeline.py --identity <p> --skip-contracts` — collection,

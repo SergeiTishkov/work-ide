@@ -34,7 +34,7 @@ really read.
 
 Attempts are recorded whether or not they succeed, so a page that returns
 nothing is not re-fetched on every run. Same principle as link_check and
-company_intel: the cache is what keeps this polite.
+company_intel: the cache keeps the request count down.
 """
 from __future__ import annotations
 

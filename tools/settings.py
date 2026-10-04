@@ -40,7 +40,7 @@ MERGE RULES (each chosen deliberately, each closing a known trap)
 4. Frozen keys (config/settings_policy.yaml) cannot be changed by the local
    layer; the attempt fails loudly with an explanation. Layering without that
    exception would mean a file outside git could quietly lift, say, the ban on
-   circumventing bot protection. Specific-beats-general is a rule about
+   personal data in git. Specific-beats-general is a rule about
    PREFERENCES, not about boundaries.
 
 WHAT IS NOT HERE, AND WILL NOT BE

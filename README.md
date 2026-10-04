@@ -260,7 +260,7 @@ texts — your own settings sit elsewhere and cannot be lost.
 | [docs/OVERRIDES.md](docs/OVERRIDES.md) | What overrides what between layers, and what cannot be overridden |
 | [docs/TECH_MATCHING.md](docs/TECH_MATCHING.md) | How to look for technology names in vacancy text |
 | [docs/VACANCY_CHECKLIST.md](docs/VACANCY_CHECKLIST.md) | The mandatory manual check on candidates |
-| [docs/SOURCES.md](docs/SOURCES.md) | The sources, and the boundary of what is allowed when collecting |
+| [docs/SOURCES.md](docs/SOURCES.md) | The sources, with measured response codes |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Decisions and rejected alternatives |
 
 ## Language
@@ -271,17 +271,11 @@ from `preferences.language` in your identity, and you can ask for another
 language at any time. The split is deliberate: the repository is shared, while a
 report is read by one person.
 
-## Boundaries
+## Sites that are not fetched automatically
 
-The project freely reads anything served to an ordinary HTTP request, and does
-so politely: an honest User-Agent carrying a contact, pauses between requests,
-caching.
-
-The project **does not circumvent** active bot protection — no faked browser
-fingerprints, no CAPTCHA solving, no headless browser run to fool a detector.
-Sites closed off that way (Glassdoor, Indeed) are reachable only through the
-agent, which searches them as an ordinary person would and enters what it finds
-by hand. More detail, with measured response codes, in
+Glassdoor and Indeed answer 403 to a plain HTTP request, so the fetchers do not
+read them; the agent looks through them with web search and enters what it
+finds by hand. Measured response codes are in
 [docs/SOURCES.md](docs/SOURCES.md).
 
 ## Agent commands

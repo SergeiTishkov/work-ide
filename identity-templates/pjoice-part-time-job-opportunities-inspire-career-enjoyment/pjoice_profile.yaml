@@ -21,8 +21,8 @@ identity:
     crypto, AI, distributed systems — adds a little; dull work costs nothing.
 
 contact:
-  # The contact in the User-Agent (CLAUDE.md §5, "politeness by default"). The
-  # template sets no value: an address is personal.
+  # The contact in the User-Agent. The template sets no value: an address is
+  # personal.
   user_agent_contact: ""
 
 # ==== PERSONAL: the values live in the local identity, outside git ====
