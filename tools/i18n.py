@@ -88,6 +88,7 @@ CATALOGUES = {
         "this vacancy is not on the board — possibly placed through an agency":
             "этой вакансии на доске нет — возможно, размещена через агентство",
         "address given in the vacancy": "адрес, указанный в вакансии",
+        "the board sends applications to": "площадка отправляет отклик на",
         "no direct way to apply found — only through the board":
             "прямого способа подать заявку не нашлось — только через площадку",
         "Work arrangement not confirmed — check by hand":

@@ -2036,3 +2036,6 @@ closed_sources:
   # 2026-10-04, the owner's feedback: applying needs a Singpass login, and
   # Singpass is for Singapore residents.
   mycareersfuture: "applying needs a Singpass login (Singapore residents only)"
+  # A website works as a key too (the vacancy link's host, without www.).
+  # 2026-10-04: the UK board of devitjobs closed; the US one stays.
+  devitjobs.uk: "the board closed: every devitjobs.uk page redirects to a JobCopilot signup"

@@ -6,6 +6,19 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V19 — devitjobs.uk closed, 2026-10-04
+
+**Changed:**
+- `kisel_sources.yaml` → `devitjobs`: `boards: [us]` (was `[uk, us]`).
+- `kisel_criteria.yaml` → `closed_sources`: `devitjobs.uk`. A key can now be
+  a website as well as a source name; the vacancies already in the base from
+  that site are rejected with the reason.
+
+**Why.** The owner opened a devitjobs.uk vacancy and landed on
+https://devitjobs.jobcopilot.com/signup?utm_source=dot_uk_old. Every
+devitjobs.uk address does that now, the API too; on 2026-10-03 the API still
+served its list. 178 UK vacancies were in view in KISEL's base.
+
 ## V18 — LinkedIn counts as remote only where it says so, 2026-10-04
 
 **Changed:** `kisel_criteria.yaml` → `remote_location_fit`: new

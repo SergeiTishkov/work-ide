@@ -130,6 +130,14 @@ def normalize_record(raw: dict) -> Optional[dict]:
         # to apply directly with the employer, bypassing a job-board account
         # (relevant for WWR: it keeps the application funnel to itself).
         "company_url": str(raw.get("company_url") or "").strip() or None,
+        # Where the board's own "Apply" button sends a person, when it is not
+        # the page above (devitjobs: a jobg8/appcast/Indeed link). Shown, never
+        # requested.
+        "apply_url": str(raw.get("apply_url") or "").strip() or None,
+        # Where the description is read from, when that is not the page a
+        # person opens (devitjobs: its detail API takes the id, the page has a
+        # slug). See enrich_descriptions.
+        "read_url": str(raw.get("read_url") or "").strip() or None,
         "location_raw": str(raw.get("location_raw") or "").strip(),
         "remote": remote,
         # Where the employer or the board says the work happens: "remote",

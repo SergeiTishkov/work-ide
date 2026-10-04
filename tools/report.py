@@ -370,10 +370,18 @@ def _apply_channel_items(v: dict) -> list:
     most vacancies have nothing here — and that is different from "we looked
     and found nothing", which the owner asked to be told about explicitly.
     """
+    items = []
+    # The board's own "Apply" target, from the fetcher (devitjobs). Not a link
+    # anybody checked: the board publishes it, and requesting it would count
+    # as a paid click.
+    if v.get("apply_url"):
+        from urllib.parse import urlparse
+
+        host = urlparse(v["apply_url"]).netloc.removeprefix("www.")
+        items.append(f"📨 {t('the board sends applications to')} {host}: {v['apply_url']}")
     found = v.get("apply_channels")
     if not found:
-        return []
-    items = []
+        return items
     if found.get("direct_apply_url"):
         items.append(f"📨 {t('apply directly')}: {found['direct_apply_url']}")
     elif found.get("board_url"):

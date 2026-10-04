@@ -265,6 +265,14 @@ def _matches(text: str, keywords: list) -> list:
     return found
 
 
+def _site_of(url) -> str:
+    """The host of a link, without "www." — how closed_sources names a site."""
+    from urllib.parse import urlparse
+
+    host = urlparse(str(url or "")).netloc.lower()
+    return host[4:] if host.startswith("www.") else host
+
+
 def _check_location_field_arrangement(vacancy: dict, rl: dict) -> Optional[str]:
     """The work arrangement as the BOARD's own structured location field states it.
 
@@ -285,15 +293,14 @@ def _check_location_field_arrangement(vacancy: dict, rl: dict) -> Optional[str]:
     """
     cfg = rl.get("location_field_arrangement") or {}
 
-    # A declared arrangement outranks everything below. Nothing sets this
-    # automatically to anything but "remote" — the on-site/hybrid badge is not
-    # served to anonymous requests — so a non-remote value here is always
-    # something a PERSON read and entered by hand, through kb.py. That is the
-    # division of labour CLAUDE.md §5 describes, and it is the only way what
-    # the owner sees on the page can reach the scoring at all.
+    # A declared arrangement outranks everything below. It comes from a board
+    # that states it in a field of its own (ContractorUK's badge, devitjobs'
+    # `workplace`), or from a PERSON who read the page and entered it through
+    # kb.py — LinkedIn's on-site/hybrid badge is not served to anonymous
+    # requests, and CLAUDE.md §5 leaves reading it to a person.
     declared = (vacancy.get("workplace_type") or "").strip().lower()
     if declared and declared != "remote":
-        return f"entered by hand: the employer states \"{declared}\""
+        return f"the posting states the work is \"{declared}\""
 
     field = common.normalize_for_matching(vacancy.get("location_raw"))
     if not field:
@@ -2678,7 +2685,11 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     # <p>_sources.yaml only stops new ones. Added 2026-10-04 on the owner's
     # feedback: mycareersfuture.gov.sg wants a Singpass login to apply, and
     # Singpass is for Singapore residents.
-    closed_source = (criteria.get("closed_sources") or {}).get(vacancy.get("source"))
+    #
+    # A key is a source name or a website: one source can serve several sites,
+    # and a site can close while its siblings stay (devitjobs.uk, 2026-10-04).
+    closed = criteria.get("closed_sources") or {}
+    closed_source = closed.get(vacancy.get("source")) or closed.get(_site_of(vacancy.get("url")))
     if closed_source:
         dealbreakers.append(f"source: {closed_source}")
 

@@ -84,7 +84,8 @@ sources:
   - name: devitjobs
     enabled: true
     params:
-      boards: [uk, us]
+      # uk closed 2026-10-04: devitjobs.uk redirects to a JobCopilot signup.
+      boards: [us]
 
   - name: jobs_ch
     enabled: true

@@ -278,4 +278,4 @@ def test_an_arrangement_entered_by_hand_outranks_everything():
         ),
     )
     assert r["classification"] == "rejected"
-    assert any("entered by hand" in d for d in r["dealbreakers"]), r["dealbreakers"]
+    assert any("the posting states" in d for d in r["dealbreakers"]), r["dealbreakers"]

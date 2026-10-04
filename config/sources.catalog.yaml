@@ -182,11 +182,17 @@ sources:
     kind: json_api
     remote_only: false
     params_schema:
-      boards: "the list of boards: uk and/or us"
-    yield_notes: "Measured 2026-08-04: UK 2447 records, US 1590. The largest source by volume."
+      boards: "the list of boards: us (uk closed 2026-10-04)"
+    yield_notes: >
+      Measured 2026-08-04: UK 2447 records, US 1590. 2026-10-04: US 2 918, of
+      which `workplace` says office 2 635, remote 142, hybrid 132.
     caveats: >
       The response has NO description text — only the title, tags and
-      structured fields. The gates that read a description work blind here.
+      structured fields; the description is read from the detail API
+      (enrich_descriptions). devitjobs.uk closed on 2026-10-04: every page,
+      the API too, redirects to a JobCopilot signup. devitjobs.com mostly
+      relays paid job feeds (jobg8, appcast, Indeed): the board's "Apply"
+      target is kept as `apply_url`.
 
   - name: jobs_ch
     site: "jobs.ch"

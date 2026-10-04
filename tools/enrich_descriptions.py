@@ -342,7 +342,8 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT,
         reader = _reader_for(record.get("source"))
         try:
             if reader is not None:
-                facts = reader(record["url"], common.DEFAULT_TIMEOUT)
+                facts = reader(record.get("read_url") or record["url"],
+                               common.DEFAULT_TIMEOUT)
         except Exception:  # noqa: BLE001 — one page must not stop the rest
             stats["errors"] += 1
         if reader is not None and READ_PAUSE_SECONDS.get(record.get("source")):
