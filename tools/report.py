@@ -23,7 +23,9 @@ import kb  # noqa: E402
 # The reasoning behind "the key IS the English phrase" is in tools/i18n.py.
 t = i18n.translate
 
-TOP_N_PER_SECTION = 15
+# The same as the app's "Show 10 more" step (app/renderer/app.js, PAGE): the
+# owner asked on 2026-10-05 for the first page to match the step.
+TOP_N_PER_SECTION = 10
 
 # The classes a person actually reads. Everything else is in the database for
 # the record, not in the report for a decision.
