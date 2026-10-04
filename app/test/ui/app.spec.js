@@ -244,6 +244,26 @@ test('an undone stub is not removed again by its timer', async ({ page }) => {
   await expect(page.getByTestId('stub-a1')).toBeVisible();
 });
 
+test('in "All", a vacancy turned down folds into a stub and goes; an applied one stays', async ({ page }) => {
+  await page.clock.install();
+  await open(page);
+  await page.getByTestId('filter').selectOption('all');
+  await byId(page, 'a1').getByTestId('btn-expired').click();
+  await expect(page.getByTestId('stub-a1')).toBeVisible();
+  await expect(byId(page, 'a1')).toHaveCount(0);
+  await byId(page, 'a2r').getByTestId('btn-rejected').dblclick();
+  await expect(page.getByTestId('stub-a2r')).toBeVisible();
+  await byId(page, 'a3').getByTestId('btn-applied').click();
+  await expect(byId(page, 'a3').getByTestId('status-badge')).toBeVisible();
+  await expect(page.getByTestId('stub-a3')).toHaveCount(0);
+  await page.clock.runFor(30000);
+  await expect(page.getByTestId('stub-a1')).toHaveCount(0);
+  await expect(page.getByTestId('stub-a2r')).toHaveCount(0);
+  await expect(byId(page, 'a1')).toHaveCount(0);
+  await expect(byId(page, 'a2r')).toHaveCount(0);
+  await expect(byId(page, 'a3')).toBeVisible();
+});
+
 test('changing the filter clears stubs', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('btn-applied').click();

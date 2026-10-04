@@ -114,9 +114,13 @@
     sources: [],
     listing: [],
     counts: {},
-    // vacancy id -> { class, index, status }: rows marked out of the current
-    // filter, kept as a one-line stub with an undo until the view changes
+    // vacancy id -> { class, index, status, expires }: rows marked out of the
+    // current filter, or turned down, kept as a one-line stub with an undo
+    // for STUB_LIFETIME_MS
     stubs: new Map(),
+    // ids whose stub has gone: a filter that still holds them ("All") does not
+    // show them again until the view changes
+    gone: new Set(),
     reasonFor: null,   // { id, status } while a reason form is open
     stepFor: null,     // { id, step, draft } while a funnel step's comment is written
     editing: null,     // { key, id, kind, index, draft } while a timeline comment is edited
@@ -345,6 +349,7 @@
 
   function resetView() {
     state.stubs.clear();
+    state.gone.clear();
     state.reasonFor = null;
     state.stepFor = null;
     state.editing = null;
@@ -414,7 +419,11 @@
     const shown = arranged().byClass.get(item.class) || [];
     const index = shown.findIndex((entry) => entry.kind === 'row' && entry.row.id === item.id);
     await loadList();
-    if (status !== 'new' && !state.listing.some((row) => row.id === item.id)) {
+    // A vacancy turned down goes out of sight whatever the filter (the owner,
+    // 2026-10-04: "Vacancy expired" must fold like "Not for me"). One that
+    // goes on along the funnel stays while the filter holds it.
+    const left = !state.listing.some((row) => row.id === item.id);
+    if (status !== 'new' && (left || TURNED_DOWN.includes(status))) {
       const stub = { class: item.class, index, status, expires: Date.now() + STUB_LIFETIME_MS };
       state.stubs.set(item.id, stub);
       setTimeout(() => expireStub(item.id, stub), STUB_LIFETIME_MS);
@@ -426,11 +435,13 @@
   // "Marked" lines piled up). A ring on its right drains over that time; its
   // tooltip counts the seconds down.
   const STUB_LIFETIME_MS = 30000;
+  const TURNED_DOWN = ['rejected', 'bugged', 'expired'];
 
   function expireStub(id, stub) {
     // undone, or cleared by a change of view, in the meantime
     if (state.stubs.get(id) !== stub) return;
     state.stubs.delete(id);
+    state.gone.add(id);
     // The stubs below it move up one: their places count this one.
     for (const other of state.stubs.values()) {
       if (other.class === stub.class && other.index > stub.index) other.index -= 1;
@@ -471,6 +482,7 @@
   function undo(id) {
     return guarded(async () => {
       state.stubs.delete(id);
+      state.gone.delete(id);
       state.stepFor = null;
       state.editing = null;
       await api.stepBack(state.active, id);
@@ -753,6 +765,8 @@
     const sections = [];
     const byClass = new Map();
     for (const row of state.listing) {
+      // a row still in the filter but folded into its stub, or gone with it
+      if (state.stubs.has(row.id) || state.gone.has(row.id)) continue;
       if (!byClass.has(row.class)) {
         byClass.set(row.class, []);
         sections.push(row.class);
