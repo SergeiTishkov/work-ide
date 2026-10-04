@@ -68,6 +68,7 @@ _NON_SALARY_CONTEXT_WORDS = (
 # and the database holds thousands. Re-reading YAML each time would turn a
 # scoring pass into a parsing pass.
 _REMOTE_ONLY_SOURCES_CACHE: dict = {}
+_WORKPLACE_HIDDEN_SOURCES_CACHE: dict = {}
 
 
 def _reset_caches() -> None:
@@ -76,6 +77,7 @@ def _reset_caches() -> None:
     Belt and braces: the caches are keyed by identity already, and this is
     what keeps them correct if someone ever breaks that keying."""
     _REMOTE_ONLY_SOURCES_CACHE.clear()
+    _WORKPLACE_HIDDEN_SOURCES_CACHE.clear()
 
 
 common.register_identity_hook(_reset_caches)
@@ -94,6 +96,19 @@ def _remote_only_sources() -> set:
             if s.get("remote_only") and s.get("enabled", True) and s.get("name")
         }
     return _REMOTE_ONLY_SOURCES_CACHE[key]
+
+
+def _workplace_hidden_sources() -> set:
+    """Sources flagged workplace_hidden — boards that show the work
+    arrangement to logged-in visitors only (config/sources.catalog.yaml)."""
+    common.require_identity()
+    key = common.ACTIVE_IDENTITY
+    if key not in _WORKPLACE_HIDDEN_SOURCES_CACHE:
+        _WORKPLACE_HIDDEN_SOURCES_CACHE[key] = {
+            s.get("name") for s in common.load_sources()
+            if s.get("workplace_hidden") and s.get("name")
+        }
+    return _WORKPLACE_HIDDEN_SOURCES_CACHE[key]
 
 
 def load_criteria() -> dict:
@@ -1233,8 +1248,26 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     # tax form its product files. They now wait for a person in
     # remote_unconfirmed, with their scores untouched. The contractor words
     # still earn their points above; they just prove nothing about location.
-    if not (worldwide_hits or eor_platform_hits or restrictive_hits):
-        remote_word_hits = _matches(text, rl["remote_synonym_keywords"])
+    # A board that hides the work arrangement from anonymous visitors
+    # (workplace_hidden in the catalogue — LinkedIn) gets the remote question
+    # asked even when the text talks about worldwide hiring, contractors or a
+    # region, and only an explicit word answers it.
+    #
+    # Measured 2026-10-04 on KISEL's base: 19 LinkedIn vacancies sat in the
+    # confident tiers with no "remote" anywhere. Five had the employer's
+    # TELECOMMUTE. The rest passed on "WFH 3 Days per week" (hybrid), "an
+    # allowance when you work from home" (a perk), "collaborate with a
+    # distributed team", "work from any location in Belarus, whether it's
+    # your home or our offices", and a named EOR platform on a Rome posting
+    # with three office days a week. The owner: everything from LinkedIn
+    # where remote is not stated goes to "remote not confirmed".
+    exempt = bool(worldwide_hits or eor_platform_hits or restrictive_hits)
+    workplace_hidden = vacancy.get("source") in _workplace_hidden_sources()
+    if not exempt or workplace_hidden:
+        remote_words = rl["remote_synonym_keywords"]
+        if workplace_hidden:
+            remote_words = rl.get("explicit_remote_keywords") or remote_words
+        remote_word_hits = _matches(text, remote_words)
         # A board that publishes ONLY remote roles (WWR, RemoteOK, Remotive,
         # Jobicy, Himalayas — see remote_only in the sources catalogue) is
         # sufficient proof of remoteness by itself. Found 2026-07-30:
@@ -1250,10 +1283,15 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         declared_remote = vacancy.get("workplace_type") == "remote"
         # max(), not an overwrite: a region_hits bonus already computed above
         # (e.g. 16 for Israel/UAE) must survive even when this branch runs.
-        points = max(points, 4)  # remote-ish, unclear about hiring abroad
-        location_unknown = True
+        # An exempt vacancy is here only for the remote question above; what
+        # it says about hiring abroad has been scored already.
+        if not exempt:
+            points = max(points, 4)  # remote-ish, unclear about hiring abroad
+            location_unknown = True
         if not (declared_remote or vacancy.get("remote") is True
                 or remote_word_hits or from_remote_only_source):
+            if workplace_hidden:
+                breakdown["workplace_hidden_by_source"] = vacancy.get("source")
             # Nobody ever said this was remote — not the employer, not the
             # source. That is a statement about our knowledge, not about the
             # job, so it is NOT scored down: the points above stand and the

@@ -14,6 +14,11 @@
 #  An identity CANNOT override url/kind/remote_only: those are properties of
 #  the board rather than settings. It can override enabled and params.
 #
+#  `workplace_hidden: true` marks a board that shows remote/hybrid/on-site to
+#  logged-in visitors only. Its vacancies count as remote only on an explicit
+#  word (`explicit_remote_keywords` in the criteria) or the employer's
+#  schema.org TELECOMMUTE; see tools/score.py, _score_remote_location.
+#
 #  `site` is the website the vacancies come from, as a person knows it: the
 #  app's "Source" drop-down shows it instead of the source's code name.
 #
@@ -138,6 +143,10 @@ sources:
 
   - name: linkedin
     site: "linkedin.com"
+    # The Remote/Hybrid/On-site badge renders for a logged-in session only
+    # (checked 2026-08-11 on the guest search, the guest jobPosting fragment
+    # and the page HTML).
+    workplace_hidden: true
     kind: html_guest_search
     remote_only: false
     params_schema:

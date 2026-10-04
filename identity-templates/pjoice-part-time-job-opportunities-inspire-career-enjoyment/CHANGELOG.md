@@ -6,6 +6,21 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V9 — LinkedIn counts as remote only where it says so, 2026-10-04
+
+**Changed:** `pjoice_criteria.yaml` → `remote_location_fit`: new
+`explicit_remote_keywords` ("remote", "telecommute", "telework"). For a board
+marked `workplace_hidden` in the shared catalogue (LinkedIn) only these words
+or the employer's TELECOMMUTE confirm remote; worldwide, contractor and region
+phrases no longer skip the question for it.
+
+**Why.** LinkedIn shows Remote/Hybrid/On-site to logged-in visitors only. In
+KISEL's base 14 LinkedIn vacancies sat in the confident tiers on "WFH 3 Days
+per week" (hybrid), "an allowance when you work from home", "a distributed
+team", "work from any location in Belarus ... or our offices", or a named EOR
+platform on a Rome posting with three office days a week. They now wait in
+"remote not confirmed", scores unchanged.
+
 ## V8 — mycareersfuture is closed: applying needs a Singapore ID, 2026-10-04
 
 **Changed:**

@@ -87,6 +87,7 @@
   'row.reputation': '⭐ Репутация',
   'row.company_age': '🏛 Компания',
   'row.company_site': '🏢 Сайт компании',
+  'row.source': '🌐 Источник',
   'row.note': 'Заметка',
 
   'badge.fresh': 'свежая',

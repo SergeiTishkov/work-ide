@@ -809,6 +809,13 @@
 
   function renderDetails(view) {
     const lines = [];
+    // Where the vacancy came from, by the website a person knows: on LinkedIn
+    // remote/hybrid shows only after logging in, so the board is worth seeing
+    // before the link is opened.
+    if (view.source) {
+      const site = (state.sourceSites || {})[view.source] || view.source;
+      lines.push(el('li', { testid: 'details-source' }, `${t('row.source')}: ${site}`));
+    }
     if (view.to_confirm && view.to_confirm.length) {
       lines.push(md('li', `${t('row.to_confirm')}: ${view.to_confirm.join(', ')}`));
     }

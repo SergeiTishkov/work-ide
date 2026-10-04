@@ -393,6 +393,14 @@ test('"Source" lists the boards of the current filter, each with its count', asy
   expect(await calls(page, 'listSources')).toContainEqual(['kisel', 'full', 'fresh_new']);
 });
 
+test('the details open with the website the vacancy came from', async ({ page }) => {
+  await open(page);
+  const details = byId(page, 'b1').locator('details');
+  await details.locator('summary').click();
+  await expect(details.locator('li').first()).toHaveText(`${ru['row.source']}: devitjobs.uk, devitjobs.com`);
+  await expect(byId(page, 'a1').getByTestId('details-source')).toHaveText(`${ru['row.source']}: linkedin.com`);
+});
+
 test('choosing a source lists only its vacancies, and the filter counts follow it', async ({ page }) => {
   await open(page);
   await page.getByTestId('source-filter').selectOption('devitjobs');

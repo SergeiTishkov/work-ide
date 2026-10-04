@@ -84,6 +84,7 @@
   'row.reputation': '⭐ Reputation',
   'row.company_age': '🏛 Company',
   'row.company_site': '🏢 Company site',
+  'row.source': '🌐 Source',
   'row.note': 'Note',
 
   'badge.fresh': 'fresh',

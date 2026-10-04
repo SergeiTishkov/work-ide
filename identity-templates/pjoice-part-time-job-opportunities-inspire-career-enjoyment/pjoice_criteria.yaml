@@ -751,6 +751,17 @@ remote_location_fit:
     - "telecommute"
     - "telework"
     - "work remotely"
+  # What confirms remote for a board that hides the work arrangement from
+  # anonymous visitors (workplace_hidden in config/sources.catalog.yaml —
+  # LinkedIn). The synonyms above minus the ones its postings use for
+  # something else: "WFH 3 days per week" is hybrid, "an allowance when you
+  # work from home" is a perk, "a distributed team" is the team.
+  # Measured on the base 2026-10-04 (the owner: everything from LinkedIn
+  # where remote is not stated goes to "remote not confirmed").
+  explicit_remote_keywords:
+    - "remote"
+    - "telecommute"
+    - "telework"
   # ==== IDENTITY TUNING ====
   # Ambiguous place names: one name, two different places. It does not affect
   # the score but sets needs_manual_review so a person checks with their eyes.
