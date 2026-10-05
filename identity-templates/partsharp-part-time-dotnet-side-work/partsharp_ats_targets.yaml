@@ -3,7 +3,7 @@
 # Read by tools/fetch_ats.py — see the SHARP template's file of the same kind for
 # how tokens are found and checked.
 #
-# EMPTY ON PURPOSE, and the `ats` source is disabled in pjoice_sources.yaml.
+# EMPTY ON PURPOSE, and the `ats` source is disabled in partsharp_sources.yaml.
 # A product company's own board is overwhelmingly full-time, and a search for
 # part-time work gains little from reading them one by one. Add a company here
 # when there is evidence that it hires part-time or freelance developers — for

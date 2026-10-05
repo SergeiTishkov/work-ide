@@ -1,10 +1,10 @@
-# PJOICE — part-time side work, paid as well as possible
+# PARTSHARP — part-time side work, paid as well as possible
 
-> **PJOICE = Part-time Job Opportunities Inspire Career Enjoyment.**
+> **PARTSHARP = part-time SHARP**: the same CV as SHARP, the opposite search.
 >
-> The name is the owner's own. Like SHARP, it names what the search is for
-> rather than a person or a stack, and `pjoice_` greps cleanly out of vacancy
-> text.
+> The name is the owner's own (until 2026-10-05 it was PARTSHARP). Like SHARP, it
+> names what the search is for rather than a person or a stack, and
+> `partsharp_` greps cleanly out of vacancy text.
 
 ## What this identity is
 
@@ -24,7 +24,7 @@ microservices, distributed and event-driven systems. Dull work is **neutral**:
 it costs nothing, it simply does not earn the plus.
 
 This is SHARP turned round, deliberately. SHARP wants calm legacy work and
-treats crypto as a dealbreaker; PJOICE wants money and a bit of interest and
+treats crypto as a dealbreaker; PARTSHARP wants money and a bit of interest and
 treats crypto as a plus. They are two identities rather than one with a filter
 because blending them would make both shortlists worse without the report
 showing it (CLAUDE.md, rule zero).

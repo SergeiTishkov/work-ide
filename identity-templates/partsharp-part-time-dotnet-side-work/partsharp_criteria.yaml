@@ -1,4 +1,4 @@
-# The vacancy scoring rubric for PJOICE. Read by tools/score.py.
+# The vacancy scoring rubric for PARTSHARP. Read by tools/score.py.
 # The final score is 0..100, plus a separate list of dealbreaker flags and
 # needs_manual_review. Every component is explained in score_breakdown.
 #
@@ -1197,7 +1197,7 @@ role_relevance_signal:
     - "(implementation|technical support|field) engineer"
   hard_wrong_profession_title_patterns:
     # Not a professional engagement at all. A board's "part-time" label covers
-    # internships, working-student posts and teaching, and the first PJOICE run
+    # internships, working-student posts and teaching, and the first PARTSHARP run
     # put "Software Engineering Intern", "Werkstudent", a "Co-op" and an
     # "Online Visiting Professor" in the shortlist on the strength of it.
     - '\bintern\b'

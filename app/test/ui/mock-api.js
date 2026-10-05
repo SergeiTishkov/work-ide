@@ -201,7 +201,7 @@ function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new', s
   };
 }
 
-// sharp: collected, three markets; pjoice: collected, one market;
+// sharp: collected, three markets; partsharp: collected, one market;
 // newbie: never collected.
 function standardFixture() {
   const full = [
@@ -213,7 +213,7 @@ function standardFixture() {
   return {
     identities: [
       { prefix: 'sharp', displayName: 'Senior .NET/C# remote engineering', hasDatabase: true },
-      { prefix: 'pjoice', displayName: 'Part-time side work', hasDatabase: true },
+      { prefix: 'partsharp', displayName: 'Part-time side work', hasDatabase: true },
       { prefix: 'newbie', displayName: 'Nothing yet', hasDatabase: false },
     ],
     segments: {
@@ -225,14 +225,14 @@ function standardFixture() {
           { slug: 'full', name: 'Everything', isDefault: true },
         ],
       },
-      pjoice: {
+      partsharp: {
         selection: { ...selection, id: 3 }, displayName: 'Part-time side work',
         segments: [{ slug: 'full', name: 'Everything', isDefault: true }],
       },
     },
     rows: {
       sharp: { full, uk: [row('u1'), row('u2', { fresh: false })], worldwide: [] },
-      pjoice: { full: [row('p1')] },
+      partsharp: { full: [row('p1')] },
     },
   };
 }

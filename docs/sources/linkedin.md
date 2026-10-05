@@ -126,7 +126,7 @@ longer than 53 minutes. Its numbers belong in the next entry.
 
 **2026-10-03: the first full runs.** With the split:
 
-| | sharp | pjoice |
+| | sharp | partsharp |
 |---|---|---|
 | pairs (word x country) | 168 | 140 |
 | queries, at the ceiling / narrower | 446, 92 / 278 | 378, 83 / 238 |

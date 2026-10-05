@@ -1,10 +1,19 @@
-# Change log for the PJOICE template
+# Change log for the PARTSHARP template
 
 New versions go on TOP. A section's number must match `version` in
 `template.yaml` — that is checked by a test.
 
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
+
+## V11 — renamed from PJOICE to PARTSHARP, 2026-10-05
+
+**Renamed.** The prefix `pjoice` became `partsharp` (part-time SHARP: the same
+CV, the opposite search), the folder `partsharp-part-time-dotnet-side-work`,
+the files `partsharp_*`. Nothing in the rules changed. A local identity made
+from this template is renamed the same way: folder, files, `prefix` and
+`template` in `identity.yaml`, its data (`data/identities/partsharp/`, its rows
+in `data/workide.sqlite`) and its reports.
 
 ## V10 — crypto by fit; exclusivity is a line on the card, 2026-10-05
 

@@ -17,7 +17,7 @@ function fixtureRepo() {
   const identities = path.join(root, 'identities.json');
   fs.writeFileSync(identities, JSON.stringify([
     { prefix: 'sharp', display_name: 'Senior .NET/C# remote engineering', database: 'data/workide.sqlite' },
-    { prefix: 'pjoice', display_name: 'Part-time', database: 'data/workide.sqlite' },
+    { prefix: 'partsharp', display_name: 'Part-time', database: 'data/workide.sqlite' },
   ]));
   return { root, database, identities };
 }
@@ -92,7 +92,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await expect(window.getByTestId('filter')).toHaveValue('all');
     await expect(window.getByTestId('error')).toBeHidden();
 
-    await window.getByTestId('identity-tab-pjoice').click();
+    await window.getByTestId('identity-tab-partsharp').click();
     await expect(window.getByTestId('never-collected')).toBeVisible();
   } finally {
     await app.close();

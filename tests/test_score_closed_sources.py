@@ -54,7 +54,7 @@ def test_the_same_vacancy_from_another_board_is_untouched():
 def test_both_templates_close_mycareersfuture_and_turn_it_off():
     for criteria_file in TEMPLATES.glob("*/*_criteria.yaml"):
         folder = criteria_file.parent
-        if folder.name.startswith(("sharp-", "pjoice-")):
+        if folder.name.startswith(("sharp-", "partsharp-")):
             criteria = yaml.safe_load(criteria_file.read_text(encoding="utf-8"))
             assert "mycareersfuture" in criteria["closed_sources"], folder.name
             sources = yaml.safe_load(

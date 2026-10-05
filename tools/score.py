@@ -2879,7 +2879,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     # person asks them to check something that cannot change the outcome.
     #
     # Opt-in per identity. For a search where the gate means "this CV will not
-    # be considered" (PJOICE, 2026-09-13: a Principal Data Engineer sat in "hours
+    # be considered" (PARTSHARP, 2026-09-13: a Principal Data Engineer sat in "hours
     # not confirmed" at 55) it is plainly right. For SHARP, where a single
     # "agentic" in a consultancy's boilerplate gates an ordinary ".NET
     # Developer", it would hide 51 vacancies on a thin signal — measured before

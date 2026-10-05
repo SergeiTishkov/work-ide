@@ -34,7 +34,7 @@ const ALLOWED_TOOLS = [
 
 // The same rule as identity.PREFIX_RE. The identity goes into a prompt, so
 // anything else is refused rather than passed on.
-const IDENTITY_PATTERN = /^[a-z][a-z0-9]{2,5}$/;
+const IDENTITY_PATTERN = /^[a-z][a-z0-9]{2,9}$/;
 
 function buildCommand(kind, identity, { root, claude = 'claude' }) {
   if (!KINDS[kind]) throw new Error(`unknown run kind: ${kind}`);

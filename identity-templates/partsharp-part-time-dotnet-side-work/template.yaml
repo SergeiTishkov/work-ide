@@ -6,8 +6,8 @@
 # test_template_version_matches_changelog — a rule that rests on an agent's
 # memory has broken in this project before.
 
-name: pjoice
-version: 10
+name: partsharp
+version: 11
 summary: >
   Part-time side work for a .NET/JS developer, paid as well as the market
   allows. Part-time, freelance or fractional hours are required; the rate is

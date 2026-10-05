@@ -17,7 +17,7 @@ test('collect runs /run for the identity, headless, with the allowed tools', () 
 });
 
 test('feedback runs /feedback for the identity', () => {
-  assert.equal(buildCommand('feedback', 'pjoice', { root: '/repo' }).args[1], '/feedback pjoice');
+  assert.equal(buildCommand('feedback', 'partsharp', { root: '/repo' }).args[1], '/feedback partsharp');
 });
 
 test('the agent may not commit', () => {

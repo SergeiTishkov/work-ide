@@ -1,4 +1,4 @@
-# Sources for the PJOICE identity.
+# Sources for the PARTSHARP identity.
 #
 # ONLY preferences here: which sources are enabled, and with what parameters.
 # Endpoints and documentation live in config/sources.catalog.yaml; the survey of
@@ -104,7 +104,7 @@ sources:
 
   - name: mycareersfuture
     # Applying needs a Singpass login, for Singapore residents only
-    # (2026-10-04); closed_sources in pjoice_criteria.yaml rejects its vacancies.
+    # (2026-10-04); closed_sources in partsharp_criteria.yaml rejects its vacancies.
     enabled: false
 
   - name: landing_jobs

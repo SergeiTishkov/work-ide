@@ -99,11 +99,12 @@ The rule is checked automatically: `python tools/identity.py validate`.
 
 ## Rules for choosing a prefix
 
-- 3-6 characters, lowercase Latin letters and digits only, first character a
+- 3-10 characters, lowercase Latin letters and digits only, first character a
   letter.
 - **Pronounceable**, and not a person's name.
 - **The short name does not have to match the longer description.** It may be
-  an abbreviation of it (`pjoice`), or simply a name (`sharp`). What the search
+  a name built from another one (`partsharp`, part-time SHARP), or simply a
+  name (`sharp`). What the search
   is about is said by the description: in the folder name and in
   `<prefix>_identity.md`. The owner, 2026-10-05: the short name and the
   description are separate things.
@@ -118,7 +119,7 @@ Some worked examples:
 | Prefix | Longer description | Comment |
 |---|---|---|
 | `sharp` | Senior dotnet remote engineering | A name, not an abbreviation |
-| `pjoice` | **P**art-time **J**ob **O**pportunities **I**nspire **C**areer **E**njoyment | The same CV as `sharp`, the opposite search: paid side work |
+| `partsharp` | Part-time dotnet side work | The same CV as `sharp`, the opposite search: paid side work |
 | `jvst` | **J**a**v**a **St**artup | Stack plus environment |
 | `usts` | **US** + **TS** (TypeScript) | Residency plus stack |
 

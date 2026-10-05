@@ -1,18 +1,18 @@
 # =============================================================================
-#  PJOICE — the identity profile
+#  PARTSHARP — the identity profile
 # =============================================================================
 #  The human-readable truth about who is searching, and for what.
-#  tools/score.py reads pjoice_criteria.yaml; this file is context for the agent
+#  tools/score.py reads partsharp_criteria.yaml; this file is context for the agent
 #  and the person, which must not get lost in the code.
 #
-#  The full description of the identity is in pjoice_identity.md.
-#  Why the settings are what they are is in pjoice_questionnaire.yaml.
+#  The full description of the identity is in partsharp_identity.md.
+#  Why the settings are what they are is in partsharp_questionnaire.yaml.
 # =============================================================================
 
 identity:
   kind: personal
   display_name: "Part-time side work: well paid, interesting where possible (.NET/JS)"
-  abbreviation: "PJOICE = Part-time Job Opportunities Inspire Career Enjoyment"
+  abbreviation: "PARTSHARP = part-time SHARP"
   created_at: "2026-09-13"
   # How to explain the score scale to a person in their report.
   scoring_philosophy: >
@@ -48,7 +48,7 @@ target_regions:
   note: >
     "The company is based in region X" is not "the company requires residency
     in X". A residency or citizenship requirement in a country the person does
-    not hold is always a dealbreaker, see pjoice_criteria.yaml ->
+    not hold is always a dealbreaker, see partsharp_criteria.yaml ->
     remote_location_fit.restrictive_region_signal.
 
 goal:
@@ -71,14 +71,14 @@ goal:
   #     hourly_contractor_usd: [60, 150]
   #     annual_parttime_usd:   [125000, 300000]   # full-time equivalent
   #
-  # The graded tiers that actually rank pay are in pjoice_criteria.yaml ->
+  # The graded tiers that actually rank pay are in partsharp_criteria.yaml ->
   # compensation_signal.hourly_equivalent_tiers.
   target_compensation: {}
 
 employment_type_priority:
   high: ["part-time", "freelance", "fractional", "hourly contract with flexible hours"]
   medium: ["contract with bounded hours", "retainer"]
-  # Full-time is not low priority here — it is out (pjoice_criteria.yaml ->
+  # Full-time is not low priority here — it is out (partsharp_criteria.yaml ->
   # engagement_fit).
   low_but_possible: []
   # Shown on the card as a line, not a refusal (the owner, 2026-10-05).

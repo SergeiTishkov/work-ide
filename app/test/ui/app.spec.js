@@ -63,7 +63,7 @@ test('"Collect vacancies" starts the agent for this identity and locks the butto
 test('buttons are locked on every identity while any run is going', async ({ page }) => {
   await open(page);
   await page.getByTestId('run-collect').click();
-  await page.getByTestId('identity-tab-pjoice').click();
+  await page.getByTestId('identity-tab-partsharp').click();
   await expect(page.getByTestId('identity-name')).toHaveText('Part-time side work');
   await expect(page.getByTestId('run-collect')).toBeDisabled();
 });
@@ -77,7 +77,7 @@ test('"Review feedback" shows the pending count and starts the feedback run', as
 
 test('"Review feedback" is disabled when nothing is pending', async ({ page }) => {
   await open(page);
-  await page.getByTestId('identity-tab-pjoice').click();
+  await page.getByTestId('identity-tab-partsharp').click();
   await expect(page.getByTestId('run-feedback')).toBeDisabled();
 });
 
@@ -168,14 +168,14 @@ test('each market of each identity keeps its own filter', async ({ page }) => {
   await page.getByTestId('segment-tab-full').click();
   await expect(page.getByTestId('filter')).toHaveValue('all');
 
-  await page.getByTestId('identity-tab-pjoice').click();
+  await page.getByTestId('identity-tab-partsharp').click();
   await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
   await page.getByTestId('filter').selectOption('applied');
 
   await page.getByTestId('identity-tab-sharp').click();
   await expect(page.getByTestId('segment-tab-full')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('filter')).toHaveValue('all');
-  await page.getByTestId('identity-tab-pjoice').click();
+  await page.getByTestId('identity-tab-partsharp').click();
   await expect(page.getByTestId('filter')).toHaveValue('applied');
 });
 
@@ -367,7 +367,7 @@ test('a pipeline run going anywhere shows on the button and the tab, then clears
   await expect(button).toBeDisabled();
   await expect(button.getByTestId('collect-indicator')).toBeVisible();
   await expect(page.getByTestId('identity-tab-sharp').getByTestId('tab-collecting')).toBeVisible();
-  await expect(page.getByTestId('identity-tab-pjoice').getByTestId('tab-collecting')).toHaveCount(0);
+  await expect(page.getByTestId('identity-tab-partsharp').getByTestId('tab-collecting')).toHaveCount(0);
 
   const loadsBefore = (await calls(page, 'loadSegments')).length;
   await page.evaluate(() => window.__setPipeline('sharp', { running: false }));
@@ -528,7 +528,7 @@ test('a failing request shows the error over the real screen, not the start one'
   await open(page, fixture);
   await expect(page.getByTestId('error')).toContainText("No handler registered for 'class-totals'");
   await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
-  await expect(page.getByTestId('identity-tab-pjoice')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-partsharp')).toBeVisible();
   await expect(page.getByTestId('no-identities')).toHaveCount(0);
   await expect(page.getByTestId('run-collect')).toBeVisible();
 });

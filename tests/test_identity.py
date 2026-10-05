@@ -16,14 +16,15 @@ import identity
 
 # --- Prefix format ---------------------------------------------------------
 
-@pytest.mark.parametrize("prefix", ["sharp", "ftf", "abc", "a1b2c3", "jvst"])
+@pytest.mark.parametrize("prefix", ["sharp", "ftf", "abc", "a1b2c3", "jvst", "partsharp",
+                                    "abcdefghij"])
 def test_valid_prefixes_accepted(prefix):
     assert identity.PREFIX_RE.match(prefix), f"{prefix} should be accepted"
 
 
 @pytest.mark.parametrize("prefix", [
     "ab",           # too short
-    "abcdefg",      # too long
+    "abcdefghijk",  # too long
     "SHARP",        # uppercase: the Windows FS is case-insensitive, so confusion
                     # is guaranteed
     "1abc",         # starts with a digit
@@ -116,6 +117,21 @@ def test_validate_catches_foreign_prefix_leak(tmp_path, monkeypatch):
 
     problems = identity.validate("abcd")
     assert any("efgh_" in p for p in problems)
+
+
+def test_a_prefix_inside_this_identitys_own_name_is_not_a_leak(tmp_path, monkeypatch):
+    """`partsharp_criteria.yaml` contains `sharp_`; it is partsharp's own file
+    name, not a path copied from sharp (2026-10-05)."""
+    identities_dir = tmp_path / "identities"
+    for prefix in ("sharp", "partsharp"):
+        d = identities_dir / prefix
+        d.mkdir(parents=True)
+        for name in identity.REQUIRED_FILES:
+            (d / f"{prefix}_{name}").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(common, "IDENTITIES_DIR", identities_dir)
+    (identities_dir / "partsharp" / "partsharp_identity.md").write_text(
+        "the weights are in partsharp_criteria.yaml", encoding="utf-8")
+    assert not any("sharp_" in p for p in identity.validate("partsharp"))
 
 
 def test_validate_catches_missing_required_file(tmp_path, monkeypatch):
@@ -517,3 +533,16 @@ def test_identities_for_app_leave_fixtures_out_and_name_the_database():
         assert entry["database"].endswith("workide.sqlite")
         assert entry["data_dir"].endswith(entry["prefix"])
         assert isinstance(entry["has_database"], bool)
+
+
+def test_tabs_follow_tab_position_then_the_alphabet(monkeypatch):
+    """The owner, 2026-10-05: sharp before partsharp. The alphabet says the
+    opposite, so the order is written down in each local identity.yaml."""
+    import templates
+
+    positions = {"sharp": 1, "partsharp": 2}
+    monkeypatch.setattr(identity, "list_identities",
+                        lambda include_fixtures=False: ["abc", "partsharp", "sharp"])
+    monkeypatch.setattr(templates, "local_manifest",
+                        lambda prefix: {"tab_position": positions[prefix]} if prefix in positions else {})
+    assert [e["prefix"] for e in identity.identities_for_app()] == ["sharp", "partsharp", "abc"]

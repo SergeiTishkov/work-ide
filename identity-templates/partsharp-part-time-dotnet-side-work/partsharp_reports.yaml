@@ -27,7 +27,7 @@ segments:
     name: "Rest of the world"
     rest: true
 
-  # The whole shortlist, undivided; also written to pjoice_latest.md.
+  # The whole shortlist, undivided; also written to partsharp_latest.md.
   - slug: full
     name: "Everything together"
     everything: true

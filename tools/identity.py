@@ -38,13 +38,14 @@ from typing import List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 
-# Prefix: 3-6 lowercase Latin letters or digits, starting with a letter.
+# Prefix: 3-10 lowercase Latin letters or digits, starting with a letter.
 # Short, so file names stay readable; lowercase, so nothing depends on the
-# case-insensitivity of the Windows file system.
-PREFIX_RE = re.compile(r"^[a-z][a-z0-9]{2,5}$")
+# case-insensitivity of the Windows file system. 10, not 6, since 2026-10-05:
+# the owner named a search `partsharp` (part-time SHARP).
+PREFIX_RE = re.compile(r"^[a-z][a-z0-9]{2,9}$")
 
 PREFIX_RULE_TEXT = (
-    "Identity prefix: 3-6 characters, lowercase Latin letters and digits only, "
+    "Identity prefix: 3-10 characters, lowercase Latin letters and digits only, "
     "first character a letter. It should be pronounceable. It does not have to "
     "be an abbreviation of the identity's longer description (for example: "
     "sharp, in the folder sharp-senior-dotnet-remote-engineering)."
@@ -63,7 +64,7 @@ PREFIX_RULE_TEXT = (
 # `sharp-senior-dotnet-remote-engineering_criteria.yaml`): their names appear in
 # every command, in grep output, in editor tabs and in paths inside reports,
 # where a long name only makes reading harder.
-FOLDER_RE = re.compile(r"^([a-z][a-z0-9]{2,5})(-[a-z0-9]+(?:-[a-z0-9]+)*)?$")
+FOLDER_RE = re.compile(r"^([a-z][a-z0-9]{2,9})(-[a-z0-9]+(?:-[a-z0-9]+)*)?$")
 
 FOLDER_RULE_TEXT = (
     "Identity folder name: <prefix>-<description with hyphens>, lowercase Latin "
@@ -378,7 +379,9 @@ def _check_foreign_prefix_leaks(prefix: str) -> List[str]:
             continue  # a binary or unreadable file is not our business
         for other in others:
             token = f"{other}_"
-            if token in text:
+            # At the start of a word: `sharp_` inside `partsharp_` is this
+            # identity's own name, not a leak.
+            if re.search(rf"(?<![a-z0-9]){re.escape(token)}", text):
                 problems.append(
                     f"file {path.name} mentions the foreign prefix '{token}' — "
                     f"this looks like copy-paste from identity '{other}'"
@@ -518,11 +521,20 @@ def identities_for_app() -> List[dict]:
 
     The display name is resolved through the profile layers, not read from one
     file as describe() does: in a personal identity the root profile file
-    usually does not repeat it, and the tab would say just "sharp"."""
+    usually does not repeat it, and the tab would say just "sharp".
+
+    The tabs go in the order of `tab_position` in each local identity.yaml
+    (the owner, 2026-10-05: sharp before partsharp, which the alphabet puts
+    the other way round); identities without one follow, alphabetically."""
     import settings
+    import templates
+
+    def tab_order(prefix: str) -> tuple:
+        position = templates.local_manifest(prefix).get("tab_position")
+        return (position is None, position or 0, prefix)
 
     result = []
-    for prefix in list_identities(include_fixtures=False):
+    for prefix in sorted(list_identities(include_fixtures=False), key=tab_order):
         try:
             profile, _ = settings.resolve("profile", prefix)
             display_name = (profile.get("identity") or {}).get("display_name") or ""
@@ -923,7 +935,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Scaffold an identity from the template (the first one or another)",
     )
     p_new.add_argument("--prefix", required=True,
-                       help="Prefix: 3-6 lowercase Latin characters")
+                       help="Prefix: 3-10 lowercase Latin characters")
     p_new.add_argument(
         "--name", required=True,
         help='The longer description as an ordinary phrase, e.g. "Senior dotnet '

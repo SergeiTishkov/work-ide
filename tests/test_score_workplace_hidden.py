@@ -101,7 +101,7 @@ def test_the_catalogue_marks_linkedin_and_both_templates_name_the_words():
     catalog = yaml.safe_load((root / "config" / "sources.catalog.yaml").read_text(encoding="utf-8"))
     hidden = {s["name"] for s in catalog["sources"] if s.get("workplace_hidden")}
     assert hidden == {"linkedin"}
-    for name in ("sharp", "pjoice"):
+    for name in ("sharp", "partsharp"):
         path = next((root / "identity-templates").glob(f"{name}-*/{name}_criteria.yaml"))
         criteria = yaml.safe_load(path.read_text(encoding="utf-8"))
         words = criteria["remote_location_fit"]["explicit_remote_keywords"]

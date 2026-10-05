@@ -69,7 +69,7 @@ answers:
     tier: essential
     q: >
       The identity prefix. The agent offers 2-3 options with expansions and the
-      person chooses. 3-6 lowercase Latin letters, pronounceable, describing
+      person chooses. 3-10 lowercase Latin letters, pronounceable, describing
       WHAT THE SEARCH IS ABOUT (not the person — it outlives a change of stack).
     answer: null
     required: true

@@ -410,7 +410,7 @@ signals with points, cap and floor, summed into the score, listed in the
 breakdown under its own name, and printed in the report with the identity's
 own label. The fixed components stay: they carry measured history, and turning
 them into list entries would lose it for no gain. A search that does not want a
-fixed component zeroes it (PJOICE's `legacy_enterprise_signal` weighs 0).
+fixed component zeroes it (PARTSHARP's `legacy_enterprise_signal` weighs 0).
 
 ### Graded pay (2026-09-13)
 
@@ -448,7 +448,7 @@ the UK, "freelance" is a full-time assignment at a client in Belgium and France.
 The classification checks "is this only unconfirmed?" before "has the
 complexity gate ruled the role out?", so a gated role can wait in a
 check-by-hand section even though confirming it could never make it a
-candidate. For PJOICE, where the gate means "this CV will not be considered", a
+candidate. For PARTSHARP, where the gate means "this CV will not be considered", a
 Principal Data Engineer sat at 55 in "hours not confirmed".
 
 It is an opt-in, `role_complexity_signal.applies_to_unconfirmed`, rather than a

@@ -57,7 +57,7 @@ without trouble.
 ## Step 3. Choose a prefix and clone the template
 
 The agent offers two or three options with expansions and the person picks one.
-The requirements are in `identity-templates/README.md`: 3-6 lowercase Latin
+The requirements are in `identity-templates/README.md`: 3-10 lowercase Latin
 characters, pronounceable, naming **what the search is about** rather than the
 person.
 

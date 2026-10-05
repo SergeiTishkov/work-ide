@@ -34,7 +34,8 @@ shares (a vacancy is stored once, its score per identity), and
 
 ```
 local-identities/sharp-senior-dotnet-remote-engineering/
-  identity.yaml            which template, and which version it is pinned to
+  identity.yaml            which template, and which version it is pinned to;
+                           tab_position: where its tab goes in the app (1 first)
   template/                a VERBATIM copy of the template, never edited
     sharp_profile.yaml
     sharp_criteria.yaml
@@ -141,9 +142,10 @@ renaming buys nothing while breaking how the owner recognises and finds them.
 
 ### Requirements for a prefix
 
-3-6 characters, lowercase Latin letters and digits, first character a letter,
+3-10 characters, lowercase Latin letters and digits, first character a letter,
 pronounceable, not a person's name. **The short name does not have to match the
-identity's longer description**: it may be an abbreviation of it (`pjoice`) or
+identity's longer description**: it may be built from another name
+(`partsharp`, part-time SHARP) or
 simply a name (`sharp`, whose description is "Senior dotnet remote
 engineering"). The description lives in the folder name and in
 `<prefix>_identity.md` (the owner, 2026-10-05). A non-Latin name is

@@ -10,7 +10,7 @@
 # The full list of questions and the order to ask them: docs/QUESTIONNAIRE.md.
 
 schema_version: 1
-identity_prefix: pjoice
+identity_prefix: partsharp
 kind: template
 
 answers:
@@ -70,7 +70,7 @@ answers:
   - question: "What hourly rate is the floor, and what is a good one?"
     answer: null
     note: >
-      The tiers in pjoice_criteria.yaml describe the remote contract market for
+      The tiers in partsharp_criteria.yaml describe the remote contract market for
       a senior developer. A person's own floor and target go in the local
       profile (goal.target_compensation) and, if the tiers do not fit them, in
       a local override of compensation_signal.hourly_equivalent_tiers.

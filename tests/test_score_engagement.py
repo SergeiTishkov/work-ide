@@ -206,7 +206,7 @@ def test_when_both_remote_and_hours_are_unknown_both_are_kept():
 
 
 def test_a_role_ruled_out_is_not_parked_for_a_person_when_the_identity_says_so():
-    """PJOICE's first run: a Principal Data Engineer at 55 in "hours not
+    """PARTSHARP's first run: a Principal Data Engineer at 55 in "hours not
     confirmed". Confirming its hours could not have made it a candidate."""
     criteria = _criteria(engagement_fit=ENGAGEMENT)
     criteria["role_complexity_signal"] = dict(criteria["role_complexity_signal"],

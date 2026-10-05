@@ -197,7 +197,7 @@ RUNBOOK.md             what to do in each search cycle
 identity-templates/    KINDS of search. In git. Not one personal fact.
   README.md              how to clone one, the naming rules
   blank-.../             an empty starting point if none of the others fit
-  sharp-.../, pjoice-.../  two different searches built for one CV: remote
+  sharp-.../, partsharp-.../  two different searches built for one CV: remote
                            senior work, and paid part-time side work
   <prefix>-<expansion>/  the folder explains itself by its name:
     template.yaml            the template version number
