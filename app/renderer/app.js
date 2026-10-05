@@ -1007,6 +1007,10 @@
     if (view.to_confirm && view.to_confirm.length) {
       lines.push(md('li', `${t('row.to_confirm')}: ${view.to_confirm.join(', ')}`));
     }
+    if (view.exclusivity && view.exclusivity.length) {
+      lines.push(el('li', { testid: 'details-exclusivity' },
+        `${t('row.exclusivity')}: ${view.exclusivity.join(', ')}`));
+    }
     if (view.eligibility) {
       lines.push(md('li', view.eligibility.label + (view.eligibility.reason ? ` — _${view.eligibility.reason}_` : '')));
     }

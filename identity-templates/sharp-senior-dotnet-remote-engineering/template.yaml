@@ -7,7 +7,7 @@
 # memory has broken in this project before.
 
 name: sharp
-version: 21
+version: 22
 summary: >
   Senior .NET/C# (and JS/TS) remote engineering for a person outside the US
   and the EU. Ranked first by whether the employer can hire them remotely and

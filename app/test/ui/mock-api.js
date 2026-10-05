@@ -189,6 +189,7 @@ function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new', s
       url: `https://example.test/${id}`, score, classification: cls,
       highlights: ['legacy/enterprise: insurance'], salary: 'not stated _(no data)_',
       to_confirm: [], company_url: null,
+      exclusivity: id === 'b1' ? ['moonlighting prohibited'] : [],
       eligibility: { level: 'likely', label: 'likely', reason: 'anywhere' },
       apply_channels: [], technologies: ['C#'], reputation: 'not checked',
       hiring_country: 'United Kingdom', company_age: null, note: null,

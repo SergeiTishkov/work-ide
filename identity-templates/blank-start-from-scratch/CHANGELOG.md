@@ -2,6 +2,12 @@
 
 New versions go on TOP.
 
+## V4 — exclusivity can be a line on the card, 2026-10-05
+
+**Changed** (`blank_profile.yaml`): new `employment_type_priority.exclusivity_signals`,
+phrases shown on the card rather than refusing the vacancy; the
+questionnaire asks which of the two the person wants.
+
 ## V3 — the short name need not be an abbreviation
 
 `blank_identity.md` and `blank_profile.yaml` no longer ask for the prefix to

@@ -631,6 +631,14 @@ test('the details open with the website the vacancy came from', async ({ page })
   await expect(byId(page, 'a1').getByTestId('details-source')).toHaveText(`${ru['row.source']}: linkedin.com`);
 });
 
+test('an exclusivity clause is a line in the details, not a refusal', async ({ page }) => {
+  await open(page);
+  await byId(page, 'b1').locator('details summary').click();
+  await expect(byId(page, 'b1').getByTestId('details-exclusivity'))
+    .toHaveText(`${ru['row.exclusivity']}: moonlighting prohibited`);
+  await expect(byId(page, 'a1').getByTestId('details-exclusivity')).toHaveCount(0);
+});
+
 test('choosing a source lists only its vacancies, and the filter counts follow it', async ({ page }) => {
   await open(page);
   await page.getByTestId('source-filter').selectOption('devitjobs');

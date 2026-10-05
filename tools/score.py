@@ -132,17 +132,28 @@ def load_profile() -> dict:
     return common.load_profile()
 
 
+MAX_TAGS_READ = 25
+
+
 def _vacancy_text(vacancy: dict) -> str:
     # Emails and links are stripped BEFORE any keyword search: a domain inside
     # an address is indistinguishable from a technology name (".net" inside
     # "harnly.net"), and a URL path can contain anything at all
     # ("react-native" in a job link). See tools/textclean.py, which also
     # explains why this is shape recognition rather than address validation.
+    # A tag list this long is the board's catalogue rather than the vacancy's
+    # stack. Found 2026-10-05: Remotive gives Lemon.io 45 tags — every stack it
+    # places, React Native and Flutter among them — so the mobile gate refused
+    # a "Senior .NET Full-stack Developer" at 90. 73 records in SHARP's base
+    # had more than 25 tags (RemoteOK, Remotive, arbeitnow).
+    tags = vacancy.get("tags") or []
+    if len(tags) > MAX_TAGS_READ:
+        tags = []
     parts = [
         vacancy.get("title") or "",
         vacancy.get("company") or "",
         vacancy.get("location_raw") or "",
-        " ".join(vacancy.get("tags") or []),
+        " ".join(tags),
         vacancy.get("description_text") or "",
         vacancy.get("salary_raw") or "",
     ]
@@ -1830,6 +1841,119 @@ def _check_industry_dealbreaker(text: str, criteria: dict):
     }
 
 
+# Words that turn a sentence into a wish rather than a requirement: "Solidity
+# is a plus", "nice to have: Rust". A short line made of one of them is a
+# heading, and the lines under it are wishes too.
+_DEFAULT_PLUS_MARKERS = [
+    "nice to have", "nice-to-have", "good to have", "a plus", "a bonus",
+    "bonus points", "is a bonus", "preferred", "desirable", "an advantage",
+    "advantageous", "beneficial", "would be great", "optional",
+]
+_HEADING_RE = re.compile(
+    r"(requirements|qualifications|must[- ]haves?|what you|you have|you bring|"
+    r"responsibilities|about (us|you|the)|benefits|we offer|what we|skills|"
+    r"experience|tech stack|our stack)", re.IGNORECASE)
+
+
+def _required_and_wished(text: str, plus_markers: list):
+    """The posting's statements, split into what it requires and what it only
+    wishes for. A sentence is a wish when it carries a plus marker, or when it
+    sits under a short heading that does ("Nice to have:")."""
+    required, wished = [], []
+    under_plus_heading = False
+    for sentence in _sentences(text):
+        short = len(sentence.split()) <= 6
+        is_plus = bool(_matches(sentence, plus_markers))
+        if short and is_plus:
+            under_plus_heading = True
+            continue
+        if short and (sentence.endswith(":") or _HEADING_RE.search(sentence)):
+            under_plus_heading = False
+            continue
+        (wished if is_plus or under_plus_heading else required).append(sentence)
+    return required, wished
+
+
+def _score_domain_fit(text: str, title: str, criteria: dict, profile: dict):
+    """An industry worth a bonus, but only where this CV is what it hires.
+
+    The owner, 2026-10-05, about crypto: a crypto project that wants a .NET
+    developer with five years of experience, Solidity a plus, is exactly the
+    job (+20). One that wants five years in crypto, Solidity and Rust, .NET a
+    plus, will not hire this person — however many .NET words it contains.
+    So the bonus reads WHAT IS REQUIRED rather than what is mentioned:
+
+        domain_fit_signals:
+          - name: crypto
+            label: "crypto project"
+            keywords: [blockchain, crypto, web3, ...]   # the industry
+            min_hits: 2              # distinct words, stack-spam cut first...
+            min_mentions: 3          # ...or this many mentions of any of them
+            points: 20               # the core stack is required, nothing foreign is
+            foreign_requirements:    # regexes: skills this CV does not have
+              - '\\bsolidity\\b'
+
+    The verdicts: `core_required` (points), `foreign_required` (a
+    rejection: the core stack is at most a wish), `mixed` (both required —
+    neither bonus nor rejection), `mentioned` (the industry, but no stack
+    either way: the stack gates decide).
+    """
+    specs = criteria.get("domain_fit_signals") or []
+    if not specs:
+        return 0, [], {}
+    text, _ = _strip_stack_noise_sections(text, criteria)
+    title = common.normalize_for_matching(title or "")
+    core = profile["tech_stack"].get("core", [])
+    core_specs = _pattern_specs_for(core)
+
+    def core_in(fragment):
+        hits = _matches(fragment, core)
+        return hits + _matches_patterns(fragment, core_specs, hits)
+
+    total, dealbreakers, detail = 0, [], {}
+    for spec in specs:
+        name = (spec or {}).get("name")
+        if not name:
+            continue
+        label = spec.get("label") or name
+        domain_hits = _matches(text, spec.get("keywords") or [])
+        # A company that is about crypto may say only "crypto", but says it
+        # again and again (Cryptonow, 2026-10-05: one word, six times).
+        mentions = sum(text.count(common.normalize_for_matching(h)) for h in domain_hits)
+        if (len(domain_hits) < spec.get("min_hits", 2)
+                and mentions < spec.get("min_mentions", 3)):
+            continue
+        required, wished = _required_and_wished(
+            text, spec.get("plus_markers") or _DEFAULT_PLUS_MARKERS)
+        core_required = core_in(title) + [h for s in required for h in core_in(s)]
+        core_wished = [h for s in wished for h in core_in(s)]
+        foreign = spec.get("foreign_requirements") or []
+        foreign_required = sorted({p for p in foreign
+                                   for s in [title] + required if _regex(p).search(s)})
+        if core_required and not foreign_required:
+            verdict, points = "core_required", int(spec.get("points") or 0)
+        elif foreign_required and not core_required:
+            verdict, points = "foreign_required", 0
+            dealbreakers.append(
+                f"domain: a {label} that requires what this CV lacks "
+                f"({', '.join(foreign_required[:3])}); the core stack is at most a plus")
+        elif foreign_required:
+            verdict, points = "mixed", 0
+        else:
+            verdict, points = "mentioned", 0
+        total += points
+        detail[name] = {
+            "label": label,
+            "verdict": verdict,
+            "points": points,
+            "domain_hits": domain_hits,
+            "core_required": sorted(set(core_required)),
+            "core_wished": sorted(set(core_wished)),
+            "foreign_required": foreign_required,
+        }
+    return total, dealbreakers, detail
+
+
 def _check_mobile_role(text: str, title: str, criteria: dict):
     """Mobile development behind a neutral title — full rejection.
 
@@ -2637,6 +2761,9 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
             "industry: an industry this search avoids "
             f"({', '.join(industry_bd['hits'][:4])})"
         )
+    domain_points, domain_dealbreakers, domain_bd = _score_domain_fit(
+        text, vacancy.get("title") or "", criteria, profile)
+    dealbreakers.extend(domain_dealbreakers)
 
     mobile_role, mobile_bd = _check_mobile_role(text, vacancy.get("title") or "", criteria)
     if mobile_bd:
@@ -2680,6 +2807,10 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     )
     if employment_dealbreakers:
         dealbreakers.extend(f"employment: {d}" for d in employment_dealbreakers)
+    # An exclusivity clause is a fact for the person, not a refusal: the owner,
+    # 2026-10-05, moved it out of dealbreaker_signals into a line on the card.
+    exclusivity_hits = _matches(
+        text, profile["employment_type_priority"].get("exclusivity_signals") or [])
 
     engagement, engagement_bd = _check_engagement(vacancy, text, criteria)
     engagement_policy = (criteria.get("engagement_fit") or {}).get(
@@ -2718,6 +2849,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         + legacy_points
         + intensity_points
         + extra_points
+        + domain_points
         + comp_points
         + contractor_points
         + reputation_points
@@ -2814,6 +2946,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "legacy_enterprise_signal": legacy_bd,
         "low_intensity_signal": intensity_bd,
         "extra_signals": extra_bd,
+        "domain_fit_signals": domain_bd,
+        "employment_exclusivity": {"hits": exclusivity_hits},
         "engagement_fit": engagement_bd,
         "compensation_signal": comp_bd,
         "contractor_friendliness": contractor_bd,

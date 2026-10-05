@@ -123,6 +123,8 @@ CATALOGUES = {
             "прямо пишут full-time, вакансия отклонена и сюда не попала. "
             "Оценка не снижена: не хватает подтверждения, а не качества.",
         "engagement confirmed": "занятость подтверждена",
+        "the core stack is required": "основной стек обязателен",
+        "requires exclusivity": "требует эксклюзивности",
         "left to confirm": "осталось подтвердить",
         "that it is remote": "что это удалёнка",
         "the hours (part-time, freelance)": "занятость (part-time, фриланс)",

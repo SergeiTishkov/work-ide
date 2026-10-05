@@ -6,6 +6,33 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V22 — crypto by fit; exclusivity is a line on the card, 2026-10-05
+
+**Changed** (`sharp_criteria.yaml`): new `domain_fit_signals` with `crypto`.
+A crypto project scores +20 where the core stack is what it requires and
+nothing this CV lacks is (Solidity, Rust, EVM, smart-contract development,
+years in crypto); where it requires those and the core stack is at most a
+plus, it is rejected. Sentences with "a plus", "nice to have", "preferred"
+and lines under such a heading are read as wishes, not requirements.
+
+**Changed:** `industry_dealbreaker_gate` is empty: crypto and web3 are no
+longer refused as an industry. It also rejected Lemon.io's ordinary .NET
+vacancies, whose stack list names Blockchain, Ethereum and Solana.
+
+**Changed:** `role_complexity_signal.title_red_flag_patterns`: "research
+engineer" ("AI Research Engineer (Pre-training)" at Tether, which only the
+crypto gate used to hide).
+`low_priority_avoid` is empty.
+
+**Changed** (`sharp_profile.yaml` → `employment_type_priority`): the exclusivity
+phrases ("exclusive employment", "moonlighting prohibited", ...) moved from
+`dealbreaker_signals` to the new `exclusivity_signals`. A vacancy with such a
+clause is no longer refused; its card says "requires exclusivity".
+
+**Why.** The owner, 2026-10-05: a crypto project that hires a .NET developer
+is welcome; one that wants a Solidity or Rust developer will not hire this
+CV. An exclusivity clause is for the person to weigh.
+
 ## V21 — renamed from KISEL to SHARP; reachability and pay first, 2026-10-05
 
 **Renamed.** The prefix `kisel` became `sharp`, the folder

@@ -91,6 +91,7 @@
   'row.company_site': '🏢 Company site',
   'row.source': '🌐 Source',
   'row.note': 'Note',
+  'row.exclusivity': 'Requires exclusivity',
 
   'badge.fresh': 'fresh',
   'badge.manual_review': 'needs a manual check',

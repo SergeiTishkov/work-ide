@@ -81,12 +81,14 @@ employment_type_priority:
   # Full-time is not low priority here — it is out (pjoice_criteria.yaml ->
   # engagement_fit).
   low_but_possible: []
-  dealbreaker_signals:
+  # Shown on the card as a line, not a refusal (the owner, 2026-10-05).
+  exclusivity_signals:
     - "exclusive employment"
     - "no other employment"
     - "moonlighting prohibited"
     - "sole and primary employer"
     - "must not hold other employment"
+  dealbreaker_signals:
     - "security clearance required"
     - "must relocate"
     - "on-site required"

@@ -6,6 +6,25 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V10 — crypto by fit; exclusivity is a line on the card, 2026-10-05
+
+**Changed** (`pjoice_criteria.yaml`): new `domain_fit_signals` with `crypto`.
+A crypto project scores +20 where the core stack is what it requires and
+nothing this CV lacks is (Solidity, Rust, EVM, smart-contract development,
+years in crypto); where it requires those and the core stack is at most a
+plus, it is rejected. Sentences with "a plus", "nice to have", "preferred"
+and lines under such a heading are read as wishes, not requirements.
+
+**Changed:** the crypto words left `extra_signals.interesting_work` (up to
++8), so that crypto is counted in one place.
+
+**Changed** (`pjoice_profile.yaml` → `employment_type_priority`): the exclusivity
+phrases ("exclusive employment", "moonlighting prohibited", ...) moved from
+`dealbreaker_signals` to the new `exclusivity_signals`. A vacancy with such a
+clause is no longer refused; its card says "requires exclusivity".
+
+**Why.** The owner, 2026-10-05, for both searches.
+
 ## V9 — LinkedIn counts as remote only where it says so, 2026-10-04
 
 **Changed:** `pjoice_criteria.yaml` → `remote_location_fit`: new

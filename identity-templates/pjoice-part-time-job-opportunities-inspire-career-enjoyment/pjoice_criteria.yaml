@@ -10,8 +10,10 @@
 #   * part-time, freelance or fractional hours are REQUIRED — a full-time role
 #     cannot be done beside a full-time job (engagement_fit);
 #   * dull work is neutral, not a plus (legacy_enterprise_signal weighs 0);
-#   * interesting work — crypto, AI, distributed systems — is a small plus
-#     (extra_signals.interesting_work), and crypto is no longer a dealbreaker;
+#   * interesting work — AI, distributed systems — is a small plus
+#     (extra_signals.interesting_work); a crypto project is +20 where this CV
+#     is what it hires, and a rejection where it requires Solidity, Rust or
+#     years in crypto (domain_fit_signals);
 #   * but only work THIS CV will be considered for: research, machine learning,
 #     data engineering and smart contracts are cut however interesting they are
 #     (role_complexity_signal, repurposed — see there).
@@ -27,7 +29,8 @@
 #   compensation_signal          -8..+34   the hourly rate, graded
 #   stack_fit.cap                     25   the fit to the CV
 #   company_reputation_signal        ~24   reviews
-#   extra_signals.interesting_work    +8   crypto, AI, distributed systems
+#   domain_fit_signals.crypto         +20  a crypto project hiring this CV
+#   extra_signals.interesting_work    +8   AI, distributed systems
 #   extra_signals.fits_beside_a_job -12..+6 async and flexible against on-call
 #   extra_signals.ai_training_gig     -6   paid, but not a product team
 #   remote_location_fit.worldwide      6
@@ -1579,11 +1582,69 @@ language_requirement_signal:
 # rather than a penalty. The two-match threshold exists so that a vacancy
 # mentioning crypto in passing among its clients is not cut.
 industry_dealbreaker_gate:
-  # EMPTY ON PURPOSE. SHARP refuses crypto and web3 here; for this search they
-  # are among the interesting domains the owner named first (2026-09-13), and
-  # they are a plus in extra_signals.interesting_work.
+  # EMPTY ON PURPOSE: crypto and web3 are among the domains the owner named
+  # first for this search (2026-09-13); domain_fit_signals below gives the
+  # bonus where this CV is what the project hires.
   threshold_hits: 2
   keywords: []
+
+# An industry worth a bonus where this CV is what it hires
+# (score._score_domain_fit). The owner, 2026-10-05: a crypto project that
+# wants a .NET developer, Solidity a plus, is exactly the job: +20. One that
+# wants years in crypto, Solidity and Rust, .NET a plus, will not hire this
+# person: a rejection, however many .NET words it has.
+#
+# The verdict reads what each sentence REQUIRES: a sentence with "a plus",
+# "nice to have", "preferred" and the like, or a line under such a heading, is
+# a wish. Both required ("C# and Solidity") is neither a bonus nor a rejection.
+# Stack-spam paragraphs (stack_fit.noise_section_markers) are cut first: until
+# V22 Lemon.io's "Blockchain (Ethereum/Solana)" in its list of every stack it
+# matches made the old industry gate reject its ordinary .NET vacancies.
+#
+# Substring matching for `keywords`, so no short words: "crypto" alone is
+# inside "cryptography", "defi" inside "defining", "nft" inside many words.
+domain_fit_signals:
+  - name: crypto
+    label: "crypto project"
+    min_hits: 2
+    min_mentions: 3
+    points: 20
+    keywords:
+      - "blockchain"
+      - "web3"
+      - "cryptocurrenc"
+      - "crypto "
+      - "crypto-"
+      - "crypto,"
+      - "crypto."
+      - " defi "
+      - " defi,"
+      - "(defi"
+      - "decentralized finance"
+      - "ethereum"
+      - "solana"
+      - "polkadot"
+      - "bitcoin"
+      - "stablecoin"
+      - "on-chain"
+      - "onchain"
+      - "smart contract"
+      - "token economics"
+      # Not "tokenization": it is also data privacy (IBM "Anonymization
+      # Developer", 2026-10-05, mentioned it three times).
+    # Regexes over the normalised text: what a crypto project may require
+    # that this CV does not have.
+    foreign_requirements:
+      - '\bsolidity\b'
+      - '\brust\b'
+      - '\bvyper\b'
+      - '\bevm\b'
+      - '\bcairo\b'
+      - '\bmove (language|smart contracts?)\b'
+      - '(writ\w*|develop\w*|build\w*|audit\w*|deploy\w*) (secure )?smart[- ]contracts?'
+      - 'smart[- ]contracts? (development|developer|engineer\w*)'
+      - '\b\d+\+?\s*years?\b[^.]{0,60}\b(crypto|web3|blockchain|defi)\b'
+      - '\b(experience|background|track record) (in|with|building|developing)[^.]{0,30}\b(crypto|web3|blockchain|defi|dapps?)\b'
 
 legacy_enterprise_signal:
   # NEUTRAL. The owner, 2026-09-13: "boring work is not a plus now, it is
@@ -1867,24 +1928,8 @@ extra_signals:
     points_per_keyword: 2
     cap: 8
     keywords:
-      - "blockchain"
-      - "web3"
-      - "crypto"
-      # Never a bare "defi": it is inside "defining", "definitely" and
-      # "deficit". Seen on the first run, where G2i collected "interesting
-      # work: defi" for "defining engineering standards". The same trap as
-      # "LESS" in "no less than" (docs/TECH_MATCHING.md).
-      - " defi "
-      - " defi,"
-      - "(defi"
-      - "decentralized finance"
-      - "ethereum"
-      - "solana"
-      - "bitcoin"
-      - "stablecoin"
-      - "on-chain"
-      - "onchain"
-      - "tokenization"
+      # Crypto words left this list in V10: the crypto bonus is
+      # domain_fit_signals (+20 where this CV is what the project hires).
       - "large language model"
       # Not a bare "llm", which is inside "enrollment".
       - " llm "

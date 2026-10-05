@@ -142,12 +142,14 @@ employment_type_priority:
   medium: ["W-2 part-time", "temporary", "contract-to-hire"]
   # Full-time is NOT lower priority in itself.
   low_but_possible: ["W-2 full-time remote without any workload signal"]
-  dealbreaker_signals:
+  # Shown on the card as a line, not a refusal (the owner, 2026-10-05).
+  exclusivity_signals:
     - "exclusive employment"
     - "no other employment"
     - "moonlighting prohibited"
     - "sole and primary employer"
     - "must not hold other employment"
+  dealbreaker_signals:
     - "security clearance required"
     - "must relocate"
     - "on-site required"
@@ -246,11 +248,9 @@ ideal_company_traits:
     - "pays at the top of the market and states the amount"
     - "mature company (10+ years old)"
   # Since 2026-10-05 reachability, fit and pay rank a vacancy; the kind of work
-  # or company does not. Crypto and web3 stay: criteria.yaml ->
-  # industry_dealbreaker_gate still rejects them.
-  low_priority_avoid:
-    - "crypto"
-    - "web3"
+  # or company does not. Crypto is a plus where this CV is what it hires
+  # (criteria.yaml -> domain_fit_signals).
+  low_priority_avoid: []
 
 eor_platforms_signal:
   # A mention of an employment platform is a strong signal that a company is

@@ -95,8 +95,11 @@ employment_type_priority:
   high: []
   medium: []
   low_but_possible: []
-  # Things that make a vacancy impossible. If it is to be combined with other
-  # work, leave exclusivity requirements here.
+  # Phrases shown on the card as a line rather than refusing the vacancy:
+  # exclusivity clauses, for instance ("exclusive employment", "moonlighting
+  # prohibited"). Move them to dealbreaker_signals to refuse instead.
+  exclusivity_signals: []
+  # Things that make a vacancy impossible.
   dealbreaker_signals:
     - "must relocate"
     - "on-site required"

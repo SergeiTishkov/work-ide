@@ -248,13 +248,14 @@ answers:
   # --- §7 Employment type --------------------------------------------------
   - id: employment.exclusivity
     tier: later
-    q: "Exclusivity requirements — acceptable, or a disqualification?"
+    q: "Exclusivity requirements — acceptable, a line on the card, or a disqualification?"
     why: >
-      If they disqualify, exclusivity clauses become
-      disqualifiers.
+      If they disqualify, exclusivity clauses go to dealbreaker_signals;
+      otherwise to exclusivity_signals, shown as a line on the card.
     answer: null
     required: true
-    drives: ["profile.employment_type_priority.dealbreaker_signals"]
+    drives: ["profile.employment_type_priority.exclusivity_signals",
+             "profile.employment_type_priority.dealbreaker_signals"]
 
   - id: employment.preferred
     tier: later

@@ -486,6 +486,10 @@ def vacancy_view(v: dict) -> dict:
         if signal.get("negative_hits"):
             highlights.append(f"⚠ {signal.get('label')}: "
                               + ", ".join(signal["negative_hits"][:3]))
+    for domain in (bd.get("domain_fit_signals") or {}).values():
+        if domain.get("verdict") == "core_required":
+            highlights.append(f"{domain.get('label')}: " + t("the core stack is required")
+                              + f" ({', '.join(domain.get('core_required', [])[:3])})")
     engagement = bd.get("engagement_fit") or {}
     if engagement.get("verdict") == "confirmed":
         highlights.append("⏱ " + t("engagement confirmed") + f" ({engagement.get('reason')})")
@@ -532,6 +536,9 @@ def vacancy_view(v: dict) -> dict:
         "highlights": highlights,
         "salary": salary_line,
         "to_confirm": pending,
+        # The vacancy's exclusivity clause, in its own words: a fact for the
+        # person to weigh, not a refusal (the owner, 2026-10-05).
+        "exclusivity": (bd.get("employment_exclusivity") or {}).get("hits") or [],
         # The employer's own site, when known — so the same vacancy can be
         # found on their careers page and applied to without an account on the
         # job board (WWR keeps the application funnel to itself, see
@@ -579,6 +586,8 @@ def _fmt_vacancy_line(v: dict) -> str:
     ]
     if view["to_confirm"]:
         lines.append(f"  - ❓ {t('left to confirm')}: {', '.join(view['to_confirm'])}")
+    if view["exclusivity"]:
+        lines.append(f"  - ⚠ {t('requires exclusivity')}: {', '.join(view['exclusivity'])}")
     if view["company_url"]:
         lines.append(f"  - 🏢 {t('company site (apply directly)')}: {view['company_url']}")
     eligibility = view["eligibility"]
