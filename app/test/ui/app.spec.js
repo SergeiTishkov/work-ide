@@ -216,6 +216,17 @@ test('a stub drains for 30 seconds, counts down on hover, then goes', async ({ p
   await expect(stub).toHaveCount(0);
 });
 
+test('"Hide" removes a stub at once and keeps the answer', async ({ page }) => {
+  await page.clock.install();
+  await open(page);
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  const stub = page.getByTestId('stub-a1');
+  await expect(stub).toBeVisible();
+  await stub.getByTestId('btn-hide').click();
+  await expect(stub).toHaveCount(0);
+  await expect(byId(page, 'a1')).toHaveCount(0);
+});
+
 test('a stub that goes lets the ones below keep their order', async ({ page }) => {
   await page.clock.install();
   const order = () => page.getByTestId('section-hot_lead').locator('article, .stub')

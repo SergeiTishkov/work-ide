@@ -939,7 +939,11 @@
     const elapsed = STUB_LIFETIME_MS - Math.max(0, stub.expires - Date.now());
     return el('div', { class: 'row stub', testid: `stub-${id}` },
       el('span', {}, t('stub.marked', { status: t(STATUS_KEYS[stub.status]) }), ' · ',
-        el('button', { class: 'link', testid: 'btn-undo', onclick: () => undo(id) }, t('action.undo'))),
+        el('button', { class: 'link', testid: 'btn-undo', onclick: () => undo(id) }, t('action.undo')),
+        ' · ',
+        // Goes now rather than when the ring runs out (the owner, 2026-10-05).
+        el('button', { class: 'link', testid: 'btn-hide', onclick: () => expireStub(id, stub) },
+          t('action.hide'))),
       el('span', { class: 'stub-timer', testid: 'stub-timer' },
         el('span', {
           class: 'ring', style: `animation-duration: ${STUB_LIFETIME_MS}ms; animation-delay: -${elapsed}ms`,

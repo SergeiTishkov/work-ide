@@ -103,6 +103,7 @@
   'action.bugged': 'Wrong pick',
   'action.expired': 'Vacancy expired',
   'action.undo': 'undo',
+  'action.hide': 'hide',
 
   'reason.rejected': 'Why not for you? (optional)',
   'reason.bugged': 'What is wrong with the pick? (optional)',
@@ -150,5 +151,5 @@
   'timeline.edit': 'Edit the comment',
   'timeline.edit_hint': 'Comment',
   'stub.marked': 'Marked: {status}',
-  'stub.removed_in': '{n} s until this line is removed',
+  'stub.removed_in': '{n} sec until this line is removed',
 })));
