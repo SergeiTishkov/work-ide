@@ -16,15 +16,15 @@ database by hand:
         --outcome "role gate now rejects 'Java' titles; test added"
     python tools/feedback.py --identity sharp reject --id X --reason "on-site in Lyon"
 
-A package (data/<prefix>/feedback/pending_<time>.yaml) holds everything a
+A package (data/identities/<prefix>/feedback/pending_<time>.yaml) holds everything a
 diagnosis needs: the person's words, what the vacancy looked like, why the
 scorer let it through (the full score breakdown), the class and score when
 the feedback was given next to the class and score now, and a summary of what
 the pending items have in common. One shared cause is worth more than a patch
 per vacancy, so the summary comes first.
 
-This script writes vacancies.feedback_reviewed_at, and — through `reject`
-only — the agent's own "not for me" (see reject()).
+This script writes vacancy_identity.feedback_reviewed_at, and — through
+`reject` only — the agent's own "not for me" (see reject()).
 """
 from __future__ import annotations
 
@@ -61,7 +61,8 @@ def count() -> dict:
     if not db.exists():
         return {"bugged": 0, "rejected": 0}
     with db.session() as conn:
-        row = conn.execute(selections.load_queries()["pending_feedback_counts"]).fetchone()
+        row = conn.execute(selections.load_queries()["pending_feedback_counts"],
+                           {"identity": db.identity()}).fetchone()
     return {"bugged": row[0], "rejected": row[1]}
 
 
@@ -84,9 +85,9 @@ def _signal_hits(breakdown: dict) -> list:
 
 
 def _item(conn, row: tuple, latest_selection: Optional[int]) -> dict:
-    (vid, data, view, status, rejected_reason, bugged_reason, at, selection_id) = row
+    (vid, data, computed, view, status, rejected_reason, bugged_reason, at, selection_id) = row
     v = json.loads(data)
-    c = v.get("computed") or {}
+    c = json.loads(computed) if computed else {}
 
     def listed_in(sel_id):
         if sel_id is None:
@@ -134,9 +135,11 @@ def pending_items(include_reviewed: bool = False, statuses=("bugged", "rejected"
     with db.session() as conn:
         latest = selections.latest_selection_id(conn)
         rows = conn.execute(
-            "SELECT id, data, view, feedback_status, rejected_reason, bugged_reason, "
-            "feedback_at, feedback_selection_id FROM vacancies "
-            f"WHERE {where} AND feedback_status IN ({marks})", tuple(statuses)).fetchall()
+            "SELECT vi.vacancy_id, v.data, vi.computed, vi.view, vi.feedback_status, "
+            "vi.rejected_reason, vi.bugged_reason, vi.feedback_at, vi.feedback_selection_id "
+            "FROM vacancy_identity vi JOIN vacancies v ON v.id = vi.vacancy_id "
+            f"WHERE vi.identity_id = ? AND {where} AND feedback_status IN ({marks})",
+            (db.identity(), *statuses)).fetchall()
         items = [_item(conn, row, latest) for row in rows]
     items.sort(key=lambda it: (it["status"] != "bugged", -(it["now"]["score"] or 0), it["id"]))
     return items
@@ -202,8 +205,10 @@ def mark_reviewed(ids: list, outcome: str, package: Optional[Path] = None) -> in
         changed = 0
         for vid in ids:
             changed += conn.execute(
-                "UPDATE vacancies SET feedback_reviewed_at = ? WHERE id = ? "
-                "AND feedback_status IN ('bugged', 'rejected')", (reviewed_at, vid)).rowcount
+                "UPDATE vacancy_identity SET feedback_reviewed_at = ? "
+                "WHERE identity_id = ? AND vacancy_id = ? "
+                "AND feedback_status IN ('bugged', 'rejected')",
+                (reviewed_at, db.identity(), vid)).rowcount
     package = package or _latest_package()
     if package is not None and package.exists():
         data = yaml.safe_load(package.read_text(encoding="utf-8")) or {}
@@ -226,10 +231,10 @@ def reject(vid: str, reason: str) -> bool:
     with db.session() as conn:
         latest = selections.latest_selection_id(conn)
         return conn.execute(
-            "UPDATE vacancies SET feedback_status = 'rejected', rejected_reason = ?, "
+            "UPDATE vacancy_identity SET feedback_status = 'rejected', rejected_reason = ?, "
             "bugged_reason = NULL, feedback_at = ?, feedback_selection_id = ?, "
-            "feedback_reviewed_at = ? WHERE id = ?",
-            (reason.strip() or None, at, latest, at, vid)).rowcount == 1
+            "feedback_reviewed_at = ? WHERE identity_id = ? AND vacancy_id = ?",
+            (reason.strip() or None, at, latest, at, db.identity(), vid)).rowcount == 1
 
 
 def _latest_package() -> Optional[Path]:

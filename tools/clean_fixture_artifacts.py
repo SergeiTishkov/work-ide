@@ -19,7 +19,7 @@ This module deletes only what is certainly a fixture's trace:
 
   * the prefix must belong to an identity with `kind: fixture`;
   * EXACTLY two paths are removed: `reports/<p>_latest.md` and
-    `reports/archive/<p>/`, plus `data/<p>/` if it appeared;
+    `reports/archive/<p>/`, plus `data/identities/<p>/` if it appeared;
   * nothing under any other name is touched under any circumstances.
 
 Live identities (`kind: personal`) are never deleted, even if their prefix is
@@ -49,7 +49,7 @@ def artifact_paths(prefix: str) -> List[Path]:
     return [
         common.REPORTS_ROOT / f"{prefix}_latest.md",
         common.REPORTS_ROOT / "archive" / prefix,
-        common.DATA_ROOT / prefix,
+        common.identity_data_dir(prefix),
     ]
 
 

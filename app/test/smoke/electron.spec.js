@@ -12,11 +12,12 @@ const ru = require('../../renderer/locales/ru.js');
 function fixtureRepo() {
   const root = tempDir('work-ide-smoke-');
   fs.cpSync(SCHEMA_DIR, path.join(root, 'schemas'), { recursive: true });
-  const database = standardDatabase(path.join(root, 'data', 'sharp', 'sharp.sqlite'));
+  const database = standardDatabase(path.join(root, 'data', 'workide.sqlite'),
+    { identity: 'sharp' });
   const identities = path.join(root, 'identities.json');
   fs.writeFileSync(identities, JSON.stringify([
-    { prefix: 'sharp', display_name: 'Senior .NET/C# remote engineering', database: 'data/sharp/sharp.sqlite' },
-    { prefix: 'pjoice', display_name: 'Part-time', database: 'data/pjoice/pjoice.sqlite' },
+    { prefix: 'sharp', display_name: 'Senior .NET/C# remote engineering', database: 'data/workide.sqlite' },
+    { prefix: 'pjoice', display_name: 'Part-time', database: 'data/workide.sqlite' },
   ]));
   return { root, database, identities };
 }
@@ -57,7 +58,8 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await expect(window.getByTestId('filter-option-bugged')).toContainText('(1)');
 
     const db = new DatabaseSync(repo.database);
-    const row = db.prepare('SELECT feedback_status, bugged_reason FROM vacancies WHERE id = ?').get('new0');
+    const row = db.prepare('SELECT feedback_status, bugged_reason FROM vacancy_identity '
+      + "WHERE identity_id = 'sharp' AND vacancy_id = ?").get('new0');
     db.close();
     expect({ ...row }).toEqual({ feedback_status: 'bugged', bugged_reason: 'onsite in fact' });
 
@@ -65,15 +67,15 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await expect(window.getByTestId('run-log')).toContainText('fake run: /run sharp');
     await expect(window.getByTestId('run-status')).toContainText(ru['run.finished']);
     await expect(window.getByTestId('run-collect')).toBeEnabled();
-    expect(fs.readdirSync(path.join(repo.root, 'data', 'sharp', 'runs'))).toHaveLength(1);
+    expect(fs.readdirSync(path.join(repo.root, 'data', 'identities', 'sharp', 'runs'))).toHaveLength(1);
 
     // The indicator reads tools/runstate.py's row: a live one (this test's own
     // pid, fresh heartbeat) shows, a finished one clears within a poll.
     const runs = new DatabaseSync(repo.database);
     const now = new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
     const { lastInsertRowid } = runs.prepare(
-      "INSERT INTO pipeline_runs (started_at, heartbeat_at, status, stage, pid, host) "
-      + "VALUES (?, ?, 'running', 'check links', ?, ?)").run(now, now, process.pid, os.hostname());
+      "INSERT INTO pipeline_runs (identity_id, started_at, heartbeat_at, status, stage, pid, host) "
+      + "VALUES ('sharp', ?, ?, 'running', 'check links', ?, ?)").run(now, now, process.pid, os.hostname());
     await expect(window.getByTestId('collect-indicator')).toBeVisible({ timeout: 10000 });
     await expect(window.getByTestId('run-collect')).toContainText('check links');
     runs.prepare("UPDATE pipeline_runs SET status = 'finished' WHERE id = ?").run(lastInsertRowid);

@@ -160,8 +160,9 @@ def test_pipeline_is_idempotent_and_preserves_manual_status(isolated_data_dir, m
     import db
 
     with db.session() as conn:     # the person's answer, written by the app
-        conn.execute("UPDATE vacancies SET feedback_status = 'applied', "
-                     "feedback_at = '2026-07-30T10:00:00+00:00' WHERE id = ?", (vid,))
+        conn.execute("UPDATE vacancy_identity SET feedback_status = 'applied', "
+                     "feedback_at = '2026-07-30T10:00:00+00:00' "
+                     "WHERE identity_id = ? AND vacancy_id = ?", (db.identity(), vid))
 
     # a second run with the same data must not create duplicates and must not
     # lose what was recorded about the vacancy in between
@@ -173,8 +174,9 @@ def test_pipeline_is_idempotent_and_preserves_manual_status(isolated_data_dir, m
     v = kb.load_vacancies()[vid]
     assert v["external_signals"]["salary_estimate"]["source"] == "Glassdoor"
     with db.session() as conn:
-        assert conn.execute("SELECT feedback_status FROM vacancies WHERE id = ?",
-                            (vid,)).fetchone()[0] == "applied"
+        assert conn.execute("SELECT feedback_status FROM vacancy_identity "
+                            "WHERE identity_id = ? AND vacancy_id = ?",
+                            (db.identity(), vid)).fetchone()[0] == "applied"
 
 
 def test_ingest_manual_merges_into_same_kb_and_reruns_report(isolated_data_dir, monkeypatch):

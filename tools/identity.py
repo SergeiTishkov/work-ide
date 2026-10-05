@@ -528,12 +528,14 @@ def identities_for_app() -> List[dict]:
             display_name = (profile.get("identity") or {}).get("display_name") or ""
         except Exception:  # noqa: BLE001 — a caption must not hide the tab
             display_name = ""
-        database = common.DATA_ROOT / prefix / f"{prefix}.sqlite"
+        # The base is shared; the folder is the identity's own (run logs).
+        database = common.DATA_ROOT / common.DB_NAME
         result.append({
             "prefix": prefix,
             "display_name": display_name,
             "database": str(database),
             "has_database": database.exists(),
+            "data_dir": str(common.identity_data_dir(prefix)),
         })
     return result
 

@@ -1,5 +1,5 @@
 """
-Whether a pipeline run is going right now, in the identity's database.
+Whether a pipeline run is going right now, in the shared database.
 
 WHY
 ---
@@ -7,7 +7,8 @@ A run takes an hour, and it can be started from the desktop app, by the agent
 in a terminal, or by hand. The app shows whether one is going — whoever
 started it — and two runs on one base must not overlap: each loads the base,
 works for an hour and saves it whole, so the second save would silently undo
-the first.
+the first. The base is shared by every identity (tools/db.py), so that holds
+across identities too: one run at a time, whichever identity it is for.
 
 HOW, AND WHY IT CANNOT GET STUCK
 --------------------------------
@@ -36,6 +37,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import common  # noqa: E402
 import db  # noqa: E402
 import progress  # noqa: E402
 
@@ -47,7 +49,7 @@ STALE_AFTER_SECONDS = 45
 
 
 class AlreadyRunningError(RuntimeError):
-    """Another run of this identity's pipeline is alive."""
+    """Another pipeline run is alive."""
 
 
 def _now() -> datetime:
@@ -67,16 +69,17 @@ def is_stale(heartbeat_at: str, now: Optional[datetime] = None) -> bool:
 
 
 def current() -> Optional[dict]:
-    """The live run of the active identity, or None."""
+    """The live run, of whichever identity, or None."""
     if not db.exists():
         return None
     with db.session() as conn:
         row = conn.execute(
-            "SELECT id, started_at, heartbeat_at, stage, pid, host FROM pipeline_runs "
-            "WHERE status = 'running' ORDER BY id DESC LIMIT 1").fetchone()
-    if row is None or is_stale(row[2]):
+            "SELECT id, identity_id, started_at, heartbeat_at, stage, pid, host "
+            "FROM pipeline_runs WHERE status = 'running' ORDER BY id DESC LIMIT 1").fetchone()
+    if row is None or is_stale(row[3]):
         return None
-    return dict(zip(("id", "started_at", "heartbeat_at", "stage", "pid", "host"), row))
+    return dict(zip(("id", "identity", "started_at", "heartbeat_at", "stage", "pid", "host"),
+                    row))
 
 
 class PipelineRun:
@@ -102,18 +105,19 @@ class PipelineRun:
                         (_iso(now), run_id))
                 else:
                     other = conn.execute(
-                        "SELECT started_at, pid, host, stage FROM pipeline_runs WHERE id = ?",
-                        (run_id,)).fetchone()
+                        "SELECT started_at, pid, host, stage, identity_id FROM pipeline_runs "
+                        "WHERE id = ?", (run_id,)).fetchone()
                     raise AlreadyRunningError(
-                        f"another pipeline run of this identity is going: started "
+                        f"another pipeline run is going (identity {other[4] or '?'}): started "
                         f"{other[0]}, pid {other[1]} on {other[2]}, stage: {other[3] or '?'}. "
-                        f"Two runs at once would overwrite each other's work. If that "
-                        f"process is gone, its heartbeat expires within "
-                        f"{STALE_AFTER_SECONDS} s.")
+                        f"The base is shared, and two runs at once would overwrite each "
+                        f"other's work. If that process is gone, its heartbeat expires "
+                        f"within {STALE_AFTER_SECONDS} s.")
             self.run_id = conn.execute(
-                "INSERT INTO pipeline_runs (started_at, heartbeat_at, status, pid, host, log_path) "
-                "VALUES (?, ?, 'running', ?, ?, ?)",
-                (_iso(now), _iso(now), os.getpid(), socket.gethostname(), self.log_path),
+                "INSERT INTO pipeline_runs (identity_id, started_at, heartbeat_at, status, pid, "
+                "host, log_path) VALUES (?, ?, ?, 'running', ?, ?, ?)",
+                (common.ACTIVE_IDENTITY, _iso(now), _iso(now), os.getpid(),
+                 socket.gethostname(), self.log_path),
             ).lastrowid
         progress.set_stage_listener(self._on_stage)
         self._thread = threading.Thread(target=self._beat, name="pipeline-heartbeat", daemon=True)

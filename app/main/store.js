@@ -1,16 +1,18 @@
 'use strict';
-// The app's access to the identities' SQLite databases (schemas/db.sql).
+// The app's access to the shared SQLite base (schemas/db.sql).
 //
-// The app reads selections and writes ONLY the feedback and funnel columns of
-// `vacancies`. Everything else in the database belongs to the pipeline; that
-// column ownership is what lets both write at the same time.
+// One base holds every identity; each query names the identity it is about
+// (:identity). The app reads selections and writes ONLY the feedback and
+// funnel columns of `vacancy_identity`. Everything else in the base belongs
+// to the pipeline; that column ownership is what lets both write at the same
+// time.
 const fs = require('node:fs');
 const os = require('node:os');
 const { DatabaseSync } = require('node:sqlite');
 const { loadQueries } = require('./queries');
 const funnel = require('../renderer/funnel.js');
 
-const SCHEMA_VERSION = '7';
+const SCHEMA_VERSION = '8';
 // The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
 // beaten for this long is gone, whatever its row still says.
 const STALE_AFTER_MS = 45000;
@@ -74,7 +76,8 @@ function recordOf(row) {
 class SchemaMismatchError extends Error {}
 
 class Store {
-  // databasePathOf(identity) -> the file of that identity's database.
+  // databasePathOf(identity) -> the base file (one for every identity; the
+  // lookup keeps the app working on whatever the identity list says).
   constructor({
     schemaDir, databasePathOf, isPidAlive = pidAlive, hostname = os.hostname(), clock = nowIso,
   }) {
@@ -89,7 +92,8 @@ class Store {
   // Is a pipeline run of this identity going right now — started from here,
   // from a terminal or by the agent? tools/runstate.py keeps the row; a run
   // killed without cleaning up is recognised by its silent heartbeat, or at
-  // once by its dead pid when it ran on this machine.
+  // once by its dead pid when it ran on this machine. A run of another
+  // identity is not this one's, but it holds the base: `busyWith` names it.
   pipelineStatus(identity, now = Date.now()) {
     const db = this.connection(identity);
     if (!db) return { running: false };
@@ -98,6 +102,7 @@ class Store {
     const beat = Date.parse(row.heartbeat_at);
     if (Number.isNaN(beat) || now - beat > STALE_AFTER_MS) return { running: false };
     if (row.host === this.hostname && row.pid && !this.isPidAlive(row.pid)) return { running: false };
+    if (row.identity_id !== identity) return { running: false, busyWith: row.identity_id };
     return { running: true, stage: row.stage, startedAt: row.started_at, pid: row.pid, host: row.host };
   }
 
@@ -115,17 +120,18 @@ class Store {
         db.close();
         throw new SchemaMismatchError(
           `${file}: schema version ${row ? row.value : 'missing'}, the app expects ${SCHEMA_VERSION}`
-          + ' — any Python tool (e.g. tools/feedback.py count) upgrades it');
+          + ' — any Python tool (e.g. tools/feedback.py count) upgrades a newer one;'
+          + ' bases before 8 were merged into one by tools/merge_shared_base.py');
       }
       this.connections.set(file, db);
     }
     return db;
   }
 
-  latestSelection(db) {
-    const row = db.prepare(this.queries.latest_selection).get();
+  latestSelection(db, identity) {
+    const row = db.prepare(this.queries.latest_selection).get({ identity });
     if (!row || row.id == null) return null;
-    return { ...db.prepare(this.queries.selection).get({ selection_id: row.id }) };
+    return { ...db.prepare(this.queries.selection).get({ selection_id: row.id, identity }) };
   }
 
   // { selection, displayName, segments } — selection is null before the first
@@ -133,8 +139,8 @@ class Store {
   segments(identity) {
     const db = this.connection(identity);
     if (!db) return { selection: null, displayName: null, segments: [] };
-    const selection = this.latestSelection(db);
-    const name = db.prepare(this.queries.display_name).get();
+    const selection = this.latestSelection(db, identity);
+    const name = db.prepare(this.queries.display_name).get({ identity });
     const segments = selection
       ? db.prepare(this.queries.segments).all({ selection_id: selection.id })
         .map((s) => ({ slug: s.slug, name: s.name, isDefault: s.is_default === 1 }))
@@ -149,13 +155,13 @@ class Store {
   listing(identity, segment, filter, expanded = [], source = '', { shown = {}, fit = '' } = {}) {
     if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
     const db = this.connection(identity);
-    const selection = db && this.latestSelection(db);
+    const selection = db && this.latestSelection(db, identity);
     if (!selection) return [];
     const rows = FUNNEL.includes(filter)
-      ? db.prepare(this.queries.funnel_listing).all({ filter, source, fit })
+      ? db.prepare(this.queries.funnel_listing).all({ identity, filter, source, fit })
       : db.prepare(this.queries.listing).all({
-        selection_id: selection.id, segment, filter, expanded: `,${expanded.join(',')},`, source,
-        shown: JSON.stringify(shown), fit,
+        identity, selection_id: selection.id, segment, filter, expanded: `,${expanded.join(',')},`,
+        source, shown: JSON.stringify(shown), fit,
       });
     return rows.map((row) => ({
       id: row.vacancy_id,
@@ -173,7 +179,7 @@ class Store {
   classTotals(identity, segment, filter, source = '') {
     if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
     const db = this.connection(identity);
-    const selection = db && this.latestSelection(db);
+    const selection = db && this.latestSelection(db, identity);
     if (!selection) return {};
     if (FUNNEL.includes(filter)) {
       const totals = {};
@@ -183,7 +189,7 @@ class Store {
       return totals;
     }
     const rows = db.prepare(this.queries.listing_class_totals)
-      .all({ selection_id: selection.id, segment, filter, source });
+      .all({ identity, selection_id: selection.id, segment, filter, source });
     return Object.fromEntries(rows.map((r) => [r.class, r.total]));
   }
 
@@ -193,11 +199,13 @@ class Store {
   sources(identity, segment, filter, fit = '') {
     if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
     const db = this.connection(identity);
-    const selection = db && this.latestSelection(db);
+    const selection = db && this.latestSelection(db, identity);
     if (!selection) return [];
     const rows = FUNNEL.includes(filter)
-      ? db.prepare(this.queries.funnel_sources).all({ filter, fit })
-      : db.prepare(this.queries.listing_sources).all({ selection_id: selection.id, segment, filter, fit });
+      ? db.prepare(this.queries.funnel_sources).all({ identity, filter, fit })
+      : db.prepare(this.queries.listing_sources).all({
+        identity, selection_id: selection.id, segment, filter, fit,
+      });
     const sites = this.sourceSites(db);
     return rows.map((r) => ({ source: r.source, site: sites[r.source] || null, total: r.total }));
   }
@@ -217,11 +225,11 @@ class Store {
   counts(identity, segment, source = '', fit = '') {
     const empty = Object.fromEntries(FILTERS.map((f) => [f, 0]));
     const db = this.connection(identity);
-    const selection = db && this.latestSelection(db);
+    const selection = db && this.latestSelection(db, identity);
     if (!selection) return empty;
     const row = db.prepare(this.queries.listing_counts)
-      .get({ selection_id: selection.id, segment, source, fit });
-    const inFunnel = db.prepare(this.queries.funnel_counts).get({ source, fit });
+      .get({ identity, selection_id: selection.id, segment, source, fit });
+    const inFunnel = db.prepare(this.queries.funnel_counts).get({ identity, source, fit });
     return Object.fromEntries(FILTERS.map((f) => [f, (FUNNEL.includes(f) ? inFunnel[f] : row[f]) || 0]));
   }
 
@@ -231,9 +239,10 @@ class Store {
     if (!STATUSES.includes(status)) throw new Error(`unknown feedback status: ${status}`);
     const db = this.connection(identity);
     if (!db) throw new Error(`no database for identity ${identity}`);
-    const selection = this.latestSelection(db);
+    const selection = this.latestSelection(db, identity);
     const text = typeof reason === 'string' && reason.trim() ? reason.trim() : null;
     const result = db.prepare(this.queries.set_feedback).run({
+      identity,
       id: vacancyId,
       status,
       rejected_reason: status === 'rejected' ? text : null,
@@ -249,13 +258,14 @@ class Store {
   record(identity, vacancyId) {
     const db = this.connection(identity);
     if (!db) throw new Error(`no database for identity ${identity}`);
-    const row = db.prepare(this.queries.vacancy_progress).get({ id: vacancyId });
+    const row = db.prepare(this.queries.vacancy_progress).get({ identity, id: vacancyId });
     if (!row) throw new Error(`no vacancy ${vacancyId} in ${identity}`);
     return { db, record: recordOf(row) };
   }
 
-  write(db, vacancyId, record) {
+  write(db, identity, vacancyId, record) {
     db.prepare(this.queries.write_progress).run({
+      identity,
       id: vacancyId,
       status: record.status,
       at: record.at,
@@ -284,25 +294,25 @@ class Store {
   // the offer.
   advance(identity, vacancyId, step, comment) {
     const { db, record } = this.record(identity, vacancyId);
-    this.write(db, vacancyId, funnel.advance(record, step, comment, this.clock()));
+    this.write(db, identity, vacancyId, funnel.advance(record, step, comment, this.clock()));
   }
 
   // "Undo" on a vacancy with an answer: one step back.
   stepBack(identity, vacancyId) {
     const { db, record } = this.record(identity, vacancyId);
-    this.write(db, vacancyId, funnel.stepBack(record, this.clock()));
+    this.write(db, identity, vacancyId, funnel.stepBack(record, this.clock()));
   }
 
   // Rewrites one comment of the timeline under a vacancy.
   editComment(identity, vacancyId, kind, index, text) {
     const { db, record } = this.record(identity, vacancyId);
-    this.write(db, vacancyId, funnel.editComment(record, kind, index, text, this.clock()));
+    this.write(db, identity, vacancyId, funnel.editComment(record, kind, index, text, this.clock()));
   }
 
   pendingFeedback(identity) {
     const db = this.connection(identity);
     if (!db) return { bugged: 0, rejected: 0 };
-    const row = db.prepare(this.queries.pending_feedback_counts).get();
+    const row = db.prepare(this.queries.pending_feedback_counts).get({ identity });
     return { bugged: row.bugged, rejected: row.rejected };
   }
 

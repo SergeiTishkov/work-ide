@@ -28,6 +28,7 @@
   'run.collecting': 'Collecting vacancies…',
   'run.collecting_stage': 'Collecting: {stage}',
   'run.collecting_since': 'Collecting since {time} (UTC)',
+  'run.busy_other': 'A collection for {identity} is going: one at a time, the base is shared',
   'run.feedback': 'Review feedback ({n})',
   'run.stop': 'Stop',
   'run.running': 'Running {kind}: {identity}…',

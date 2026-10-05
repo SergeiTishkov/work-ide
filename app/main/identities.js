@@ -12,6 +12,8 @@ function parse(text) {
     prefix: e.prefix,
     displayName: e.display_name || '',
     database: e.database,
+    // the identity's own folder: insights, state, feedback packages, run logs
+    dataDir: e.data_dir || null,
     hasDatabase: Boolean(e.has_database),
   }));
 }
@@ -20,10 +22,11 @@ function listIdentities({ root = repoRoot(), exec = execFile } = {}) {
   const fixture = process.env.WORK_IDE_IDENTITIES_JSON;
   if (fixture) {
     const entries = parse(fs.readFileSync(fixture, 'utf8'));
-    // A fixture names databases relative to the fixture root.
+    // A fixture names paths relative to the fixture root.
     return Promise.resolve(entries.map((e) => {
       const database = path.resolve(root, e.database);
-      return { ...e, database, hasDatabase: fs.existsSync(database) };
+      const dataDir = path.resolve(root, e.dataDir || path.join('data', 'identities', e.prefix));
+      return { ...e, database, dataDir, hasDatabase: fs.existsSync(database) };
     }));
   }
   return new Promise((resolve, reject) => {

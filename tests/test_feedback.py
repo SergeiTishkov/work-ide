@@ -43,7 +43,7 @@ def _setup(statuses: dict) -> int:
 def _mark(vid, status, selection_id=None, reason="because"):
     with db.session() as conn:
         conn.execute(selections.load_queries()["set_feedback"], {
-            "id": vid, "status": status,
+            "identity": db.identity(), "id": vid, "status": status,
             "rejected_reason": reason if status == "rejected" else None,
             "bugged_reason": reason if status == "bugged" else None,
             "at": db.now_iso(), "selection_id": selection_id,
@@ -119,6 +119,7 @@ def test_the_agents_reject_is_a_reviewed_not_for_me(isolated_data_dir):
     with db.session() as conn:
         row = conn.execute(
             "SELECT feedback_status, rejected_reason, feedback_selection_id, "
-            "feedback_reviewed_at = feedback_at FROM vacancies WHERE id = 'a'").fetchone()
+            "feedback_reviewed_at = feedback_at FROM vacancy_identity "
+            "WHERE identity_id = 'ftf' AND vacancy_id = 'a'").fetchone()
     assert row == ("rejected", "on-site in Lyon, says the page", sel, 1)
     assert feedback.count() == {"bugged": 0, "rejected": 0}

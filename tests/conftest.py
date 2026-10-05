@@ -44,24 +44,25 @@ def isolated_data_dir(tmp_path, monkeypatch):
     File names here are prefixed exactly as they are in production: a test that
     accidentally hard-codes "vacancies.json" should fail, not quietly work.
     """
-    data_dir = tmp_path / "data"
+    data_root = tmp_path / "data"
+    data_dir = common.identity_data_dir(TEST_IDENTITY, data_root)
     knowledge_dir = data_dir / "knowledge"
     prefix = f"{TEST_IDENTITY}_"
 
     monkeypatch.setattr(common, "FILE_PREFIX", prefix)
+    monkeypatch.setattr(common, "DB_PATH", data_root / common.DB_NAME)
+    monkeypatch.setattr(common, "RAW_DIR", data_root / "raw")
     monkeypatch.setattr(common, "DATA_DIR", data_dir)
     monkeypatch.setattr(common, "KNOWLEDGE_DIR", knowledge_dir)
-    monkeypatch.setattr(common, "RAW_DIR", data_dir / "raw")
     # Reports live apart from data: a shared reports/ folder, with the archive
     # inside it split per identity (see common.activate_identity).
     reports_dir = tmp_path / "reports"
     monkeypatch.setattr(common, "REPORTS_DIR", reports_dir)
     monkeypatch.setattr(common, "REPORTS_ARCHIVE_DIR", reports_dir / "archive" / TEST_IDENTITY)
     monkeypatch.setattr(common, "STATE_PATH", data_dir / f"{prefix}state.json")
-    monkeypatch.setattr(common, "DB_PATH", data_dir / f"{TEST_IDENTITY}.sqlite")
     monkeypatch.setattr(common, "INSIGHTS_PATH", knowledge_dir / f"{prefix}insights.md")
     common.ensure_dirs()
-    return data_dir
+    return data_root
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -80,14 +81,27 @@ def _no_test_writes_into_real_folders():
         result = {}
         for root in (common.REPORTS_ROOT, common.DATA_ROOT):
             result[root] = sorted(p.name for p in root.iterdir()) if root.exists() else None
-            archive = root / "archive"
-            if archive.exists():
-                result[archive] = sorted(p.name for p in archive.iterdir())
+            for inner in ("archive", "identities"):
+                if (root / inner).exists():
+                    result[root / inner] = sorted(p.name for p in (root / inner).iterdir())
         return result
+
+    # The shared base holds every identity's work: a test writing into it
+    # leaves rows nobody can tell apart from real ones, so it must not be
+    # touched at all — not even opened, which would update it.
+    real_base = common.DATA_ROOT / common.DB_NAME
+
+    def base_stamp():
+        return real_base.stat().st_mtime_ns if real_base.exists() else None
+
+    base_before = base_stamp()
 
     before = snapshot()
     yield
     after = snapshot()
+    assert base_stamp() == base_before, (
+        f"the tests wrote into the real shared base {real_base}: use the "
+        "isolated_data_dir fixture for anything that touches the database")
 
     appeared_all = []
     for path, names_before in before.items():

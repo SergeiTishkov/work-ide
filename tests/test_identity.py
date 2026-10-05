@@ -197,8 +197,11 @@ def test_activation_binds_all_paths(tmp_path):
     try:
         assert common.ACTIVE_IDENTITY == "ftf"
         assert common.FILE_PREFIX == "ftf_"
-        assert common.DATA_DIR == tmp_path / "ftf"
-        assert common.DB_PATH == tmp_path / "ftf" / "ftf.sqlite"
+        assert common.DATA_DIR == tmp_path / "identities" / "ftf"
+        # One base for every identity (tools/db.py), and the raw responses of
+        # the sources are the sources' — not anyone's search.
+        assert common.DB_PATH == tmp_path / "workide.sqlite"
+        assert common.RAW_DIR == tmp_path / "raw"
         assert common.STATE_PATH.name == "ftf_state.json"
         # Reports live separately from accumulated data: a shared reports/
         # folder, with the archive inside it split per identity. On an isolated
@@ -511,5 +514,6 @@ def test_identities_for_app_leave_fixtures_out_and_name_the_database():
     prefixes = [e["prefix"] for e in entries]
     assert "ftf" not in prefixes
     for entry in entries:
-        assert entry["database"].endswith(f"{entry['prefix']}.sqlite")
+        assert entry["database"].endswith("workide.sqlite")
+        assert entry["data_dir"].endswith(entry["prefix"])
         assert isinstance(entry["has_database"], bool)

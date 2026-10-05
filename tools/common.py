@@ -101,6 +101,14 @@ DATA_ROOT = Path(os.environ.get("WORK_IDE_DATA_ROOT") or (ROOT / "data"))
 # Here the latest shortlist of every identity sits side by side.
 REPORTS_ROOT = Path(os.environ.get("WORK_IDE_REPORTS_ROOT") or (ROOT / "reports"))
 
+# --- Shared data (the same for every identity) ------------------------------
+# The knowledge base: one file for every identity (tools/db.py, schemas/db.sql),
+# and the sources' raw responses. A vacancy is the same posting whoever
+# fetched it; what differs per identity lives in rows keyed by the identity.
+DB_NAME = "workide.sqlite"
+DB_PATH: Path = DATA_ROOT / DB_NAME
+RAW_DIR: Path = DATA_ROOT / "raw"
+
 # --- Identity-level paths (None until activation) -------------------------
 # NOTE: `CONFIG_DIR` is deliberately absent. It used to point at the shared
 # config/; had it been kept as an alias, a forgotten call site would quietly
@@ -111,15 +119,14 @@ ACTIVE_IDENTITY: Optional[str] = None
 IDENTITY_DIR: Optional[Path] = None
 FILE_PREFIX: Optional[str] = None
 
+# data/identities/<prefix>/: what belongs to one identity and is not a row in
+# the shared base — its run state, its insights, its feedback packages, its
+# run logs.
 DATA_DIR: Optional[Path] = None
 KNOWLEDGE_DIR: Optional[Path] = None
-RAW_DIR: Optional[Path] = None
 REPORTS_DIR: Optional[Path] = None
 REPORTS_ARCHIVE_DIR: Optional[Path] = None
 STATE_PATH: Optional[Path] = None
-
-# The knowledge base proper (tools/db.py).
-DB_PATH: Optional[Path] = None
 INSIGHTS_PATH: Optional[Path] = None
 
 USER_AGENT: Optional[str] = None
@@ -223,9 +230,10 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
     IDENTITY_DIR = identity_mod.identity_dir(prefix)
     FILE_PREFIX = f"{prefix}_"
 
-    DATA_DIR = root / prefix
+    DB_PATH = root / DB_NAME
+    RAW_DIR = root / "raw"
+    DATA_DIR = identity_data_dir(prefix, root)
     KNOWLEDGE_DIR = DATA_DIR / "knowledge"
-    RAW_DIR = DATA_DIR / "raw"
 
     # REPORTS_DIR is shared by every identity: the latest shortlist of each sits
     # there, distinguished by the prefix in its name (sharp_latest.md,
@@ -244,8 +252,6 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
     REPORTS_DIR = reports_base
     REPORTS_ARCHIVE_DIR = reports_base / "archive" / prefix
     STATE_PATH = DATA_DIR / f"{FILE_PREFIX}state.json"
-
-    DB_PATH = DATA_DIR / f"{prefix}.sqlite"
     INSIGHTS_PATH = KNOWLEDGE_DIR / f"{FILE_PREFIX}insights.md"
 
     USER_AGENT = _build_user_agent(prefix, profile)
@@ -261,11 +267,19 @@ def deactivate_identity() -> None:
     global DB_PATH, INSIGHTS_PATH, USER_AGENT
 
     ACTIVE_IDENTITY = IDENTITY_DIR = FILE_PREFIX = None
-    DATA_DIR = KNOWLEDGE_DIR = RAW_DIR = REPORTS_DIR = REPORTS_ARCHIVE_DIR = STATE_PATH = None
-    DB_PATH = INSIGHTS_PATH = None
+    DATA_DIR = KNOWLEDGE_DIR = REPORTS_DIR = REPORTS_ARCHIVE_DIR = STATE_PATH = None
+    INSIGHTS_PATH = None
+    DB_PATH = DATA_ROOT / DB_NAME
+    RAW_DIR = DATA_ROOT / "raw"
     USER_AGENT = None
     for hook in _IDENTITY_HOOKS:
         hook()
+
+
+def identity_data_dir(prefix: str, data_root: Optional[Path] = None) -> Path:
+    """data/identities/<prefix>/ — the one rule for where an identity's own
+    files live; the desktop app gets it from `identity.py list --json`."""
+    return Path(data_root or DATA_ROOT) / "identities" / prefix
 
 
 def load_profile(prefix: Optional[str] = None) -> dict:

@@ -34,7 +34,7 @@ const runner = new Runner({
   root,
   logDirOf: (prefix) => {
     const entry = identities.find((e) => e.prefix === prefix);
-    return path.join(entry ? path.dirname(entry.database) : path.join(root, 'data', prefix), 'runs');
+    return path.join(entry ? entry.dataDir : path.join(root, 'data', 'identities', prefix), 'runs');
   },
   ...(fake ? { spawn: fake.fakeSpawn, kill: fake.fakeKill } : {}),
 });

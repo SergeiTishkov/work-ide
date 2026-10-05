@@ -1,6 +1,6 @@
-"""The SQLite knowledge base (tools/db.py): the dict contract the rest of the
-code relies on, column ownership between the pipeline and the app, and the
-schema upgrades."""
+"""The shared SQLite knowledge base (tools/db.py): the dict contract the rest
+of the code relies on, the split between what a vacancy is and what one
+identity thinks of it, and column ownership between the pipeline and the app."""
 import json
 import sqlite3
 import threading
@@ -14,37 +14,92 @@ import kb
 
 
 def _vacancy(vid, title="Senior .NET Developer", **extra):
-    return {"id": vid, "title": title, "company": "Acme", "computed": {"score": 50}, **extra}
+    return {"id": vid, "title": title, "company": "Acme",
+            "computed": {"score": 50, "classification": "worth_a_look"}, **extra}
 
 
-def _set_feedback(vid, status, reason=None):
-    """What the app does — the only other writer of the vacancies table."""
+def _set_feedback(vid, status, reason=None, identity="ftf"):
+    """What the app does — the only other writer of vacancy_identity."""
     column = {"rejected": "rejected_reason", "bugged": "bugged_reason"}.get(status)
     with db.session() as conn:
-        conn.execute("UPDATE vacancies SET feedback_status = ?, feedback_at = '2026-09-29' "
-                     "WHERE id = ?", (status, vid))
+        conn.execute("UPDATE vacancy_identity SET feedback_status = ?, "
+                     "feedback_at = '2026-09-29' WHERE identity_id = ? AND vacancy_id = ?",
+                     (status, identity, vid))
         if column:
-            conn.execute(f"UPDATE vacancies SET {column} = ? WHERE id = ?", (reason, vid))
+            conn.execute(f"UPDATE vacancy_identity SET {column} = ? "
+                         "WHERE identity_id = ? AND vacancy_id = ?", (reason, identity, vid))
 
 
-def _feedback(vid):
+def _feedback(vid, identity="ftf"):
     """The feedback columns of one vacancy, or None when it has none."""
     if not db.exists():
         return None
     with db.session() as conn:
         row = conn.execute(
-            "SELECT feedback_status, rejected_reason, bugged_reason FROM vacancies "
-            "WHERE id = ? AND feedback_status <> 'new'", (vid,)).fetchone()
+            "SELECT feedback_status, rejected_reason, bugged_reason FROM vacancy_identity "
+            "WHERE identity_id = ? AND vacancy_id = ? AND feedback_status <> 'new'",
+            (identity, vid)).fetchone()
     return dict(zip(("status", "rejected_reason", "bugged_reason"), row)) if row else None
+
+
+def _as(monkeypatch, prefix):
+    """Another identity looking at the same base. Only the prefix matters to
+    the storage layer; activating a real second identity is what
+    test_identity_isolation.py does."""
+    monkeypatch.setattr(common, "ACTIVE_IDENTITY", prefix)
 
 
 def test_vacancies_round_trip_unchanged(isolated_data_dir):
     vacancies = {
         "a1": _vacancy("a1", title="\u0420\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a .NET", tags=["market:uk"]),
-        "b2": _vacancy("b2", salary_raw=None, remote=True),
+        "b2": _vacancy("b2", salary_raw=None, remote=True, duplicate_of="a1"),
     }
     kb.save_vacancies(vacancies)
     assert kb.load_vacancies() == vacancies
+
+
+def test_the_vacancy_is_stored_once_and_the_verdict_per_identity(isolated_data_dir):
+    kb.save_vacancies({"a1": _vacancy("a1", _company_reputation={"overall_rating": 4})})
+    with db.session() as conn:
+        data = json.loads(conn.execute("SELECT data FROM vacancies").fetchone()[0])
+        verdict = conn.execute(
+            "SELECT identity_id, score, class, json_extract(computed, '$.score') "
+            "FROM vacancy_identity").fetchall()
+    assert "computed" not in data, "the score belongs to the identity, not the vacancy"
+    assert "_company_reputation" not in data, "copied for scoring, kept in companies"
+    assert verdict == [("ftf", 50, "worth_a_look", 50)]
+
+
+def test_another_identity_sees_the_vacancy_but_not_the_verdict(isolated_data_dir, monkeypatch):
+    """The owner, 2026-10-05: a vacancy is one entity, its score one per
+    identity. A vacancy one identity fetched is there for the next one to
+    score; the first one's score and the person's answer are not."""
+    kb.save_vacancies({"a1": _vacancy("a1", duplicate_of="zz")})
+    _set_feedback("a1", "rejected", "too much travel")
+
+    _as(monkeypatch, "other")
+    seen = kb.load_vacancies()
+    assert seen["a1"]["title"] == "Senior .NET Developer"
+    assert "computed" not in seen["a1"] and "duplicate_of" not in seen["a1"]
+
+    kb.save_vacancies({"a1": {**seen["a1"], "computed": {"score": 80,
+                                                         "classification": "hot_lead"}}})
+    assert _feedback("a1", identity="other") is None
+
+    _as(monkeypatch, "ftf")
+    mine = kb.load_vacancies()["a1"]
+    assert mine["computed"]["score"] == 50 and mine["duplicate_of"] == "zz"
+    assert _feedback("a1")["rejected_reason"] == "too much travel"
+
+
+def test_a_fact_learned_under_one_identity_is_there_for_the_other(isolated_data_dir, monkeypatch):
+    kb.save_vacancies({"a1": _vacancy("a1")})
+    _as(monkeypatch, "other")
+    record = kb.load_vacancies()["a1"]
+    record["description_text"] = "The page, read once."
+    kb.save_vacancies({"a1": record})
+    _as(monkeypatch, "ftf")
+    assert kb.load_vacancies()["a1"]["description_text"] == "The page, read once."
 
 
 def test_companies_round_trip_and_are_replaced_whole(isolated_data_dir):
@@ -86,7 +141,7 @@ def test_feedback_written_during_a_pipeline_save_is_not_lost(isolated_data_dir):
     pipeline = db.connect()
     pipeline.execute("BEGIN IMMEDIATE")
     pipeline.execute("UPDATE vacancies SET data = ? WHERE id = 'b2'",
-                     (json.dumps(_vacancy("b2", title="changed")),))
+                     (json.dumps({"id": "b2", "title": "changed"}),))
 
     errors = []
 
@@ -122,6 +177,17 @@ def test_schema_version_mismatch_is_refused(isolated_data_dir):
         kb.load_vacancies()
 
 
+def test_a_base_from_before_the_shared_one_is_refused_with_the_way_out(isolated_data_dir):
+    """Versions 1-7 were one file per identity; they were merged once by a
+    script, never upgraded in place — an upgrade could not know which
+    identity the rows belong to."""
+    kb.save_vacancies({"a1": _vacancy("a1")})
+    with db.session() as conn:
+        conn.execute("UPDATE meta SET value = '7' WHERE key = 'schema_version'")
+    with pytest.raises(db.SchemaVersionError, match="merge_shared_base"):
+        kb.load_vacancies()
+
+
 def test_dump_gives_the_shortlist_with_full_descriptions(isolated_data_dir, capsys):
     """RUNBOOK step 1.5 reads full descriptions; the base is no longer a file
     one can open, so `kb.py dump` is the way in."""
@@ -146,132 +212,3 @@ def test_dump_gives_the_shortlist_with_full_descriptions(isolated_data_dir, caps
 
     kb.cmd_dump(argparse.Namespace(id=None, min_class="hot_lead"))
     assert [r["id"] for r in yaml.safe_load(capsys.readouterr().out)] == ["h"]
-
-
-# The vacancies table exactly as schema version 2 defined it.
-VERSION_2_VACANCIES = """CREATE TABLE vacancies_v2 (
-  id                    TEXT PRIMARY KEY,
-  data                  TEXT NOT NULL,
-  view                  TEXT,
-  feedback_status       TEXT NOT NULL DEFAULT 'new'
-                        CHECK (feedback_status IN ('new', 'applied', 'rejected', 'bugged')),
-  rejected_reason       TEXT,
-  bugged_reason         TEXT,
-  feedback_at           TEXT,
-  feedback_selection_id INTEGER REFERENCES selections(id),
-  feedback_reviewed_at  TEXT
-)"""
-
-
-def _downgrade_to_version_2(path):
-    """Rebuilds the vacancies table the way schema 2 defined it (the rename
-    leaves its stored definition quoted, as a real rename would)."""
-    raw = sqlite3.connect(str(path))
-    raw.execute("PRAGMA foreign_keys = OFF")
-    raw.execute(VERSION_2_VACANCIES)
-    columns = ("id, data, view, feedback_status, rejected_reason, bugged_reason, "
-               "feedback_at, feedback_selection_id, feedback_reviewed_at")
-    raw.execute(f"INSERT INTO vacancies_v2 ({columns}) SELECT {columns} FROM vacancies")
-    raw.execute("DROP TABLE vacancies")
-    raw.execute("ALTER TABLE vacancies_v2 RENAME TO vacancies")
-    raw.execute("UPDATE meta SET value = '2' WHERE key = 'schema_version'")
-    raw.commit()
-    raw.close()
-
-
-def test_version_2_is_migrated_to_the_current_table_keeping_everything(isolated_data_dir):
-    import selections
-
-    listed = {"score": 60, "classification": "hot_lead", "score_breakdown": {}, "dealbreakers": []}
-    vacancies = {"a": _vacancy("a", computed=listed), "b": _vacancy("b", computed=listed)}
-    kb.save_vacancies(vacancies)
-    sel = selections.record(vacancies, {"run_count": 1})
-    _set_feedback("a", "rejected", "too much travel")
-    _downgrade_to_version_2(db.db_path())
-
-    raw = sqlite3.connect(str(db.db_path()))
-    with pytest.raises(sqlite3.IntegrityError):
-        raw.execute("UPDATE vacancies SET feedback_status = 'expired' WHERE id = 'b'")
-    raw.close()
-
-    assert kb.load_vacancies() == vacancies          # any access migrates
-    with db.session() as conn:
-        assert conn.execute("SELECT value FROM meta WHERE key = 'schema_version'"
-                            ).fetchone()[0] == str(db.SCHEMA_VERSION)
-        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
-        items = conn.execute("SELECT COUNT(*) FROM selection_items WHERE selection_id = ?",
-                             (sel,)).fetchone()[0]
-    assert items == 2, "the selection's rows still point at the vacancies"
-    assert _feedback("a")["rejected_reason"] == "too much travel"
-    _set_feedback("b", "expired")
-    assert _feedback("b")["status"] == "expired"
-    with db.session() as conn:
-        conn.execute("UPDATE vacancies SET feedback_status = 'interview', "
-                     "interview_comments = '[\"\"]' WHERE id = 'b'")   # the funnel columns exist
-
-
-def test_migration_runs_once(isolated_data_dir):
-    kb.save_vacancies({"a": _vacancy("a")})
-    _downgrade_to_version_2(db.db_path())
-    kb.load_vacancies()
-    kb.load_vacancies()          # already at the latest version: nothing to redo
-    with db.session() as conn:
-        assert conn.execute("SELECT COUNT(*) FROM vacancies").fetchone()[0] == 1
-
-
-def test_version_3_gains_the_funnel_keeping_expired_marks(isolated_data_dir):
-    kb.save_vacancies({"a": _vacancy("a"), "b": _vacancy("b")})
-    _set_feedback("a", "expired")
-    raw = sqlite3.connect(str(db.db_path()))
-    version_3 = VERSION_2_VACANCIES.replace("'bugged')", "'bugged', 'expired')").replace(
-        "vacancies_v2", "vacancies_v3")
-    raw.execute("PRAGMA foreign_keys = OFF")
-    raw.execute(version_3)
-    columns = ("id, data, view, feedback_status, rejected_reason, bugged_reason, "
-               "feedback_at, feedback_selection_id, feedback_reviewed_at")
-    raw.execute(f"INSERT INTO vacancies_v3 ({columns}) SELECT {columns} FROM vacancies")
-    raw.execute("DROP TABLE vacancies")
-    raw.execute("ALTER TABLE vacancies_v3 RENAME TO vacancies")
-    raw.execute("UPDATE meta SET value = '3' WHERE key = 'schema_version'")
-    raw.commit()
-    raw.close()
-
-    assert _feedback("a")["status"] == "expired"
-    with db.session() as conn:
-        conn.execute("UPDATE vacancies SET feedback_status = 'awaiting_final', "
-                     "final_comment = '' WHERE id = 'b'")
-        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
-
-
-def test_version_4_gains_views_in_every_language_keeping_the_rest(isolated_data_dir):
-    import re
-
-    kb.save_vacancies({"a": _vacancy("a")})
-    _set_feedback("a", "rejected", "far too senior")
-    schema = db.SCHEMA_PATH.read_text(encoding="utf-8")
-    table = re.search(r"CREATE TABLE IF NOT EXISTS vacancies (\(.*?\n\));", schema, re.S).group(1)
-    version_4 = "CREATE TABLE vacancies_v4 " + re.sub(r"\n\s*views\s+TEXT,", "", table)
-    assert "views" not in re.sub(r"--[^\n]*", "", version_4)
-    raw = sqlite3.connect(str(db.db_path()))
-    raw.execute("PRAGMA foreign_keys = OFF")
-    raw.execute(version_4)
-    columns = ", ".join(row[1] for row in raw.execute("PRAGMA table_info(vacancies)")
-                        if row[1] != "views")
-    raw.execute(f"INSERT INTO vacancies_v4 ({columns}) SELECT {columns} FROM vacancies")
-    raw.execute("DROP TABLE vacancies")
-    raw.execute("ALTER TABLE vacancies_v4 RENAME TO vacancies")
-    raw.execute("UPDATE meta SET value = '4' WHERE key = 'schema_version'")
-    raw.commit()
-    raw.close()
-
-    assert _feedback("a")["rejected_reason"] == "far too senior"
-    with db.session() as conn:
-        assert "views" in {row[1] for row in conn.execute("PRAGMA table_info(vacancies)")}
-        assert conn.execute("SELECT value FROM meta WHERE key = 'schema_version'"
-                            ).fetchone()[0] == str(db.SCHEMA_VERSION)
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(vacancies)")}
-        assert {"awaiting_offer_comment", "declined_at"} <= columns, "version 6 too"
-        assert {"offered_comment", "started_at"} <= columns, "version 7 too"
-        conn.execute("UPDATE vacancies SET feedback_status = 'declined', "
-                     "declined_comment = '' WHERE id = 'a'")
-        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []

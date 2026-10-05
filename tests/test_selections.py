@@ -49,7 +49,7 @@ def _set_feedback(vid, status, reason=None, selection_id=None):
     """Exactly what the app runs."""
     with db.session() as conn:
         conn.execute(selections.load_queries()["set_feedback"], {
-            "id": vid, "status": status,
+            "identity": db.identity(), "id": vid, "status": status,
             "rejected_reason": reason if status == "rejected" else None,
             "bugged_reason": reason if status == "bugged" else None,
             "at": db.now_iso(), "selection_id": selection_id,
@@ -292,7 +292,8 @@ def test_row_view_is_the_one_the_report_renders(isolated_data_dir):
 def test_display_name_is_recorded_for_the_app(isolated_data_dir):
     _store({"a": _vacancy("a")})
     with db.session() as conn:
-        (name,) = conn.execute(selections.load_queries()["display_name"]).fetchone()
+        (name,) = conn.execute(selections.load_queries()["display_name"],
+                               {"identity": db.identity()}).fetchone()
     assert name
 
 
@@ -347,7 +348,7 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
     _set_feedback("a", "applied", selection_id=sel)
     with db.session() as conn:
         conn.execute(selections.load_queries()["write_progress"], {
-            "id": "a", "status": "interview", "at": "2026-10-02T10:00:00+00:00",
+            "identity": db.identity(), "id": "a", "status": "interview", "at": "2026-10-02T10:00:00+00:00",
             "rejected_reason": None, "bugged_reason": None,
             "applied_at": "2026-10-01T10:00:00+00:00",
             "contact_comment": "", "contact_at": "2026-10-01T12:00:00+00:00",
@@ -359,7 +360,8 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
             "started_comment": None, "started_at": None,
         })
         conn.row_factory = selections._dict_row
-        row = conn.execute(selections.load_queries()["vacancy_progress"], {"id": "a"}).fetchone()
+        row = conn.execute(selections.load_queries()["vacancy_progress"],
+                           {"identity": db.identity(), "id": "a"}).fetchone()
     assert row["feedback_status"] == "interview"
     assert row["contact_comment"] == "" and row["interview_comments"] == '["went well"]'
     assert _ids(_listing(sel, filter_name="interview")) == ["a"]
@@ -367,7 +369,8 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
     _set_feedback("a", "new", selection_id=None)
     with db.session() as conn:
         conn.row_factory = selections._dict_row
-        row = conn.execute(selections.load_queries()["vacancy_progress"], {"id": "a"}).fetchone()
+        row = conn.execute(selections.load_queries()["vacancy_progress"],
+                           {"identity": db.identity(), "id": "a"}).fetchone()
     assert row["applied_at"] is None and row["contact_at"] is None
     assert row["interview_comments"] is None and row["final_comment"] is None
     assert row["declined_comment"] is None and row["declined_at"] is None
@@ -388,7 +391,7 @@ def test_refresh_views_renders_shown_rows_again_without_a_selection(isolated_dat
     sel = _store({"a": _vacancy("a")})
     kb.save_vacancies({"b": _vacancy("b")})          # never shown: stays without a row
     with db.session() as conn:
-        conn.execute("UPDATE vacancies SET views = NULL")
+        conn.execute("UPDATE vacancy_identity SET views = NULL")
     renamed = {"a": {**_vacancy("a"), "title": "Renamed"}, "b": _vacancy("b")}
     assert selections.refresh_views(renamed) == 1
     row = _listing(sel)[0]
@@ -396,7 +399,8 @@ def test_refresh_views_renders_shown_rows_again_without_a_selection(isolated_dat
     assert json.loads(row["view"])["title"] == "Renamed"
     with db.session() as conn:
         assert conn.execute("SELECT COUNT(*) FROM selections").fetchone()[0] == 1
-        assert conn.execute("SELECT view FROM vacancies WHERE id = 'b'").fetchone()[0] is None
+        assert conn.execute("SELECT view FROM vacancy_identity WHERE vacancy_id = 'b'"
+                            ).fetchone()[0] is None
 
 
 # --- the source filter -------------------------------------------------------
@@ -458,7 +462,7 @@ def test_a_view_written_before_it_carried_the_source_is_still_filtered(isolated_
     """Views recorded before 2026-10-04 have no "source": the record's is read."""
     sel = _store(_by_source())
     with db.session() as conn:
-        conn.execute("UPDATE vacancies SET view = json_remove(view, '$.source')")
+        conn.execute("UPDATE vacancy_identity SET view = json_remove(view, '$.source')")
     with db.session() as conn:
         assert set(_ids(selections.listing(conn, sel, "full", "all", source="devitjobs"))) == {"d0", "d1", "d2"}
         assert selections.listing_sources(conn, sel, "full", "all") == {"linkedin": 6, "devitjobs": 3}

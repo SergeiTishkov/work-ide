@@ -1,6 +1,5 @@
 """tools/runstate.py: whether a pipeline run is going, kept in the database,
 and never stuck at "running" after the run is gone."""
-import sqlite3
 import time
 
 import pytest
@@ -71,16 +70,15 @@ def test_staleness_threshold():
     assert not runstate.is_stale(runstate._iso(runstate._now()))
 
 
-def test_a_version_1_database_is_upgraded_in_place(isolated_data_dir):
-    kb.save_vacancies({"a": {"id": "a"}})
-    raw = sqlite3.connect(str(db.db_path()))
-    raw.execute("DROP TABLE pipeline_runs")
-    raw.execute("UPDATE meta SET value = '1' WHERE key = 'schema_version'")
-    raw.commit()
-    raw.close()
+def test_a_run_of_another_identity_blocks_this_one_too(isolated_data_dir, monkeypatch):
+    """The base is shared: a run saves the facts it loaded an hour earlier, so
+    a second run — whichever identity it is for — would undo the first one's
+    merges. The refusal names whose run is going."""
+    import common
 
-    assert kb.load_vacancies() == {"a": {"id": "a"}}
-    with db.session() as conn:
-        assert conn.execute("SELECT value FROM meta WHERE key = 'schema_version'"
-                            ).fetchone()[0] == str(db.SCHEMA_VERSION)
-        conn.execute("SELECT COUNT(*) FROM pipeline_runs").fetchone()
+    with runstate.PipelineRun():
+        monkeypatch.setattr(common, "ACTIVE_IDENTITY", "other")
+        with pytest.raises(runstate.AlreadyRunningError, match="identity ftf"):
+            with runstate.PipelineRun():
+                pass
+        assert runstate.current()["identity"] == "ftf"

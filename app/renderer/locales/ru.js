@@ -31,6 +31,7 @@
   'run.collecting': 'Идёт сбор вакансий…',
   'run.collecting_stage': 'Идёт сбор: {stage}',
   'run.collecting_since': 'Сбор идёт с {time} (UTC)',
+  'run.busy_other': 'Идёт сбор для {identity}: база общая, сбор по одному',
   'run.feedback': 'Разобрать фидбек ({n})',
   'run.stop': 'Остановить',
   'run.running': 'Идёт {kind}: {identity}…',

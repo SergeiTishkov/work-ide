@@ -17,7 +17,6 @@ function view(id, overrides = {}) {
     url: `https://example.test/${id}`,
     score: 60,
     classification: 'hot_lead',
-    status: 'new',
     highlights: ['legacy/enterprise: insurance'],
     salary: 'not stated _(source: no data)_',
     to_confirm: [],
@@ -28,7 +27,6 @@ function view(id, overrides = {}) {
     reputation: 'not checked',
     hiring_country: 'without a country',
     company_age: null,
-    note: null,
     needs_manual_review: false,
     first_seen: '2026-09-01T00:00:00+00:00',
     posted_on: '2026-08-30',
@@ -37,25 +35,32 @@ function view(id, overrides = {}) {
   };
 }
 
+// One identity's work in a fresh shared base.
 // vacancies: [{ id, score, class, segments: ['full', ...] }]
 // selections: [{ kind, run, items: [id, ...] }] — later ones are newer
-function createDatabase(file, { vacancies, selections, segments, displayName = 'Test search' }) {
+function createDatabase(file, {
+  vacancies, selections, segments, identity = 'test', displayName = 'Test search',
+}) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(fs.readFileSync(path.join(SCHEMA_DIR, 'db.sql'), 'utf8'));
-  db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', '7')").run();
-  db.prepare("INSERT INTO meta (key, value) VALUES ('display_name', ?)").run(displayName);
+  db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', '8')").run();
+  db.prepare("INSERT INTO identities (id, display_name, created_at) VALUES (?, ?, '2026-09-01')")
+    .run(identity, displayName);
   const classOrder = ['hot_lead', 'worth_a_look', 'long_shot',
     'remote_unconfirmed', 'engagement_unconfirmed'];
-  const insertVacancy = db.prepare('INSERT INTO vacancies (id, data, view) VALUES (?, ?, ?)');
+  const insertVacancy = db.prepare('INSERT INTO vacancies (id, data) VALUES (?, ?)');
+  const insertVerdict = db.prepare(
+    'INSERT INTO vacancy_identity (identity_id, vacancy_id, score, class, view) VALUES (?, ?, ?, ?, ?)');
   for (const v of vacancies) {
-    insertVacancy.run(v.id, JSON.stringify({ id: v.id, title: `data ${v.id}`, source: v.source || 'linkedin' }),
+    insertVacancy.run(v.id, JSON.stringify({ id: v.id, title: `data ${v.id}`, source: v.source || 'linkedin' }));
+    insertVerdict.run(identity, v.id, v.score, v.class || 'hot_lead',
       JSON.stringify(view(v.id, { score: v.score, classification: v.class })));
   }
   for (const [index, selection] of selections.entries()) {
     const id = index + 1;
-    db.prepare('INSERT INTO selections (id, run, created_at, kind) VALUES (?, ?, ?, ?)')
-      .run(id, selection.run || id, `2026-09-2${id}T10:00:00+00:00`, selection.kind || 'run');
+    db.prepare('INSERT INTO selections (id, identity_id, run, created_at, kind) VALUES (?, ?, ?, ?, ?)')
+      .run(id, identity, selection.run || id, `2026-09-2${id}T10:00:00+00:00`, selection.kind || 'run');
     for (const [position, s] of segments.entries()) {
       db.prepare('INSERT INTO selection_segments VALUES (?, ?, ?, ?, ?)')
         .run(id, s.slug, s.name, position, s.isDefault ? 1 : 0);
@@ -80,7 +85,7 @@ function tempDir(prefix = 'work-ide-app-') {
 // A standard two-run fixture: 20 hot leads seen in run 1, plus fresh ones in
 // run 2 (hot and worth_a_look), split over two markets. The old ones came from
 // linkedin, the new ones from devitjobs.
-function standardDatabase(file) {
+function standardDatabase(file, options = {}) {
   const vacancies = [];
   for (let i = 0; i < 20; i += 1) {
     vacancies.push({ id: `old${String(i).padStart(2, '0')}`, score: 90 - i, class: 'hot_lead',
@@ -92,6 +97,7 @@ function standardDatabase(file) {
   }
   const old = vacancies.filter((v) => v.id.startsWith('old')).map((v) => v.id);
   return createDatabase(file, {
+    ...options,
     vacancies,
     segments: [
       { slug: 'worldwide', name: 'Worldwide' },

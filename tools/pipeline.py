@@ -461,14 +461,15 @@ def main() -> None:
     identity_mod.activate_or_exit(args.identity)
 
     # Mirrored into a file, so a run started by the agent or the app can be
-    # followed from outside: tail -f data/<prefix>/runs/pipeline_<time>.log
+    # followed from outside: tail -f data/identities/<prefix>/runs/pipeline_<time>.log
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     log_path = progress.open_log(common.DATA_DIR / "runs" / f"pipeline_{stamp}.log")
     started = time.monotonic()
     progress.log(f"pipeline for '{common.ACTIVE_IDENTITY}' started; log: {log_path}")
     try:
         # Marks the run as going in the database (the app's indicator), and
-        # refuses to start while another run of this identity is alive.
+        # refuses to start while another run is alive — of any identity: the
+        # base is shared.
         with runstate.PipelineRun(log_path=log_path):
             result = run_pipeline(check_contracts=not args.skip_contracts)
     except runstate.AlreadyRunningError as exc:

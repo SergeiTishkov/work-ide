@@ -740,8 +740,11 @@
   function collectButton(running) {
     const pipeline = state.pipelines[state.active] || { running: false };
     if (!pipeline.running) {
+      // A run of another identity holds the shared base; this one would be
+      // refused (tools/runstate.py).
       return el('button', {
-        class: 'primary', testid: 'run-collect', disabled: running,
+        class: 'primary', testid: 'run-collect', disabled: running || Boolean(pipeline.busyWith),
+        title: pipeline.busyWith ? t('run.busy_other', { identity: pipeline.busyWith }) : null,
         onclick: () => startRun('collect'),
       }, t('run.collect'));
     }

@@ -55,7 +55,8 @@ test('feedback writes only the feedback columns, and the next one moves up', () 
   store.closeAll();
 
   const db = new DatabaseSync(file);
-  const row = db.prepare('SELECT data, view, feedback_selection_id FROM vacancies WHERE id = ?').get('old00');
+  const row = db.prepare('SELECT d.data, v.view, v.feedback_selection_id FROM vacancy_identity v '
+    + "JOIN vacancies d ON d.id = v.vacancy_id WHERE v.identity_id = 'test' AND v.vacancy_id = ?").get('old00');
   assert.equal(JSON.parse(row.data).title, 'data old00', 'data untouched');
   assert.equal(JSON.parse(row.view).id, 'old00', 'view untouched');
   assert.equal(row.feedback_selection_id, 2, 'remembers the selection it was given in');
@@ -108,10 +109,13 @@ test('timestamps in the format tools/db.py writes', () => {
   assert.equal(nowIso(new Date('2026-09-29T10:11:12.345Z')), '2026-09-29T10:11:12+00:00');
 });
 
-function insertRun(file, { heartbeat, pid, host, stage = 'check links', status = 'running' }) {
+function insertRun(file, {
+  heartbeat, pid, host, stage = 'check links', status = 'running', identity = 'test',
+}) {
   const db = new DatabaseSync(file);
-  db.prepare('INSERT INTO pipeline_runs (started_at, heartbeat_at, status, stage, pid, host) '
-    + 'VALUES (?, ?, ?, ?, ?, ?)').run('2026-09-30T00:23:41+00:00', heartbeat, status, stage, pid, host);
+  db.prepare('INSERT INTO pipeline_runs (identity_id, started_at, heartbeat_at, status, stage, pid, host) '
+    + 'VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(identity, '2026-09-30T00:23:41+00:00', heartbeat, status, stage, pid, host);
   db.close();
 }
 
@@ -148,6 +152,35 @@ test('a run on this machine whose process is gone is not running at once', () =>
   assert.equal(elsewhere.pipelineStatus('test').running, true, 'a pid on another host cannot be checked');
   store.closeAll();
   elsewhere.closeAll();
+});
+
+test('a run of another identity is not this one, but it holds the shared base', () => {
+  const { file } = setup();
+  insertRun(file, { heartbeat: nowIso(), pid: process.pid, host: 'here', identity: 'other' });
+  const store = new Store({ schemaDir: SCHEMA_DIR, databasePathOf: () => file, hostname: 'here' });
+  assert.deepEqual(store.pipelineStatus('test'), { running: false, busyWith: 'other' });
+  assert.equal(store.pipelineStatus('other').running, true);
+  store.closeAll();
+});
+
+test('one base, two identities: each sees its own selections and answers', () => {
+  const { file } = setup();
+  const store = new Store({ schemaDir: SCHEMA_DIR, databasePathOf: () => file });
+  const db = new DatabaseSync(file);
+  db.prepare("INSERT INTO identities (id, display_name, created_at) VALUES ('other', 'Other', '2026-10-05')").run();
+  db.prepare("INSERT INTO vacancy_identity (identity_id, vacancy_id, score, class) VALUES ('other', 'old00', 10, 'long_shot')").run();
+  db.close();
+  store.setFeedback('test', 'old00', 'applied');
+  assert.equal(store.segments('other').selection, null, 'never collected for other');
+  assert.equal(store.segments('other').displayName, 'Other');
+  store.setFeedback('other', 'old00', 'rejected', 'not for this one');
+  store.closeAll();
+  const check = new DatabaseSync(file);
+  const rows = check.prepare('SELECT identity_id, feedback_status FROM vacancy_identity '
+    + "WHERE vacancy_id = 'old00' ORDER BY identity_id").all();
+  check.close();
+  assert.deepEqual(rows.map((r) => [r.identity_id, r.feedback_status]),
+    [['other', 'rejected'], ['test', 'applied']]);
 });
 
 test('finished runs and a missing database mean not running', () => {
@@ -222,7 +255,7 @@ test('the funnel is written step by step, arrays and dates included', () => {
   store.closeAll();
 
   const db = new DatabaseSync(file);
-  const row = db.prepare('SELECT * FROM vacancies WHERE id = ?').get('new0');
+  const row = db.prepare("SELECT * FROM vacancy_identity WHERE identity_id = 'test' AND vacancy_id = ?").get('new0');
   db.close();
   assert.equal(row.feedback_status, 'declined');
   assert.equal(row.applied_at, '2026-10-01T10:00:00+00:00');
@@ -295,7 +328,8 @@ test('a row carries its lines in every language, and in funnel filters too', () 
   const { store, file } = setup();
   const db = new DatabaseSync(file);
   const views = { en: { title: 'in English' }, ru: { title: 'in Russian' } };
-  db.prepare('UPDATE vacancies SET views = ? WHERE id = ?').run(JSON.stringify(views), 'old00');
+  db.prepare("UPDATE vacancy_identity SET views = ? WHERE identity_id = 'test' AND vacancy_id = ?")
+    .run(JSON.stringify(views), 'old00');
   db.close();
   const all = store.listing('test', 'full', 'all');
   assert.deepEqual(all.find((r) => r.id === 'old00').views, views);
@@ -315,7 +349,7 @@ test('an offer and the first day are written to their own columns', () => {
   assert.equal(store.counts('test', 'uk').started, 1);
   store.closeAll();
   const db = new DatabaseSync(file);
-  const row = db.prepare('SELECT * FROM vacancies WHERE id = ?').get('new1');
+  const row = db.prepare("SELECT * FROM vacancy_identity WHERE identity_id = 'test' AND vacancy_id = ?").get('new1');
   db.close();
   assert.equal(row.feedback_status, 'started');
   assert.equal(row.offered_comment, 'from November');

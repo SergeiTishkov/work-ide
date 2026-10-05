@@ -1,24 +1,31 @@
 """
-The SQLite knowledge base of the active identity: data/<prefix>/<prefix>.sqlite.
+The SQLite knowledge base shared by every identity: data/workide.sqlite.
 
 WHY SQLITE, AND NOT THE JSON FILES IT REPLACES
 ----------------------------------------------
-Two writers now touch the vacancy base: the pipeline, and the desktop app
+Two writers touch the vacancy base: the pipeline, and the desktop app
 recording a person's feedback on a vacancy. With one JSON file of 150 MB, every
 click in the app meant rewriting the whole file, possibly while the pipeline
 was rewriting it too, and one of the two would silently lose. SQLite gives each
 writer its own columns inside one transactional file, so neither can overwrite
 the other (the column ownership is written down in schemas/db.sql).
 
-The rest of the code did not have to change: kb.load_vacancies() still returns
-a plain dict keyed by id, and kb.save_vacancies() still takes one.
+WHY ONE BASE FOR EVERY IDENTITY
+-------------------------------
+A vacancy is the same posting whoever looks at it; only its score, its class
+and the person's answer depend on the identity. Since 2026-10-05 the facts
+live once (`vacancies`) and the rest per identity (`vacancy_identity`), so a
+vacancy fetched for one search is scored for every search.
+
+The rest of the code did not have to change: load_vacancies() returns a plain
+dict keyed by id — the facts with the active identity's `computed` and
+`duplicate_of` on top — and save_vacancies() takes one and splits it again.
 
 The schema lives in schemas/db.sql, shared with the app's tests.
 """
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 import sys
 from contextlib import closing, contextmanager
@@ -29,11 +36,9 @@ from typing import Iterator, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 
-# 2: pipeline_runs — a new table, created by applying the schema.
-# 3: feedback status 'expired'; 4: the application funnel (contacted,
-#    interview, awaiting_final) with a comment and a date per step. Both change
-#    the vacancies table, rebuilt by _rebuild_vacancies.
-SCHEMA_VERSION = 7
+# 8: one base for every identity. The per-identity files of versions 1-7 are
+# not upgraded in place: tools/merge_shared_base.py merged them once.
+SCHEMA_VERSION = 8
 SCHEMA_PATH = common.ROOT / "schemas" / "db.sql"
 
 # How long a writer waits for another writer's transaction before giving up.
@@ -44,13 +49,19 @@ FEEDBACK_STATUSES = ("new", "applied", "rejected", "bugged", "expired",
                      "contacted", "interview", "awaiting_final", "awaiting_offer",
                      "declined", "offered", "started")
 
+# The keys of a loaded record that belong to the identity, not to the vacancy.
+PER_IDENTITY_KEYS = ("computed", "duplicate_of")
+
+# Copied onto a record for one scoring pass (kb.attach_company_reputation);
+# the company table is where they live.
+TRANSIENT_KEYS = ("_company_reputation", "_company_intel")
+
 
 class SchemaVersionError(RuntimeError):
     """The database was created by a different version of the schema."""
 
 
 def db_path() -> Path:
-    common.require_identity()
     return common.DB_PATH
 
 
@@ -58,54 +69,15 @@ def exists() -> bool:
     return db_path().exists()
 
 
-def _table_body(ddl: str) -> str:
-    """What is between the outer parentheses of a CREATE TABLE, whitespace
-    normalised — for comparing a stored definition with the schema file."""
-    body = ddl[ddl.index("(") + 1:ddl.rindex(")")]
-    return " ".join(body.split())
+def identity() -> str:
+    common.require_identity()
+    return common.ACTIVE_IDENTITY
 
 
-def _rebuild_vacancies(conn: sqlite3.Connection) -> None:
-    """Brings the vacancies table to its definition in schemas/db.sql.
-
-    SQLite cannot change a CHECK constraint (the allowed feedback statuses),
-    so the table is rebuilt the documented way: a new table from the schema
-    file, the shared columns copied, the old table dropped, the new one
-    renamed — in one transaction, with foreign keys off so that the selection
-    rows referring to vacancies survive the swap. Columns the new definition
-    adds start empty. Skipped when the table already matches."""
-    schema = SCHEMA_PATH.read_text(encoding="utf-8")
-    match = re.search(r"CREATE TABLE IF NOT EXISTS vacancies (\(.*?\n\));", schema, re.S)
-    if match is None:
-        raise SchemaVersionError("schemas/db.sql defines no vacancies table")
-    target = "CREATE TABLE vacancies_new " + match.group(1)
-    (current,) = conn.execute(
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vacancies'").fetchone()
-    if _table_body(current) == _table_body(target):
-        return
-    old_columns = [row[1] for row in conn.execute("PRAGMA table_info(vacancies)")]
-    conn.execute("PRAGMA foreign_keys = OFF")
-    try:
-        with conn:
-            conn.execute(target)
-            new_columns = {row[1] for row in conn.execute("PRAGMA table_info(vacancies_new)")}
-            shared = ", ".join(c for c in old_columns if c in new_columns)
-            conn.execute(f"INSERT INTO vacancies_new ({shared}) SELECT {shared} FROM vacancies")
-            conn.execute("DROP TABLE vacancies")
-            conn.execute("ALTER TABLE vacancies_new RENAME TO vacancies")
-            conn.execute("CREATE INDEX IF NOT EXISTS vacancies_feedback "
-                         "ON vacancies(feedback_status, feedback_reviewed_at)")
-    finally:
-        conn.execute("PRAGMA foreign_keys = ON")
-
-
-# version reached -> the step that reaches it. Versions without a step only
-# added tables, which applying the schema already did. Version 3 (status
-# 'expired') and 4 (the funnel) both change the vacancies table; one rebuild
-# to the current definition, at 4, covers both. Version 5 adds `views`; on a
-# base coming from 3, the rebuild at 4 has already added it and 5 is a no-op.
-MIGRATIONS = {4: _rebuild_vacancies, 5: _rebuild_vacancies, 6: _rebuild_vacancies,
-              7: _rebuild_vacancies}
+# version reached -> the step that reaches it. Empty since version 8 started
+# the shared base afresh; the next change to an existing table adds its step
+# here.
+MIGRATIONS: dict = {}
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
@@ -125,8 +97,12 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     while version < SCHEMA_VERSION:
         version += 1
         step = MIGRATIONS.get(version)
-        if step is not None:
-            step(conn)
+        if step is None:
+            raise SchemaVersionError(
+                f"the database has schema version {row[0]} and there is no step to "
+                f"version {version}: a base from before the shared one (version 8) is "
+                "merged by tools/merge_shared_base.py, not upgraded in place.")
+        step(conn)
         with conn:
             conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'",
                          (str(version),))
@@ -134,8 +110,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
 
 def connect(path: Optional[Path] = None) -> sqlite3.Connection:
     """Opens (creating if needed) the database and applies the schema."""
-    if path is None:
-        path = db_path()
+    path = path or db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path), timeout=BUSY_TIMEOUT_MS / 1000)
     conn.execute("PRAGMA journal_mode = WAL")
@@ -157,28 +132,84 @@ def dumps(value) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+def now_iso() -> str:
+    """The one timestamp format of the base: seconds, "+00:00". Feedback and
+    review times are compared as strings, so every writer — the app included
+    (store.js nowIso) — must agree on it."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def ensure_identity(conn: sqlite3.Connection, prefix: Optional[str] = None,
+                    display_name: Optional[str] = None) -> str:
+    """The identity's row, created on first use; the display name refreshed
+    when given. Returns the prefix."""
+    prefix = prefix or identity()
+    conn.execute("INSERT INTO identities (id, display_name, created_at) VALUES (?, ?, ?) "
+                 "ON CONFLICT(id) DO NOTHING", (prefix, display_name, now_iso()))
+    if display_name is not None:
+        conn.execute("UPDATE identities SET display_name = ? WHERE id = ?",
+                     (display_name, prefix))
+    return prefix
+
+
 # --- Vacancies and companies ------------------------------------------------
 
+def split_record(record: dict) -> tuple:
+    """(facts, computed, duplicate_of) of one loaded record."""
+    facts = {k: v for k, v in record.items()
+             if k not in PER_IDENTITY_KEYS and k not in TRANSIENT_KEYS}
+    return facts, record.get("computed"), record.get("duplicate_of")
+
+
+def join_record(data: str, computed: Optional[str], duplicate_of: Optional[str]) -> dict:
+    record = json.loads(data)
+    if computed is not None:
+        record["computed"] = json.loads(computed)
+    if duplicate_of is not None:
+        record["duplicate_of"] = duplicate_of
+    return record
+
+
 def load_vacancies() -> dict:
-    """Every vacancy record, keyed by id. A missing database reads as empty —
-    reading must not create files (tests and fresh identities rely on that)."""
+    """Every vacancy in the base, keyed by id, with the active identity's
+    verdict on it. A vacancy the identity has not scored yet comes without
+    `computed`. A missing database reads as empty — reading must not create
+    files (tests and fresh identities rely on that)."""
+    prefix = identity()
     if not exists():
         return {}
     with session() as conn:
-        return {vid: json.loads(data)
-                for vid, data in conn.execute("SELECT id, data FROM vacancies")}
+        rows = conn.execute(
+            "SELECT v.id, v.data, vi.computed, vi.duplicate_of FROM vacancies v "
+            "LEFT JOIN vacancy_identity vi ON vi.vacancy_id = v.id AND vi.identity_id = ?",
+            (prefix,))
+        return {vid: join_record(data, computed, dup) for vid, data, computed, dup in rows}
 
 
 def save_vacancies(vacancies: dict) -> None:
-    """Upserts the `data` column only. The feedback columns belong to the app
-    and are never touched here; rows are never deleted, the pipeline has never
-    removed a vacancy from the base."""
+    """Upserts the facts and the active identity's verdict, in one
+    transaction. The feedback columns belong to the app and are never touched
+    here; rows are never deleted, the pipeline has never removed a vacancy
+    from the base."""
+    prefix = identity()
+    facts_rows, verdict_rows = [], []
+    for vid, record in vacancies.items():
+        facts, computed, duplicate_of = split_record(record)
+        facts_rows.append((vid, dumps(facts)))
+        c = computed or {}
+        verdict_rows.append((prefix, vid, dumps(computed) if computed is not None else None,
+                             c.get("score"), c.get("classification"), duplicate_of))
     with session() as conn:
+        ensure_identity(conn, prefix)
         conn.executemany(
             "INSERT INTO vacancies (id, data) VALUES (?, ?) "
-            "ON CONFLICT(id) DO UPDATE SET data = excluded.data",
-            ((vid, dumps(v)) for vid, v in vacancies.items()),
-        )
+            "ON CONFLICT(id) DO UPDATE SET data = excluded.data", facts_rows)
+        conn.executemany(
+            "INSERT INTO vacancy_identity (identity_id, vacancy_id, computed, score, class, "
+            "duplicate_of) VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(identity_id, vacancy_id) DO UPDATE SET computed = excluded.computed, "
+            "score = excluded.score, class = excluded.class, "
+            "duplicate_of = excluded.duplicate_of", verdict_rows)
 
 
 def load_companies() -> dict:
@@ -196,7 +227,3 @@ def save_companies(companies: dict) -> None:
         conn.execute("DELETE FROM companies")
         conn.executemany("INSERT INTO companies (key, data) VALUES (?, ?)",
                          ((key, dumps(c)) for key, c in companies.items()))
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")

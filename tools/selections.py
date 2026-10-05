@@ -1,8 +1,8 @@
 """
 Selections: what one run showed, recorded in the database.
 
-A selection is the shortlist of one run, split by market (segment) exactly as
-the Markdown report splits it. The desktop app reads its lists from here with
+A selection is the shortlist of one identity's run, split by market (segment)
+exactly as the Markdown report splits it. The desktop app reads its lists from here with
 the queries in schemas/queries.sql, instead of from files.
 
 WHY RECORDED, NOT RECOMPUTED BY THE APP
@@ -52,17 +52,19 @@ def listed_vacancies(vacancies: dict) -> list:
 
 
 def _view_row(v: dict) -> tuple:
-    """(view, views, id) for the UPDATE of one vacancy's display row: `view`
-    in the identity's language, `views` in every language of the app."""
+    """(view, views, identity, id) for the UPDATE of one vacancy's display
+    row: `view` in the identity's language, `views` in every language of the
+    app."""
     import i18n
     import report
 
     views = report.vacancy_views(v)
     own = views.get(i18n.language()) or report.vacancy_view(v)
-    return db.dumps(own), db.dumps(views), v["id"]
+    return db.dumps(own), db.dumps(views), db.identity(), v["id"]
 
 
-UPDATE_VIEWS = "UPDATE vacancies SET view = ?, views = ? WHERE id = ?"
+UPDATE_VIEWS = ("UPDATE vacancy_identity SET view = ?, views = ? "
+                "WHERE identity_id = ? AND vacancy_id = ?")
 
 
 def refresh_views(vacancies: dict) -> int:
@@ -72,7 +74,8 @@ def refresh_views(vacancies: dict) -> int:
     for weeks — change too. Returns how many were rendered."""
     with db.session() as conn:
         shown = {row[0] for row in conn.execute(
-            "SELECT id FROM vacancies WHERE view IS NOT NULL")}
+            "SELECT vacancy_id FROM vacancy_identity WHERE identity_id = ? "
+            "AND view IS NOT NULL", (db.identity(),))}
     rows = [_view_row(v) for vid, v in vacancies.items() if vid in shown]
     with db.session() as conn:
         conn.executemany(UPDATE_VIEWS, rows)
@@ -124,9 +127,10 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
                               report._eligibility_rank(v)))
 
     with db.session() as conn:
+        prefix = db.ensure_identity(conn, display_name=_display_name())
         selection_id = conn.execute(
-            "INSERT INTO selections (run, created_at, kind) VALUES (?, ?, ?)",
-            (run, db.now_iso(), kind),
+            "INSERT INTO selections (identity_id, run, created_at, kind) VALUES (?, ?, ?, ?)",
+            (prefix, run, db.now_iso(), kind),
         ).lastrowid
         conn.executemany(
             "INSERT INTO selection_segments (selection_id, slug, name, position, is_default) "
@@ -140,11 +144,6 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
             "class_position, section_limit, score, eligibility_rank) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             ((selection_id, *item) for item in items),
-        )
-        conn.execute(
-            "INSERT INTO meta (key, value) VALUES ('display_name', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (_display_name(),),
         )
         write_source_sites(conn)
     return selection_id
@@ -194,7 +193,8 @@ FILTERS = ("fresh_new", "no_feedback", "all", "fresh", "rejected", "bugged", "ex
 
 
 def latest_selection_id(conn) -> Optional[int]:
-    row = conn.execute(load_queries()["latest_selection"]).fetchone()
+    """The active identity's latest selection."""
+    row = conn.execute(load_queries()["latest_selection"], {"identity": db.identity()}).fetchone()
     return row[0] if row and row[0] is not None else None
 
 
@@ -215,8 +215,10 @@ def listing(conn, selection_id: int, segment: str, filter_name: str,
     try:
         if filter_name in FUNNEL:
             return conn.execute(load_queries()["funnel_listing"],
-                                {"filter": filter_name, "source": source, "fit": fit}).fetchall()
+                                {"identity": db.identity(), "filter": filter_name,
+                                 "source": source, "fit": fit}).fetchall()
         return conn.execute(load_queries()["listing"], {
+            "identity": db.identity(),
             "selection_id": selection_id, "segment": segment, "filter": filter_name,
             "expanded": "," + ",".join(expanded) + ",", "source": source,
             "shown": json.dumps(shown or {}), "fit": fit,
@@ -235,7 +237,7 @@ def class_totals(conn, selection_id: int, segment: str, filter_name: str,
             totals[row["class"]] = totals.get(row["class"], 0) + 1
         return totals
     rows = conn.execute(load_queries()["listing_class_totals"], {
-        "selection_id": selection_id, "segment": segment, "filter": filter_name,
+        "identity": db.identity(), "selection_id": selection_id, "segment": segment, "filter": filter_name,
         "source": source,
     }).fetchall()
     return {cls: total for cls, total in rows}
@@ -248,10 +250,11 @@ def listing_sources(conn, selection_id: int, segment: str, filter_name: str,
     the class (`fit`) does."""
     _check_filter(filter_name)
     if filter_name in FUNNEL:
-        rows = conn.execute(load_queries()["funnel_sources"], {"filter": filter_name, "fit": fit})
+        rows = conn.execute(load_queries()["funnel_sources"],
+                            {"identity": db.identity(), "filter": filter_name, "fit": fit})
     else:
         rows = conn.execute(load_queries()["listing_sources"], {
-            "selection_id": selection_id, "segment": segment, "filter": filter_name,
+            "identity": db.identity(), "selection_id": selection_id, "segment": segment, "filter": filter_name,
             "fit": fit,
         })
     return {source: total for source, total in rows.fetchall()}
@@ -262,10 +265,11 @@ def listing_counts(conn, selection_id: int, segment: str, source: str = "",
     conn.row_factory = _dict_row
     try:
         row = conn.execute(load_queries()["listing_counts"], {
-            "selection_id": selection_id, "segment": segment, "source": source, "fit": fit,
+            "identity": db.identity(), "selection_id": selection_id, "segment": segment,
+            "source": source, "fit": fit,
         }).fetchone()
         funnel = conn.execute(load_queries()["funnel_counts"],
-                              {"source": source, "fit": fit}).fetchone()
+                              {"identity": db.identity(), "source": source, "fit": fit}).fetchone()
     finally:
         conn.row_factory = None
     counts = {name: row[name] or 0 for name in FILTERS if name not in FUNNEL}

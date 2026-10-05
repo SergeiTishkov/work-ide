@@ -66,29 +66,35 @@ def two_identities(tmp_path, monkeypatch):
     common.activate_identity(TEST_IDENTITY, allow_fixture=True)
 
 
-def test_data_written_under_a_is_invisible_under_b(two_identities):
+def test_a_vacancy_is_shared_and_the_verdict_on_it_is_not(two_identities):
+    """Since 2026-10-05 the identities share one base: what a vacancy IS (its
+    title, its page, its company) is fetched once for all of them. What one
+    identity made of it — the score, the class, the person's answer — stays
+    with that identity."""
     common.activate_identity("aaaa", allow_fixture=True)
     common.ensure_dirs()
-    kb.save_vacancies({"vac-1": {"id": "vac-1", "title": "Identity A secret"}})
-    assert len(kb.load_vacancies()) == 1
+    kb.save_vacancies({"vac-1": {"id": "vac-1", "title": "A .NET role",
+                                 "computed": {"score": 77, "classification": "hot_lead"}}})
 
     common.activate_identity("bbbb", allow_fixture=True)
     common.ensure_dirs()
-    assert kb.load_vacancies() == {}, "B's database must be empty — A's data is not its business"
+    assert kb.load_vacancies() == {"vac-1": {"id": "vac-1", "title": "A .NET role"}}, (
+        "B sees the vacancy, not A's verdict on it")
 
 
 def _identity_paths() -> dict:
     return {
-        "database": common.DB_PATH,
+        "data": common.DATA_DIR,
         "state": common.STATE_PATH,
+        "insights": common.INSIGHTS_PATH,
         "reports_archive": common.REPORTS_ARCHIVE_DIR,
-        "raw": common.RAW_DIR,
     }
 
 
 def test_paths_of_two_identities_share_no_components(two_identities):
     common.activate_identity("aaaa", allow_fixture=True)
     a_paths = _identity_paths()
+    a_shared = (common.DB_PATH, common.RAW_DIR)
 
     common.activate_identity("bbbb", allow_fixture=True)
     b_paths = _identity_paths()
@@ -96,6 +102,7 @@ def test_paths_of_two_identities_share_no_components(two_identities):
     for key in a_paths:
         assert a_paths[key] != b_paths[key], f"path '{key}' matched for two identities"
         assert "aaaa" not in str(b_paths[key]), f"A's prefix leaked into B's path '{key}'"
+    assert (common.DB_PATH, common.RAW_DIR) == a_shared, "the base and raw/ are shared"
 
 
 def test_reports_folder_is_shared_but_files_are_not(two_identities):
