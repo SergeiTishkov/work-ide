@@ -131,8 +131,8 @@ provenance are in `tools/settings.py` and `docs/OVERRIDES.md`.
    the widest possible set of sources.
 2. Score every finding against a transparent, reproducible rubric
    (`<prefix>_criteria.yaml`) and explain the score to a person.
-3. Accumulate structured knowledge about companies, vacancies, recruiters and
-   market patterns — so that each run is more accurate than the last.
+3. Accumulate structured knowledge about companies, vacancies and market
+   patterns — so that each run is more accurate than the last.
 4. Produce, on every run, a digest a person can actually read
    (`reports/<prefix>_latest.md`) with the top candidates and an explanation of
    "why".
@@ -152,7 +152,7 @@ The project is succeeding if:
 - The latest report lets a person spend ten minutes over morning coffee looking
   through 5-15 of the best vacancies, understand why they are good, and decide
   where to apply.
-- `insights.md` really does grow with substantive, non-obvious conclusions about
+- `<prefix>_insights.md` really does grow with substantive, non-obvious conclusions about
   the market, rather than restating what the code already says.
 - The tests (`pytest`) pass and genuinely exercise edge cases, not only the
   happy path.

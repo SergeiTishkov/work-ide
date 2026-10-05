@@ -155,10 +155,6 @@ It needs Node.js and, for the two buttons, the `claude` CLI on `PATH`. The app
 only lists and records; everything else is the same Python as ever. Its tests
 (`cd app && npm test`) spend no tokens: the agent is mocked at the boundary.
 
-The knowledge base of an identity created before the app is still JSON; move it
-once with `python tools/kb.py --identity <prefix> migrate-to-sqlite` (it keeps
-the JSON as `*.json.bak`).
-
 ## How it works
 
 1. **Collection.** Several sources needing no authorisation: remote-work
@@ -288,7 +284,6 @@ If you work through Claude Code, the project ships some ready-made entry points:
 | `/run` | The ordinary search cycle, including the mandatory manual check on candidates |
 | `/add-identity` | Add another search without breaking the one already tuned |
 | `/check` | Self-check: environment, identities, sources, tests |
-| `/applied` | Record an application and its outcome |
 | `/feedback` | Review the answers given in the desktop app and fix the filter |
 
 These are thin wrappers over the documentation rather than a duplicate of it:

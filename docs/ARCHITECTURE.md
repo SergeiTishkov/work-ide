@@ -21,8 +21,8 @@ top of `schemas/db.sql`): the pipeline the record and the selections, the app
 the feedback, `tools/feedback.py` the review mark. `kb.load_vacancies()` still
 returns a dict, so the rest of the code did not change.
 
-`state.json` and `recruiters.json` stay JSON (small, one writer), Markdown
-stays for reports and `insights.md`, YAML for configuration.
+`state.json` stays JSON (small, one writer), Markdown stays for reports and
+`<prefix>_insights.md`, YAML for configuration.
 
 ### Selections: what each run showed
 Every run records a selection (`tools/selections.py`): the shortlist split by
@@ -593,8 +593,6 @@ process is exactly the constraint wanted.
   does not yet catch.
 - Smarter geographic deduplication (see "Rejected approaches" above) — if enough
   data accumulates, it is worth comparing (company, title-without-city).
-- `recruiters.json` is not populated automatically yet — fill it in as the agent
-  or the owner runs into particular recruiters.
 - `link_check.py` treats only 404/410 as "dead" and deliberately does not try to
   detect "200 OK, but the page says 'vacancy closed'" (that would need brittle
   per-site content sniffing). If it becomes a frequent problem, collect concrete

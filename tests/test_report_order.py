@@ -37,7 +37,6 @@ def _vacancy(vid, score, eligibility, classification="hot_lead"):
             "dealbreakers": [],
             "residency_eligibility": eligibility,
         },
-        "manual": {"status": "new"},
     }
 
 

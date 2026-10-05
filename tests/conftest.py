@@ -59,9 +59,6 @@ def isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(common, "REPORTS_ARCHIVE_DIR", reports_dir / "archive" / TEST_IDENTITY)
     monkeypatch.setattr(common, "STATE_PATH", data_dir / f"{prefix}state.json")
     monkeypatch.setattr(common, "DB_PATH", data_dir / f"{TEST_IDENTITY}.sqlite")
-    monkeypatch.setattr(common, "VACANCIES_PATH", knowledge_dir / f"{prefix}vacancies.json")
-    monkeypatch.setattr(common, "COMPANIES_PATH", knowledge_dir / f"{prefix}companies.json")
-    monkeypatch.setattr(common, "RECRUITERS_PATH", knowledge_dir / f"{prefix}recruiters.json")
     monkeypatch.setattr(common, "INSIGHTS_PATH", knowledge_dir / f"{prefix}insights.md")
     common.ensure_dirs()
     return data_dir

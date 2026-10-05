@@ -1,6 +1,6 @@
 """The SQLite knowledge base (tools/db.py): the dict contract the rest of the
 code relies on, column ownership between the pipeline and the app, and the
-one-off migration from the JSON files."""
+schema upgrades."""
 import json
 import sqlite3
 import threading
@@ -27,9 +27,20 @@ def _set_feedback(vid, status, reason=None):
             conn.execute(f"UPDATE vacancies SET {column} = ? WHERE id = ?", (reason, vid))
 
 
+def _feedback(vid):
+    """The feedback columns of one vacancy, or None when it has none."""
+    if not db.exists():
+        return None
+    with db.session() as conn:
+        row = conn.execute(
+            "SELECT feedback_status, rejected_reason, bugged_reason FROM vacancies "
+            "WHERE id = ? AND feedback_status <> 'new'", (vid,)).fetchone()
+    return dict(zip(("status", "rejected_reason", "bugged_reason"), row)) if row else None
+
+
 def test_vacancies_round_trip_unchanged(isolated_data_dir):
     vacancies = {
-        "a1": _vacancy("a1", title="\u0420\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a .NET", tags=["market:uk"], manual={"status": "new"}),
+        "a1": _vacancy("a1", title="\u0420\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a .NET", tags=["market:uk"]),
         "b2": _vacancy("b2", salary_raw=None, remote=True),
     }
     kb.save_vacancies(vacancies)
@@ -45,7 +56,7 @@ def test_companies_round_trip_and_are_replaced_whole(isolated_data_dir):
 def test_missing_database_reads_as_empty_without_creating_it(isolated_data_dir):
     assert kb.load_vacancies() == {}
     assert kb.load_companies() == {}
-    assert db.load_feedback() == {}
+    assert _feedback("a1") is None
     assert not common.DB_PATH.exists()
 
 
@@ -56,7 +67,7 @@ def test_save_does_not_overwrite_feedback(isolated_data_dir):
     kb.save_vacancies({"a1": _vacancy("a1", title="Senior .NET Developer (updated)")})
 
     assert kb.load_vacancies()["a1"]["title"] == "Senior .NET Developer (updated)"
-    feedback = db.load_feedback()["a1"]
+    feedback = _feedback("a1")
     assert feedback["status"] == "bugged"
     assert feedback["bugged_reason"] == "Java, not .NET"
 
@@ -66,7 +77,7 @@ def test_feedback_stays_out_of_vacancy_records(isolated_data_dir):
     kb.save_vacancies({"a1": _vacancy("a1"), "b2": _vacancy("b2")})
     _set_feedback("a1", "rejected", "too much travel")
     assert "feedback" not in kb.load_vacancies()["a1"]
-    assert set(db.load_feedback()) == {"a1"}
+    assert _feedback("a1")["status"] == "rejected" and _feedback("b2") is None
 
 
 def test_feedback_written_during_a_pipeline_save_is_not_lost(isolated_data_dir):
@@ -93,7 +104,7 @@ def test_feedback_written_during_a_pipeline_save_is_not_lost(isolated_data_dir):
     app.join(timeout=10)
 
     assert not errors
-    assert db.load_feedback()["a1"]["status"] == "applied"
+    assert _feedback("a1")["status"] == "applied"
     assert kb.load_vacancies()["b2"]["title"] == "changed"
 
 
@@ -109,59 +120,6 @@ def test_schema_version_mismatch_is_refused(isolated_data_dir):
         conn.execute("UPDATE meta SET value = '999' WHERE key = 'schema_version'")
     with pytest.raises(db.SchemaVersionError):
         kb.load_vacancies()
-
-
-# --- Migration ---------------------------------------------------------------
-
-def _write_legacy_json(vacancies, companies):
-    common.KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
-    common.VACANCIES_PATH.write_text(json.dumps(vacancies), encoding="utf-8")
-    common.COMPANIES_PATH.write_text(json.dumps(companies), encoding="utf-8")
-
-
-def test_unmigrated_identity_refuses_instead_of_starting_empty(isolated_data_dir):
-    _write_legacy_json({"a1": _vacancy("a1")}, {})
-    with pytest.raises(db.NotMigratedError):
-        kb.load_vacancies()
-    with pytest.raises(db.NotMigratedError):
-        kb.save_vacancies({})
-    assert not common.DB_PATH.exists()
-
-
-def test_migration_moves_everything_and_keeps_a_backup(isolated_data_dir):
-    vacancies = {
-        "a1": _vacancy("a1", manual={"status": "not_relevant", "notes": "Java shop"}),
-        "b2": _vacancy("b2", manual={"status": "not_relevant", "notes": "  "}),
-        "c3": _vacancy("c3", manual={"status": "shortlisted", "notes": "looks good"}),
-        "d4": _vacancy("d4"),
-    }
-    companies = {"acme": {"name": "Acme"}}
-    _write_legacy_json(vacancies, companies)
-
-    result = db.migrate_from_json()
-
-    assert result == {"vacancies": 4, "companies": 1, "rejected": 2}
-    assert kb.load_vacancies() == vacancies          # manual stays in the record as is
-    assert kb.load_companies() == companies
-    feedback = db.load_feedback()
-    assert set(feedback) == {"a1", "b2"}
-    assert feedback["a1"]["status"] == "rejected"
-    assert feedback["a1"]["rejected_reason"] == "Java shop"
-    assert feedback["b2"]["rejected_reason"] is None  # a blank note is no reason
-    # Settled under the old process: not pending review in the new one.
-    assert feedback["a1"]["reviewed_at"] == feedback["a1"]["at"]
-    import feedback as feedback_mod
-    assert feedback_mod.count() == {"bugged": 0, "rejected": 0}
-    assert not common.VACANCIES_PATH.exists()
-    assert common.VACANCIES_PATH.with_name(common.VACANCIES_PATH.name + ".bak").exists()
-    assert common.COMPANIES_PATH.with_name(common.COMPANIES_PATH.name + ".bak").exists()
-
-
-def test_migration_refuses_to_run_twice(isolated_data_dir):
-    _write_legacy_json({"a1": _vacancy("a1")}, {})
-    db.migrate_from_json()
-    with pytest.raises(RuntimeError):
-        db.migrate_from_json()
 
 
 def test_dump_gives_the_shortlist_with_full_descriptions(isolated_data_dir, capsys):
@@ -244,9 +202,9 @@ def test_version_2_is_migrated_to_the_current_table_keeping_everything(isolated_
         items = conn.execute("SELECT COUNT(*) FROM selection_items WHERE selection_id = ?",
                              (sel,)).fetchone()[0]
     assert items == 2, "the selection's rows still point at the vacancies"
-    assert db.load_feedback()["a"]["rejected_reason"] == "too much travel"
+    assert _feedback("a")["rejected_reason"] == "too much travel"
     _set_feedback("b", "expired")
-    assert db.load_feedback()["b"]["status"] == "expired"
+    assert _feedback("b")["status"] == "expired"
     with db.session() as conn:
         conn.execute("UPDATE vacancies SET feedback_status = 'interview', "
                      "interview_comments = '[\"\"]' WHERE id = 'b'")   # the funnel columns exist
@@ -278,7 +236,7 @@ def test_version_3_gains_the_funnel_keeping_expired_marks(isolated_data_dir):
     raw.commit()
     raw.close()
 
-    assert db.load_feedback()["a"]["status"] == "expired"
+    assert _feedback("a")["status"] == "expired"
     with db.session() as conn:
         conn.execute("UPDATE vacancies SET feedback_status = 'awaiting_final', "
                      "final_comment = '' WHERE id = 'b'")
@@ -306,7 +264,7 @@ def test_version_4_gains_views_in_every_language_keeping_the_rest(isolated_data_
     raw.commit()
     raw.close()
 
-    assert db.load_feedback()["a"]["rejected_reason"] == "far too senior"
+    assert _feedback("a")["rejected_reason"] == "far too senior"
     with db.session() as conn:
         assert "views" in {row[1] for row in conn.execute("PRAGMA table_info(vacancies)")}
         assert conn.execute("SELECT value FROM meta WHERE key = 'schema_version'"

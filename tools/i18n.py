@@ -141,7 +141,6 @@ CATALOGUES = {
         "no data": "нет данных",
 
         # --- vacancy line ------------------------------------------------
-        "status": "статус",
         "link": "ссылка",
         "salary": "ЗП",
         "technologies": "технологии",
@@ -256,7 +255,6 @@ CATALOGUES = {
         'Accumulated market findings': 'Накопленные закономерности о рынке',
         'Full vacancy database': 'Полная база вакансий',
         'Archive of past reports': 'Архив прошлых отчётов',
-        'Mark status after applying': 'Отметить статус после отклика',
     },
 }
 

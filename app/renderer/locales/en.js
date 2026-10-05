@@ -90,7 +90,6 @@
   'row.company_age': '🏛 Company',
   'row.company_site': '🏢 Company site',
   'row.source': '🌐 Source',
-  'row.note': 'Note',
   'row.exclusivity': 'Requires exclusivity',
 
   'badge.fresh': 'fresh',

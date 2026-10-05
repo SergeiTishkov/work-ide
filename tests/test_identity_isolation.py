@@ -28,7 +28,6 @@ def two_identities(tmp_path, monkeypatch):
 
     aaaa: the remote-only source weworkremotely is enabled
     bbbb: the NOT remote-only source arbeitnow is enabled
-    The different sets are what catches a leak of the _remote_only_sources() cache.
     """
     identities_dir = tmp_path / "identities"
     src = identity.identity_dir(TEST_IDENTITY)
@@ -81,8 +80,6 @@ def test_data_written_under_a_is_invisible_under_b(two_identities):
 def _identity_paths() -> dict:
     return {
         "database": common.DB_PATH,
-        "vacancies": common.VACANCIES_PATH,
-        "companies": common.COMPANIES_PATH,
         "state": common.STATE_PATH,
         "reports_archive": common.REPORTS_ARCHIVE_DIR,
         "raw": common.RAW_DIR,
@@ -128,19 +125,19 @@ def test_reports_folder_is_shared_but_files_are_not(two_identities):
     assert a_archive.name == "aaaa" and b_archive.name == "bbbb"
 
 
-def test_remote_only_cache_does_not_leak_between_identities(two_identities):
-    """A regression test for one specific bug: before the refactor
-    _REMOTE_ONLY_SOURCES_CACHE was a single global set, filled on first call. A's
-    set of sources would then drive B's remote gate — and that gate decides
-    between 'disqualify the vacancy' and 'add 4 points'."""
+def test_a_remote_only_board_is_the_same_fact_for_every_identity(two_identities):
+    """Whether a board publishes only remote roles is a fact about the board.
+    It used to be read from the active identity's ENABLED sources, so a
+    vacancy from We Work Remotely lost its proof of remoteness when scored for
+    an identity that does not fetch from that board — in a shared base, every
+    vacancy is scored for every identity."""
     common.activate_identity("aaaa", allow_fixture=True)
     a_sources = score._remote_only_sources()
-    assert a_sources == {"weworkremotely"}
-
     common.activate_identity("bbbb", allow_fixture=True)
     b_sources = score._remote_only_sources()
-    assert b_sources == set(), "B has no remote-only sources — A's cache leaked"
-    assert "weworkremotely" not in b_sources
+    assert "weworkremotely" in a_sources
+    assert a_sources == b_sources
+    assert "arbeitnow" not in b_sources
 
 
 def test_criteria_and_profile_read_from_active_identity(two_identities):

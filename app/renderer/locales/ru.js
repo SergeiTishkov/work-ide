@@ -93,7 +93,6 @@
   'row.company_age': '🏛 Компания',
   'row.company_site': '🏢 Сайт компании',
   'row.source': '🌐 Источник',
-  'row.note': 'Заметка',
   'row.exclusivity': 'Требует эксклюзивности',
 
   'badge.fresh': 'свежая',

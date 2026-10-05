@@ -123,8 +123,14 @@ def check_links(
 
 
 if __name__ == "__main__":
+    import argparse
+
+    import identity
     import kb
 
+    parser = argparse.ArgumentParser(description="Check the links of the shortlist")
+    identity.add_identity_arg(parser)
+    identity.activate_or_exit(parser.parse_args().identity)
     vacancies = kb.load_vacancies()
     stats = check_links(vacancies)
     kb.save_vacancies(vacancies)

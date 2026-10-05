@@ -107,3 +107,18 @@ def test_expired_is_not_feedback_on_the_filter(isolated_data_dir):
     _setup({"gone": "expired", "bug": "bugged"})
     assert feedback.count() == {"bugged": 1, "rejected": 0}
     assert [it["id"] for it in feedback.pending_items()] == ["bug"]
+
+
+def test_the_agents_reject_is_a_reviewed_not_for_me(isolated_data_dir):
+    """`feedback.py reject` replaced `kb.py set-status not_relevant`: the
+    agent's verdict after the checklist is the same answer the person gives in
+    the app, and reviewed at once — /feedback has nothing to learn from it."""
+    sel = _setup({"a": "new", "b": "new"})
+    assert feedback.reject("a", "on-site in Lyon, says the page")
+    assert not feedback.reject("nope", "no such vacancy")
+    with db.session() as conn:
+        row = conn.execute(
+            "SELECT feedback_status, rejected_reason, feedback_selection_id, "
+            "feedback_reviewed_at = feedback_at FROM vacancies WHERE id = 'a'").fetchone()
+    assert row == ("rejected", "on-site in Lyon, says the page", sel, 1)
+    assert feedback.count() == {"bugged": 0, "rejected": 0}

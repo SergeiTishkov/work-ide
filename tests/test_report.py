@@ -58,7 +58,6 @@ def test_vacancy_line_always_includes_salary_sub_line():
         "company": "Acme Corp",
         "url": "https://example.com/1",
         "salary_raw": None,
-        "manual": {"status": "new", "notes": ""},
         "computed": {
             "score": 50,
             "score_breakdown": {"compensation_signal": {"explicit": False}},

@@ -154,21 +154,27 @@ def test_pipeline_is_idempotent_and_preserves_manual_status(isolated_data_dir, m
     pipeline.run_pipeline()
     vacancies = kb.load_vacancies()
     vid = list(vacancies.keys())[0]
-    vacancies[vid]["manual"]["status"] = "applied"
-    vacancies[vid]["manual"]["notes"] = "Sent CV on 2026-07-30"
+    vacancies[vid]["external_signals"]["salary_estimate"] = {
+        "low": 60000, "high": 80000, "period": "year", "source": "Glassdoor"}
     kb.save_vacancies(vacancies)
+    import db
+
+    with db.session() as conn:     # the person's answer, written by the app
+        conn.execute("UPDATE vacancies SET feedback_status = 'applied', "
+                     "feedback_at = '2026-07-30T10:00:00+00:00' WHERE id = ?", (vid,))
 
     # a second run with the same data must not create duplicates and must not
-    # overwrite manual.status/notes
+    # lose what was recorded about the vacancy in between
     result2 = pipeline.run_pipeline()
     assert result2["new_vacancies"] == 0
     assert result2["updated_vacancies"] == 1
     assert result2["total_in_kb"] == 1
 
-    vacancies_after = kb.load_vacancies()
-    v = vacancies_after[vid]
-    assert v["manual"]["status"] == "applied"
-    assert v["manual"]["notes"] == "Sent CV on 2026-07-30"
+    v = kb.load_vacancies()[vid]
+    assert v["external_signals"]["salary_estimate"]["source"] == "Glassdoor"
+    with db.session() as conn:
+        assert conn.execute("SELECT feedback_status FROM vacancies WHERE id = ?",
+                            (vid,)).fetchone()[0] == "applied"
 
 
 def test_ingest_manual_merges_into_same_kb_and_reruns_report(isolated_data_dir, monkeypatch):

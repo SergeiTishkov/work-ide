@@ -21,6 +21,7 @@ import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
@@ -163,7 +164,7 @@ def rescore_all(vacancies: dict, criteria: dict, profile: dict, companies: Optio
         kb.attach_company_reputation(vacancies, companies)
     tick = progress.Progress(len(vacancies), "rescore")
     for v in vacancies.values():
-        vacancy_view = {k: val for k, val in v.items() if k not in ("computed", "manual")}
+        vacancy_view = {k: val for k, val in v.items() if k != "computed"}
         v["computed"] = score.score_vacancy(vacancy_view, criteria, profile)
         tick()
 
@@ -306,8 +307,8 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
         st.note = (f"#{selection_id}, "
                    f"{progress.number(len(selections.listed_vacancies(vacancies)))} listed")
 
-    if not (common.KNOWLEDGE_DIR / "insights.md").exists():
-        (common.KNOWLEDGE_DIR / "insights.md").write_text(
+    if not common.INSIGHTS_PATH.exists():
+        common.INSIGHTS_PATH.write_text(
             "# Insights — accumulated patterns about the market\n\n"
             "_This file is maintained by hand, by the agent or the owner, from "
             "the analysis of reports. The pipeline never overwrites it._\n",

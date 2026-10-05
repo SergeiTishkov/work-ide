@@ -1,17 +1,14 @@
 """
-The knowledge base: vacancies, companies, recruiters.
+The knowledge base: vacancies and companies.
 
-Vacancies and companies live in SQLite (data/<prefix>/<prefix>.sqlite, see
-tools/db.py); recruiters stay a small JSON file. This file also holds the CLI
-for managing records by hand — marking a vacancy's status, adding a note,
-looking at statistics — usable from an interactive session without opening
-the database.
+They live in SQLite (see tools/db.py). This file also holds the CLI for what
+the agent records by hand — a salary estimate, a company's reputation — and
+for looking at the base without opening the database.
 
-An important invariant: re-running the pipeline must NEVER overwrite the
-"manual" field (status/notes), which a person or agent may have edited. It is
-created once, with a default value, when a vacancy is first seen, and after
-that only merge_vacancy(..., manual_patch=) or this file's CLI commands
-touch it.
+An important invariant: re-fetching a vacancy must NEVER erase what was
+learned about it after the fetch — the page read for its description, the
+link check, the application channels, a salary estimate entered by hand. See
+merge_vacancy.
 """
 from __future__ import annotations
 
@@ -26,18 +23,6 @@ import common  # noqa: E402
 import db  # noqa: E402
 import score  # noqa: E402
 
-VALID_STATUSES = (
-    "new",
-    "shortlisted",
-    "applied",
-    "interviewing",
-    "offer",
-    "rejected_by_owner",
-    "dead_link",
-    "not_relevant",
-)
-
-
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -47,9 +32,9 @@ def now_iso() -> str:
 # Every function starts with require_identity(). That is rule zero implemented
 # in code: without an active identity, any touch of the data must fail with a
 # comprehensible explanation rather than "NoneType has no attribute 'exists'".
-# Formally activate_identity() runs earlier anyway — but these six functions are
+# Formally activate_identity() runs earlier anyway — but these functions are
 # the front door to the data, and checking here is cheaper than one day writing
-# one person's vacancies into another person's database.
+# one person's verdicts into another person's rows.
 
 def load_vacancies() -> dict:
     common.require_identity()
@@ -71,25 +56,29 @@ def save_companies(companies: dict) -> None:
     db.save_companies(companies)
 
 
-def load_recruiters() -> list:
-    common.require_identity()
-    return common.load_json(common.RECRUITERS_PATH, default=[])
-
-
-def save_recruiters(recruiters: list) -> None:
-    common.require_identity()
-    common.save_json_atomic(common.RECRUITERS_PATH, recruiters)
-
-
 # --- Merging vacancies -----------------------------------------------------
+
+# What is learned about a vacancy after it was fetched, by the pipeline's own
+# later stages (link_check, enrich_descriptions, apply_channels) or by the
+# agent (`set-salary-estimate`). A source never sends these, so a re-fetch
+# rebuilding the record from the source must carry them over.
+LEARNED_KEYS = ("link_check", "description_fetch", "apply_channels", "external_signals")
+
+# Facts a source may send empty while a later stage filled them in: a LinkedIn
+# card has no description and no salary, and the page read for it had both.
+# Kept when the source sends nothing; the source wins when it says something.
+FILLED_LATER_KEYS = ("description_text", "salary_raw", "workplace_type")
+
 
 def merge_vacancy(kb: dict, normalized: dict, computed: dict) -> str:
     """Inserts or updates a vacancy in the kb (a dict keyed by id). Returns
-    "new" or "updated". The "manual" and "external_signals" fields are created
-    once and never touched by automation again — they hold what a person or
-    agent entered (application status, a pay range found by hand on Glassdoor
-    via `tools/kb.py set-salary-estimate`), and the next pipeline run has no
-    right to erase that while rebuilding the record from scratch."""
+    "new" or "updated".
+
+    An update takes what the source says now and keeps what was learned
+    since the first fetch (LEARNED_KEYS, FILLED_LATER_KEYS). Until 2026-10-05
+    it kept only `external_signals`: every re-fetch of a LinkedIn card threw
+    away the description read from its page, so the shortlist was scored
+    blind again and the page was read again on the next run."""
     vid = normalized["id"]
     ts = now_iso()
     existing = kb.get(vid)
@@ -101,22 +90,36 @@ def merge_vacancy(kb: dict, normalized: dict, computed: dict) -> str:
             "last_seen": ts,
             "fetched_at": ts,
             "computed": computed,
-            "manual": {"status": "new", "notes": ""},
             "external_signals": {},
         }
         return "new"
 
-    manual = existing.get("manual", {"status": "new", "notes": ""})
-    external_signals = existing.get("external_signals", {})
-    kb[vid] = {
+    record = {
         **normalized,
         "first_seen": existing.get("first_seen", ts),
         "last_seen": ts,
         "fetched_at": ts,
         "computed": computed,
-        "manual": manual,
-        "external_signals": external_signals,
     }
+    for key in LEARNED_KEYS:
+        if key in existing:
+            record[key] = existing[key]
+    for key in FILLED_LATER_KEYS:
+        if not record.get(key) and existing.get(key):
+            record[key] = existing[key]
+    # The longer text is the page read later; a card carries a snippet.
+    if len(existing.get("description_text") or "") > len(record.get("description_text") or ""):
+        record["description_text"] = existing["description_text"]
+    # Merged, not replaced: the card saying "contract" and the page adding
+    # "part-time" are both still true (the rule enrich_descriptions follows).
+    if existing.get("employment_types") or record.get("employment_types"):
+        import normalize
+
+        record["employment_types"] = normalize.employment_types(
+            list(existing.get("employment_types") or [])
+            + list(record.get("employment_types") or []))
+    record.setdefault("external_signals", {})
+    kb[vid] = record
     return "updated"
 
 
@@ -272,7 +275,7 @@ def cmd_list(args) -> None:
     for v in items[: args.limit]:
         c = v.get("computed", {})
         print(f"[{c.get('score'):>3}] {c.get('classification'):14} {v['company'][:30]:30} | {v['title'][:60]}")
-        print(f"       id={v['id']} status={v.get('manual', {}).get('status')} url={v['url']}")
+        print(f"       id={v['id']} url={v['url']}")
 
 
 def cmd_show(args) -> None:
@@ -286,30 +289,13 @@ def cmd_show(args) -> None:
     print(json.dumps(v, ensure_ascii=False, indent=2))
 
 
-def cmd_set_status(args) -> None:
-    if args.status not in VALID_STATUSES:
-        print(f"Invalid status. Valid ones: {', '.join(VALID_STATUSES)}")
-        sys.exit(1)
-    vacancies = load_vacancies()
-    v = vacancies.get(args.id)
-    if not v:
-        print(f"No vacancy with id={args.id}.")
-        sys.exit(1)
-    v.setdefault("manual", {"status": "new", "notes": ""})
-    v["manual"]["status"] = args.status
-    if args.notes is not None:
-        v["manual"]["notes"] = args.notes
-    save_vacancies(vacancies)
-    print(f"OK: {args.id} -> status={args.status}")
-
-
 def cmd_set_salary_estimate(args) -> None:
     """Records a pay range found by hand (on Glassdoor, say) for a vacancy that
     states no salary itself. Confirmed explicitly by the owner (2026-07-30):
     such an estimate earns a small plus — less than a rate stated in the
     vacancy itself, more than no data at all. Stored in
-    vacancy.external_signals rather than in manual, which is precisely why it
-    takes part in scoring instead of only being displayed."""
+    vacancy.external_signals, which takes part in scoring rather than only
+    being displayed."""
     vacancies = load_vacancies()
     v = vacancies.get(args.id)
     if not v:
@@ -329,7 +315,7 @@ def cmd_set_salary_estimate(args) -> None:
     # the next tools/pipeline.py run.
     criteria = score.load_criteria()
     profile = score.load_profile()
-    vacancy_view = {k: val for k, val in v.items() if k not in ("computed", "manual")}
+    vacancy_view = {k: val for k, val in v.items() if k != "computed"}
     v["computed"] = score.score_vacancy(vacancy_view, criteria, profile)
     save_vacancies(vacancies)
     print(
@@ -389,7 +375,7 @@ def cmd_set_company_reputation(args) -> None:
         v = vacancies.get(vid)
         if not v:
             continue
-        vacancy_view = {k: val for k, val in v.items() if k not in ("computed", "manual")}
+        vacancy_view = {k: val for k, val in v.items() if k != "computed"}
         vacancy_view["_company_reputation"] = reputation
         v["computed"] = score.score_vacancy(vacancy_view, criteria, profile)
         updated += 1
@@ -458,21 +444,10 @@ def cmd_dump(args) -> None:
             "classification": c.get("classification"), "score": c.get("score"),
             "needs_manual_review": c.get("needs_manual_review"),
             "dealbreakers": c.get("dealbreakers") or [],
-            "manual": v.get("manual") or {},
             "description_text": v.get("description_text") or "",
         })
     sys.stdout.reconfigure(encoding="utf-8")
     print(yaml.safe_dump(records, allow_unicode=True, sort_keys=False, width=100))
-
-
-def cmd_migrate_to_sqlite(_args) -> None:
-    result = db.migrate_from_json()
-    print(
-        f"OK: moved into {common.DB_PATH}: {result['vacancies']} vacancies, "
-        f"{result['companies']} companies; {result['rejected']} 'not_relevant' "
-        "statuses carried over as 'rejected' feedback. The JSON files were "
-        "renamed to *.json.bak."
-    )
 
 
 def cmd_refresh_views(_args) -> None:
@@ -486,11 +461,6 @@ def cmd_refresh_views(_args) -> None:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Manage the Work IDE knowledge base")
     sub = p.add_subparsers(dest="command", required=True)
-
-    sub.add_parser(
-        "migrate-to-sqlite",
-        help="One-off: move this identity's JSON knowledge base into SQLite",
-    ).set_defaults(func=cmd_migrate_to_sqlite)
 
     sub.add_parser("stats", help="Summary statistics for the knowledge base"
                    ).set_defaults(func=cmd_stats)
@@ -520,13 +490,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_show = sub.add_parser("show", help="The full vacancy record, by id")
     p_show.add_argument("--id", required=True)
     p_show.set_defaults(func=cmd_show)
-
-    p_status = sub.add_parser("set-status",
-                              help="Change a vacancy's manual.status/notes")
-    p_status.add_argument("--id", required=True)
-    p_status.add_argument("--status", required=True)
-    p_status.add_argument("--notes", default=None)
-    p_status.set_defaults(func=cmd_set_status)
 
     p_salary = sub.add_parser(
         "set-salary-estimate",

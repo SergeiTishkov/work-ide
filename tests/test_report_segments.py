@@ -40,7 +40,6 @@ def _vacancy(vid, country, score=60, classification="hot_lead", title=None):
             "score_breakdown": {},
             "dealbreakers": [],
         },
-        "manual": {"status": "new"},
     }
 
 

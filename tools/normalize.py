@@ -84,8 +84,8 @@ def employment_types(value) -> list:
 
 
 def normalize_record(raw: dict) -> Optional[dict]:
-    """raw -> canonical vacancy dict (without first_seen/last_seen/computed/
-    manual — those are added when merging into the knowledge base in kb.py).
+    """raw -> canonical vacancy dict (without first_seen/last_seen/computed —
+    those are added when merging into the knowledge base in kb.py).
 
     Returns None if the record will not do (required fields missing).
     """

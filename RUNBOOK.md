@@ -117,10 +117,11 @@ tools (WebSearch/WebFetch):
    each such vacancy: resolve the ambiguity (is "Georgia" the country or the US
    state?) and update the record:
    ```bash
-   python tools/kb.py set-status --identity <p> --id <id> --status not_relevant --notes "why it does not fit"
+   python tools/feedback.py --identity <p> reject --id <id> --reason "why it does not fit"
    ```
-   (or leave it as it is and raise the priority if the check came out positive —
-   then just add a note through `--notes`).
+   That is the same "Not for me" the person gives in the app, marked reviewed
+   at once; the person sees it in the app and can take it back. If the check
+   came out positive, leave the vacancy as it is.
 
 2. Make two to four targeted web searches along the lines of:
    `site:linkedin.com/jobs "<stack keywords>" remote contractor` — across all

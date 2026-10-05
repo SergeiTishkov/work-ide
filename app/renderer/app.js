@@ -1021,7 +1021,6 @@
     }
     if (view.reputation) lines.push(md('li', `${t('row.reputation')}: ${view.reputation}`));
     if (view.company_age) lines.push(md('li', `${t('row.company_age')}: ${view.company_age}`));
-    if (view.note) lines.push(md('li', `${t('row.note')}: ${view.note}`));
     if (!lines.length) return null;
     return el('details', { class: 'details' }, el('summary', {}, t('row.details')), el('ul', {}, lines));
   }

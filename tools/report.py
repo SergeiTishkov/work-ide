@@ -462,10 +462,8 @@ def vacancy_view(v: dict) -> dict:
     light Markdown the report always used (_italic_, **bold**, `code`).
     """
     c = v.get("computed", {})
-    manual = v.get("manual", {})
     bd = c.get("score_breakdown", {})
 
-    highlights = []
     highlights = []
     legacy_hits = bd.get("legacy_enterprise_signal", {}).get("hits", [])
     if legacy_hits:
@@ -532,7 +530,6 @@ def vacancy_view(v: dict) -> dict:
         "url": v.get("url", ""),
         "score": c.get("score", 0),
         "classification": c.get("classification"),
-        "status": manual.get("status", "new"),
         "highlights": highlights,
         "salary": salary_line,
         "to_confirm": pending,
@@ -551,7 +548,6 @@ def vacancy_view(v: dict) -> dict:
                                       c.get("classification", "")),
         "hiring_country": _hiring_country_text(v, bd),
         "company_age": company_age,
-        "note": manual.get("notes") or None,
         "needs_manual_review": bool(c.get("needs_manual_review")),
         "first_seen": v.get("first_seen"),
         # Two different dates, both shown in the app: when the employer put
@@ -580,8 +576,7 @@ def _fmt_vacancy_line(v: dict) -> str:
     highlight_str = f" — _{'; '.join(highlights)}_" if highlights else ""
     lines = [
         f"- **[{view['score']}] {view['title']}** @ {view['company']} — "
-        f"[{t('link')}]({view['url']}) — "
-        f"{t('status')}: `{view['status']}`{highlight_str}",
+        f"[{t('link')}]({view['url']}){highlight_str}",
         f"  - 💰 {t('salary')}: {view['salary']}",
     ]
     if view["to_confirm"]:
@@ -601,8 +596,6 @@ def _fmt_vacancy_line(v: dict) -> str:
     lines.append(f"  - 🌍 {t('hiring country')}: {view['hiring_country']}")
     if view["company_age"]:
         lines.append(f"  - 🏛 {t('company')}: {view['company_age']}")
-    if view["note"]:
-        lines.append(f"  - {t('note')}: {view['note']}")
     return "\n".join(lines)
 
 
@@ -1043,8 +1036,6 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         f"- {t('Full vacancy database')}: `{_rel(common.DB_PATH)}` "
         f"(or `python tools/kb.py list --identity {common.ACTIVE_IDENTITY}`)",
         f"- {t('Archive of past reports')}: `{_rel(common.REPORTS_ARCHIVE_DIR)}`",
-        f"- {t('Mark status after applying')}: `python tools/kb.py set-status "
-        f"--identity {common.ACTIVE_IDENTITY} --id <id> --status applied --notes \"...\"`",
         "",
     ]
     return "\n".join(parts)

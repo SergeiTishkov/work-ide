@@ -14,6 +14,7 @@ database by hand:
     python tools/feedback.py --identity sharp list         # the same, to stdout
     python tools/feedback.py --identity sharp mark-reviewed --id X --id Y \\
         --outcome "role gate now rejects 'Java' titles; test added"
+    python tools/feedback.py --identity sharp reject --id X --reason "on-site in Lyon"
 
 A package (data/<prefix>/feedback/pending_<time>.yaml) holds everything a
 diagnosis needs: the person's words, what the vacancy looked like, why the
@@ -22,7 +23,8 @@ the feedback was given next to the class and score now, and a summary of what
 the pending items have in common. One shared cause is worth more than a patch
 per vacancy, so the summary comes first.
 
-The only column this script writes is vacancies.feedback_reviewed_at.
+This script writes vacancies.feedback_reviewed_at, and — through `reject`
+only — the agent's own "not for me" (see reject()).
 """
 from __future__ import annotations
 
@@ -211,6 +213,25 @@ def mark_reviewed(ids: list, outcome: str, package: Optional[Path] = None) -> in
     return changed
 
 
+def reject(vid: str, reason: str) -> bool:
+    """The agent's verdict after reading a vacancy (RUNBOOK step 1.5, the
+    vacancy checklist): the same "not for me" the person gives in the app,
+    with the reason, and reviewed at once — the agent reached it, so there is
+    nothing left for /feedback to review. The person sees it under "Not for
+    me" and can take it back in the app. Returns False for an unknown id.
+
+    It replaced `kb.py set-status not_relevant` (2026-10-05), which wrote a
+    second status system inside the vacancy record that the app never saw."""
+    at = db.now_iso()
+    with db.session() as conn:
+        latest = selections.latest_selection_id(conn)
+        return conn.execute(
+            "UPDATE vacancies SET feedback_status = 'rejected', rejected_reason = ?, "
+            "bugged_reason = NULL, feedback_at = ?, feedback_selection_id = ?, "
+            "feedback_reviewed_at = ? WHERE id = ?",
+            (reason.strip() or None, at, latest, at, vid)).rowcount == 1
+
+
 def _latest_package() -> Optional[Path]:
     packages = sorted(feedback_dir().glob("pending_*.yaml"))
     return packages[-1] if packages else None
@@ -247,6 +268,13 @@ def cmd_mark_reviewed(args) -> None:
     print(f"OK: {changed} marked reviewed. Still pending: {json.dumps(count())}")
 
 
+def cmd_reject(args) -> None:
+    if not reject(args.id, args.reason):
+        print(f"No vacancy with id={args.id}.")
+        sys.exit(1)
+    print(f"OK: {args.id} -> not for me ({args.reason})")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Gather a person's feedback for review")
     sub = p.add_subparsers(dest="command", required=True)
@@ -264,6 +292,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_mark.add_argument("--package", default=None,
                         help="The package to record the outcome in (default: the latest)")
     p_mark.set_defaults(func=cmd_mark_reviewed)
+    p_reject = sub.add_parser(
+        "reject", help="The agent's 'not for me' after reading a vacancy (reviewed at once)")
+    p_reject.add_argument("--id", required=True)
+    p_reject.add_argument("--reason", required=True, help="Why it does not fit")
+    p_reject.set_defaults(func=cmd_reject)
     return p
 
 

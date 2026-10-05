@@ -86,8 +86,8 @@ python tools/kb.py set-company-reputation --identity <p> --company "Acme" \
 python tools/kb.py set-salary-estimate --identity <p> --id <vacancy-id> \
     --low 60000 --high 80000 --period year --source "Glassdoor"
 
-# the status after applying
-python tools/kb.py set-status --identity <p> --id <vacancy-id> --status applied --notes "..."
+# "not for me" after reading a vacancy (the person records applications in the app)
+python tools/feedback.py --identity <p> reject --id <vacancy-id> --reason "..."
 ```
 
 On `--retrieval`: `web_search` means "the numbers came from search results, the

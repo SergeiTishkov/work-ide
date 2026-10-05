@@ -245,7 +245,7 @@ def main() -> None:
         for rec in vacancies.values():
             if rec.get("company") != args.company:
                 continue
-            view = {k: v for k, v in rec.items() if k not in ("computed", "manual")}
+            view = {k: v for k, v in rec.items() if k != "computed"}
             rec["computed"] = score.score_vacancy(view, criteria, profile)
             touched += 1
         kb.save_vacancies(vacancies)

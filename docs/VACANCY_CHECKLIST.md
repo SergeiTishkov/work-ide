@@ -69,8 +69,8 @@ For vacancy `<id>` / `<title>` @ `<company>`:
    selection.
 5. If even one point is not closed, update `<p>_criteria.yaml` (add the missing
    keyword or pattern, if the problem is systemic) and/or mark the vacancy with
-   `tools/kb.py set-status --identity <p> --id <id> --status not_relevant
-   --notes "why"`, and explain to the person what was wrong and how it was
+   `tools/feedback.py --identity <p> reject --id <id> --reason "why"`, and
+   explain to the person what was wrong and how it was
    fixed, so that next time the automation catches it itself.
 
 Put criteria edits in the file of THE identity the search is running under.

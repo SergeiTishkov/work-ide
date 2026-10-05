@@ -118,13 +118,8 @@ REPORTS_DIR: Optional[Path] = None
 REPORTS_ARCHIVE_DIR: Optional[Path] = None
 STATE_PATH: Optional[Path] = None
 
-# The knowledge base proper (tools/db.py). VACANCIES_PATH and COMPANIES_PATH
-# name the JSON files it replaced; they are kept only so a not-yet-migrated
-# identity is recognised and migrated (db.migrate_from_json).
+# The knowledge base proper (tools/db.py).
 DB_PATH: Optional[Path] = None
-VACANCIES_PATH: Optional[Path] = None
-COMPANIES_PATH: Optional[Path] = None
-RECRUITERS_PATH: Optional[Path] = None
 INSIGHTS_PATH: Optional[Path] = None
 
 USER_AGENT: Optional[str] = None
@@ -220,7 +215,7 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
 
     global ACTIVE_IDENTITY, IDENTITY_DIR, FILE_PREFIX
     global DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, REPORTS_ARCHIVE_DIR, STATE_PATH
-    global DB_PATH, VACANCIES_PATH, COMPANIES_PATH, RECRUITERS_PATH, INSIGHTS_PATH, USER_AGENT
+    global DB_PATH, INSIGHTS_PATH, USER_AGENT
 
     root = Path(data_root) if data_root else DATA_ROOT
 
@@ -251,9 +246,6 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
     STATE_PATH = DATA_DIR / f"{FILE_PREFIX}state.json"
 
     DB_PATH = DATA_DIR / f"{prefix}.sqlite"
-    VACANCIES_PATH = KNOWLEDGE_DIR / f"{FILE_PREFIX}vacancies.json"
-    COMPANIES_PATH = KNOWLEDGE_DIR / f"{FILE_PREFIX}companies.json"
-    RECRUITERS_PATH = KNOWLEDGE_DIR / f"{FILE_PREFIX}recruiters.json"
     INSIGHTS_PATH = KNOWLEDGE_DIR / f"{FILE_PREFIX}insights.md"
 
     USER_AGENT = _build_user_agent(prefix, profile)
@@ -266,11 +258,11 @@ def deactivate_identity() -> None:
     """Clears the active identity. Needed by tests that check the refusal."""
     global ACTIVE_IDENTITY, IDENTITY_DIR, FILE_PREFIX
     global DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, REPORTS_ARCHIVE_DIR, STATE_PATH
-    global DB_PATH, VACANCIES_PATH, COMPANIES_PATH, RECRUITERS_PATH, INSIGHTS_PATH, USER_AGENT
+    global DB_PATH, INSIGHTS_PATH, USER_AGENT
 
     ACTIVE_IDENTITY = IDENTITY_DIR = FILE_PREFIX = None
     DATA_DIR = KNOWLEDGE_DIR = RAW_DIR = REPORTS_DIR = REPORTS_ARCHIVE_DIR = STATE_PATH = None
-    DB_PATH = VACANCIES_PATH = COMPANIES_PATH = RECRUITERS_PATH = INSIGHTS_PATH = None
+    DB_PATH = INSIGHTS_PATH = None
     USER_AGENT = None
     for hook in _IDENTITY_HOOKS:
         hook()
@@ -339,28 +331,33 @@ def shared_config(name: str) -> Path:
     return SHARED_CONFIG_DIR / name
 
 
+# What a source IS, the same for every identity: an identity choosing a
+# source cannot change these. A stale URL is a bug for everybody rather than
+# somebody's preference, and a board does not stop being remote-only because
+# one identity says so.
+CATALOG_FACTS = ("url", "urls", "kind", "remote_only", "workplace_hidden", "site")
+
+
+def source_catalog() -> dict:
+    """{source name: its catalogue entry} from config/sources.catalog.yaml —
+    readable with no identity active: these are facts about boards."""
+    catalog = load_yaml(shared_config("sources.catalog.yaml")) or {}
+    return {s["name"]: s for s in (catalog.get("sources") or []) if s.get("name")}
+
+
 def load_sources() -> list:
     """The single place the whole project reads source configuration from.
 
     Merges the shared source catalogue (endpoints, kind, remote_only,
     documentation — identical for everyone) with the active identity's
-    settings (which sources are enabled, and with what parameters). An identity
-    cannot override an endpoint: a stale URL is a bug for everybody rather than
-    somebody's preference.
-
-    If the catalogue does not exist yet, the identity file is read as
-    self-contained — a transitional state, see docs/BUILDING_BLOCKS.md.
+    settings (which sources are enabled, and with what parameters). An
+    identity cannot override a catalogue fact (CATALOG_FACTS): the catalogue
+    entry wins over the identity's file.
     """
     require_identity()
     identity_cfg = load_yaml(identity_config("sources.yaml")) or {}
     identity_sources = identity_cfg.get("sources") or []
-
-    catalog_path = shared_config("sources.catalog.yaml")
-    if not catalog_path.exists():
-        return identity_sources
-
-    catalog = load_yaml(catalog_path) or {}
-    catalog_by_name = {s["name"]: s for s in (catalog.get("sources") or []) if s.get("name")}
+    catalog_by_name = source_catalog()
 
     merged = []
     for entry in identity_sources:
@@ -375,19 +372,15 @@ def load_sources() -> list:
                 f"Either a typo in {identity_config('sources.yaml').name}, or the "
                 "source needs adding to config/sources.catalog.yaml."
             )
-        merged.append({**base, **entry})
+        facts = {key: base[key] for key in CATALOG_FACTS if key in base}
+        merged.append({**base, **entry, **facts})
     return merged
 
 
 def source_sites() -> dict:
     """{source name: its website} from the catalogue — what a person calls
     the board (`site`), where the code calls it by its name."""
-    catalog_path = shared_config("sources.catalog.yaml")
-    if not catalog_path.exists():
-        return {}
-    catalog = load_yaml(catalog_path) or {}
-    return {s["name"]: s["site"] for s in (catalog.get("sources") or [])
-            if s.get("name") and s.get("site")}
+    return {name: s["site"] for name, s in source_catalog().items() if s.get("site")}
 
 
 def ensure_dirs() -> None:

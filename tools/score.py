@@ -58,57 +58,39 @@ _NON_SALARY_CONTEXT_WORDS = (
 )
 
 
-# The cache MUST be keyed by identity. It used to be one global set filled on
-# first call; once the project became multi-identity that turned into a
-# cross-identity leak, where identity A's list of remote-only sources drove
-# identity B's remote gate — and that gate decides between "disqualify this
-# vacancy" and "give it four points". The failure would have been silent.
+# Which boards are remote-only or hide the work arrangement is a fact about the
+# board, read from the shared catalogue (config/sources.catalog.yaml) — not
+# from the identity's choice of boards. Until 2026-10-05 it came from the
+# active identity's ENABLED sources: in a shared base, a vacancy fetched from
+# a remote-only board by one identity lost that proof when scored for another
+# identity that does not use the board.
 #
-# The cache earns its place: this runs for EVERY vacancy during a rescore,
-# and the database holds thousands. Re-reading YAML each time would turn a
-# scoring pass into a parsing pass.
-_REMOTE_ONLY_SOURCES_CACHE: dict = {}
-_WORKPLACE_HIDDEN_SOURCES_CACHE: dict = {}
+# Cached, because this runs for EVERY vacancy during a rescore and the base
+# holds tens of thousands: re-reading YAML each time would turn a scoring pass
+# into a parsing pass. Keyed by the catalogue file, so a test pointing the
+# shared config elsewhere gets its own entry.
+_SOURCE_FLAGS_CACHE: dict = {}
 
 
-def _reset_caches() -> None:
-    """Runs on every identity activation (common.register_identity_hook).
-
-    Belt and braces: the caches are keyed by identity already, and this is
-    what keeps them correct if someone ever breaks that keying."""
-    _REMOTE_ONLY_SOURCES_CACHE.clear()
-    _WORKPLACE_HIDDEN_SOURCES_CACHE.clear()
-
-
-common.register_identity_hook(_reset_caches)
+def _sources_flagged(flag: str) -> set:
+    key = (str(common.shared_config("sources.catalog.yaml")), flag)
+    if key not in _SOURCE_FLAGS_CACHE:
+        _SOURCE_FLAGS_CACHE[key] = {
+            name for name, s in common.source_catalog().items() if s.get(flag)}
+    return _SOURCE_FLAGS_CACHE[key]
 
 
 def _remote_only_sources() -> set:
     """Sources flagged remote_only — boards that publish nothing but remote
     roles, so the board itself is sufficient proof of remoteness
     (docs/SOURCES.md)."""
-    common.require_identity()
-    key = common.ACTIVE_IDENTITY
-    if key not in _REMOTE_ONLY_SOURCES_CACHE:
-        _REMOTE_ONLY_SOURCES_CACHE[key] = {
-            s.get("name")
-            for s in common.load_sources()
-            if s.get("remote_only") and s.get("enabled", True) and s.get("name")
-        }
-    return _REMOTE_ONLY_SOURCES_CACHE[key]
+    return _sources_flagged("remote_only")
 
 
 def _workplace_hidden_sources() -> set:
     """Sources flagged workplace_hidden — boards that show the work
     arrangement to logged-in visitors only (config/sources.catalog.yaml)."""
-    common.require_identity()
-    key = common.ACTIVE_IDENTITY
-    if key not in _WORKPLACE_HIDDEN_SOURCES_CACHE:
-        _WORKPLACE_HIDDEN_SOURCES_CACHE[key] = {
-            s.get("name") for s in common.load_sources()
-            if s.get("workplace_hidden") and s.get("name")
-        }
-    return _WORKPLACE_HIDDEN_SOURCES_CACHE[key]
+    return _sources_flagged("workplace_hidden")
 
 
 def load_criteria() -> dict:

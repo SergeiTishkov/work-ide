@@ -36,7 +36,6 @@ def _vacancy(vid, country=None, score=60, classification="hot_lead", **extra):
         "tags": [],
         "computed": {"score": score, "classification": classification,
                      "score_breakdown": {}, "dealbreakers": []},
-        "manual": {"status": "new"},
         **extra,
     }
 
