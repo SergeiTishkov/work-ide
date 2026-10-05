@@ -816,18 +816,24 @@
         running && el('button', { class: 'danger', testid: 'run-stop', onclick: stopRun }, t('run.stop'))));
   }
 
+  // A drop-down in an outlined box, its name on the box's top edge (Material's
+  // outlined field). The label comes after the select so the focus can colour
+  // it (styles.css, .field).
+  function field(select, labelTestid, label) {
+    return el('span', { class: 'field' },
+      select, el('label', { for: select.id, testid: labelTestid }, label));
+  }
+
   // The markets of the selection: a drop-down like the filters beside it
   // (tabs until 2026-10-06; eight of them took a line of their own).
   function renderSegmentFilter(info) {
-    return el('span', { class: 'segment-filter' },
-      el('label', { for: 'segment-select', testid: 'segment-label' }, t('filter.segment_legend')),
-      el('select', {
-        id: 'segment-select', testid: 'segment-filter',
-        onchange: (event) => selectSegment(event.target.value),
-      }, info.segments.map((segment) => el('option', {
-        value: segment.slug, testid: `segment-option-${segment.slug}`,
-        selected: segment.slug === info.activeSegment,
-      }, segment.name))));
+    return field(el('select', {
+      id: 'segment-select', testid: 'segment-filter',
+      onchange: (event) => selectSegment(event.target.value),
+    }, info.segments.map((segment) => el('option', {
+      value: segment.slug, testid: `segment-option-${segment.slug}`,
+      selected: segment.slug === info.activeSegment,
+    }, segment.name))), 'segment-label', t('filter.segment_legend'));
   }
 
   // One drop-down, its options grouped, each with how many it holds.
@@ -838,12 +844,11 @@
     }, `${t(FILTER_KEYS[name])} ${t('filter.count', { n: state.counts[name] || 0 })}`);
     return el('div', { class: 'filters', testid: 'filters' },
       renderSegmentFilter(info),
-      el('label', { for: 'filter-select', testid: 'filter-label' }, t('filter.legend')),
-      el('select', {
+      field(el('select', {
         id: 'filter-select', testid: 'filter',
         onchange: (event) => selectFilter(event.target.value),
       }, FILTER_GROUPS.map((group) => el('optgroup', { label: t(group.key) },
-        group.filters.map(option)))),
+        group.filters.map(option)))), 'filter-label', t('filter.legend')),
       renderSourceFilter(),
       renderFitFilter());
   }
@@ -860,13 +865,12 @@
     const option = (value, label, n) => el('option', {
       value, testid: `fit-option-${value || 'all'}`, selected: value === active,
     }, `${label} ${t('filter.count', { n })}`);
-    return el('span', { class: 'source-filter' },
-      el('label', { for: 'fit-select', testid: 'fit-label' }, t('filter.fit_legend')),
-      el('select', {
-        id: 'fit-select', testid: 'fit-filter',
-        onchange: (event) => selectFit(event.target.value),
-      }, option('', t('filter.fit_all'), all),
-      classes.map((cls) => option(cls, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls, totals[cls] || 0))));
+    return field(el('select', {
+      id: 'fit-select', testid: 'fit-filter',
+      onchange: (event) => selectFit(event.target.value),
+    }, option('', t('filter.fit_all'), all),
+    classes.map((cls) => option(cls, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls, totals[cls] || 0))),
+    'fit-label', t('filter.fit_legend'));
   }
 
   // The boards the current filter holds, each with how many; the chosen one
@@ -882,13 +886,12 @@
     const option = (value, label, n) => el('option', {
       value, testid: `source-option-${value || 'all'}`, selected: value === active,
     }, `${label} ${t('filter.count', { n })}`);
-    return el('span', { class: 'source-filter' },
-      el('label', { for: 'source-select', testid: 'source-label' }, t('filter.source_legend')),
-      el('select', {
-        id: 'source-select', testid: 'source-filter',
-        onchange: (event) => selectSource(event.target.value),
-      }, option('', t('filter.source_all'), all),
-      sources.filter((s) => s.source).map((s) => option(s.source, s.site || s.source, s.total))));
+    return field(el('select', {
+      id: 'source-select', testid: 'source-filter',
+      onchange: (event) => selectSource(event.target.value),
+    }, option('', t('filter.source_all'), all),
+    sources.filter((s) => s.source).map((s) => option(s.source, s.site || s.source, s.total))),
+    'source-label', t('filter.source_legend'));
   }
 
   // Rows arrive ordered by class, then score; stubs go back where they were.
