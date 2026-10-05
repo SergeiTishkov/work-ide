@@ -120,9 +120,15 @@ class Segment:
     """
 
     def __init__(self, slug: str, name: str, groups=(), rest: bool = False,
-                 everything: bool = False, default: bool = False):
+                 everything: bool = False, default: bool = False,
+                 translations: Optional[dict] = None):
         self.slug = slug
+        # `name` is the English source text, as everywhere in the project;
+        # `translations` gives it in other languages ({"ru": "..."}), for the
+        # report and the app (2026-10-06: the app's region list stayed English
+        # in Russian).
         self.name = name
+        self.translations = dict(translations or {})
         self.groups = tuple(groups)
         self.rest = rest
         self.everything = everything
@@ -134,6 +140,14 @@ class Segment:
 
     def __repr__(self):  # pragma: no cover - debugging aid
         return f"<Segment {self.slug!r} groups={self.groups} rest={self.rest}>"
+
+    def title(self, language: str) -> str:
+        """The name in `language`, the English one when it is not translated."""
+        return self.translations.get(language) or self.name
+
+    def names(self) -> dict:
+        """{language: name}, English included — what a selection stores."""
+        return {"en": self.name, **self.translations}
 
     def holds(self, group_key: str, claimed: frozenset) -> bool:
         if self.everything:
@@ -174,6 +188,7 @@ def parse_segments(config: dict) -> List[Segment]:
             rest=bool(entry.get("rest")),
             everything=bool(entry.get("everything")),
             default=bool(entry.get("default")),
+            translations={str(k): str(v) for k, v in (entry.get("translations") or {}).items()},
         ))
     return segments
 

@@ -38,7 +38,7 @@ import common  # noqa: E402
 
 # 8: one base for every identity. The per-identity files of versions 1-7 are
 # not upgraded in place: tools/merge_shared_base.py merged them once.
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 SCHEMA_PATH = common.ROOT / "schemas" / "db.sql"
 
 # How long a writer waits for another writer's transaction before giving up.
@@ -74,10 +74,18 @@ def identity() -> str:
     return common.ACTIVE_IDENTITY
 
 
-# version reached -> the step that reaches it. Empty since version 8 started
-# the shared base afresh; the next change to an existing table adds its step
-# here.
-MIGRATIONS: dict = {}
+def _to_9(conn: sqlite3.Connection) -> None:
+    """A market's name in every language its configuration gives (2026-10-06).
+    Older selections keep NULL and are shown by their English name."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(selection_segments)")}
+    if "names" not in columns:
+        with conn:
+            conn.execute("ALTER TABLE selection_segments ADD COLUMN names TEXT")
+
+
+# version reached -> the step that reaches it. Version 8 started the shared
+# base afresh.
+MIGRATIONS: dict = {9: _to_9}
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:

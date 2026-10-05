@@ -221,7 +221,7 @@ function standardFixture() {
         selection, displayName: 'Senior .NET/C# remote engineering',
         segments: [
           { slug: 'worldwide', name: 'Worldwide', isDefault: false },
-          { slug: 'uk', name: 'United Kingdom', isDefault: false },
+          { slug: 'uk', name: 'United Kingdom', names: { en: 'United Kingdom', ru: 'Velikobritaniya' }, isDefault: false },
           { slug: 'full', name: 'Everything', isDefault: true },
         ],
       },

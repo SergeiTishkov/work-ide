@@ -18,6 +18,11 @@
 # `default: true` additionally writes the file to reports/<prefix>_latest.md —
 # the path RUNBOOK.md and a person's habit both point at. Exactly one segment
 # should carry it.
+#
+# `name` is English, the source text. `translations: {ru: "..."}` gives it in
+# other languages: the report shows the one in preferences.language, the app
+# the one of its interface, and English where none is given. A selection keeps
+# the names it was made with (selection_segments.names, schema version 9).
 
 segments:
   - slug: ""

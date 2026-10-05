@@ -756,8 +756,8 @@ def _segment_banner(segment, siblings, shown: int, listed=()) -> str:
         return ""
     others = [s for s in (siblings or []) if s.slug != segment.slug]
     links = ", ".join(
-        f"[{s.name}]({segment_filename(s.slug)})" for s in others)
-    line = (f"**{t('This shortlist')}: {segment.name}** — "
+        f"[{s.title(i18n.language())}]({segment_filename(s.slug)})" for s in others)
+    line = (f"**{t('This shortlist')}: {segment.title(i18n.language())}** — "
             f"{shown} {t('vacancies')}.")
 
     # A segment holding several markets — `rest` above all — is otherwise a

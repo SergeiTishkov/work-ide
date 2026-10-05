@@ -133,9 +133,9 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
             (prefix, run, db.now_iso(), kind),
         ).lastrowid
         conn.executemany(
-            "INSERT INTO selection_segments (selection_id, slug, name, position, is_default) "
-            "VALUES (?, ?, ?, ?, ?)",
-            ((selection_id, s.slug, s.name, i, int(s.default))
+            "INSERT INTO selection_segments (selection_id, slug, name, names, position, is_default) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ((selection_id, s.slug, s.name, json.dumps(s.names(), ensure_ascii=False), i, int(s.default))
              for i, s in enumerate(configured)),
         )
         conn.executemany(UPDATE_VIEWS, views)

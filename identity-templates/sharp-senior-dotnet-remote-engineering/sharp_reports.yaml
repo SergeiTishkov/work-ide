@@ -20,31 +20,40 @@
 # Lists are REPLACED rather than merged when a layer overrides them (see
 # docs/OVERRIDES.md), so a local copy of this file must name every segment it
 # wants, not only the ones it is changing.
+#
+# `name` is English, the source text; `translations` gives it in the languages
+# the report and the app speak. A language missing there shows the English.
 
 segments:
   # Geography is not in the way at all. Read this one first.
   - slug: worldwide
     name: "Worldwide — no country tie"
+    translations: {ru: "Весь мир — без привязки к стране"}
     groups: [worldwide]
 
   - slug: uk
     name: "United Kingdom"
+    translations: {ru: "Великобритания"}
     groups: [united_kingdom]
 
   - slug: eu
     name: "European Union and EEA"
+    translations: {ru: "Евросоюз и ЕЭЗ"}
     groups: [european_union]
 
   - slug: canada
     name: "Canada"
+    translations: {ru: "Канада"}
     groups: [canada]
 
   - slug: usa
     name: "United States"
+    translations: {ru: "США"}
     groups: [united_states]
 
   - slug: anz
     name: "Australia and New Zealand"
+    translations: {ru: "Австралия и Новая Зеландия"}
     groups: [australia_new_zealand]
 
   # Everything the segments above did not claim — Singapore, the Gulf, Israel,
@@ -52,11 +61,13 @@ segments:
   # listed: add a segment above and this one shrinks by itself.
   - slug: rest
     name: "Rest of the world"
+    translations: {ru: "Остальной мир"}
     rest: true
 
   # The whole shortlist, undivided. Also written to sharp_latest.md, because
   # that is the path RUNBOOK.md, the archive and habit all point at.
   - slug: full
-    name: "Everything together"
+    name: "All regions together"
+    translations: {ru: "Все регионы вместе"}
     everything: true
     default: true

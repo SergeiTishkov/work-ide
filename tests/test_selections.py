@@ -15,7 +15,8 @@ CONFIG = {"segments": [
     {"slug": "worldwide", "name": "Worldwide", "groups": ["worldwide"]},
     {"slug": "uk", "name": "United Kingdom", "groups": ["united_kingdom"]},
     {"slug": "rest", "name": "Rest of the world", "rest": True},
-    {"slug": "full", "name": "Everything", "everything": True, "default": True},
+    {"slug": "full", "name": "Everything", "everything": True, "default": True,
+     "translations": {"ru": "Vsyo vmeste"}},
 ]}
 
 
@@ -76,9 +77,11 @@ def test_vacancy_lands_in_every_market_that_holds_it(isolated_data_dir):
     assert _ids(_listing(sel, "worldwide")) == ["w"]
     assert _ids(_listing(sel, "rest")) == ["ca"]
     with db.session() as conn:
-        names = [r[0] for r in conn.execute(selections.load_queries()["segments"],
-                                            {"selection_id": sel})]
-    assert names == ["worldwide", "uk", "rest", "full"]
+        rows = conn.execute(selections.load_queries()["segments"], {"selection_id": sel}).fetchall()
+    assert [r[0] for r in rows] == ["worldwide", "uk", "rest", "full"]
+    # Each market's name in every language the configuration gives.
+    assert json.loads(rows[3][2]) == {"en": "Everything", "ru": "Vsyo vmeste"}
+    assert json.loads(rows[1][2]) == {"en": "United Kingdom"}
 
 
 def test_only_what_the_report_would_list_is_recorded(isolated_data_dir):

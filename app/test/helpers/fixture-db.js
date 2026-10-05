@@ -44,7 +44,7 @@ function createDatabase(file, {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(fs.readFileSync(path.join(SCHEMA_DIR, 'db.sql'), 'utf8'));
-  db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', '8')").run();
+  db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', '9')").run();
   db.prepare("INSERT INTO identities (id, display_name, created_at) VALUES (?, ?, '2026-09-01')")
     .run(identity, displayName);
   const classOrder = ['hot_lead', 'worth_a_look', 'long_shot',
@@ -62,8 +62,9 @@ function createDatabase(file, {
     db.prepare('INSERT INTO selections (id, identity_id, run, created_at, kind) VALUES (?, ?, ?, ?, ?)')
       .run(id, identity, selection.run || id, `2026-09-2${id}T10:00:00+00:00`, selection.kind || 'run');
     for (const [position, s] of segments.entries()) {
-      db.prepare('INSERT INTO selection_segments VALUES (?, ?, ?, ?, ?)')
-        .run(id, s.slug, s.name, position, s.isDefault ? 1 : 0);
+      db.prepare('INSERT INTO selection_segments (selection_id, slug, name, names, position, is_default) '
+        + 'VALUES (?, ?, ?, ?, ?, ?)')
+        .run(id, s.slug, s.name, s.names ? JSON.stringify(s.names) : null, position, s.isDefault ? 1 : 0);
     }
     for (const vid of selection.items) {
       const v = vacancies.find((x) => x.id === vid);
@@ -102,7 +103,7 @@ function standardDatabase(file, options = {}) {
     segments: [
       { slug: 'worldwide', name: 'Worldwide' },
       { slug: 'uk', name: 'United Kingdom' },
-      { slug: 'full', name: 'Everything', isDefault: true },
+      { slug: 'full', name: 'Everything', names: { en: 'Everything', ru: 'Vsyo vmeste' }, isDefault: true },
     ],
     selections: [
       { kind: 'run', items: old },

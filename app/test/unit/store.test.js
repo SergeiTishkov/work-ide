@@ -19,6 +19,9 @@ test('segments of the latest selection, default marked', () => {
   assert.equal(data.displayName, 'Test search');
   assert.deepEqual(data.segments.map((s) => [s.slug, s.isDefault]),
     [['worldwide', false], ['uk', false], ['full', true]]);
+  // Each name in every language the configuration gives; none before version 9.
+  assert.deepEqual(data.segments.map((s) => s.names),
+    [{}, {}, { en: 'Everything', ru: 'Vsyo vmeste' }]);
   store.closeAll();
 });
 

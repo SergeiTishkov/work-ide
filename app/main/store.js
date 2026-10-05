@@ -12,7 +12,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { loadQueries } = require('./queries');
 const funnel = require('../renderer/funnel.js');
 
-const SCHEMA_VERSION = '8';
+const SCHEMA_VERSION = '9';
 // The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
 // beaten for this long is gone, whatever its row still says.
 const STALE_AFTER_MS = 45000;
@@ -46,6 +46,14 @@ function jsonArray(text) {
   if (!text) return [];
   const value = JSON.parse(text);
   return Array.isArray(value) ? value : [];
+}
+
+// selection_segments.names: {language: name}, NULL in selections from before
+// version 9.
+function parseNames(text) {
+  if (!text) return {};
+  const value = JSON.parse(text);
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
 // A row's feedback columns -> the record renderer/funnel.js works with.
@@ -143,7 +151,9 @@ class Store {
     const name = db.prepare(this.queries.display_name).get({ identity });
     const segments = selection
       ? db.prepare(this.queries.segments).all({ selection_id: selection.id })
-        .map((s) => ({ slug: s.slug, name: s.name, isDefault: s.is_default === 1 }))
+        .map((s) => ({
+          slug: s.slug, name: s.name, names: parseNames(s.names), isDefault: s.is_default === 1,
+        }))
       : [];
     return { selection, displayName: name ? name.value : null, segments };
   }

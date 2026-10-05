@@ -8,27 +8,35 @@
 # `worldwide` first: it is the only group where geography is not an obstacle to
 # start with. Lists are REPLACED rather than merged when a layer overrides them
 # (docs/OVERRIDES.md), so a local copy must name every segment it wants.
+#
+# `name` is English, the source text; `translations` gives it in the languages
+# the report and the app speak. A language missing there shows the English.
 
 segments:
   - slug: worldwide
     name: "Worldwide — no country tie"
+    translations: {ru: "Весь мир — без привязки к стране"}
     groups: [worldwide]
 
   - slug: usa
     name: "United States"
+    translations: {ru: "США"}
     groups: [united_states]
 
   - slug: europe
     name: "United Kingdom and the European Union"
+    translations: {ru: "Великобритания и Евросоюз"}
     groups: [united_kingdom, european_union]
 
   # Everything the segments above did not claim. Computed, not listed.
   - slug: rest
     name: "Rest of the world"
+    translations: {ru: "Остальной мир"}
     rest: true
 
   # The whole shortlist, undivided; also written to partsharp_latest.md.
   - slug: full
-    name: "Everything together"
+    name: "All regions together"
+    translations: {ru: "Все регионы вместе"}
     everything: true
     default: true

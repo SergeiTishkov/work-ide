@@ -57,6 +57,10 @@ ALLOWED = {
         "the translation catalogue itself — the values ARE the other language",
     "app/renderer/locales/ru.js":
         "the desktop app's interface texts — the values ARE the other language",
+    "identity-templates/sharp-senior-dotnet-remote-engineering/sharp_reports.yaml":
+        "the markets' names under `translations` — the values ARE the other language",
+    "identity-templates/partsharp-part-time-dotnet-side-work/partsharp_reports.yaml":
+        "the markets' names under `translations` — the values ARE the other language",
     "config/derivation/ambiguous_places.yaml":
         "a Ukrainian phrase matched against vacancy TEXT, which is not always "
         "in English",

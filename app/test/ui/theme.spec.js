@@ -67,6 +67,16 @@ test('theme sits left of the language; neither button has an arrow; one menu at 
   await expect(page.getByTestId('language-menu')).toHaveCount(0);
 });
 
+test('market names follow the interface language where the configuration translates them', async ({ page }) => {
+  await open(page);
+  const uk = page.getByTestId('segment-option-uk');
+  await expect(uk).toHaveText('Velikobritaniya');
+  await expect(page.getByTestId('segment-option-worldwide')).toHaveText('Worldwide');   // not translated
+  await page.getByTestId('language-button').click();
+  await page.getByTestId('language-option-en').click();
+  await expect(uk).toHaveText('United Kingdom');
+});
+
 test('the markets are a drop-down before the filters', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('segment-label')).toHaveText(ru['filter.segment_legend']);

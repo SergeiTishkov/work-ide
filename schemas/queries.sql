@@ -49,7 +49,7 @@ SELECT id, run, created_at, kind FROM selections
 WHERE id = :selection_id AND identity_id = :identity;
 
 -- name: segments
-SELECT slug, name, position, is_default
+SELECT slug, name, names, position, is_default
 FROM selection_segments
 WHERE selection_id = :selection_id
 ORDER BY position;

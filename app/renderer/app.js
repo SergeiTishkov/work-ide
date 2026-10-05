@@ -913,13 +913,19 @@
 
   // The markets of the selection: a drop-down like the filters beside it
   // (tabs until 2026-10-06; eight of them took a line of their own).
+  // A market's name comes from the identity's configuration, translated there;
+  // English when it gives no translation for the current language.
+  function segmentName(segment) {
+    return (segment.names && segment.names[I18n.language()]) || segment.name;
+  }
+
   function renderSegmentFilter(info) {
     return dropdown({
       id: 'segment-select', testid: 'segment-filter',
       label: t('filter.segment_legend'), labelTestid: 'segment-label',
       value: info.activeSegment,
       groups: [{ options: info.segments.map((segment) => ({
-        value: segment.slug, text: segment.name, testid: `segment-option-${segment.slug}`,
+        value: segment.slug, text: segmentName(segment), testid: `segment-option-${segment.slug}`,
       })) }],
       onChange: selectSegment,
     });

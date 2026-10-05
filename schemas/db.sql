@@ -130,7 +130,8 @@ CREATE INDEX IF NOT EXISTS selections_identity ON selections(identity_id, kind, 
 CREATE TABLE IF NOT EXISTS selection_segments (
   selection_id INTEGER NOT NULL REFERENCES selections(id),
   slug         TEXT NOT NULL,
-  name         TEXT NOT NULL,
+  name         TEXT NOT NULL,      -- English
+  names        TEXT,               -- JSON {language: name}, English included (version 9)
   position     INTEGER NOT NULL,
   is_default   INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (selection_id, slug)

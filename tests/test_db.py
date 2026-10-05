@@ -177,6 +177,23 @@ def test_schema_version_mismatch_is_refused(isolated_data_dir):
         kb.load_vacancies()
 
 
+def test_version_8_gains_the_markets_names_in_other_languages(isolated_data_dir):
+    kb.save_vacancies({"a1": _vacancy("a1")})
+    with db.session() as conn:
+        # The table as version 8 made it (SQLite 3.34 has no DROP COLUMN).
+        conn.execute("DROP TABLE selection_segments")
+        conn.execute("CREATE TABLE selection_segments (selection_id INTEGER NOT NULL, "
+                     "slug TEXT NOT NULL, name TEXT NOT NULL, position INTEGER NOT NULL, "
+                     "is_default INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (selection_id, slug))")
+        conn.execute("UPDATE meta SET value = '8' WHERE key = 'schema_version'")
+    kb.load_vacancies()
+    with db.session() as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(selection_segments)")}
+        version = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()[0]
+    assert "names" in columns
+    assert version == str(db.SCHEMA_VERSION)
+
+
 def test_a_base_from_before_the_shared_one_is_refused_with_the_way_out(isolated_data_dir):
     """Versions 1-7 were one file per identity; they were merged once by a
     script, never upgraded in place — an upgrade could not know which

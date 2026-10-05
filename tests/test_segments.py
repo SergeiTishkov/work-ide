@@ -90,6 +90,16 @@ def test_an_empty_configuration_produces_no_segments():
     assert segments.parse_segments({"segments": []}) == []
 
 
+def test_a_segment_name_is_english_with_its_translations_beside_it():
+    """The app showed the English names in a Russian interface (2026-10-06)."""
+    [full] = segments.parse_segments(_config({
+        "slug": "full", "name": "All regions together", "everything": True,
+        "translations": {"ru": "Vse regiony vmeste"}}))
+    assert full.title("ru") == "Vse regiony vmeste"
+    assert full.title("de") == "All regions together"
+    assert full.names() == {"en": "All regions together", "ru": "Vse regiony vmeste"}
+
+
 # --- splitting -------------------------------------------------------------
 
 def test_each_vacancy_lands_in_its_market_and_in_the_full_file():
