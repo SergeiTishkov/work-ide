@@ -803,7 +803,7 @@
     return el('div', { class: 'toolbar' },
       el('div', { class: 'identity-heading' },
         el('h1', { testid: 'identity-name' }, info.displayName || (identity && identity.displayName) || state.active),
-        selection && el('span', { class: 'muted', testid: 'selection-caption' },
+        selection && el('span', { class: 'muted selection-caption', testid: 'selection-caption' },
           t('selection.caption', {
             id: selection.id,
             run: selection.run,

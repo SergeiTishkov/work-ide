@@ -122,6 +122,7 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 
 .toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
 .identity-heading h1 { font-size: 18px; margin: 0 0 2px; }
+.selection-caption { display: block; margin: 4px 0; }
 .actions { display: flex; gap: 8px; }
 
 /* The filters: Material's outlined field — the name sits on the box's top
