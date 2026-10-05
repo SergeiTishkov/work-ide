@@ -25,7 +25,7 @@ const byId = (page, id) => page.getByTestId(`vacancy-${id}`);
 test('opens on the first identity, its default market, fresh without feedback', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('identity-tab-sharp')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByTestId('segment-tab-full')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('segment-filter')).toHaveValue('full');
   await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
   expect((await calls(page, 'loadListing'))[0]).toEqual(['sharp', 'full', 'fresh_new']);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(3);   // a1, a2r, b1
@@ -161,11 +161,11 @@ test('filters ask for their own list and show their counts', async ({ page }) =>
 test('each market of each identity keeps its own filter', async ({ page }) => {
   await open(page);
   await page.getByTestId('filter').selectOption('all');
-  await page.getByTestId('segment-tab-uk').click();
+  await page.getByTestId('segment-filter').selectOption('uk');
   await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'uk', 'fresh_new']);
 
-  await page.getByTestId('segment-tab-full').click();
+  await page.getByTestId('segment-filter').selectOption('full');
   await expect(page.getByTestId('filter')).toHaveValue('all');
 
   await page.getByTestId('identity-tab-partsharp').click();
@@ -173,7 +173,7 @@ test('each market of each identity keeps its own filter', async ({ page }) => {
   await page.getByTestId('filter').selectOption('applied');
 
   await page.getByTestId('identity-tab-sharp').click();
-  await expect(page.getByTestId('segment-tab-full')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('segment-filter')).toHaveValue('full');
   await expect(page.getByTestId('filter')).toHaveValue('all');
   await page.getByTestId('identity-tab-partsharp').click();
   await expect(page.getByTestId('filter')).toHaveValue('applied');
@@ -389,13 +389,13 @@ test('a reason being typed survives the indicator re-rendering the list', async 
 test('"Refresh" reloads the interface and keeps the tab, market and filter', async ({ page }) => {
   await open(page);
   await page.getByTestId('identity-tab-sharp').click();
-  await page.getByTestId('segment-tab-uk').click();
+  await page.getByTestId('segment-filter').selectOption('uk');
   await page.getByTestId('filter').selectOption('all');
   await expect(page.getByTestId('refresh')).toHaveText(ru['app.refresh']);
   await page.evaluate(() => { window.__beforeRefresh = true; });
 
   await page.getByTestId('refresh').click();
-  await expect(page.getByTestId('segment-tab-uk')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('segment-filter')).toHaveValue('uk');
   expect(await page.evaluate(() => window.__beforeRefresh)).toBeUndefined();   // a new page
   await expect(page.getByTestId('filter')).toHaveValue('all');
   expect((await calls(page, 'loadListing'))[0]).toEqual(['sharp', 'uk', 'all']);
@@ -669,9 +669,9 @@ test('the status filter and the source apply together', async ({ page }) => {
 test('each market keeps its own source, and a refresh brings it back', async ({ page }) => {
   await open(page);
   await page.getByTestId('source-filter').selectOption('devitjobs');
-  await page.getByTestId('segment-tab-uk').click();
+  await page.getByTestId('segment-filter').selectOption('uk');
   await expect(page.getByTestId('source-filter')).toHaveValue('');
-  await page.getByTestId('segment-tab-full').click();
+  await page.getByTestId('segment-filter').selectOption('full');
   await expect(page.getByTestId('source-filter')).toHaveValue('devitjobs');
   await page.getByTestId('refresh').click();
   await expect(page.getByTestId('source-filter')).toHaveValue('devitjobs');

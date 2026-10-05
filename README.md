@@ -144,7 +144,8 @@ It opens a window over the knowledge base:
   identity's tab. **Refresh** re-reads everything and reloads the interface
   itself (markup, styles, code), keeping the tab, market and filter.
 - the interface speaks Russian or English: a flag in the top right opens a
-  drop-down of flags, and the choice is remembered. The lines the pipeline
+  drop-down of flags, and the choice is remembered. Left of it the same kind
+  of button picks the theme: as in the system, light or dark. The lines the pipeline
   writes about a vacancy (highlights, salary notes, eligibility) switch too:
   it renders them in every language of the app. What the sources and the
   agent wrote themselves (the posting, notes) stays as written. After a change

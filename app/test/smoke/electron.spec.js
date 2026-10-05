@@ -48,7 +48,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     const window = await app.firstWindow();
     await expect(window.getByTestId('identity-tab-sharp')).toBeVisible();
     await expect(window.getByTestId('identity-name')).toHaveText('Test search');
-    await expect(window.getByTestId('segment-tab-full')).toHaveAttribute('aria-selected', 'true');
+    await expect(window.getByTestId('segment-filter')).toHaveValue('full');
     await expect(window.getByTestId('list').locator('article')).toHaveCount(3);   // new0..new2
 
     await window.getByTestId('vacancy-new0').getByTestId('btn-bugged').click();

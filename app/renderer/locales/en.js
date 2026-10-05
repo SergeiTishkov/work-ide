@@ -6,6 +6,10 @@
   else root.LOCALE_EN = value;
 }(typeof self !== 'undefined' ? self : this, () => ({
   'language.name': 'English',
+  'theme.choose': 'Colour theme',
+  'theme.system': 'As in the system',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
   'language.choose': 'Interface language',
 
   'app.title': 'Work IDE',
@@ -41,6 +45,7 @@
   'run.busy': 'Another run is already going.',
   'run.log_title': 'Run log',
 
+  'filter.segment_legend': 'Region',
   'filter.legend': 'Show',
   'filter.source_legend': 'Source',
   'filter.source_all': 'All sources',

@@ -9,6 +9,10 @@
   else root.LOCALE_RU = value;
 }(typeof self !== 'undefined' ? self : this, () => ({
   'language.name': 'Русский',
+  'theme.choose': 'Тема оформления',
+  'theme.system': 'Как в системе',
+  'theme.light': 'Светлая',
+  'theme.dark': 'Тёмная',
   'language.choose': 'Язык интерфейса',
 
   'app.title': 'Work IDE',
@@ -44,6 +48,7 @@
   'run.busy': 'Уже идёт другой запуск.',
   'run.log_title': 'Лог запуска',
 
+  'filter.segment_legend': 'Регион',
   'filter.legend': 'Показать',
   'filter.source_legend': 'Источник',
   'filter.source_all': 'Все источники',

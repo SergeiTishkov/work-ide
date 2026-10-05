@@ -1,4 +1,4 @@
-// The renderer: identity tabs, market sub-tabs, a filter per market, the
+// The renderer: identity tabs, a market drop-down, a filter per market, the
 // vacancy rows with their three answers, and the agent-run controls.
 //
 // Everything it does to the world goes through window.api (main/preload.js);
@@ -141,7 +141,7 @@
     pipelines: {},
     // restored after "Refresh" (page reload): which tab, market and filter
     restored: null,
-    languageOpen: false,   // the language drop-down is open
+    openPicker: null,   // which top-bar drop-down is open: 'theme', 'language' or null
   };
 
   // --- the view survives "Refresh" and a restart ----------------------------
@@ -639,54 +639,89 @@
 
   function render() {
     document.title = t('app.title');
-    renderLanguagePicker();
+    renderPickers();
     renderIdentityTabs();
     renderPanel();
     renderRunPanel();
     watchScroll();
   }
 
-  // --- the language: a small drop-down of flags --------------------------------
+  // --- the top bar's pickers: theme and language --------------------------------
+  // Each is a button showing the current choice — an icon, a flag, no arrow —
+  // that opens a short list under it. One open at a time.
 
   function flag(language) {
     return el('img', { class: 'flag', src: `flags/${language}.svg`, alt: '', width: 21, height: 14 });
   }
 
-  function renderLanguagePicker() {
-    const picker = document.querySelector('[data-testid="language-picker"]');
-    const current = I18n.language();
+  // Line icons in the text colour. Constants of this file, never data.
+  const THEME_ICONS = {
+    system: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+    light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4'
+      + 'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    dark: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  };
+  const THEME_KEYS = { system: 'theme.system', light: 'theme.light', dark: 'theme.dark' };
+
+  function themeIcon(theme) {
+    const icon = el('span', { class: 'theme-icon', 'data-theme-icon': theme });
+    icon.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" '
+      + `stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${THEME_ICONS[theme]}</svg>`;
+    return icon;
+  }
+
+  function renderPicker(name, { title, current, options, choose }) {
+    const host = document.querySelector(`[data-testid="${name}-picker"]`);
+    const open = state.openPicker === name;
+    const chosen = options.find((option) => option.value === current) || options[0];
     const button = el('button', {
-      class: 'language-button', testid: 'language-button',
-      title: t('language.choose'), 'aria-label': t('language.choose'),
-      'aria-haspopup': 'listbox', 'aria-expanded': state.languageOpen ? 'true' : 'false',
-      onclick: (event) => { event.stopPropagation(); toggleLanguages(!state.languageOpen); },
-    }, flag(current), el('span', { class: 'caret' }, '▾'));
-    const menu = state.languageOpen && el('ul', { class: 'language-menu', role: 'listbox', testid: 'language-menu' },
-      I18n.languages.map((language) => el('li', {
+      class: 'picker-button', testid: `${name}-button`, title, 'aria-label': title,
+      'aria-haspopup': 'listbox', 'aria-expanded': open ? 'true' : 'false',
+      onclick: (event) => { event.stopPropagation(); togglePicker(open ? null : name); },
+    }, chosen.icon());
+    const menu = open && el('ul', { class: 'picker-menu', role: 'listbox', testid: `${name}-menu` },
+      options.map((option) => el('li', {
         role: 'option',
-        class: language === current ? 'active' : null,
-        'aria-selected': language === current ? 'true' : 'false',
-        testid: `language-option-${language}`,
-        onclick: (event) => { event.stopPropagation(); chooseLanguage(language); },
-      }, flag(language), el('span', {}, t('language.name', null, language)))));
-    picker.replaceChildren(button, menu || '');
+        class: option.value === current ? 'active' : null,
+        'aria-selected': option.value === current ? 'true' : 'false',
+        testid: `${name}-option-${option.value}`,
+        onclick: (event) => {
+          event.stopPropagation();
+          state.openPicker = null;
+          choose(option.value);
+        },
+      }, option.icon(), el('span', {}, option.label))));
+    host.replaceChildren(button, menu || '');
   }
 
-  function toggleLanguages(open) {
-    if (state.languageOpen === open) return;
-    state.languageOpen = open;
-    renderLanguagePicker();
+  function renderPickers() {
+    renderPicker('theme', {
+      title: t('theme.choose'),
+      current: Theme.theme(),
+      options: Theme.themes.map((theme) => ({
+        value: theme, icon: () => themeIcon(theme), label: t(THEME_KEYS[theme]),
+      })),
+      choose: (theme) => { Theme.setTheme(theme); renderPickers(); },
+    });
+    renderPicker('language', {
+      title: t('language.choose'),
+      current: I18n.language(),
+      options: I18n.languages.map((language) => ({
+        value: language, icon: () => flag(language), label: t('language.name', null, language),
+      })),
+      choose: (language) => { I18n.setLanguage(language); render(); },
+    });
   }
 
-  function chooseLanguage(language) {
-    state.languageOpen = false;
-    I18n.setLanguage(language);
-    render();
+  function togglePicker(name) {
+    if (state.openPicker === name) return;
+    state.openPicker = name;
+    renderPickers();
   }
 
-  document.addEventListener('click', () => toggleLanguages(false));
+  document.addEventListener('click', () => togglePicker(null));
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') toggleLanguages(false);
+    if (event.key === 'Escape') togglePicker(null);
   });
 
   function renderIdentityTabs() {
@@ -732,7 +767,7 @@
     } else if (!info.segments.length) {
       parts.push(el('p', { class: 'empty' }, t('identity.no_segments')));
     } else {
-      parts.push(renderSegmentTabs(info), renderFilters(), renderList());
+      parts.push(renderFilters(info), renderList());
     }
     panel.replaceChildren(...parts);
   }
@@ -781,24 +816,28 @@
         running && el('button', { class: 'danger', testid: 'run-stop', onclick: stopRun }, t('run.stop'))));
   }
 
-  function renderSegmentTabs(info) {
-    return el('nav', { class: 'tabs segment-tabs', role: 'tablist', testid: 'segment-tabs' },
-      info.segments.map((segment) => el('button', {
-        class: `tab${segment.slug === info.activeSegment ? ' active' : ''}`,
-        role: 'tab',
-        'aria-selected': segment.slug === info.activeSegment ? 'true' : 'false',
-        testid: `segment-tab-${segment.slug}`,
-        onclick: () => selectSegment(segment.slug),
-      }, segment.name)));
+  // The markets of the selection: a drop-down like the filters beside it
+  // (tabs until 2026-10-06; eight of them took a line of their own).
+  function renderSegmentFilter(info) {
+    return el('span', { class: 'segment-filter' },
+      el('label', { for: 'segment-select', testid: 'segment-label' }, t('filter.segment_legend')),
+      el('select', {
+        id: 'segment-select', testid: 'segment-filter',
+        onchange: (event) => selectSegment(event.target.value),
+      }, info.segments.map((segment) => el('option', {
+        value: segment.slug, testid: `segment-option-${segment.slug}`,
+        selected: segment.slug === info.activeSegment,
+      }, segment.name))));
   }
 
   // One drop-down, its options grouped, each with how many it holds.
-  function renderFilters() {
+  function renderFilters(info) {
     const active = currentFilter();
     const option = (name) => el('option', {
       value: name, testid: `filter-option-${name}`, selected: name === active,
     }, `${t(FILTER_KEYS[name])} ${t('filter.count', { n: state.counts[name] || 0 })}`);
     return el('div', { class: 'filters', testid: 'filters' },
+      renderSegmentFilter(info),
       el('label', { for: 'filter-select', testid: 'filter-label' }, t('filter.legend')),
       el('select', {
         id: 'filter-select', testid: 'filter',
