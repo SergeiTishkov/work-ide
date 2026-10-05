@@ -178,7 +178,11 @@ sources:
 
 
   - name: devitjobs
-    site: "devitjobs.uk, devitjobs.com"
+    # The app's "Source" drop-down shows this. Only devitjobs.com is listed
+    # since devitjobs.uk closed (2026-10-04); its old records are in the base
+    # but no longer in a selection (checked 2026-10-06: 177 of 177 listed
+    # were .com).
+    site: "devitjobs.com"
     kind: json_api
     remote_only: false
     params_schema:
