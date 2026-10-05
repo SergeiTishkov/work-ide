@@ -53,6 +53,27 @@ def test_the_link_is_the_page_a_person_opens_and_the_id_is_kept_for_reading():
     assert record["external_id"] == "us:6abd7df4bb1ee58c947b149b", "the id, so no vacancy is new again"
 
 
+def test_the_location_names_the_country():
+    """2026-10-06: "New York" and "Denver" named no country, so 134 of SHARP's
+    145 fresh vacancies were listed as "Worldwide — no country tie"."""
+    assert _record()["location_raw"] == "Austin, United States"
+    texas = _record(stateCategory="Texas")
+    assert texas["location_raw"] == "Austin, Texas, United States"
+    assert report.hiring_country(texas)[0] == "United States"
+    calgary = _record(actualCity="Calgary", stateCategory="Canada", address="8th Avenue SE 312")
+    assert calgary["location_raw"] == "Calgary, Canada"
+    assert report.hiring_country(calgary)[0] == "Canada"
+    assert _record(stateCategory="New-Jersey")["location_raw"] == "Austin, New Jersey, United States"
+
+
+def test_remote_anywhere_is_not_tied_to_the_city():
+    record = _record(workplace="remote", remoteType="anywhere", stateCategory="Colorado")
+    assert record["location_raw"] == "Anywhere"
+    assert report.hiring_country(record)[0] is None
+    only_here = _record(workplace="remote", remoteType="onlycountry", stateCategory="Colorado")
+    assert report.hiring_country(only_here)[0] == "United States"
+
+
 def test_the_boards_workplace_is_the_arrangement():
     assert _record()["workplace_type"] == "on-site"
     assert _record(workplace="hybrid")["workplace_type"] == "hybrid"

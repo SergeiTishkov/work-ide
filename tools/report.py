@@ -186,51 +186,11 @@ def _normalized_tech_vocabulary() -> list:
     return _NORMALIZED_VOCABULARY_CACHE
 
 
-# Countries, spelled the way the job boards spell them.
-_COUNTRY_ALIASES = {
-    "usa": "United States", "us": "United States", "u.s.": "United States",
-    "united states of america": "United States", "america": "United States",
-    "uk": "United Kingdom", "u.k.": "United Kingdom", "england": "United Kingdom",
-    "scotland": "United Kingdom", "wales": "United Kingdom",
-    "northern ireland": "United Kingdom", "great britain": "United Kingdom",
-    "uae": "United Arab Emirates", "u.a.e.": "United Arab Emirates",
-    "ksa": "Saudi Arabia", "holland": "Netherlands", "deutschland": "Germany",
-    "schweiz": "Switzerland", "suisse": "Switzerland", "österreich": "Austria",
-    "españa": "Spain", "italia": "Italy", "sverige": "Sweden", "norge": "Norway",
-    "danmark": "Denmark", "suomi": "Finland", "éire": "Ireland",
-    "czechia": "Czech Republic", "czech republic": "Czech Republic",
-}
-
 # How the country was learned. Constants rather than inline strings: these are
 # COMPARED, and translating a compared value is a classic way to break logic
 # silently.
 HIRING_OFFICE = "hiring office"
 COMPANY_HOME = "company home country"
-
-_COUNTRY_INDEX_CACHE = {}
-
-
-def _country_index() -> dict:
-    """Normalised country name -> canonical name.
-
-    The country list comes from the shared markets table: it already enumerates
-    everything the project cares about, and maintaining a second list would buy
-    nothing.
-    """
-    if "data" not in _COUNTRY_INDEX_CACHE:
-        import markets
-
-        index = {}
-        for spec in (markets.load_tiers() or {}).values():
-            for country in spec.get("countries") or []:
-                name = country.get("name")
-                if name:
-                    index[common.normalize_for_matching(name)] = name
-        for alias, canonical in _COUNTRY_ALIASES.items():
-            index.setdefault(alias, canonical)
-        _COUNTRY_INDEX_CACHE["data"] = index
-    return _COUNTRY_INDEX_CACHE["data"]
-
 
 def hiring_country(vacancy: dict):
     """(country, how it was learned) — or (None, None).
@@ -243,43 +203,44 @@ def hiring_country(vacancy: dict):
 
       1. the board tag `market:<country>` — the country the fetcher queried,
          that is, the office that posted the vacancy. A fact, not a guess;
-      2. the last element of the location field ("Barendrecht, South Holland,
-         Netherlands");
-      3. any mention of a country in the location field ("Remote, Israel");
-      4. a "Headquarters:" heading in the description — that is the head
+      2. the location field: a country, a state or province, a city
+         (places.country_in — "Barendrecht, South Holland, Netherlands",
+         "Remote, Israel", "Seattle, WA", "Berlin");
+      3. a "Headquarters:" heading in the description — that is the head
          office rather than the hiring one, so it comes last and is labelled
          explicitly.
+
+    The countries are every country (config/derivation/countries.yaml), not
+    only the markets of market_tiers.yaml as until 2026-10-06: "Bucharest,
+    Romania" named no country the report knew, and was listed as worldwide.
     """
-    index = _country_index()
+    import places
 
     for tag in vacancy.get("tags") or []:
         tag = str(tag)
         if tag.startswith("market:"):
-            name = index.get(common.normalize_for_matching(tag[7:]), tag[7:])
-            return name, HIRING_OFFICE
+            return places.canonical(tag[7:]) or tag[7:], HIRING_OFFICE
 
-    location = (vacancy.get("location_raw") or "").strip()
-    if location:
-        parts = [p.strip() for p in location.split(",") if p.strip()]
-        if parts:
-            direct = index.get(common.normalize_for_matching(parts[-1]))
-            if direct:
-                return direct, HIRING_OFFICE
-        normalized = common.normalize_for_matching(location)
-        for needle, canonical in index.items():
-            if needle and needle in normalized:
-                return canonical, HIRING_OFFICE
+    country = places.country_in(vacancy.get("location_raw"))
+    if country:
+        return country, HIRING_OFFICE
 
     header = (vacancy.get("computed", {}).get("score_breakdown", {})
               .get("remote_location_fit", {}).get("header_scope", {}))
     for line in header.get("header_lines") or []:
-        if not line.startswith("headquarters:"):
-            continue
-        for needle, canonical in index.items():
-            if needle and needle in line:
-                return canonical, COMPANY_HOME
+        if line.startswith("headquarters:"):
+            country = places.country_in(line[len("headquarters:"):])
+            if country:
+                return country, COMPANY_HOME
 
     return None, None
+
+
+def market_group(vacancy: dict) -> str:
+    """The market group a vacancy is listed under (segments.vacancy_group)."""
+    import segments as segments_mod
+
+    return segments_mod.vacancy_group(vacancy, lambda v: hiring_country(v)[0])
 
 
 def _eligibility_rank(v: dict) -> int:
@@ -861,7 +822,7 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
 
         claimed = segments_mod._claimed_groups(list(siblings or [segment]))
         items = [v for v in items
-                 if segment.holds(segments_mod.group_of(hiring_country(v)[0]), claimed)]
+                 if segment.holds(market_group(v), claimed)]
         segment_total = _listed(items)
 
     def by_class(cls):

@@ -129,3 +129,64 @@ def test_check_links_skips_duplicates_and_recently_checked(monkeypatch):
     assert call_count["n"] == 1  # only vac-3 actually reached the network
     assert stats["skipped_recent_or_duplicate"] == 2
     assert stats["checked"] == 1
+
+
+class FakeJsonResponse(FakeResponse):
+    def __init__(self, status_code, payload):
+        super().__init__(status_code)
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def test_devitjobs_is_asked_by_its_list_and_api_not_by_status_code(monkeypatch):
+    """2026-10-06: the owner opened ten devitjobs.com vacancies and every page
+    said "could not find this job" — with status 200, the app shell. The list
+    says what is up; the detail API says what was taken down."""
+    up, paused, gone_before, new_slug = "a" * 24, "b" * 24, "c" * 24, "d" * 24
+    asked = []
+
+    def fake_get(self, url, timeout=None, allow_redirects=None, stream=None):
+        asked.append(url)
+        if url == link_check.DEVITJOBS_LIST_URL:
+            return FakeJsonResponse(200, [{"_id": up}, {"_id": new_slug}])
+        if url == link_check.DEVITJOBS_JOB_URL.format(paused):
+            return FakeJsonResponse(200, {"_id": paused, "isPaused": True})
+        raise AssertionError(f"unexpected request {url}")
+
+    monkeypatch.setattr(requests.Session, "get", fake_get)
+    monkeypatch.setattr(requests.Session, "head", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("a devitjobs page is never asked")))
+
+    def devit(vid, job_id, **extra):
+        return {"id": vid, "source": "devitjobs", "url": f"https://devitjobs.com/jobs/{job_id}", **extra}
+
+    vacancies = {
+        "up": devit("up", up),
+        "paused": devit("paused", paused),
+        "gone_before": devit("gone_before", gone_before, link_check={
+            "status": "dead", "reason": "taken down on the board",
+            "checked_at": "2026-01-01T00:00:00+00:00"}),
+        "slug": {"id": "slug", "source": "devitjobs",
+                 "url": "https://devitjobs.com/jobs/Acme-Senior-C-Developer",
+                 "read_url": f"https://devitjobs.com/jobs/{new_slug}"},
+    }
+    stats = link_check.check_links(vacancies, max_workers=1)
+
+    assert {k: v["link_check"]["status"] for k, v in vacancies.items()} == {
+        "up": "ok", "paused": "dead", "gone_before": "dead", "slug": "ok"}
+    assert stats["dead"] == 2 and stats["ok"] == 2
+    assert asked.count(link_check.DEVITJOBS_LIST_URL) == 1, "one list for the whole board"
+    assert asked[1:] == [link_check.DEVITJOBS_JOB_URL.format(paused)], \
+        "only a vacancy newly off the list is asked one by one"
+
+
+def test_devitjobs_without_its_list_is_not_judged(monkeypatch):
+    def fake_get(self, url, timeout=None, allow_redirects=None, stream=None):
+        return FakeJsonResponse(302, None)
+
+    monkeypatch.setattr(requests.Session, "get", fake_get)
+    vacancies = {"x": {"id": "x", "source": "devitjobs", "url": f"https://devitjobs.com/jobs/{'e' * 24}"}}
+    link_check.check_links(vacancies, max_workers=1)
+    assert vacancies["x"]["link_check"]["status"] == "unknown"

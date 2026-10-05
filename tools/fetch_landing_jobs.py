@@ -14,6 +14,7 @@ from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
+import places  # noqa: E402
 
 SOURCE_NAME = "landing_jobs"
 API_URL = "https://landing.jobs/api/v1/jobs?limit=100"
@@ -28,6 +29,18 @@ def _format_salary(item: dict) -> Optional[str]:
     if lo and hi:
         return f"{symbol}{int(lo):,}-{symbol}{int(hi):,}/year"
     return f"{symbol}{int(lo or hi):,}/year"
+
+
+def _location_text(location) -> str:
+    """One entry of `locations`: {"city": "Lisbon", "country_code": "PT"} as
+    "Lisbon, Portugal". Until 2026-10-06 the dict itself was written as text
+    ("{'city': 'Lisbon', 'country_code': 'PT'}"), which named no country the
+    report could read, and the vacancy was listed as worldwide."""
+    if isinstance(location, dict):
+        city = str(location.get("city") or "").strip()
+        code = str(location.get("country_code") or "").strip()
+        return ", ".join(p for p in (city, places.country_of_code(code) or code) if p)
+    return str(location or "").strip()
 
 
 def _to_common_schema(item: dict) -> Optional[dict]:
@@ -49,10 +62,9 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         return None
 
     locations = item.get("locations") or []
-    if isinstance(locations, list):
-        location = ", ".join(str(x) for x in locations if x)
-    else:
-        location = str(locations)
+    if not isinstance(locations, list):
+        locations = [locations]
+    location = "; ".join(t for t in (_location_text(x) for x in locations) if t)
 
     tags = [str(t) for t in (item.get("main_requirements") or [])[:6] if t]
     if item.get("relocation_paid"):

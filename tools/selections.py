@@ -119,7 +119,7 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
         c = v.get("computed") or {}
         cls = c["classification"]
         views.append(_view_row(v))
-        group = segments_mod.group_of(report.hiring_country(v)[0])
+        group = report.market_group(v)
         for segment in configured:
             if segment.holds(group, claimed):
                 items.append((segment.slug, vid, cls, class_position[cls],

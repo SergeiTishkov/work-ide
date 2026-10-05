@@ -1,0 +1,374 @@
+# =============================================================================
+#  THE COUNTRIES OF THE WORLD, AND THE PLACES INSIDE THEM A JOB BOARD NAMES
+# =============================================================================
+#  Read by report.hiring_country: which country a vacancy's location names.
+#
+#  Why a table of its own (2026-10-06). The country index used to be the
+#  countries of market_tiers.yaml — 35 of them, the markets somebody wanted
+#  ranked. "Bucharest, Romania", "Lithuania", "Brazil only" named no country it
+#  knew, and a vacancy naming no country is listed as "Worldwide — no country
+#  tie". So were "New York", "Berlin" and "Seattle, WA": SHARP's worldwide list
+#  held 134 devitjobs vacancies from US and Canadian offices, an office job in
+#  Calgary among them.
+#
+#  `name` is the canonical spelling, the one market_groups.yaml and
+#  market_tiers.yaml use. `aliases` are other spellings boards use. `iso2` is
+#  read where a board sends a code (landing.jobs: country_code "PT"), never
+#  searched for in free text: "IN", "IT", "NO" are words.
+#
+#  `regions` (states, provinces) and `cities` are matched only against a whole
+#  comma-separated part of the location ("Seattle, WA", "Berlin"), never as a
+#  substring of a longer text. A city whose name is shared by two well-known
+#  places (Birmingham, Portland, Cambridge, Córdoba) is left out: unresolved,
+#  it is still listed under "Rest of the world", not as worldwide.
+# =============================================================================
+
+schema_version: 1
+
+countries:
+  - {name: "Afghanistan", iso2: AF}
+  - {name: "Albania", iso2: AL}
+  - {name: "Algeria", iso2: DZ}
+  - {name: "Andorra", iso2: AD}
+  - {name: "Angola", iso2: AO}
+  - {name: "Antigua and Barbuda", iso2: AG}
+  - {name: "Argentina", iso2: AR}
+  - {name: "Armenia", iso2: AM}
+  - {name: "Australia", iso2: AU}
+  - {name: "Austria", iso2: AT, aliases: ["österreich"]}
+  - {name: "Azerbaijan", iso2: AZ}
+  - {name: "Bahamas", iso2: BS}
+  - {name: "Bahrain", iso2: BH}
+  - {name: "Bangladesh", iso2: BD}
+  - {name: "Barbados", iso2: BB}
+  - {name: "Belarus", iso2: BY}
+  - {name: "Belgium", iso2: BE}
+  - {name: "Belize", iso2: BZ}
+  - {name: "Benin", iso2: BJ}
+  - {name: "Bhutan", iso2: BT}
+  - {name: "Bolivia", iso2: BO}
+  - {name: "Bosnia and Herzegovina", iso2: BA, aliases: ["bosnia"]}
+  - {name: "Botswana", iso2: BW}
+  - {name: "Brazil", iso2: BR, aliases: ["brasil"]}
+  - {name: "Brunei", iso2: BN}
+  - {name: "Bulgaria", iso2: BG}
+  - {name: "Burkina Faso", iso2: BF}
+  - {name: "Burundi", iso2: BI}
+  - {name: "Cambodia", iso2: KH}
+  - {name: "Cameroon", iso2: CM}
+  - {name: "Canada", iso2: CA}
+  - {name: "Cape Verde", iso2: CV, aliases: ["cabo verde"]}
+  - {name: "Central African Republic", iso2: CF}
+  - {name: "Chad", iso2: TD}
+  - {name: "Chile", iso2: CL}
+  - {name: "China", iso2: CN}
+  - {name: "Colombia", iso2: CO}
+  - {name: "Comoros", iso2: KM}
+  - {name: "Costa Rica", iso2: CR}
+  - {name: "Croatia", iso2: HR}
+  - {name: "Cuba", iso2: CU}
+  - {name: "Cyprus", iso2: CY}
+  - {name: "Czechia", iso2: CZ, aliases: ["czech republic"]}
+  - {name: "Democratic Republic of the Congo", iso2: CD, aliases: ["dr congo", "drc"]}
+  - {name: "Denmark", iso2: DK, aliases: ["danmark"]}
+  - {name: "Djibouti", iso2: DJ}
+  - {name: "Dominica", iso2: DM}
+  - {name: "Dominican Republic", iso2: DO}
+  - {name: "Ecuador", iso2: EC}
+  - {name: "Egypt", iso2: EG}
+  - {name: "El Salvador", iso2: SV}
+  - {name: "Equatorial Guinea", iso2: GQ}
+  - {name: "Eritrea", iso2: ER}
+  - {name: "Estonia", iso2: EE}
+  - {name: "Eswatini", iso2: SZ, aliases: ["swaziland"]}
+  - {name: "Ethiopia", iso2: ET}
+  - {name: "Fiji", iso2: FJ}
+  - {name: "Finland", iso2: FI, aliases: ["suomi"]}
+  - {name: "France", iso2: FR}
+  - {name: "Gabon", iso2: GA}
+  - {name: "Gambia", iso2: GM}
+  - {name: "Georgia", iso2: GE}
+  - {name: "Germany", iso2: DE, aliases: ["deutschland"]}
+  - {name: "Ghana", iso2: GH}
+  - {name: "Greece", iso2: GR}
+  - {name: "Grenada", iso2: GD}
+  - {name: "Guatemala", iso2: GT}
+  - {name: "Guinea", iso2: GN}
+  - {name: "Guinea-Bissau", iso2: GW}
+  - {name: "Guyana", iso2: GY}
+  - {name: "Haiti", iso2: HT}
+  - {name: "Honduras", iso2: HN}
+  - {name: "Hong Kong", iso2: HK}
+  - {name: "Hungary", iso2: HU}
+  - {name: "Iceland", iso2: IS}
+  - {name: "India", iso2: IN}
+  - {name: "Indonesia", iso2: ID}
+  - {name: "Iran", iso2: IR}
+  - {name: "Iraq", iso2: IQ}
+  - {name: "Ireland", iso2: IE, aliases: ["éire"]}
+  - {name: "Israel", iso2: IL}
+  - {name: "Italy", iso2: IT, aliases: ["italia"]}
+  - {name: "Ivory Coast", iso2: CI, aliases: ["côte d'ivoire", "cote d'ivoire"]}
+  - {name: "Jamaica", iso2: JM}
+  - {name: "Japan", iso2: JP}
+  - {name: "Jordan", iso2: JO}
+  - {name: "Kazakhstan", iso2: KZ}
+  - {name: "Kenya", iso2: KE}
+  - {name: "Kosovo", iso2: XK}
+  - {name: "Kuwait", iso2: KW}
+  - {name: "Kyrgyzstan", iso2: KG}
+  - {name: "Laos", iso2: LA}
+  - {name: "Latvia", iso2: LV}
+  - {name: "Lebanon", iso2: LB}
+  - {name: "Lesotho", iso2: LS}
+  - {name: "Liberia", iso2: LR}
+  - {name: "Libya", iso2: LY}
+  - {name: "Liechtenstein", iso2: LI}
+  - {name: "Lithuania", iso2: LT}
+  - {name: "Luxembourg", iso2: LU}
+  - {name: "Macau", iso2: MO, aliases: ["macao"]}
+  - {name: "Madagascar", iso2: MG}
+  - {name: "Malawi", iso2: MW}
+  - {name: "Malaysia", iso2: MY}
+  - {name: "Maldives", iso2: MV}
+  - {name: "Mali", iso2: ML}
+  - {name: "Malta", iso2: MT}
+  - {name: "Mauritania", iso2: MR}
+  - {name: "Mauritius", iso2: MU}
+  - {name: "Mexico", iso2: MX, aliases: ["méxico"]}
+  - {name: "Moldova", iso2: MD}
+  - {name: "Monaco", iso2: MC}
+  - {name: "Mongolia", iso2: MN}
+  - {name: "Montenegro", iso2: ME}
+  - {name: "Morocco", iso2: MA}
+  - {name: "Mozambique", iso2: MZ}
+  - {name: "Myanmar", iso2: MM}
+  - {name: "Namibia", iso2: NA}
+  - {name: "Nepal", iso2: NP}
+  - {name: "Netherlands", iso2: NL, aliases: ["holland", "the netherlands"]}
+  - {name: "New Zealand", iso2: NZ}
+  - {name: "Nicaragua", iso2: NI}
+  - {name: "Niger", iso2: NE}
+  - {name: "Nigeria", iso2: NG}
+  - {name: "North Macedonia", iso2: MK, aliases: ["macedonia"]}
+  - {name: "Norway", iso2: "NO", aliases: ["norge"]}
+  - {name: "Oman", iso2: OM}
+  - {name: "Pakistan", iso2: PK}
+  - {name: "Palestine", iso2: PS}
+  - {name: "Panama", iso2: PA}
+  - {name: "Papua New Guinea", iso2: PG}
+  - {name: "Paraguay", iso2: PY}
+  - {name: "Peru", iso2: PE}
+  - {name: "Philippines", iso2: PH}
+  - {name: "Poland", iso2: PL, aliases: ["polska"]}
+  - {name: "Portugal", iso2: PT}
+  - {name: "Puerto Rico", iso2: PR}
+  - {name: "Qatar", iso2: QA}
+  - {name: "Republic of the Congo", iso2: CG}
+  - {name: "Romania", iso2: RO}
+  - {name: "Russia", iso2: RU, aliases: ["russian federation"]}
+  - {name: "Rwanda", iso2: RW}
+  - {name: "Saudi Arabia", iso2: SA, aliases: ["ksa"]}
+  - {name: "Senegal", iso2: SN}
+  - {name: "Serbia", iso2: RS}
+  - {name: "Seychelles", iso2: SC}
+  - {name: "Sierra Leone", iso2: SL}
+  - {name: "Singapore", iso2: SG}
+  - {name: "Slovakia", iso2: SK}
+  - {name: "Slovenia", iso2: SI}
+  - {name: "Somalia", iso2: SO}
+  - {name: "South Africa", iso2: ZA}
+  - {name: "South Korea", iso2: KR, aliases: ["korea", "republic of korea"]}
+  - {name: "South Sudan", iso2: SS}
+  - {name: "Spain", iso2: ES, aliases: ["españa"]}
+  - {name: "Sri Lanka", iso2: LK}
+  - {name: "Sudan", iso2: SD}
+  - {name: "Suriname", iso2: SR}
+  - {name: "Sweden", iso2: SE, aliases: ["sverige"]}
+  - {name: "Switzerland", iso2: CH, aliases: ["schweiz", "suisse", "svizzera"]}
+  - {name: "Syria", iso2: SY}
+  - {name: "Taiwan", iso2: TW}
+  - {name: "Tajikistan", iso2: TJ}
+  - {name: "Tanzania", iso2: TZ}
+  - {name: "Thailand", iso2: TH}
+  - {name: "Togo", iso2: TG}
+  - {name: "Trinidad and Tobago", iso2: TT}
+  - {name: "Tunisia", iso2: TN}
+  - {name: "Turkey", iso2: TR, aliases: ["türkiye", "turkiye"]}
+  - {name: "Turkmenistan", iso2: TM}
+  - {name: "Uganda", iso2: UG}
+  - {name: "Ukraine", iso2: UA}
+  - {name: "United Arab Emirates", iso2: AE, aliases: ["uae", "u.a.e."]}
+  - {name: "United Kingdom", iso2: GB, aliases: ["uk", "u.k.", "england", "scotland", "wales",
+                                                  "northern ireland", "great britain", "britain"]}
+  - {name: "United States", iso2: US, aliases: ["usa", "us", "u.s.", "u.s.a.",
+                                                 "united states of america"]}
+  - {name: "Uruguay", iso2: UY}
+  - {name: "Uzbekistan", iso2: UZ}
+  - {name: "Venezuela", iso2: VE}
+  - {name: "Vietnam", iso2: VN, aliases: ["viet nam"]}
+  - {name: "Yemen", iso2: YE}
+  - {name: "Zambia", iso2: ZM}
+  - {name: "Zimbabwe", iso2: ZW}
+
+# The last part of "Seattle, WA" or "Austin, Texas": {code: name}. A null name
+# means the code alone counts — Georgia the state shares its name with the
+# country (ambiguous_places.yaml), Victoria with the capital of British
+# Columbia. A code two countries use (WA, NT) belongs to the first listed.
+# A code is a weaker word than a city: "Berlin, DE" is not Delaware, and
+# when the two disagree no country is taken from either.
+regions:
+  United States:
+    AL: Alabama
+    AK: Alaska
+    AZ: Arizona
+    AR: Arkansas
+    CA: California
+    CO: Colorado
+    CT: Connecticut
+    DE: Delaware
+    DC: District of Columbia
+    FL: Florida
+    GA: null
+    HI: Hawaii
+    ID: Idaho
+    IL: Illinois
+    IN: Indiana
+    IA: Iowa
+    KS: Kansas
+    KY: Kentucky
+    LA: Louisiana
+    ME: Maine
+    MD: Maryland
+    MA: Massachusetts
+    MI: Michigan
+    MN: Minnesota
+    MS: Mississippi
+    MO: Missouri
+    MT: Montana
+    NE: Nebraska
+    NV: Nevada
+    NH: New Hampshire
+    NJ: New Jersey
+    NM: New Mexico
+    NY: New York
+    NC: North Carolina
+    ND: North Dakota
+    OH: Ohio
+    OK: Oklahoma
+    OR: Oregon
+    PA: Pennsylvania
+    RI: Rhode Island
+    SC: South Carolina
+    SD: South Dakota
+    TN: Tennessee
+    TX: Texas
+    UT: Utah
+    VT: Vermont
+    VA: Virginia
+    WA: Washington
+    WV: West Virginia
+    WI: Wisconsin
+    WY: Wyoming
+  Canada:
+    AB: Alberta
+    BC: British Columbia
+    MB: Manitoba
+    NB: New Brunswick
+    NL: Newfoundland and Labrador
+    NS: Nova Scotia
+    "ON": Ontario
+    PE: Prince Edward Island
+    QC: Quebec
+    SK: Saskatchewan
+    NT: Northwest Territories
+    NU: Nunavut
+    YT: Yukon
+  Australia:
+    NSW: New South Wales
+    VIC: null
+    QLD: Queensland
+    TAS: Tasmania
+    ACT: Australian Capital Territory
+
+# Cities job boards name without a country (arbeitnow: "Berlin"; devitjobs
+# before 2026-10-06: "New York"; company career pages: "Toronto").
+cities:
+  United States: [New York, New York City, NYC, San Francisco, SF Bay Area, Bay Area,
+                  Los Angeles, Seattle, Boston, Chicago, Austin, Denver, Atlanta, Dallas,
+                  Houston, Miami, San Diego, San Jose, Palo Alto, Mountain View,
+                  Sunnyvale, Menlo Park, Philadelphia, Pittsburgh, Phoenix, Minneapolis,
+                  Detroit, Salt Lake City, Raleigh, Nashville, Charlotte, Columbus,
+                  Baltimore, Arlington, Jersey City, Plano, Irving, Brooklyn, Manhattan,
+                  Washington DC, Washington D.C., Boulder, Jacksonville, Tampa, Orlando,
+                  Las Vegas, Sacramento, Oakland, Berkeley, Santa Clara, Redmond, Bellevue,
+                  Cincinnati, Cleveland, Indianapolis, Kansas City, St. Louis, Milwaukee,
+                  Albuquerque, Tucson, Scottsdale, Durham, Ann Arbor, McLean, Reston]
+  Canada: [Toronto, Montreal, Montréal, Vancouver, Calgary, Ottawa, Edmonton, Waterloo,
+           Mississauga, Winnipeg, Quebec City, Halifax, Kitchener, Markham, Burnaby]
+  United Kingdom: [London, Manchester, Edinburgh, Glasgow, Bristol, Leeds, Liverpool,
+                   Newcastle, Sheffield, Nottingham, Belfast, Cardiff, Reading, Oxford,
+                   Brighton, Milton Keynes]
+  Germany: [Berlin, Munich, München, Hamburg, Frankfurt, Frankfurt am Main, Cologne, Köln,
+            Stuttgart, Düsseldorf, Dusseldorf, Leipzig, Dresden, Hannover, Hanover,
+            Nuremberg, Nürnberg, Bonn, Karlsruhe, Mannheim, Essen, Dortmund, Bremen]
+  France: [Paris, Lyon, Marseille, Toulouse, Nice, Nantes, Bordeaux, Lille, Strasbourg,
+           Montpellier, Rennes, Grenoble]
+  Netherlands: [Amsterdam, Rotterdam, The Hague, Utrecht, Eindhoven, Delft, Haarlem]
+  Belgium: [Brussels, Bruxelles, Antwerp, Ghent, Leuven]
+  Spain: [Madrid, Barcelona, Valencia, Seville, Sevilla, Malaga, Málaga, Bilbao]
+  Portugal: [Lisbon, Lisboa, Porto, Braga, Coimbra]
+  Italy: [Rome, Roma, Milan, Milano, Turin, Torino, Florence, Bologna, Naples]
+  Ireland: [Dublin, Cork, Galway, Limerick]
+  Austria: [Vienna, Wien, Graz, Linz, Salzburg, Innsbruck]
+  Switzerland: [Zurich, Zürich, Geneva, Genève, Basel, Lausanne, Bern, Zug, Lugano]
+  Poland: [Warsaw, Warszawa, Krakow, Kraków, Wroclaw, Wrocław, Gdansk, Gdańsk, Poznan,
+           Poznań, Lodz, Łódź, Katowice]
+  Czechia: [Prague, Praha, Brno, Ostrava]
+  Denmark: [Copenhagen, Aarhus]
+  Sweden: [Stockholm, Gothenburg, Göteborg, Malmö, Malmo, Uppsala]
+  Norway: [Oslo, Bergen, Trondheim]
+  Finland: [Helsinki, Espoo, Tampere, Oulu]
+  Estonia: [Tallinn, Tartu]
+  Latvia: [Riga]
+  Lithuania: [Vilnius, Kaunas]
+  Romania: [Bucharest, Cluj-Napoca, Cluj, Iasi, Iași, Timisoara, Timișoara]
+  Bulgaria: [Sofia, Plovdiv, Varna]
+  Hungary: [Budapest, Debrecen]
+  Greece: [Athens, Thessaloniki]
+  Croatia: [Zagreb, Split]
+  Serbia: [Belgrade, Novi Sad]
+  Slovakia: [Bratislava, Kosice, Košice]
+  Slovenia: [Ljubljana]
+  Luxembourg: [Luxembourg City]
+  Ukraine: [Kyiv, Kiev, Lviv, Kharkiv, Odesa, Odessa, Dnipro]
+  Turkey: [Istanbul, Ankara, Izmir]
+  Israel: [Tel Aviv, Tel Aviv-Yafo, Haifa, Herzliya, Jerusalem]
+  United Arab Emirates: [Dubai, Abu Dhabi, Sharjah]
+  Saudi Arabia: [Riyadh, Jeddah]
+  Qatar: [Doha]
+  India: [Bangalore, Bengaluru, Hyderabad, Pune, Mumbai, Chennai, Delhi, New Delhi,
+          Gurgaon, Gurugram, Noida, Kolkata, Ahmedabad]
+  Pakistan: [Karachi, Lahore, Islamabad]
+  Singapore: []
+  Japan: [Tokyo, Osaka, Kyoto, Fukuoka, Yokohama]
+  South Korea: [Seoul, Busan]
+  China: [Beijing, Shanghai, Shenzhen, Guangzhou, Hangzhou]
+  Taiwan: [Taipei]
+  Philippines: [Manila, Makati, Cebu]
+  Vietnam: [Ho Chi Minh City, Hanoi]
+  Indonesia: [Jakarta, Bali]
+  Malaysia: [Kuala Lumpur]
+  Thailand: [Bangkok]
+  Australia: [Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra]
+  New Zealand: [Auckland, Wellington, Christchurch]
+  Brazil: [São Paulo, Sao Paulo, Rio de Janeiro, Belo Horizonte, Florianópolis,
+           Florianopolis, Curitiba, Porto Alegre]
+  Argentina: [Buenos Aires]
+  Mexico: [Mexico City, Ciudad de México, Guadalajara, Monterrey]
+  Colombia: [Bogotá, Bogota, Medellín, Medellin]
+  Chile: [Santiago]
+  South Africa: [Cape Town, Johannesburg, Durban, Pretoria]
+  Nigeria: [Lagos, Abuja]
+  Kenya: [Nairobi]
+  Egypt: [Cairo]

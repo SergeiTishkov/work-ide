@@ -336,6 +336,16 @@ carries `default: true` and is additionally written there.
 file could miss the worldwide one. Paid for by a banner in every file naming
 the shortlist and linking to the others.
 
+**Worldwide means the location names no place (2026-10-06).** Not "the report
+found no country". The country index was the 35 countries of
+`market_tiers.yaml`, and a location it could not read ("New York", "Berlin",
+"Bucharest, Romania") made the vacancy worldwide: SHARP's worldwide list held
+134 devitjobs offices in the US and Canada. Now `tools/places.py` reads every
+country, US states and Canadian provinces, and the cities boards name alone
+(`config/derivation/countries.yaml`); a place it still cannot resolve goes to
+the `rest` segment. Worldwide keeps what names nowhere: an empty field,
+"Remote", "Anywhere", a region, a time zone.
+
 ### Eligibility as a second axis, not more points (2026-08-12)
 
 Every vacancy now carries a verdict alongside its score: CONFIRMED, LIKELY, NOT

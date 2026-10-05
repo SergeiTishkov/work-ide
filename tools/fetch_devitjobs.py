@@ -34,6 +34,21 @@ WHAT A RECORD OF devitjobs.com HOLDS (measured 2026-10-04, 2 918 records):
     Adzuna. Kept as `apply_url` and shown beside the vacancy. It is never
     requested: these are paid-click links, and a check would cost the
     advertiser a click.
+  * `actualCity` + `stateCategory` — where the job is. The board covers the
+    US and Canada (measured 2026-10-06: 537 of 3 263 in Canada), and
+    `stateCategory` is the state, or "Canada". Until 2026-10-06 only the city
+    went into `location_raw` ("New York", "Denver"), so no hiring country was
+    found and 134 of SHARP's 145 fresh vacancies sat in "Worldwide — no
+    country tie", an office in Calgary among them.
+  * `remoteType` — "onlycountry" (59) or "anywhere" (1) on a remote job:
+    "anywhere" is the one case the location is not the hiring country.
+
+A CLOSED VACANCY. The page is a single-page app: every /jobs/... address
+answers 200, a vacancy taken down too, and the "could not find this job"
+shown then is drawn by JavaScript. Whether it is up is read from the board
+instead: the list (`jobsLight`) holds what is up, and the detail API marks
+the rest `isPaused` (38 of 40 sampled 2026-10-06) or `isDisabledOrOutdated`.
+See link_check._devitjobs_results.
 """
 from __future__ import annotations
 
@@ -72,6 +87,21 @@ def _format_salary(item: dict) -> Optional[str]:
     return f"{symbol}{int(lo or hi):,}/year"
 
 
+def _location(item: dict, board: str) -> str:
+    """"City, State, United States", "City, Canada", or "Anywhere" for a remote
+    job the board marks open everywhere. The street `address` is not a
+    location anybody filters by."""
+    if str(item.get("remoteType") or "").strip().lower() == "anywhere":
+        return "Anywhere"
+    city = str(item.get("actualCity") or "").strip()
+    if board == "uk":
+        return ", ".join(p for p in (city, "United Kingdom") if p)
+    state = str(item.get("stateCategory") or "").replace("-", " ").strip()
+    if state.lower() == "canada":
+        return ", ".join(p for p in (city, "Canada") if p)
+    return ", ".join(p for p in (city, state, "United States") if p)
+
+
 def _to_common_schema(item: dict, board: str) -> Optional[dict]:
     if not isinstance(item, dict):
         return None
@@ -100,7 +130,7 @@ def _to_common_schema(item: dict, board: str) -> Optional[dict]:
         elif value:
             tags.append(str(value))
 
-    location = str(item.get("actualCity") or item.get("address") or "").strip()
+    location = _location(item, board)
     # The board marks remote work with a city category, not a separate flag.
     is_remote = (workplace == "remote" or "remote" in " ".join(tags).lower()
                  or "remote" in location.lower())
@@ -113,7 +143,7 @@ def _to_common_schema(item: dict, board: str) -> Optional[dict]:
         "url": url,
         "read_url": read_url,
         "apply_url": apply_url,
-        "location_raw": location or ("United Kingdom" if board == "uk" else "United States"),
+        "location_raw": location,
         "remote": is_remote,
         "workplace_type": workplace,
         "tags": tags,

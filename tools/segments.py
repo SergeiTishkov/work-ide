@@ -33,6 +33,11 @@ somebody contracting from outside every market in the table, that is not the
 leftovers — it is the only group where geography is not an obstacle to begin
 with. It is deliberately first in the catalogue and first in the default
 segmentation.
+
+"Named no country" means named no PLACE (vacancy_group). A location that names
+one the report could not resolve ("Denver", "Multiple locations") goes to
+OTHER_GROUP: until 2026-10-06 it counted as worldwide, and 134 of SHARP's 145
+fresh worldwide vacancies were offices in the US and Canada.
 """
 from __future__ import annotations
 
@@ -42,6 +47,7 @@ from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
+import places  # noqa: E402
 
 GROUPS_PATH = common.ROOT / "config" / "derivation" / "market_groups.yaml"
 
@@ -82,6 +88,16 @@ def group_of(country: Optional[str]) -> str:
                 return key
         return OTHER_GROUP
     return _country_index().get(common.normalize_for_matching(country), OTHER_GROUP)
+
+
+def vacancy_group(vacancy: dict, country_of) -> str:
+    """The group of one vacancy: its hiring country's, or, with no country
+    found, `worldwide` only when the location names no place
+    (places.names_a_place) and OTHER_GROUP when it names one nobody resolved."""
+    country = country_of(vacancy)
+    if not country and places.names_a_place(vacancy.get("location_raw")):
+        return OTHER_GROUP
+    return group_of(country)
 
 
 def group_name(key: str) -> str:
@@ -181,7 +197,7 @@ def split(vacancies: list, segments: List[Segment], country_of) -> dict:
     claimed = _claimed_groups(segments)
     buckets = {segment.slug: [] for segment in segments}
     for vacancy in vacancies:
-        key = group_of(country_of(vacancy))
+        key = vacancy_group(vacancy, country_of)
         for segment in segments:
             if segment.holds(key, claimed):
                 buckets[segment.slug].append(vacancy)
@@ -192,6 +208,6 @@ def counts_by_group(vacancies: list, country_of) -> dict:
     """{group key: how many}. For showing a person what the split cost them."""
     tally = {}
     for vacancy in vacancies:
-        key = group_of(country_of(vacancy))
+        key = vacancy_group(vacancy, country_of)
         tally[key] = tally.get(key, 0) + 1
     return tally
