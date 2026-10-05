@@ -4,6 +4,7 @@
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test, expect } = require('@playwright/test');
+const { choose } = require('../helpers/dropdown');
 const { installMockApi, standardFixture, row } = require('./mock-api');
 const ru = require('../../renderer/locales/ru.js');
 
@@ -37,7 +38,7 @@ test('an application moves on: "Contact happened" opens a large optional comment
   const fixture = standardFixture();
   inFunnel(fixture, 'p1', { status: 'applied', at: APPLIED_AT, appliedAt: APPLIED_AT });
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('applied');
+  await choose(page, 'filter', 'applied');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('btn-step-contacted')).toHaveText(ru['step.contacted']);
   await expect(card.getByTestId('btn-step-interview')).toHaveCount(0);
@@ -66,7 +67,7 @@ test('a step saved without a comment sends an empty string, never null', async (
     status: 'contacted', at: CONTACT_AT, appliedAt: APPLIED_AT, contactAt: CONTACT_AT, contactComment: '',
   });
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('contacted');
+  await choose(page, 'filter', 'contacted');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('btn-step-interview')).toHaveText(ru['step.interview']);
   await expect(card.getByTestId('btn-step-awaiting_final')).toHaveText(ru['step.awaiting_final']);
@@ -82,7 +83,7 @@ test('after an interview: another interview, or waiting for the final word', asy
     interviewComments: [''], interviewAt: [CONTACT_AT],
   });
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('interview');
+  await choose(page, 'filter', 'interview');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('btn-step-interview')).toBeVisible();
   await card.getByTestId('btn-step-awaiting_final').click();
@@ -101,7 +102,7 @@ test('the timeline: dated steps, empty ones plain, commented ones accordions', a
     interviewAt: ['2026-10-03T09:00:00+00:00', '2026-10-05T09:00:00+00:00'],
   });
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('interview');
+  await choose(page, 'filter', 'interview');
   const card = byId(page, 'p1');
 
   const applied = card.getByTestId('entry-applied');
@@ -134,7 +135,7 @@ test('Ctrl+Enter saves a step comment and an edited one, as "Save" does', async 
     status: 'contacted', at: CONTACT_AT, appliedAt: APPLIED_AT, contactAt: CONTACT_AT, contactComment: '',
   });
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('contacted');
+  await choose(page, 'filter', 'contacted');
   const card = byId(page, 'p1');
   await card.getByTestId('entry-contact').getByTestId('entry-edit').click();
   await card.getByTestId('entry-input').fill('recruiter wrote on LinkedIn');
@@ -154,7 +155,7 @@ test('the pencil edits in place: an empty step becomes an open accordion', async
     status: 'contacted', at: CONTACT_AT, appliedAt: APPLIED_AT, contactAt: CONTACT_AT, contactComment: '',
   });
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('contacted');
+  await choose(page, 'filter', 'contacted');
   const contact = byId(page, 'p1').getByTestId('entry-contact');
   await contact.getByTestId('entry-edit').click();
   await expect(contact.getByTestId('entry-input')).toHaveValue('');
@@ -174,7 +175,7 @@ test('editing an open comment turns its text into a text area', async ({ page })
     interviewComments: ['went well'], interviewAt: ['2026-10-03T09:00:00+00:00'],
   });
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('interview');
+  await choose(page, 'filter', 'interview');
   const entry = byId(page, 'p1').getByTestId('entry-interview-0');
   await entry.getByTestId('entry-toggle').click();
   await expect(entry.getByTestId('entry-comment')).toHaveText('went well');
@@ -195,7 +196,7 @@ test('the pencil opens a closed accordion straight into editing', async ({ page 
     interviewComments: ['went well'], interviewAt: ['2026-10-03T09:00:00+00:00'],
   });
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('interview');
+  await choose(page, 'filter', 'interview');
   const entry = byId(page, 'p1').getByTestId('entry-interview-0');
   await entry.getByTestId('entry-edit').click();
   await expect(entry.getByTestId('entry-toggle')).toHaveAttribute('aria-expanded', 'true');
@@ -207,7 +208,7 @@ test('the pencil opens a closed accordion straight into editing', async ({ page 
 
 test('a negative answer shows in the timeline, its reason editable', async ({ page }) => {
   await open(page);
-  await page.getByTestId('filter').selectOption('bugged');
+  await choose(page, 'filter', 'bugged');
   const card = byId(page, 'x1');
   const entry = card.getByTestId('entry-bugged');
   await expect(entry.getByTestId('entry-label')).toHaveText(ru['timeline.bugged']);
@@ -221,7 +222,7 @@ test('funnel filters are among the filters, with their counts', async ({ page })
     contactAt: CONTACT_AT, contactComment: '', finalAt: CONTACT_AT, finalComment: '' });
   await open(page, fixture);
   await expect(page.getByTestId('filter-option-awaiting_final')).toContainText('(1)');
-  await page.getByTestId('filter').selectOption('awaiting_final');
+  await choose(page, 'filter', 'awaiting_final');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'awaiting_final']);
   await expect(byId(page, 'p1').getByTestId('entry-final').getByTestId('entry-label'))
     .toHaveText(ru['timeline.final']);
@@ -235,7 +236,7 @@ test('"Rejected" can close an application at any step, with an optional comment'
   const fixture = standardFixture();
   inFunnel(fixture, 'p1', { status: 'applied', at: APPLIED_AT, appliedAt: APPLIED_AT });
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('applied');
+  await choose(page, 'filter', 'applied');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('btn-step-declined')).toHaveText(ru['step.declined']);
   await card.getByTestId('btn-step-declined').click();
@@ -244,7 +245,7 @@ test('"Rejected" can close an application at any step, with an optional comment'
   await card.getByTestId('step-save').click();
   expect(await calls(page, 'advance')).toEqual([['sharp', 'p1', 'declined', 'not enough Azure']]);
 
-  await page.getByTestId('filter').selectOption('declined');
+  await choose(page, 'filter', 'declined');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'declined']);
   const closed = byId(page, 'p1');
   await expect(closed.getByTestId('status-badge')).toHaveText(ru['status.declined']);
@@ -262,7 +263,7 @@ test('waiting for the offer comes after the final resolution and shows in the ti
   });
   await open(page, fixture);
   await expect(page.getByTestId('filter-option-awaiting_offer')).toContainText('(1)');
-  await page.getByTestId('filter').selectOption('awaiting_offer');
+  await choose(page, 'filter', 'awaiting_offer');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('entry-offer').getByTestId('entry-label')).toHaveText(ru['timeline.offer']);
   await card.getByTestId('entry-offer').getByTestId('entry-toggle').click();
@@ -282,7 +283,7 @@ test('"Started working" follows only the offer, and closes the funnel', async ({
   });
   await open(page, fixture);
   await expect(page.getByTestId('filter-option-offered')).toContainText('(1)');
-  await page.getByTestId('filter').selectOption('offered');
+  await choose(page, 'filter', 'offered');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('entry-offered').getByTestId('entry-label')).toHaveText(ru['timeline.offered']);
   await expect(card.locator('[data-testid^="btn-step-"]')).toHaveCount(1);
@@ -290,7 +291,7 @@ test('"Started working" follows only the offer, and closes the funnel', async ({
   await expect(card.getByTestId('step-input')).toHaveAttribute('placeholder', ru['step.hint.started']);
   await card.getByTestId('step-save').click();
   expect(await calls(page, 'advance')).toEqual([['sharp', 'p1', 'started', '']]);
-  await page.getByTestId('filter').selectOption('started');
+  await choose(page, 'filter', 'started');
   await expect(byId(page, 'p1').getByTestId('status-badge')).toHaveText(ru['status.started']);
   await expect(byId(page, 'p1').locator('[data-testid^="btn-step-"]')).toHaveCount(0);
 });

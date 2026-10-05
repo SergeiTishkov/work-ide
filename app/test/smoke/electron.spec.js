@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const { test, expect, _electron: electron } = require('@playwright/test');
+const { choose } = require('../helpers/dropdown');
 const { SCHEMA_DIR, standardDatabase, tempDir } = require('../helpers/fixture-db');
 const ru = require('../../renderer/locales/ru.js');
 
@@ -31,6 +32,10 @@ function cleanEnv() {
 }
 
 test('the real window lists, records feedback, and runs the (fake) agent', async () => {
+  // A click in the hidden window takes about 2 s (Playwright waits for frames
+  // the hidden window seldom draws); the run took 20 s alone and over 30 s
+  // beside the UI tests once the filters became clicks (2026-10-06).
+  test.setTimeout(60000);
   const repo = fixtureRepo();
   const app = await electron.launch({
     args: [path.join(__dirname, '..', '..')],
@@ -48,7 +53,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     const window = await app.firstWindow();
     await expect(window.getByTestId('identity-tab-sharp')).toBeVisible();
     await expect(window.getByTestId('identity-name')).toHaveText('Test search');
-    await expect(window.getByTestId('segment-filter')).toHaveValue('full');
+    await expect(window.getByTestId('segment-filter')).toHaveAttribute('data-value', 'full');
     await expect(window.getByTestId('list').locator('article')).toHaveCount(3);   // new0..new2
 
     await window.getByTestId('vacancy-new0').getByTestId('btn-bugged').click();
@@ -85,11 +90,11 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
 
     // Refresh through the real IPC: the main process's code has not changed
     // since start, so the page reloads, keeps the view and works.
-    await window.getByTestId('filter').selectOption('all');
+    await choose(window, 'filter', 'all');
     await window.evaluate(() => { window.__beforeRefresh = true; });
     await window.getByTestId('refresh').click();
     await expect.poll(() => window.evaluate(() => window.__beforeRefresh)).toBeUndefined();
-    await expect(window.getByTestId('filter')).toHaveValue('all');
+    await expect(window.getByTestId('filter')).toHaveAttribute('data-value', 'all');
     await expect(window.getByTestId('error')).toBeHidden();
 
     await window.getByTestId('identity-tab-partsharp').click();

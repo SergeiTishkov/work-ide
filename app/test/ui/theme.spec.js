@@ -70,8 +70,8 @@ test('theme sits left of the language; neither button has an arrow; one menu at 
 test('the markets are a drop-down before the filters', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('segment-label')).toHaveText(ru['filter.segment_legend']);
-  const options = await page.getByTestId('segment-filter').locator('option').evaluateAll(
-    (nodes) => nodes.map((n) => n.value));
+  const options = await page.getByTestId('segment-filter-menu').locator('[role="option"]').evaluateAll(
+    (nodes) => nodes.map((n) => n.dataset.value));
   expect(options.length).toBeGreaterThan(1);
   const segment = await page.getByTestId('segment-filter').boundingBox();
   const filter = await page.getByTestId('filter').boundingBox();

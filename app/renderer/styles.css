@@ -129,22 +129,49 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
    the page's colour above the border, the field's below, so the line looks
    cut where the name crosses it. */
 .filters { margin: 8px 0 14px; display: flex; flex-wrap: wrap; gap: 14px 12px; align-items: center; }
-.field { position: relative; display: inline-flex; }
+.field { position: relative; display: inline-flex; width: 250px; }
 .field label {
   position: absolute; left: 9px; top: 0; transform: translateY(-50%);
   padding: 0 4px; font-size: 11.5px; line-height: 1; color: var(--muted);
   background: linear-gradient(var(--bg) 50%, var(--surface) 50%);
   pointer-events: none; white-space: nowrap;
 }
-.field select {
-  font: inherit; color: var(--text); background: var(--surface);
-  border: 1px solid var(--border); border-radius: 6px; padding: 10px 10px 8px; min-width: 240px;
-  cursor: pointer;
+.dropdown-button {
+  width: 100%; display: flex; align-items: center; gap: 8px; text-align: left;
+  border-radius: 6px; padding: 10px 10px 8px;
 }
-.field select:hover { border-color: var(--muted); }
-.field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.field select:focus + label { color: var(--accent); }
-.filters #segment-select { min-width: 200px; }
+.dropdown-button:hover:not(:disabled) { border-color: var(--muted); }
+.dropdown-button:focus-visible, .dropdown.open .dropdown-button {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent);
+}
+.dropdown-button:focus-visible + label, .dropdown.open label { color: var(--accent); }
+/* The chosen value on one line; the list below gives it as many as it needs. */
+.dropdown-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdown-arrow {
+  flex: none; width: 0; height: 0; border-style: solid;
+  border-width: 5px 4.5px 0; border-color: var(--muted) transparent transparent;
+  transition: transform .15s ease;
+}
+.dropdown.open .dropdown-arrow { transform: rotate(180deg); border-top-color: var(--accent); }
+/* The list: as wide as the box, a long option wraps onto a second line. */
+.dropdown-menu {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
+  margin: 0; padding: 4px; list-style: none; max-height: 60vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+}
+.dropdown-menu ul { margin: 0; padding: 0; list-style: none; }
+.dropdown-menu [role="option"] {
+  padding: 6px 10px; border-radius: 4px; cursor: pointer;
+  white-space: normal; overflow-wrap: anywhere; line-height: 1.35;
+}
+.dropdown-menu [role="option"].cursor { background: var(--accent-soft); }
+.dropdown-menu [role="option"].active { color: var(--accent); font-weight: 600; }
+.dropdown-group + .dropdown-group { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
+.dropdown-group-label {
+  padding: 6px 10px 2px; font-size: 11.5px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .04em;
+}
 
 .class-section h2 { font-size: 15px; margin: 18px 0 8px; }
 /* How much of the class is shown: prominent, a gap after the title */

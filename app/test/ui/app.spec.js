@@ -5,6 +5,7 @@
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test, expect } = require('@playwright/test');
+const { choose } = require('../helpers/dropdown');
 const { installMockApi, standardFixture, row } = require('./mock-api');
 const ru = require('../../renderer/locales/ru.js');
 
@@ -25,8 +26,8 @@ const byId = (page, id) => page.getByTestId(`vacancy-${id}`);
 test('opens on the first identity, its default market, fresh without feedback', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('identity-tab-sharp')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByTestId('segment-filter')).toHaveValue('full');
-  await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
+  await expect(page.getByTestId('segment-filter')).toHaveAttribute('data-value', 'full');
+  await expect(page.getByTestId('filter')).toHaveAttribute('data-value', 'fresh_new');
   expect((await calls(page, 'loadListing'))[0]).toEqual(['sharp', 'full', 'fresh_new']);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(3);   // a1, a2r, b1
   await expect(byId(page, 'a3')).toHaveCount(0);   // not fresh
@@ -149,7 +150,7 @@ test('filters ask for their own list and show their counts', async ({ page }) =>
   await open(page);
   await expect(page.getByTestId('filter-option-all')).toContainText('(5)');
   await expect(page.getByTestId('filter-option-bugged')).toContainText('(1)');
-  await page.getByTestId('filter').selectOption('bugged');
+  await choose(page, 'filter', 'bugged');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'bugged']);
   await expect(byId(page, 'x1')).toBeVisible();
   await expect(byId(page, 'x1').getByTestId('status-badge')).toHaveText(ru['status.bugged']);
@@ -160,23 +161,23 @@ test('filters ask for their own list and show their counts', async ({ page }) =>
 
 test('each market of each identity keeps its own filter', async ({ page }) => {
   await open(page);
-  await page.getByTestId('filter').selectOption('all');
-  await page.getByTestId('segment-filter').selectOption('uk');
-  await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
+  await choose(page, 'filter', 'all');
+  await choose(page, 'segment-filter', 'uk');
+  await expect(page.getByTestId('filter')).toHaveAttribute('data-value', 'fresh_new');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'uk', 'fresh_new']);
 
-  await page.getByTestId('segment-filter').selectOption('full');
-  await expect(page.getByTestId('filter')).toHaveValue('all');
+  await choose(page, 'segment-filter', 'full');
+  await expect(page.getByTestId('filter')).toHaveAttribute('data-value', 'all');
 
   await page.getByTestId('identity-tab-partsharp').click();
-  await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
-  await page.getByTestId('filter').selectOption('applied');
+  await expect(page.getByTestId('filter')).toHaveAttribute('data-value', 'fresh_new');
+  await choose(page, 'filter', 'applied');
 
   await page.getByTestId('identity-tab-sharp').click();
-  await expect(page.getByTestId('segment-filter')).toHaveValue('full');
-  await expect(page.getByTestId('filter')).toHaveValue('all');
+  await expect(page.getByTestId('segment-filter')).toHaveAttribute('data-value', 'full');
+  await expect(page.getByTestId('filter')).toHaveAttribute('data-value', 'all');
   await page.getByTestId('identity-tab-partsharp').click();
-  await expect(page.getByTestId('filter')).toHaveValue('applied');
+  await expect(page.getByTestId('filter')).toHaveAttribute('data-value', 'applied');
 });
 
 test('marked vacancies keep their places, whatever order they are marked in', async ({ page }) => {
@@ -258,7 +259,7 @@ test('an undone stub is not removed again by its timer', async ({ page }) => {
 test('in "All", a vacancy turned down folds into a stub and goes; an applied one stays', async ({ page }) => {
   await page.clock.install();
   await open(page);
-  await page.getByTestId('filter').selectOption('all');
+  await choose(page, 'filter', 'all');
   await byId(page, 'a1').getByTestId('btn-expired').click();
   await expect(page.getByTestId('stub-a1')).toBeVisible();
   await expect(byId(page, 'a1')).toHaveCount(0);
@@ -279,7 +280,7 @@ test('changing the filter clears stubs', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('btn-applied').click();
   await expect(page.getByTestId('stub-a1')).toBeVisible();
-  await page.getByTestId('filter').selectOption('all');
+  await choose(page, 'filter', 'all');
   await expect(page.getByTestId('stub-a1')).toHaveCount(0);
   await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(ru['status.applied']);
 });
@@ -353,7 +354,7 @@ test('"Open the vacancy link" hands the URL to the system browser, marked or not
   expect(await calls(page, 'openExternal')).toEqual([['https://example.test/a1']]);
   expect(await calls(page, 'setFeedback')).toEqual([]);   // opening is not an answer
 
-  await page.getByTestId('filter').selectOption('bugged');
+  await choose(page, 'filter', 'bugged');
   await byId(page, 'x1').getByTestId('btn-open').click();
   expect((await calls(page, 'openExternal')).at(-1)).toEqual(['https://example.test/x1']);
 });
@@ -389,15 +390,15 @@ test('a reason being typed survives the indicator re-rendering the list', async 
 test('"Refresh" reloads the interface and keeps the tab, market and filter', async ({ page }) => {
   await open(page);
   await page.getByTestId('identity-tab-sharp').click();
-  await page.getByTestId('segment-filter').selectOption('uk');
-  await page.getByTestId('filter').selectOption('all');
+  await choose(page, 'segment-filter', 'uk');
+  await choose(page, 'filter', 'all');
   await expect(page.getByTestId('refresh')).toHaveText(ru['app.refresh']);
   await page.evaluate(() => { window.__beforeRefresh = true; });
 
   await page.getByTestId('refresh').click();
-  await expect(page.getByTestId('segment-filter')).toHaveValue('uk');
+  await expect(page.getByTestId('segment-filter')).toHaveAttribute('data-value', 'uk');
   expect(await page.evaluate(() => window.__beforeRefresh)).toBeUndefined();   // a new page
-  await expect(page.getByTestId('filter')).toHaveValue('all');
+  await expect(page.getByTestId('filter')).toHaveAttribute('data-value', 'all');
   expect((await calls(page, 'loadListing'))[0]).toEqual(['sharp', 'uk', 'all']);
 });
 
@@ -419,13 +420,13 @@ test('"All without feedback" lists every unanswered vacancy, fresh or not', asyn
   await open(page);
   await expect(page.getByTestId('filter-option-no_feedback'))
     .toHaveText(`${ru['filter.no_feedback']} (4)`);   // a1, a2r, a3, b1; not x1
-  await page.getByTestId('filter').selectOption('no_feedback');
+  await choose(page, 'filter', 'no_feedback');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'no_feedback']);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(4);
   await expect(byId(page, 'a3')).toBeVisible();   // not fresh
   await expect(byId(page, 'x1')).toHaveCount(0);   // has feedback
-  const options = await page.getByTestId('filter').locator('optgroup').first().locator('option')
-    .evaluateAll((nodes) => nodes.map((n) => n.value));
+  const options = await page.getByTestId('filter-menu').locator('[role="group"]').first().locator('[role="option"]')
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.value));
   expect(options).toEqual(['fresh_new', 'no_feedback', 'fresh', 'all']);
 });
 
@@ -460,12 +461,12 @@ test('a capped class says how much is shown and brings ten more at a time', asyn
 test('"Fit" narrows the list to one class, and the other filters count within it', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('fit-label')).toHaveText(ru['filter.fit_legend']);
-  await expect(page.getByTestId('fit-filter')).toHaveValue('');
+  await expect(page.getByTestId('fit-filter')).toHaveAttribute('data-value', '');
   await expect(page.getByTestId('fit-option-all')).toHaveText(`${ru['filter.fit_all']} (3)`);
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveText(`${ru['class.hot_lead']} (2)`);
   await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${ru['class.worth_a_look']} (1)`);
 
-  await page.getByTestId('fit-filter').selectOption('hot_lead');
+  await choose(page, 'fit-filter', 'hot_lead');
   await expect(page.getByTestId('section-worth_a_look')).toHaveCount(0);
   await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(2);
   expect((await calls(page, 'loadListing')).at(-1))
@@ -477,22 +478,22 @@ test('"Fit" narrows the list to one class, and the other filters count within it
   await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${ru['class.worth_a_look']} (1)`);
 
   // with the status filter: "All" adds a3 (not fresh) and x1 (a wrong pick)
-  await page.getByTestId('filter').selectOption('all');
-  await expect(page.getByTestId('fit-filter')).toHaveValue('hot_lead');
+  await choose(page, 'filter', 'all');
+  await expect(page.getByTestId('fit-filter')).toHaveAttribute('data-value', 'hot_lead');
   await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(4);
   // and with the source
-  await page.getByTestId('source-filter').selectOption('devitjobs');
+  await choose(page, 'source-filter', 'devitjobs');
   await expect(page.getByTestId('list').locator('article')).toHaveCount(1);   // x1
   await expect(byId(page, 'x1')).toBeVisible();
 
   await page.getByTestId('refresh').click();
-  await expect(page.getByTestId('fit-filter')).toHaveValue('hot_lead');
+  await expect(page.getByTestId('fit-filter')).toHaveAttribute('data-value', 'hot_lead');
 });
 
 test('one class chosen: the scroll brings ten more at a time', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 700 });
   await open(page, manyHotLeads(40));
-  await page.getByTestId('fit-filter').selectOption('hot_lead');
+  await choose(page, 'fit-filter', 'hot_lead');
   const section = page.getByTestId('section-hot_lead');
   await expect(section.locator('article')).toHaveCount(15);
   await expect(page.getByTestId('section-count-hot_lead'))
@@ -574,7 +575,7 @@ test('"Refresh" leaves the reload to the app when the app restarts itself', asyn
   const fixture = standardFixture();
   fixture.refreshReply = 'relaunch';
   await open(page, fixture);
-  await page.getByTestId('filter').selectOption('all');
+  await choose(page, 'filter', 'all');
   await page.evaluate(() => { window.__beforeRefresh = true; });
   await page.getByTestId('refresh').click();
   await expect.poll(() => calls(page, 'refresh')).toHaveLength(1);
@@ -604,7 +605,7 @@ test('"Vacancy expired" is recorded at once, with no reason, and has its own fil
     .toContainText(ru['stub.marked'].replace('{status}', ru['status.expired']));
   await expect(page.getByTestId('filter-option-expired')).toContainText('(1)');
 
-  await page.getByTestId('filter').selectOption('expired');
+  await choose(page, 'filter', 'expired');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'expired']);
   await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(ru['status.expired']);
   await byId(page, 'a1').getByTestId('btn-undo').click();
@@ -616,7 +617,7 @@ test('"Vacancy expired" is recorded at once, with no reason, and has its own fil
 test('"Source" lists the boards of the current filter, each with its count', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('source-label')).toHaveText(ru['filter.source_legend']);
-  await expect(page.getByTestId('source-filter')).toHaveValue('');
+  await expect(page.getByTestId('source-filter')).toHaveAttribute('data-value', '');
   await expect(page.getByTestId('source-option-all')).toHaveText(`${ru['filter.source_all']} (3)`);
   await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (2)');
   await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs.uk, devitjobs.com (1)');
@@ -641,7 +642,7 @@ test('an exclusivity clause is a line in the details, not a refusal', async ({ p
 
 test('choosing a source lists only its vacancies, and the filter counts follow it', async ({ page }) => {
   await open(page);
-  await page.getByTestId('source-filter').selectOption('devitjobs');
+  await choose(page, 'source-filter', 'devitjobs');
   await expect(page.getByTestId('list').locator('article')).toHaveCount(1);
   await expect(byId(page, 'b1')).toBeVisible();
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'fresh_new', [], 'devitjobs']);
@@ -652,29 +653,29 @@ test('choosing a source lists only its vacancies, and the filter counts follow i
 
 test('the status filter and the source apply together', async ({ page }) => {
   await open(page);
-  await page.getByTestId('source-filter').selectOption('linkedin');
-  await page.getByTestId('filter').selectOption('bugged');
+  await choose(page, 'source-filter', 'linkedin');
+  await choose(page, 'filter', 'bugged');
   await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'bugged', [], 'linkedin']);
   // the chosen board stays on the list with nothing in it; the others follow the filter
-  await expect(page.getByTestId('source-filter')).toHaveValue('linkedin');
+  await expect(page.getByTestId('source-filter')).toHaveAttribute('data-value', 'linkedin');
   await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (0)');
   await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs.uk, devitjobs.com (1)');
-  await page.getByTestId('source-filter').selectOption('devitjobs');
+  await choose(page, 'source-filter', 'devitjobs');
   await expect(byId(page, 'x1')).toBeVisible();
-  await page.getByTestId('source-filter').selectOption('');
+  await choose(page, 'source-filter', '');
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'bugged']);
 });
 
 test('each market keeps its own source, and a refresh brings it back', async ({ page }) => {
   await open(page);
-  await page.getByTestId('source-filter').selectOption('devitjobs');
-  await page.getByTestId('segment-filter').selectOption('uk');
-  await expect(page.getByTestId('source-filter')).toHaveValue('');
-  await page.getByTestId('segment-filter').selectOption('full');
-  await expect(page.getByTestId('source-filter')).toHaveValue('devitjobs');
+  await choose(page, 'source-filter', 'devitjobs');
+  await choose(page, 'segment-filter', 'uk');
+  await expect(page.getByTestId('source-filter')).toHaveAttribute('data-value', '');
+  await choose(page, 'segment-filter', 'full');
+  await expect(page.getByTestId('source-filter')).toHaveAttribute('data-value', 'devitjobs');
   await page.getByTestId('refresh').click();
-  await expect(page.getByTestId('source-filter')).toHaveValue('devitjobs');
+  await expect(page.getByTestId('source-filter')).toHaveAttribute('data-value', 'devitjobs');
   await expect(byId(page, 'b1')).toBeVisible();
   await expect(byId(page, 'a1')).toHaveCount(0);
 });

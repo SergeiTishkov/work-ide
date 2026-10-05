@@ -721,7 +721,10 @@
 
   document.addEventListener('click', () => togglePicker(null));
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') togglePicker(null);
+    if (event.key === 'Escape') {
+      togglePicker(null);
+      closeDropdowns();
+    }
   });
 
   function renderIdentityTabs() {
@@ -816,39 +819,128 @@
         running && el('button', { class: 'danger', testid: 'run-stop', onclick: stopRun }, t('run.stop'))));
   }
 
-  // A drop-down in an outlined box, its name on the box's top edge (Material's
-  // outlined field). The label comes after the select so the focus can colour
-  // it (styles.css, .field).
-  function field(select, labelTestid, label) {
-    return el('span', { class: 'field' },
-      select, el('label', { for: select.id, testid: labelTestid }, label));
+  // --- the filters' drop-down ----------------------------------------------------
+  // An outlined box with its name on the top edge (Material's outlined field),
+  // all four the same width. Not a <select>: a native list cannot wrap a long
+  // option onto a second line, and the four are the same width only if a long
+  // option may take two (2026-10-06). The list stays in the page while closed
+  // (hidden), so what it offers can be read without opening it.
+  //
+  // groups: [{ label (or none), options: [{ value, text, testid }] }]
+  function dropdown({ id, testid, label, labelTestid, value, groups, onChange }) {
+    const options = groups.flatMap((group) => group.options);
+    const chosen = options.find((option) => option.value === value) || options[0] || { text: '' };
+    const button = el('button', {
+      id, class: 'dropdown-button', testid, type: 'button',
+      'data-value': chosen.value === undefined ? '' : chosen.value,
+      'aria-haspopup': 'listbox', 'aria-expanded': 'false', title: chosen.text,
+    }, el('span', { class: 'dropdown-value' }, chosen.text), el('span', { class: 'dropdown-arrow' }));
+    const optionNode = (option) => el('li', {
+      role: 'option', testid: option.testid, 'data-value': option.value,
+      class: option.value === chosen.value ? 'active' : null,
+      'aria-selected': option.value === chosen.value ? 'true' : 'false',
+      onclick: (event) => { event.stopPropagation(); pick(option.value); },
+    }, option.text);
+    const menu = el('ul', { class: 'dropdown-menu', role: 'listbox', testid: `${testid}-menu`, hidden: true },
+      groups.flatMap((group) => (group.label
+        ? el('li', { class: 'dropdown-group', role: 'presentation' },
+          el('div', { class: 'dropdown-group-label' }, group.label),
+          el('ul', { role: 'group', 'aria-label': group.label }, group.options.map(optionNode)))
+        : group.options.map(optionNode))));
+    const box = el('span', { class: 'field dropdown' },
+      button, el('label', { for: id, testid: labelTestid }, label), menu);
+
+    const items = () => [...menu.querySelectorAll('[role="option"]')];
+    function setCursor(item) {
+      for (const node of items()) node.classList.toggle('cursor', node === item);
+      if (item) item.scrollIntoView({ block: 'nearest' });
+    }
+    function open() {
+      closeDropdowns(box);
+      menu.hidden = false;
+      box.classList.add('open');
+      button.setAttribute('aria-expanded', 'true');
+      setCursor(menu.querySelector('.active') || items()[0]);
+    }
+    function close() {
+      menu.hidden = true;
+      box.classList.remove('open');
+      button.setAttribute('aria-expanded', 'false');
+    }
+    function pick(chosenValue) {
+      close();
+      button.focus();
+      if (chosenValue !== chosen.value) onChange(chosenValue);
+    }
+    box.closeDropdown = close;
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (menu.hidden) open(); else close();
+    });
+    button.addEventListener('keydown', (event) => {
+      const list = items();
+      const at = list.indexOf(menu.querySelector('.cursor'));
+      if (menu.hidden) {
+        if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) { event.preventDefault(); open(); }
+        return;
+      }
+      if (event.key === 'ArrowDown') { event.preventDefault(); setCursor(list[Math.min(at + 1, list.length - 1)]); }
+      else if (event.key === 'ArrowUp') { event.preventDefault(); setCursor(list[Math.max(at - 1, 0)]); }
+      else if (event.key === 'Home') { event.preventDefault(); setCursor(list[0]); }
+      else if (event.key === 'End') { event.preventDefault(); setCursor(list[list.length - 1]); }
+      else if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (at >= 0) pick(list[at].dataset.value);
+      } else if (event.key === 'Escape') { event.stopPropagation(); close(); }
+      else if (event.key === 'Tab') close();
+    });
+    menu.addEventListener('mousemove', (event) => {
+      const item = event.target.closest('[role="option"]');
+      if (item && !item.classList.contains('cursor')) {
+        for (const node of items()) node.classList.toggle('cursor', node === item);
+      }
+    });
+    return box;
   }
+
+  function closeDropdowns(except) {
+    for (const box of document.querySelectorAll('.dropdown.open')) {
+      if (box !== except) box.closeDropdown();
+    }
+  }
+
+  document.addEventListener('click', () => closeDropdowns());
 
   // The markets of the selection: a drop-down like the filters beside it
   // (tabs until 2026-10-06; eight of them took a line of their own).
   function renderSegmentFilter(info) {
-    return field(el('select', {
+    return dropdown({
       id: 'segment-select', testid: 'segment-filter',
-      onchange: (event) => selectSegment(event.target.value),
-    }, info.segments.map((segment) => el('option', {
-      value: segment.slug, testid: `segment-option-${segment.slug}`,
-      selected: segment.slug === info.activeSegment,
-    }, segment.name))), 'segment-label', t('filter.segment_legend'));
+      label: t('filter.segment_legend'), labelTestid: 'segment-label',
+      value: info.activeSegment,
+      groups: [{ options: info.segments.map((segment) => ({
+        value: segment.slug, text: segment.name, testid: `segment-option-${segment.slug}`,
+      })) }],
+      onChange: selectSegment,
+    });
   }
 
   // One drop-down, its options grouped, each with how many it holds.
   function renderFilters(info) {
     const active = currentFilter();
-    const option = (name) => el('option', {
-      value: name, testid: `filter-option-${name}`, selected: name === active,
-    }, `${t(FILTER_KEYS[name])} ${t('filter.count', { n: state.counts[name] || 0 })}`);
+    const option = (name) => ({
+      value: name, testid: `filter-option-${name}`,
+      text: `${t(FILTER_KEYS[name])} ${t('filter.count', { n: state.counts[name] || 0 })}`,
+    });
     return el('div', { class: 'filters', testid: 'filters' },
       renderSegmentFilter(info),
-      field(el('select', {
+      dropdown({
         id: 'filter-select', testid: 'filter',
-        onchange: (event) => selectFilter(event.target.value),
-      }, FILTER_GROUPS.map((group) => el('optgroup', { label: t(group.key) },
-        group.filters.map(option)))), 'filter-label', t('filter.legend')),
+        label: t('filter.legend'), labelTestid: 'filter-label',
+        value: active,
+        groups: FILTER_GROUPS.map((group) => ({ label: t(group.key), options: group.filters.map(option) })),
+        onChange: selectFilter,
+      }),
       renderSourceFilter(),
       renderFitFilter());
   }
@@ -862,15 +954,17 @@
     const classes = [...order, ...Object.keys(totals).filter((cls) => !order.includes(cls))]
       .filter((cls) => totals[cls] || cls === active);
     const all = Object.values(totals).reduce((sum, n) => sum + n, 0);
-    const option = (value, label, n) => el('option', {
-      value, testid: `fit-option-${value || 'all'}`, selected: value === active,
-    }, `${label} ${t('filter.count', { n })}`);
-    return field(el('select', {
+    const option = (value, label, n) => ({
+      value, testid: `fit-option-${value || 'all'}`, text: `${label} ${t('filter.count', { n })}`,
+    });
+    return dropdown({
       id: 'fit-select', testid: 'fit-filter',
-      onchange: (event) => selectFit(event.target.value),
-    }, option('', t('filter.fit_all'), all),
-    classes.map((cls) => option(cls, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls, totals[cls] || 0))),
-    'fit-label', t('filter.fit_legend'));
+      label: t('filter.fit_legend'), labelTestid: 'fit-label',
+      value: active || '',
+      groups: [{ options: [option('', t('filter.fit_all'), all),
+        ...classes.map((cls) => option(cls, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls, totals[cls] || 0))] }],
+      onChange: selectFit,
+    });
   }
 
   // The boards the current filter holds, each with how many; the chosen one
@@ -883,15 +977,17 @@
       sources.push({ source: active, site: known || null, total: 0 });
     }
     const all = state.sources.reduce((sum, s) => sum + s.total, 0);
-    const option = (value, label, n) => el('option', {
-      value, testid: `source-option-${value || 'all'}`, selected: value === active,
-    }, `${label} ${t('filter.count', { n })}`);
-    return field(el('select', {
+    const option = (value, label, n) => ({
+      value, testid: `source-option-${value || 'all'}`, text: `${label} ${t('filter.count', { n })}`,
+    });
+    return dropdown({
       id: 'source-select', testid: 'source-filter',
-      onchange: (event) => selectSource(event.target.value),
-    }, option('', t('filter.source_all'), all),
-    sources.filter((s) => s.source).map((s) => option(s.source, s.site || s.source, s.total))),
-    'source-label', t('filter.source_legend'));
+      label: t('filter.source_legend'), labelTestid: 'source-label',
+      value: active || '',
+      groups: [{ options: [option('', t('filter.source_all'), all),
+        ...sources.filter((s) => s.source).map((s) => option(s.source, s.site || s.source, s.total))] }],
+      onChange: selectSource,
+    });
   }
 
   // Rows arrive ordered by class, then score; stubs go back where they were.
