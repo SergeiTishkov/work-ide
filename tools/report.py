@@ -422,7 +422,7 @@ _ISO_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 def calendar_date(value) -> Optional[str]:
     """YYYY-MM-DD from whatever a source put in posted_at, or None.
 
-    Every board says it its own way — measured on the kisel base 2026-09-29:
+    Every board says it its own way — measured on the sharp base 2026-09-29:
     unix seconds (4dayweek), ISO with and without an offset or milliseconds
     (most), a bare date (LinkedIn, Reed), RFC 2822 (the RSS boards), nothing at
     all (Jobserve). The date is taken as the source wrote it: shifting it into

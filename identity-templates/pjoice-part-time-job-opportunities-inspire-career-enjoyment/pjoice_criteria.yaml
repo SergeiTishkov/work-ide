@@ -2,8 +2,8 @@
 # The final score is 0..100, plus a separate list of dealbreaker flags and
 # needs_manual_review. Every component is explained in score_breakdown.
 #
-# The philosophy: side work beside a main job. Built from the KISEL template
-# and turned round on almost every axis KISEL scores:
+# The philosophy: side work beside a main job. Built from the SHARP template
+# and turned round on almost every axis SHARP scores:
 #
 #   * money is THE priority — graded by the hourly rate, not merely "a salary is
 #     stated" (compensation_signal.hourly_equivalent_tiers);
@@ -16,12 +16,12 @@
 #     data engineering and smart contracts are cut however interesting they are
 #     (role_complexity_signal, repurposed — see there).
 #
-# What is unchanged from KISEL: geography, stack, language and profession
+# What is unchanged from SHARP: geography, stack, language and profession
 # gates. They follow from the CV and the residency, which are the same person's.
 
 # HOW A COMPONENT'S WEIGHT WORKS
 #
-# There is no `weights` block (the KISEL template explains why). A component's
+# There is no `weights` block (the SHARP template explains why). A component's
 # real weight is its cap or its range:
 #
 #   compensation_signal          -8..+34   the hourly rate, graded
@@ -876,7 +876,7 @@ role_complexity_signal:
   # Engineer" at 55 in "hours not confirmed" — confirming its hours could not
   # have made it a candidate.
   applies_to_unconfirmed: true
-  # REPURPOSED. In KISEL this gate means "not simple work", and interesting,
+  # REPURPOSED. In SHARP this gate means "not simple work", and interesting,
   # complex work is exactly what it keeps out. Here that work is WANTED, so the
   # gate means something narrower: "this CV will not be considered".
   #
@@ -1393,7 +1393,7 @@ language_requirement_signal:
   readable_scripts: ["latin", "cyrillic"]
   unreadable_script_threshold: 0.15
   # Language demands a word list cannot hold (score._score_language_fit), added
-  # to both templates on 2026-09-13 — see the KISEL template for the
+  # to both templates on 2026-09-13 — see the SHARP template for the
   # measurement. The languages named are the ones this search's person does
   # NOT speak.
   explicit_requirement_patterns:
@@ -1527,7 +1527,7 @@ language_requirement_signal:
                 # a single explicit Dutch word on exactly one vacancy — and
                 # that one really is Dutch. Zero false positives.
                 # (Corrected 2026-09-13: the edge spaces were being stripped,
-                # so German postings matched as Dutch — see the KISEL
+                # so German postings matched as Dutch — see the SHARP
                 # template's V14.)
                 " je ", " het ", " van de ", " in de ", " voor de ",
                 " met een ", " zijn ", " worden ", " ontwikkelaar "]
@@ -1544,7 +1544,7 @@ language_requirement_signal:
     # Widened 2026-09-13. The seven markers below missed LinkedIn's French
     # postings, which say "je recherche" rather than "nous recherchons" and
     # "Télétravail : hybride". Functional words were added, and the threshold
-    # rose from 3 to 4, both measured over KISEL's base: 60 detections became
+    # rose from 3 to 4, both measured over SHARP's base: 60 detections became
     # 86, not one earlier detection was lost, and every shown vacancy newly
     # caught had a French title. (Corrected the same day: at 3 the English
     # false matches were " des " inside "design" and " les " inside "sales" —
@@ -1579,7 +1579,7 @@ language_requirement_signal:
 # rather than a penalty. The two-match threshold exists so that a vacancy
 # mentioning crypto in passing among its clients is not cut.
 industry_dealbreaker_gate:
-  # EMPTY ON PURPOSE. KISEL refuses crypto and web3 here; for this search they
+  # EMPTY ON PURPOSE. SHARP refuses crypto and web3 here; for this search they
   # are among the interesting domains the owner named first (2026-09-13), and
   # they are a plus in extra_signals.interesting_work.
   threshold_hits: 2
@@ -1596,7 +1596,7 @@ legacy_enterprise_signal:
 low_intensity_signal:
   # NEUTRAL. What matters here is not intensity but whether the work fits
   # beside a main job — a different axis with different words, declared in
-  # extra_signals.fits_beside_a_job. Several of KISEL's words ("startup",
+  # extra_signals.fits_beside_a_job. Several of SHARP's words ("startup",
   # "crypto", "fast-paced") are not minuses for this search at all.
   positive_points_per_keyword: 0
   negative_points_per_keyword: 0
@@ -1693,7 +1693,7 @@ company_reputation_signal:
   # calm pace — exactly what is wanted. Until 2026-07-31 that trait was
   # recorded in the profile and checked nowhere.
   company_age:
-    # Not KISEL's "mature is calm". For side work the question is whether an
+    # Not SHARP's "mature is calm". For side work the question is whether an
     # invoice gets paid: a very young company is a small risk, an old one is
     # not a plus in itself.
     mature_threshold_years: 10
@@ -1720,7 +1720,7 @@ contractor_friendliness:
 
 classification_thresholds:
   # Starting values, to be recalibrated by measurement over the first run's
-  # base — the same way KISEL's were (see the KISEL template). The scale is
+  # base — the same way SHARP's were (see the SHARP template). The scale is
   # different: a stated $100/hour alone is worth 22 points here.
   hot_lead: 40
   worth_a_look: 28
@@ -1758,7 +1758,7 @@ talent_pipeline_gate:
     - "speculative application"
 
 ai_training_crowdwork_gate:
-  # EMPTY ON PURPOSE. KISEL gates AI-training piecework because a steady
+  # EMPTY ON PURPOSE. SHARP gates AI-training piecework because a steady
   # position is what it wants. Side work paid by the hour is a legitimate
   # trade, and some of it pays $130 an hour — so the markers moved to
   # extra_signals.ai_training_gig, where they cost points and carry a label a

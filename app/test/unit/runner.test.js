@@ -9,10 +9,10 @@ const { Runner, buildCommand, describeEvent, ALLOWED_TOOLS } = require('../../ma
 const { tempDir } = require('../helpers/fixture-db');
 
 test('collect runs /run for the identity, headless, with the allowed tools', () => {
-  const cmd = buildCommand('collect', 'kisel', { root: '/repo' });
+  const cmd = buildCommand('collect', 'sharp', { root: '/repo' });
   assert.equal(cmd.command, 'claude');
   assert.equal(cmd.cwd, '/repo');
-  assert.deepEqual(cmd.args, ['-p', '/run kisel', '--output-format', 'stream-json', '--verbose',
+  assert.deepEqual(cmd.args, ['-p', '/run sharp', '--output-format', 'stream-json', '--verbose',
     '--allowedTools', ALLOWED_TOOLS.join(',')]);
 });
 
@@ -25,9 +25,9 @@ test('the agent may not commit', () => {
 });
 
 test('unknown kinds and malformed identities are refused', () => {
-  assert.throws(() => buildCommand('deploy', 'kisel', { root: '/r' }));
-  assert.throws(() => buildCommand('collect', 'kisel; rm -rf /', { root: '/r' }));
-  assert.throws(() => buildCommand('collect', 'KISEL', { root: '/r' }));
+  assert.throws(() => buildCommand('deploy', 'sharp', { root: '/r' }));
+  assert.throws(() => buildCommand('collect', 'sharp; rm -rf /', { root: '/r' }));
+  assert.throws(() => buildCommand('collect', 'SHARP', { root: '/r' }));
 });
 
 function fakeChild() {
@@ -51,15 +51,15 @@ test('one run at a time; output is described and logged; exit is reported', asyn
   const events = [];
   runner.onEvent((e) => events.push(e));
 
-  assert.deepEqual(runner.start('collect', 'kisel'), { ok: true });
-  assert.equal(spawned[0].args[1], '/run kisel');
+  assert.deepEqual(runner.start('collect', 'sharp'), { ok: true });
+  assert.equal(spawned[0].args[1], '/run sharp');
   assert.equal(spawned[0].options.cwd, '/repo');
-  assert.deepEqual(runner.state(), { running: true, identity: 'kisel', kind: 'collect' });
-  assert.equal(runner.start('feedback', 'kisel').error, 'busy');
+  assert.deepEqual(runner.state(), { running: true, identity: 'sharp', kind: 'collect' });
+  assert.equal(runner.start('feedback', 'sharp').error, 'busy');
 
   child.stdout.write(`${JSON.stringify({ type: 'assistant', message: { content: [
     { type: 'text', text: 'Running the pipeline' },
-    { type: 'tool_use', name: 'Bash', input: { command: 'python tools/pipeline.py --identity kisel' } },
+    { type: 'tool_use', name: 'Bash', input: { command: 'python tools/pipeline.py --identity sharp' } },
   ] } })}\n`);
   await new Promise((r) => setImmediate(r));
   child.emit('close', 0);
@@ -69,7 +69,7 @@ test('one run at a time; output is described and logged; exit is reported', asyn
   assert.equal(events[2].code, 0);
   assert.equal(runner.state().running, false);
   await new Promise((r) => setTimeout(r, 50));
-  const [logFile] = fs.readdirSync(path.join(logs, 'kisel', 'runs'));
+  const [logFile] = fs.readdirSync(path.join(logs, 'sharp', 'runs'));
   assert.match(logFile, /_collect\.log$/);
 });
 
@@ -83,7 +83,7 @@ test('stop kills the running agent', () => {
   const events = [];
   runner.onEvent((e) => events.push(e));
   assert.deepEqual(runner.stop(), { ok: false });
-  runner.start('collect', 'kisel');
+  runner.start('collect', 'sharp');
   assert.deepEqual(runner.stop(), { ok: true });
   assert.equal(killed, child);
   assert.equal(events.at(-1).code, null);
@@ -94,7 +94,7 @@ test('a missing claude is reported as such', () => {
     root: '/repo', logDirOf: () => tempDir(),
     spawn: () => { const e = new Error('spawn claude ENOENT'); e.code = 'ENOENT'; throw e; },
   });
-  assert.deepEqual(runner.start('collect', 'kisel'), { ok: false, error: 'claude_not_found' });
+  assert.deepEqual(runner.start('collect', 'sharp'), { ok: false, error: 'claude_not_found' });
   assert.equal(runner.state().running, false);
 });
 

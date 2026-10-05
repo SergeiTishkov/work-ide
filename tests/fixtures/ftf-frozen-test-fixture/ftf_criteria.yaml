@@ -1824,7 +1824,7 @@ classification_thresholds:
 
 talent_pipeline_gate:
   # An advertisement with no vacancy behind it. Added 2026-08-11 together with
-  # tests/test_score_checklist_2026_08_11.py; the reasoning is in the kisel
+  # tests/test_score_checklist_2026_08_11.py; the reasoning is in the sharp
   # template, the vacancy that exposed it is named in the test.
   keywords:
     - "talent pipeline"

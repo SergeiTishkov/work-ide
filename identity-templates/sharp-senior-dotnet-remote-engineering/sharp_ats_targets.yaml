@@ -15,18 +15,16 @@
 #             <token>.recruitee.com
 #
 # HOW TO EXTEND IT (the main lever on the quality of the shortlist):
-# add mature enterprise companies here that really do hire for .NET/C# and
-# work remotely. Take candidates from data/knowledge/companies.json (those
-# with high legacy_enterprise_hits and an age of 10+ years per Wikidata), or
-# find them by web search. A token can be checked with one command:
+# add companies here that really do hire for .NET/C# remotely and engage
+# people abroad. Take candidates from data/knowledge/companies.json, or find
+# them by web search. A token can be checked with one command:
 #
 #   curl https://boards-api.greenhouse.io/v1/boards/<token>/jobs
 #
 # The starting list below is of verified working boards (measured 2026-07-31).
 # It is deliberately small and made up of technology companies that certainly
-# hire remotely; it needs building out to suit the person — with banks,
-# insurers, healthcare and government contractors, that is, the sort of place
-# where calm legacy projects live.
+# hire remotely; it needs building out to suit the person — with employers
+# and staffing vendors that sign contracts with engineers abroad.
 
 targets:
   - company: "Stripe"

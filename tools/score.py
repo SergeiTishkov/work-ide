@@ -1257,7 +1257,7 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     # vacancy nobody ever called remote.
     # Only a NAMED platform exempts a vacancy from confirming it is remote —
     # the same tightening the region-tie override got on 2026-08-12, for the
-    # same reason. Measured 2026-09-13 across KISEL's base: eight vacancies in
+    # same reason. Measured 2026-09-13 across SHARP's base: eight vacancies in
     # the confident tiers were there on "freelance", "contractor" or "1099"
     # alone, and not one of them was remote work — freelance missions in
     # Brussels, Lille and Stevenage, and a Stripe posting where "1099" is the
@@ -1269,7 +1269,7 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
     # asked even when the text talks about worldwide hiring, contractors or a
     # region, and only an explicit word answers it.
     #
-    # Measured 2026-10-04 on KISEL's base: 19 LinkedIn vacancies sat in the
+    # Measured 2026-10-04 on SHARP's base: 19 LinkedIn vacancies sat in the
     # confident tiers with no "remote" anywhere. Five had the employer's
     # TELECOMMUTE. The rest passed on "WFH 3 Days per week" (hybrid), "an
     # allowance when you work from home" (a perk), "collaborate with a
@@ -1706,7 +1706,7 @@ def _score_language_fit(text: str, criteria: dict):
     # opposite in the next sentence. Found 2026-09-13: "fluent in Dutch or
     # French" is a refusal, "Dutch or French is desirable" is not, and
     # "LANGUAGES – MUST Dutch OR French: fluent" puts the demand after the
-    # languages. Measured over KISEL's base before writing: a bare "dutch or
+    # languages. Measured over SHARP's base before writing: a bare "dutch or
     # french" substring would have rejected two vacancies out of six wrongly.
     explicit_hits += _matches_patterns(
         text, cfg.get("explicit_requirement_patterns"), explicit_hits)
@@ -2766,10 +2766,10 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     #
     # Opt-in per identity. For a search where the gate means "this CV will not
     # be considered" (PJOICE, 2026-09-13: a Principal Data Engineer sat in "hours
-    # not confirmed" at 55) it is plainly right. For KISEL, where a single
+    # not confirmed" at 55) it is plainly right. For SHARP, where a single
     # "agentic" in a consultancy's boilerplate gates an ordinary ".NET
     # Developer", it would hide 51 vacancies on a thin signal — measured before
-    # this was written — so KISEL keeps the old order.
+    # this was written — so SHARP keeps the old order.
     parked = unconfirmed_only
     complexity_cfg = criteria.get("role_complexity_signal") or {}
     if parked and complexity_gate and complexity_cfg.get("applies_to_unconfirmed"):

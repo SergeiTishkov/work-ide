@@ -13,7 +13,7 @@ const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.h
 async function open(page) {
   await page.addInitScript(installMockApi, standardFixture());
   await page.goto(PAGE);
-  await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
 }
 
 // A flag is an image that actually loaded, not a broken icon.
@@ -90,7 +90,7 @@ test('a click elsewhere or Escape closes the drop-down without a change', async 
 
 test("a vacancy's own lines follow the language, a row without them keeps its one", async ({ page }) => {
   const fixture = standardFixture();
-  const [withViews, without] = fixture.rows.kisel.full;
+  const [withViews, without] = fixture.rows.sharp.full;
   withViews.views = {
     ru: { ...withViews.view, highlights: ['nizkaya nagruzka'], salary: 'ne ukazana' },
     en: { ...withViews.view, highlights: ['low intensity'], salary: 'not stated' },

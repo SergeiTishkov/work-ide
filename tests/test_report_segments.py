@@ -164,5 +164,5 @@ def test_a_broken_segmentation_still_produces_a_report(monkeypatch, tmp_path):
 
 
 def test_the_filename_of_a_segment_is_predictable():
-    assert report.segment_filename("uk", prefix="kisel_") == "kisel_uk_latest.md"
-    assert report.segment_filename("", prefix="kisel_") == "kisel_latest.md"
+    assert report.segment_filename("uk", prefix="sharp_") == "sharp_uk_latest.md"
+    assert report.segment_filename("", prefix="sharp_") == "sharp_latest.md"

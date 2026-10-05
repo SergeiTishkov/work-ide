@@ -15,7 +15,7 @@ or the employer's TELECOMMUTE confirm remote; worldwide, contractor and region
 phrases no longer skip the question for it.
 
 **Why.** LinkedIn shows Remote/Hybrid/On-site to logged-in visitors only. In
-KISEL's base 14 LinkedIn vacancies sat in the confident tiers on "WFH 3 Days
+SHARP's base 14 LinkedIn vacancies sat in the confident tiers on "WFH 3 Days
 per week" (hybrid), "an allowance when you work from home", "a distributed
 team", "work from any location in Belarus ... or our offices", or a named EOR
 platform on a Rome posting with three office days a week. They now wait in
@@ -115,7 +115,7 @@ country of residence.
 - 5 vacancies move to rejected ("SC Cleared", "US CITIZEN AND GC ONLY",
   "Visa: H1B, GC, USC", "Poland or Romanian residents only", "US work
   authorization required"); each was read.
-- The same rewrite was measured on the KISEL base: 62 vacancies move to
+- The same rewrite was measured on the SHARP base: 62 vacancies move to
   rejected and 3 come back from wrong refusals.
 
 Rescoring the whole base takes about 14% longer.
@@ -176,7 +176,7 @@ caught before a run rather than in a report.
 
 That test failed on the fix itself, and found the deeper fault: the matcher
 stripped a keyword's edge spaces, so " defi " was still "defi". Fixed in
-`score.keyword_needle` for every identity (the KISEL template's V14 has the
+`score.keyword_needle` for every identity (the SHARP template's V14 has the
 measurement); two comments about language markers in this file are corrected
 to match.
 
@@ -202,7 +202,7 @@ things were wrong in `pjoice_criteria.yaml`:
                    confirmed". role_complexity_signal.applies_to_unconfirmed:
                    true keeps gated roles out of the check-by-hand sections.
 
-Three more, shared with the KISEL template (its V13 has the measurements):
+Three more, shared with the SHARP template (its V13 has the measurements):
 French postings recognised by functional words at threshold 4; language demands
 read in context (`explicit_requirement_patterns`); "50% remote" is hybrid. And
 one change in shared code: "freelance" no longer counts as proof that work is
@@ -211,27 +211,27 @@ that word alone.
 
 ## V1 — a search for side work, 2026-09-13
 
-Built from the KISEL template, because the person, the CV and the residency
-are the same — and then turned round on almost every axis KISEL scores:
+Built from the SHARP template, because the person, the CV and the residency
+are the same — and then turned round on almost every axis SHARP scores:
 
-    money          KISEL: one consideration, below calm.
+    money          SHARP: one consideration, below calm.
                    PJOICE: the priority, graded by the hourly rate
                    (compensation_signal.hourly_equivalent_tiers).
-    hours          KISEL: intensity matters, hours do not.
+    hours          SHARP: intensity matters, hours do not.
                    PJOICE: part-time, freelance or fractional is REQUIRED —
                    a full-time role cannot be done beside a full-time job
                    (engagement_fit). Silence goes to its own section.
-    dull work      KISEL: a plus (legacy_enterprise_signal).
+    dull work      SHARP: a plus (legacy_enterprise_signal).
                    PJOICE: neutral — the block is present and weighs nothing.
-    interesting    KISEL: crypto was a dealbreaker, startups a penalty.
+    interesting    SHARP: crypto was a dealbreaker, startups a penalty.
                    PJOICE: crypto, AI and distributed systems are a small plus
                    (extra_signals.interesting_work).
-    complexity     KISEL: "not simple work" is gated.
+    complexity     SHARP: "not simple work" is gated.
                    PJOICE: complex work is welcome; what is gated is work THIS
                    CV will not be considered for — research, machine learning,
                    data engineering, smart contracts (role_complexity_signal,
                    repurposed).
-    AI training    KISEL: a gate.
+    AI training    SHARP: a gate.
                    PJOICE: a visible minus — it pays, and whether a paid gig is
                    worth it is the person's call (extra_signals.ai_training_gig).
 

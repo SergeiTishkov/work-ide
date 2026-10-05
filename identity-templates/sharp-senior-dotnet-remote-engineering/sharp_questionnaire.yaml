@@ -10,31 +10,21 @@
 # The full list of questions and the order to ask them: docs/QUESTIONNAIRE.md.
 
 schema_version: 1
-identity_prefix: kisel
+identity_prefix: sharp
 kind: template
 
 answers:
 
   - question: "What exactly are you looking for?"
     answer: >
-      Easy work. The goal is INTENSITY rather than a number of hours: an
-      undemanding full-time role suits as well as a moderately loaded part-time
-      one. Reduced hours, a four-day week and part-time work are forms of low
-      intensity rather than requirements in themselves.
+      Remote senior .NET/C# engineering. First, the employer can hire me
+      remotely from my country and I fit the role; then pay. Technology
+      decides only between otherwise equal vacancies (2026-10-05).
 
-  - question: "What is NOT the goal?"
+  - question: "Does legacy or new technology matter?"
     answer: >
-      Interesting problems, career growth, ambitious projects, learning a new
-      stack. A deliberate choice rather than a compromise: it is precisely
-      giving them up that opens access to vacancies with little competition.
-
-  - question: "Why is legacy a plus?"
-    answer: >
-      Settled code changes slowly, the requirements are known, the processes
-      are documented, and competition is low: most candidates run from the
-      words "legacy" and "maintenance". On top of that, modern LLMs know
-      precisely the widespread, well-documented stack in its "ageing" edition
-      particularly well.
+      No. Legacy work can be hard and new work can be relaxed; neither is a
+      plus or a minus. A top-paying role on new technology is welcome.
 
   - question: "Which roles are cut entirely, and why?"
     answer: >
@@ -44,12 +34,12 @@ answers:
       chance at such a vacancy is zero, and a points penalty does not express
       a zero chance.
 
-  - question: "How is intensity judged when nobody writes about it?"
+  - question: "How is reachability judged when nobody writes about it?"
     answer: >
-      Indirectly. Vacancies never say "it is calm here"; the signals are
-      derived from the stack (old technologies), the industry (banks, the
-      public sector, insurance), the wording about working patterns, and from
-      boards that sort employers by pattern themselves (4dayweek.io).
+      From the employer's own words about hiring abroad (contractors from any
+      country, an EOR, the person's own company), from the board's location
+      field, and from what rules it out: a US or Canadian payroll benefit,
+      "must live in", "<place> only".
 
   # --- QUESTIONS WHOSE ANSWERS ARE PERSONAL --------------------------------
   # The template lists them but does not answer: the answer depends on the

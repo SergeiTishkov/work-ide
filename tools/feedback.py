@@ -9,10 +9,10 @@ is a bug report against the filter: the vacancy should never have been shown.
 This script does the gathering, so the agent does not have to dig through the
 database by hand:
 
-    python tools/feedback.py --identity kisel count
-    python tools/feedback.py --identity kisel collect      # writes a package
-    python tools/feedback.py --identity kisel list         # the same, to stdout
-    python tools/feedback.py --identity kisel mark-reviewed --id X --id Y \\
+    python tools/feedback.py --identity sharp count
+    python tools/feedback.py --identity sharp collect      # writes a package
+    python tools/feedback.py --identity sharp list         # the same, to stdout
+    python tools/feedback.py --identity sharp mark-reviewed --id X --id Y \\
         --outcome "role gate now rejects 'Java' titles; test added"
 
 A package (data/<prefix>/feedback/pending_<time>.yaml) holds everything a

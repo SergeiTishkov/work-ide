@@ -12,7 +12,7 @@ const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.h
 async function open(page, fixture = standardFixture()) {
   await page.addInitScript(installMockApi, fixture);
   await page.goto(PAGE);
-  await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
 }
 
 function calls(page, name) {
@@ -26,7 +26,7 @@ function inFunnel(fixture, id, feedback) {
   r.feedback = {
     rejectedReason: null, buggedReason: null, interviewComments: [], interviewAt: [], ...feedback,
   };
-  fixture.rows.kisel.full.push(r);
+  fixture.rows.sharp.full.push(r);
   return r;
 }
 
@@ -53,11 +53,11 @@ test('an application moves on: "Contact happened" opens a large optional comment
   await card.getByTestId('step-save').click();
 
   expect(await calls(page, 'advance')).toEqual(
-    [['kisel', 'p1', 'contacted', 'HR called, a call with the team lead next week']]);
+    [['sharp', 'p1', 'contacted', 'HR called, a call with the team lead next week']]);
   await expect(page.getByTestId('stub-p1'))
     .toContainText(ru['stub.marked'].replace('{status}', ru['status.contacted']));
   await page.getByTestId('stub-p1').getByTestId('btn-undo').click();
-  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['kisel', 'p1']);
+  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'p1']);
 });
 
 test('a step saved without a comment sends an empty string, never null', async ({ page }) => {
@@ -72,7 +72,7 @@ test('a step saved without a comment sends an empty string, never null', async (
   await expect(card.getByTestId('btn-step-awaiting_final')).toHaveText(ru['step.awaiting_final']);
   await card.getByTestId('btn-step-interview').click();
   await card.getByTestId('step-save').click();
-  expect(await calls(page, 'advance')).toEqual([['kisel', 'p1', 'interview', '']]);
+  expect(await calls(page, 'advance')).toEqual([['sharp', 'p1', 'interview', '']]);
 });
 
 test('after an interview: another interview, or waiting for the final word', async ({ page }) => {
@@ -140,12 +140,12 @@ test('Ctrl+Enter saves a step comment and an edited one, as "Save" does', async 
   await card.getByTestId('entry-input').fill('recruiter wrote on LinkedIn');
   await card.getByTestId('entry-input').press('Control+Enter');
   expect(await calls(page, 'editComment')).toEqual(
-    [['kisel', 'p1', 'contact', null, 'recruiter wrote on LinkedIn']]);
+    [['sharp', 'p1', 'contact', null, 'recruiter wrote on LinkedIn']]);
 
   await card.getByTestId('btn-step-interview').click();
   await card.getByTestId('step-input').fill('a call with the team lead');
   await card.getByTestId('step-input').press('Control+Enter');
-  expect(await calls(page, 'advance')).toEqual([['kisel', 'p1', 'interview', 'a call with the team lead']]);
+  expect(await calls(page, 'advance')).toEqual([['sharp', 'p1', 'interview', 'a call with the team lead']]);
 });
 
 test('the pencil edits in place: an empty step becomes an open accordion', async ({ page }) => {
@@ -162,7 +162,7 @@ test('the pencil edits in place: an empty step becomes an open accordion', async
   await contact.getByTestId('entry-save').click();
 
   expect(await calls(page, 'editComment')).toEqual(
-    [['kisel', 'p1', 'contact', null, 'recruiter wrote on LinkedIn']]);
+    [['sharp', 'p1', 'contact', null, 'recruiter wrote on LinkedIn']]);
   await expect(contact.getByTestId('entry-toggle')).toHaveAttribute('aria-expanded', 'true');
   await expect(contact.getByTestId('entry-comment')).toHaveText('recruiter wrote on LinkedIn');
 });
@@ -184,7 +184,7 @@ test('editing an open comment turns its text into a text area', async ({ page })
   await entry.getByTestId('entry-input').fill('went well; a second round on Monday');
   await entry.getByTestId('entry-save').click();
   expect((await calls(page, 'editComment')).at(-1)).toEqual(
-    ['kisel', 'p1', 'interview', 0, 'went well; a second round on Monday']);
+    ['sharp', 'p1', 'interview', 0, 'went well; a second round on Monday']);
   await expect(entry.getByTestId('entry-comment')).toHaveText('went well; a second round on Monday');
 });
 
@@ -222,7 +222,7 @@ test('funnel filters are among the filters, with their counts', async ({ page })
   await open(page, fixture);
   await expect(page.getByTestId('filter-option-awaiting_final')).toContainText('(1)');
   await page.getByTestId('filter').selectOption('awaiting_final');
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'awaiting_final']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'awaiting_final']);
   await expect(byId(page, 'p1').getByTestId('entry-final').getByTestId('entry-label'))
     .toHaveText(ru['timeline.final']);
   // After the final resolution: the offer, or a no.
@@ -242,10 +242,10 @@ test('"Rejected" can close an application at any step, with an optional comment'
   await expect(card.getByTestId('step-input')).toHaveAttribute('placeholder', ru['step.hint.declined']);
   await card.getByTestId('step-input').fill('not enough Azure');
   await card.getByTestId('step-save').click();
-  expect(await calls(page, 'advance')).toEqual([['kisel', 'p1', 'declined', 'not enough Azure']]);
+  expect(await calls(page, 'advance')).toEqual([['sharp', 'p1', 'declined', 'not enough Azure']]);
 
   await page.getByTestId('filter').selectOption('declined');
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'declined']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'declined']);
   const closed = byId(page, 'p1');
   await expect(closed.getByTestId('status-badge')).toHaveText(ru['status.declined']);
   await expect(closed.getByTestId('entry-declined').getByTestId('entry-label'))
@@ -289,7 +289,7 @@ test('"Started working" follows only the offer, and closes the funnel', async ({
   await card.getByTestId('btn-step-started').click();
   await expect(card.getByTestId('step-input')).toHaveAttribute('placeholder', ru['step.hint.started']);
   await card.getByTestId('step-save').click();
-  expect(await calls(page, 'advance')).toEqual([['kisel', 'p1', 'started', '']]);
+  expect(await calls(page, 'advance')).toEqual([['sharp', 'p1', 'started', '']]);
   await page.getByTestId('filter').selectOption('started');
   await expect(byId(page, 'p1').getByTestId('status-badge')).toHaveText(ru['status.started']);
   await expect(byId(page, 'p1').locator('[data-testid^="btn-step-"]')).toHaveCount(0);

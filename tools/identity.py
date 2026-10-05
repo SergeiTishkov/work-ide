@@ -12,11 +12,12 @@ to work at all (constitution, rule zero).
 WHAT AN IDENTITY IS
 -------------------
 A folder under `local-identities/` in which EVERY file starts with the same
-prefix. The prefix is a short, pronounceable Latin abbreviation that says
-what the search is about (`kisel` = Keep It Simple, Easy, Legacy). Uniform
+prefix. The prefix is a short, pronounceable Latin name (`sharp`). It does
+not have to be an abbreviation of the identity's longer description, which
+lives in the folder name and in `<prefix>_identity.md`. Uniform
 prefixing is not cosmetic: an agent will eventually confuse two files named
 `notes.md` in different folders; it will practically never confuse
-`kisel_notes.md` with `jvst_notes.md`.
+`sharp_notes.md` with `jvst_notes.md`.
 
 WHERE "WHICH IDENTITY IS MINE" LIVES
 ------------------------------------
@@ -44,29 +45,32 @@ PREFIX_RE = re.compile(r"^[a-z][a-z0-9]{2,5}$")
 
 PREFIX_RULE_TEXT = (
     "Identity prefix: 3-6 characters, lowercase Latin letters and digits only, "
-    "first character a letter. It should be pronounceable and should describe "
-    "what the search is about (for example: kisel = Keep It Simple, Easy, "
-    "Legacy)."
+    "first character a letter. It should be pronounceable. It does not have to "
+    "be an abbreviation of the identity's longer description (for example: "
+    "sharp, in the folder sharp-senior-dotnet-remote-engineering)."
 )
 
-# Identity folder name: <prefix>-<expansion-with-hyphens>, for example
-# `kisel-keep-it-simple-easy-legacy`.
+# Identity folder name: <prefix>-<description-with-hyphens>, for example
+# `sharp-senior-dotnet-remote-engineering`. The description need not spell out
+# the prefix: the short name and the longer description are separate things
+# (the owner, 2026-10-05).
 #
-# WHY TWO LEVELS OF NAMING. A folder is seen rarely, but when it is, `kisel`
+# WHY TWO LEVELS OF NAMING. A folder is seen rarely, but when it is, `sharp`
 # alone gives no way to remember what that search was or why it was set up.
 # The expansion in the folder name answers that without opening a file.
 #
-# The FILES inside stay short (`kisel_criteria.yaml`, not
-# `kisel-keep-it-simple-easy-legacy_criteria.yaml`): their names appear in
+# The FILES inside stay short (`sharp_criteria.yaml`, not
+# `sharp-senior-dotnet-remote-engineering_criteria.yaml`): their names appear in
 # every command, in grep output, in editor tabs and in paths inside reports,
 # where a long name only makes reading harder.
 FOLDER_RE = re.compile(r"^([a-z][a-z0-9]{2,5})(-[a-z0-9]+(?:-[a-z0-9]+)*)?$")
 
 FOLDER_RULE_TEXT = (
-    "Identity folder name: <prefix>-<expansion with hyphens>, lowercase Latin "
+    "Identity folder name: <prefix>-<description with hyphens>, lowercase Latin "
     "letters, digits and hyphens only (for example: "
-    "kisel-keep-it-simple-easy-legacy). The expansion explains what the search "
-    "is; files inside stay short and start with the prefix alone."
+    "sharp-senior-dotnet-remote-engineering). The description explains what the "
+    "search is and need not spell out the prefix; files inside stay short and "
+    "start with the prefix alone."
 )
 
 # Files without which an identity is incomplete. Order is check order.
@@ -120,7 +124,7 @@ class IdentityNotReadyError(IdentityError):
 # --- Registry -------------------------------------------------------------
 
 def folder_prefix(folder_name: str) -> Optional[str]:
-    """'kisel-keep-it-simple-easy-legacy' -> 'kisel'. None if the name does not fit."""
+    """'sharp-senior-dotnet-remote-engineering' -> 'sharp'. None if the name does not fit."""
     m = FOLDER_RE.match(folder_name)
     return m.group(1) if m else None
 
@@ -238,8 +242,8 @@ def validate(prefix: str, *, strict_prefix_check: bool = True) -> List[str]:
         problems.append(f"identity folder not found: {d}")
         return problems
 
-    # A folder name must carry an expansion: `kisel` says nothing, while
-    # `kisel-keep-it-simple-easy-legacy` explains what the search is right in
+    # A folder name must carry an expansion: `sharp` says nothing, while
+    # `sharp-senior-dotnet-remote-engineering` explains what the search is right in
     # the project tree. This is the one place a long name belongs.
     if folder_prefix(d.name) == d.name:
         problems.append(
@@ -514,7 +518,7 @@ def identities_for_app() -> List[dict]:
 
     The display name is resolved through the profile layers, not read from one
     file as describe() does: in a personal identity the root profile file
-    usually does not repeat it, and the tab would say just "kisel"."""
+    usually does not repeat it, and the tab would say just "sharp"."""
     import settings
 
     result = []
@@ -720,9 +724,9 @@ TEMPLATE_PREFIX_PLACEHOLDER = "<prefix>"
 
 
 def folder_name_for(prefix: str, full_name: str) -> str:
-    """('kisel', 'Keep It Simple, Easy, Legacy') -> 'kisel-keep-it-simple-easy-legacy'.
+    """('sharp', 'Senior dotnet remote engineering') -> 'sharp-senior-dotnet-remote-engineering'.
 
-    A person dictates the expansion as an ordinary phrase; turning it into a
+    A person dictates the description as an ordinary phrase; turning it into a
     folder name is the tool's job, not theirs.
     """
     slug = re.sub(r"[^a-z0-9]+", "-", full_name.strip().lower()).strip("-")
@@ -731,8 +735,8 @@ def folder_name_for(prefix: str, full_name: str) -> str:
             "the expansion is empty, or consists only of characters unusable in "
             "a folder name"
         )
-    # An expansion often starts with the prefix itself ("KISEL — Keep It
-    # Simple"), and then it must not appear twice in the folder name.
+    # A description often starts with the prefix itself ("SHARP — senior
+    # remote"), and then it must not appear twice in the folder name.
     if slug == prefix or slug.startswith(f"{prefix}-"):
         slug = slug[len(prefix):].lstrip("-")
     folder = f"{prefix}-{slug}" if slug else prefix
@@ -750,7 +754,7 @@ def scaffold_identity(prefix: str, full_name: str) -> List[Path]:
     Why this is code rather than a list of commands in the documentation.
     `ONBOARDING.md` used to offer six `copy` invocations, each renaming a file
     by hand. The project has already been burned at exactly this step: while
-    the `ftf` fixture was being created, a file referencing `kisel_` ended up
+    the `ftf` fixture was being created, a file referencing `sharp_` ended up
     inside it — precisely the copy-paste the prefix rule protects against. A
     six-step manual procedure performed from memory produces that mistake
     sooner or later; a function does not.
@@ -920,8 +924,9 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Prefix: 3-6 lowercase Latin characters")
     p_new.add_argument(
         "--name", required=True,
-        help='The prefix expanded as an ordinary phrase, e.g. "Keep It Simple, '
-             'Easy, Legacy". It becomes part of the folder name: '
+        help='The longer description as an ordinary phrase, e.g. "Senior dotnet '
+             'remote engineering"; it need not spell out the prefix. It becomes '
+             'part of the folder name: '
              "local-identities/<prefix>-<expansion>",
     )
     p_new.set_defaults(func=cmd_new)
@@ -934,7 +939,7 @@ def build_parser() -> argparse.ArgumentParser:
                          help="Prefix of the source identity")
     p_clone.add_argument("--prefix", required=True, help="Prefix of the new identity")
     p_clone.add_argument("--name", required=True,
-                         help='Expansion as a phrase, e.g. "KISEL for Germany"')
+                         help='Expansion as a phrase, e.g. "SHARP for Germany"')
     p_clone.set_defaults(func=cmd_clone)
 
     p_val = sub.add_parser("validate",

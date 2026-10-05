@@ -31,14 +31,14 @@ Plus the data: `data/<prefix>/`, the accumulated base, outside git.
 ## The template copy inside a local identity
 
 ```
-local-identities/kisel-keep-it-simple-easy-legacy/
+local-identities/sharp-senior-dotnet-remote-engineering/
   identity.yaml            which template, and which version it is pinned to
   template/                a VERBATIM copy of the template, never edited
-    kisel_profile.yaml
-    kisel_criteria.yaml
+    sharp_profile.yaml
+    sharp_criteria.yaml
     …
-  kisel_profile.yaml       YOUR differences, layered on top
-  kisel_criteria.yaml
+  sharp_profile.yaml       YOUR differences, layered on top
+  sharp_criteria.yaml
   documents/               your CV, under its own name
   CHANGELOG.md
 ```
@@ -60,7 +60,7 @@ rather than parsing prose.
 
 ```bash
 python tools/templates.py list                        # what is available
-python tools/templates.py clone kisel mine "My Search"
+python tools/templates.py clone sharp mine "My Search"
 python tools/templates.py check  --identity mine      # has the template moved on
 python tools/templates.py update --identity mine      # move onto its version
 ```
@@ -68,12 +68,12 @@ python tools/templates.py update --identity mine      # move onto its version
 ## The folder name: prefix plus expansion
 
 ```
-local-identities/kisel-keep-it-simple-easy-legacy/kisel_criteria.yaml
+local-identities/sharp-senior-dotnet-remote-engineering/sharp_criteria.yaml
                  └──────── folder: explains itself ─────┘ └ file: short ┘
 ```
 
 A folder is named `<prefix>-<expansion-with-hyphens>`, because six months on,
-`kisel` alone gives no way to remember what that search was. The expansion in
+`sharp` alone gives no way to remember what that search was. The expansion in
 the folder name answers that in the project tree, without opening a file.
 `identity.py validate` treats a folder with no expansion as a problem.
 
@@ -92,12 +92,12 @@ character alone tells you which level you are at.
 **Every file inside an identity folder begins with `<prefix>_`.**
 
 The reason is specific: an agent will one day confuse two files named `notes.md`
-in different folders, and that will be a silent mistake. `kisel_notes.md` and
+in different folders, and that will be a silent mistake. `sharp_notes.md` and
 `jvst_notes.md` are practically impossible to confuse — the name is recognisable
 in any context: in a project-wide search, in an editor tab, in `grep` output.
 
 The rule extends to the data:
-`data/kisel/kisel.sqlite`, `reports/kisel_latest.md`. A report
+`data/sharp/sharp.sqlite`, `reports/sharp_latest.md`. A report
 opened in its own tab or forwarded to somebody has to identify itself.
 
 Checked automatically: `python tools/identity.py validate`.
@@ -112,18 +112,18 @@ Hence the layout of the report archive:
 
 ```
 reports/
-  kisel_latest.md            # shared folder -> prefix mandatory
+  sharp_latest.md            # shared folder -> prefix mandatory
   jvst_latest.md
   archive/
-    kisel/
-      2026-07-31.md          # the folder is already kisel -> just the date
+    sharp/
+      2026-07-31.md          # the folder is already sharp -> just the date
       2026-08-01.md
     jvst/
       2026-08-01.md
 ```
 
 The "a file identifies itself" property is preserved another way: every report
-starts with the line `# Work IDE [kisel] — report of …`. Even if the file is
+starts with the line `# Work IDE [sharp] — report of …`. Even if the file is
 forwarded or opened in its own tab, the first line names the identity.
 
 ### The rule's boundary: only files the project creates
@@ -139,11 +139,14 @@ renaming buys nothing while breaking how the owner recognises and finds them.
 
 ### Requirements for a prefix
 
-3-6 characters, lowercase Latin letters and digits, first character a letter. It
-should name **what the search is about** rather than the person: an identity
-outlives a change of stack or employer. Non-Latin abbreviations are
-transliterated by sound. Better to avoid ordinary English words — a prefix is
-often looked for with `grep`, and `bore_` would drown in vacancy text.
+3-6 characters, lowercase Latin letters and digits, first character a letter,
+pronounceable, not a person's name. **The short name does not have to match the
+identity's longer description**: it may be an abbreviation of it (`pjoice`) or
+simply a name (`sharp`, whose description is "Senior dotnet remote
+engineering"). The description lives in the folder name and in
+`<prefix>_identity.md` (the owner, 2026-10-05). A non-Latin name is
+transliterated by sound. Check that `<prefix>_` does not occur in vacancy text —
+a prefix is often looked for with `grep`.
 
 ## The blast radius of a change
 
@@ -152,7 +155,7 @@ copy plus a personal overlay rather than inheritance from a shared base:
 
 > **A change can affect only the identity whose prefix is on the file changed.**
 
-An edit to `kisel_criteria.yaml` physically cannot affect `jvst`. Under a
+An edit to `sharp_criteria.yaml` physically cannot affect `jvst`. Under a
 "shared base plus overrides" scheme, editing the base for one identity's sake
 would silently change the disqualifiers for all the others, and it would not
 show in the diff — the file carrying their prefix did not change.
@@ -206,7 +209,7 @@ you can live in one country and look for work in another.
 ## Cloning: one search across several countries
 
 ```bash
-python tools/identity.py clone --from kisel --prefix kde --name "Kisel for Germany"
+python tools/identity.py clone --from sharp --prefix kde --name "Sharp for Germany"
 ```
 
 This command exists for that case. The stack, employment type, marks of a
@@ -375,14 +378,14 @@ python tools/identity.py which
 python tools/identity.py validate
 
 # has the template moved ahead of your copy
-python tools/templates.py check --identity kisel
+python tools/templates.py check --identity sharp
 
 # where a particular setting came from
 python tools/settings.py criteria classification_thresholds.hot_lead
 
 # every tool accepts --identity
-python tools/pipeline.py --identity kisel
-python tools/doctor.py --identity kisel
+python tools/pipeline.py --identity sharp
+python tools/doctor.py --identity sharp
 ```
 
 ## Related documents

@@ -2,10 +2,11 @@
 # The final score is 0..100, plus a separate list of dealbreaker flags and
 # needs_manual_review. Every component is explained in score_breakdown.
 #
-# The philosophy: an ordinary job-search system penalises "legacy", "boring"
-# and "bureaucracy" — here it is the other way round. We deliberately look for
-# what frightens most candidates off, because competition is lower there and
-# the willingness to pay for dull stability is higher.
+# The priorities, in order (the owner, 2026-10-05):
+#   1. the employer can hire this person remotely, and the person fits the role;
+#   2. pay;
+#   3. technology, only between otherwise equal vacancies.
+# Legacy or new, calm or intense: neither is a plus or a minus here.
 
 # HOW A COMPONENT'S WEIGHT WORKS
 #
@@ -16,24 +17,17 @@
 #
 # A component's real weight is its CAP. The current values, largest first:
 #
-#   legacy_enterprise_signal.cap        25   ageing technologies = calm
+#   compensation_signal                -10..+34  pay, graded by the hourly equivalent
+#   residency_eligibility.points        30   the employer is seen to engage people abroad
 #   stack_fit.cap                       25   the fit to the stack
-#   low_intensity_signal.cap            25   direct signs of low intensity
-#   company_reputation_signal          ~24   reviews, work-life balance
-#   compensation_signal                ~15   money
+#   company_reputation_signal          ~24   reviews (entered by hand, rare)
 #   remote_location_fit.worldwide       6    "can I apply at all"
 #   contractor_friendliness.cap         5
+#   legacy_enterprise_signal            0    off since V21 (2026-10-05)
+#   low_intensity_signal                0    off since V21 (2026-10-05)
 #
-# REVISED 2026-08-05 on the owner's direct instruction: "stack, pay, the signs
-# of easy work — those are the key signals. Target regions — who cares. What
-# does a region give me? What matters is the work itself, not geography."
-#
-# Before that, remote_location_fit.worldwide_remote gave 25 — more than the
-# stack (15) and money (10) together. The shortlist was ranked by WHERE a
-#
-# IMPORTANT, do not change: low_intensity_signal weighs more than
-# compensation_signal, and its range is wider. Confirmed by the owner
-# explicitly: "I will take guaranteed dull, easy work for less money over
+# Reachability is mostly decided by gates rather than points: a stated place,
+# a US or Canadian payroll benefit, hybrid work — each rejects outright.
 
 remote_location_fit:
   # Can a contractor sitting where this person sits actually take the work?
@@ -52,7 +46,7 @@ remote_location_fit:
     # reach-first order on 2026-09-13 and asked for it sorted), so a vacancy
     # that can be taken from abroad has to rise through its score.
     #
-    # Measured 2026-10-05 on KISEL's 373 unanswered vacancies in view: the
+    # Measured 2026-10-05 on SHARP's 373 unanswered vacancies in view: the
     # location axis gave 0-8 points and contractor_friendliness 0-5, while the
     # stack and personal technologies gave up to ~37. 22 had an explicit
     # signal that the employer engages people abroad; they sat among 300+
@@ -484,7 +478,7 @@ remote_location_fit:
         pattern: '\b(on|in) (a |the )?(competitive )?w-?2\b|(\d|/|per |an? )\s?(hour|hr|h)\.? ?w-?2\b|\bw-?2[- ](only|role|position|contract|contractors?|employment|employees?|consultants?|basis|arrangement|candidates?|benefits|pay|hourly|rate|salary|opportunity|tax|engagement|employer|long[- ]term|terms|status|payroll)\b|\b(direct|full[- ]time|part[- ]time|contract|only|strictly|exclusively|hourly) \(?w-?2\b|\bw-?2\)|\bemployment type\s*:\s*w-?2\b'
       # A US or Canadian retirement plan among the benefits: 401(k), 403(b),
       # RRSP, DPSP. Only somebody on that country's payroll has one. Measured
-      # 2026-10-05: 50 of KISEL's hot leads and 1992 vacancies across the base
+      # 2026-10-05: 50 of SHARP's hot leads and 1992 vacancies across the base
       # name one — Kforce, Randstad Digital, Actalent, Paychex, Experian... —
       # in an employee benefits list, and none of the hot leads said anything
       # about engaging people abroad. Lifted for an employer that does, and
@@ -568,7 +562,7 @@ remote_location_fit:
         pattern: "\\b(\\d+|one|two|three|four|five)\\s*(\\+)?\\s*days?[^.]{0,25}\\b(in|at|from)\\s+(the\\s+)?office"
       - name: "office days per week"
         pattern: "\\b(in|at|from)\\s+(the\\s+)?office[^.]{0,25}\\b(\\d+|one|two|three|four|five)\\s*(\\+)?\\s*days?"
-      # The forms the rules above missed, quoted from KISEL's hot leads on
+      # The forms the rules above missed, quoted from SHARP's hot leads on
       # 2026-10-05; each pattern was run over the whole base first and every
       # match read in a sample. "Hybrid or remote" and "hybrid / remote" offer
       # a choice and match none of them.
@@ -946,7 +940,7 @@ role_complexity_signal:
   # "Principal Machine Learning Scientist", "Staff Software Engineer,
   # Agentic Platform" is NOT simple work for 2-4 hours a day, even if
   # "enterprise" and "banking" appear in the company description as its market.
-  # This is an axis apart from legacy_enterprise_signal: legacy maintenance in
+  # This was an axis apart from legacy_enterprise_signal: legacy maintenance in
   # a bank is one thing, R&D or new architecture from scratch at the same
   # company quite another. When the gate fires, the classification cannot rise
   # above low_priority regardless of the other components (the same mechanism
@@ -964,35 +958,14 @@ role_complexity_signal:
     - "machine learning engineer"
     - "\\bml engineer\\b"
     - "data scientist"
-    - "founding engineer"
     - "head of ai"
     - "director of ai"
     - "chief ai officer"
-    - "agentic"
-    - "llm engineer"
-    - "ai engineer"
-    - "artificial intelligence engineer"
-    - "genai engineer"
-  # Matches in the description need at least threshold_hits of them (one stray
-  # buzzword in boilerplate must not gate a normal legacy role).
-  description_red_flag_keywords:
-    - "build from scratch"
-    - "greenfield"
-    - "0 to 1"
-    - "0->1"
-    - "own the technical vision"
-    - "own the entire architecture"
-    - "cutting-edge"
-    - "cutting edge"
-    - "state-of-the-art"
-    - "state of the art"
-    - "novel algorithms"
-    - "publish papers"
-    - "phd preferred"
-    - "phd required"
-    - "research new methods"
-    - "large-scale distributed systems"
-    - "hyperscale"
+  # Since V21 (2026-10-05) the gate catches only another profession: science,
+  # ML, research, AI leadership. How new or ambitious the work reads ("build
+  # from scratch", "greenfield", "agentic", "AI engineer", "founding engineer")
+  # no longer gates a role: new technology is welcome when it pays.
+  description_red_flag_keywords: []
   threshold_hits: 2
   # A real case found (2026-07-30, through the manual checklist —
   # docs/VACANCY_CHECKLIST.md): "Staff/Senior Software Engineer (AI CICD)"
@@ -1002,11 +975,7 @@ role_complexity_signal:
   # mention is enough and they need no threshold_hits bar (unlike the vaguer
   # "cutting-edge" and the like, which may be marketing boilerplate).
   #
-  description_red_flag_keywords_strong_single_hit:
-    - "agentic"
-    - "agentic ai"
-    - "llm systems"
-    - "genai"
+  description_red_flag_keywords_strong_single_hit: []
 
 # The gate for "the title names somebody else's stack".
 #
@@ -1123,6 +1092,10 @@ role_relevance_signal:
     - "financial analyst"
     - "risk analyst"
     - "operations analyst"
+    # V21 (2026-10-05): until then caught only by the description words of
+    # role_complexity_signal ("Senior Dispute Analyst" @ Lithic).
+    - "dispute analyst"
+    - "fraud analyst"
     - "onboarding manager"
     - "onboarding specialist"
     - "outreach specialist"
@@ -1212,13 +1185,13 @@ role_relevance_signal:
     - "data scientist|data analyst"
     - "business intelligence|\\bbi developer\\b"
     # machine learning as a profession, not as a buzzword in a stack list
-    - "\\b(ml|ai|machine learning)\\s+engineer\\b"
+    - "\\b(ml|ai|machine learning)\\s+(systems\\s+)?engineer\\b"
     - "research (scientist|engineer)"
     # hardware-adjacent
     - "embedded (software )?engineer|\\bfirmware\\b|\\bfpga\\b|\\blabview\\b"
     # customer-facing engineering
     - "forward deployed"
-    - "(implementation|technical support|field) engineer"
+    - "(implementation|technical support|field|demo) engineer"
   hard_wrong_profession_title_patterns:
     # Not a professional engagement at all. Found 2026-09-13 by a part-time
     # search, where a board's "part-time" label put interns, a Werkstudent and
@@ -1637,212 +1610,24 @@ industry_dealbreaker_gate:
     - "onchain"
     - "on-chain"
 
+# Off since V21 (2026-10-05): legacy or new technology is neither a plus nor a
+# minus for this search. Until then up to +25 for words like "legacy",
+# "maintenance", "enterprise", "mainframe".
 legacy_enterprise_signal:
-  points_per_keyword: 3
-  cap: 25
-  keywords:
-    - "legacy"
-    - "maintenance"
-    - "maintain existing"
-    - "support existing system"
-    - "enterprise"
-    - "back office"
-    - "internal tool"
-    - "internal tools"
-    - "on-premise"
-    - "on-premises"
-    - "monolith"
-    - "webforms"
-    - "winforms"
-    - "vb.net"
-    - "classic asp"
-    - "soap"
-    - "mainframe"
-    - "cobol"
-    - "insurance"
-    - "bank"
-    - "banking"
-    - "government"
-    - "public sector"
-    - "utility"
-    - "utilities"
-    - "healthcare"
-    - "logistics"
-    - "manufacturing"
-    - "higher education"
-    - "erp"
-    - "payroll system"
-    - "stable and mature codebase"
-    - "well-established"
-    # Nobody writes "we have legacy and tedium" (confirmed by the owner
-    # 2026-08-05). But an old stack is visible in the requirements — and it
-    # says more about the character of the work than any words about culture:
-    # where WebForms or WCF lives, there are no weekly rewrites from scratch.
-    #
-    # The list is deliberately of specific technologies rather than generic
-    # words: "legacy" occurs in marketing ("we free you from legacy"), WebForms
-    - "web forms"
-    - "asp.net webforms"
-    - "wcf"
-    - ".net framework 4"
-    - ".net framework 3"
-    - "vb6"
-    - "visual basic"
-    - "silverlight"
-    - "windows forms"
-    - "com+"
-    - "msmq"
-    - "web services description language"
-    - "wsdl"
-    - "xslt"
-    - "crystal reports"
-    - "ssrs"
-    # NOT "ssis": it is a substring of "ai-assisted", "assist", "assistance".
-    # Measured 2026-08-05: 1057 false matches, and they pushed a vacancy with
-    # no SSIS at all to the top of the shortlist. The same class of mistake as
-    # "LESS" inside "no less than" and "Multiplier" inside "productivity
-    # multiplier" — a short acronym must be written out in full.
-    - "sql server integration services"
-    - "ssis package"
-    # NOT "ssas": it is caught inside the Portuguese "nossas". The sources
-    # return text in many languages, and a three-letter acronym will sooner or
-    # later match somebody else's word.
-    - "sql server analysis services"
-    - "team foundation server"
-    - "tfs"
-    - "subversion"
-    - "svn"
-    - "angularjs"
-    - "angular 1"
-    - "knockout.js"
-    - "backbone.js"
-    - "jquery"
-    - "webpack 3"
-    - "bootstrap 3"
-    - "entity framework 6"
-    - "ef6"
-    - "web api 2"
-    - "sql server 2012"
-    - "sql server 2014"
-    - "sql server 2016"
-    - "windows server 2012"
-    - "windows server 2016"
-    - "iis"
-    - "oracle forms"
-    - "pl/sql"
-    - "as400"
-    - "as/400"
-    - "delphi"
-    - "coldfusion"
-    - "sharepoint"
-    - "biztalk"
-    - "dynamics ax"
-    - "dynamics nav"
-    - "navision"
-    - "sitecore"
-    - "umbraco"
-    - "episerver"
-    - "kentico"
-    # Support is a plus for this search (confirmed by the owner 2026-08-05):
-    # maintaining a working system is exactly the character of work being
-    # sought — predictable, no "build it from scratch", settled processes.
-    #
-    # This means ENGINEERING support specifically. Customer support stays in
-    # the profession disqualifiers (role_relevance_signal): that is not development.
-    - "application support"
-    - "production support"
-    - "product support engineer"
-    - "software support engineer"
-    - "technical support engineer"
-    - "l3 support"
-    - "level 3 support"
-    - "third line support"
-    - "3rd line support"
-    - "maintenance and support"
-    - "bug fixing"
-    - "defect resolution"
-    - "incident resolution"
-    - "keep the lights on"
-    - "business as usual"
-    - "run and maintain"
-    - "sustaining engineering"
-    - "legacy modernization"
-    - "legacy modernisation"
+  points_per_keyword: 0
+  cap: 0
+  keywords: []
 
+# Off since V21 (2026-10-05): how calm or intense a role reads is neither a
+# plus nor a minus for this search. Until then from -20 to +25 for words like
+# "part-time", "flexible hours" against "fast-paced", "startup".
 low_intensity_signal:
-  positive_points_per_keyword: 4
-  negative_points_per_keyword: -6
-  cap: 25
-  floor: -20
-  positive_keywords:
-    - "part-time"
-    - "part time"
-    - "flexible hours"
-    - "flexible schedule"
-    - "asynchronous"
-    - "async-first"
-    - "no on-call"
-    - "no on call"
-    - "low stress"
-    - "work-life balance"
-    - "work/life balance"
-    - "20 hours"
-    # Reduced-hours arrangements. They arrive as the structured schedule_type
-    # field from 4dayweek.io (see tools/fetch_4dayweek.py) — that is, not a
-    # guess from the vacancy text but the board's own classification. Both the
-    # machine and the human form are kept: the first survives a change in their
-    - "4-day week"
-    - "4 day week"
-    - "schedule:4_day_week"
-    - "schedule:4_day_week_pro_rata"
-    - "schedule:9_day_fortnight"
-    - "9-day fortnight"
-    - "schedule:compressed_week"
-    - "compressed week"
-    - "schedule:rotating_4_day"
-    - "schedule:half_day_fridays"
-    - "half-day fridays"
-    - "schedule:flexible_hours"
-    - "four-day week"
-    - "reduced hours"
-    - "reduced working week"
-    - "25 hours"
-    - "30 hours"
-    - "few meetings"
-    - "minimal meetings"
-    - "self-paced"
-    - "contractor"
-    - "freelance"
-    - "1099"
-    - "fractional"
-    - "moonlighting ok"
-    - "side project friendly"
-  negative_keywords:
-    - "fast-paced"
-    - "fast paced"
-    - "high growth"
-    - "move fast"
-    - "wear many hats"
-    - "rockstar"
-    - "ninja"
-    - "10x engineer"
-    - "24/7 on-call"
-    - "on-call rotation"
-    - "unlimited pto" # often a marker of "take leave if you survive" startup culture
-    - "hustle"
-    - "startup"
-    - "high-pressure"
-    - "tight deadlines"
-    - "crunch"
-    # profile.yaml → ideal_company_traits.low_priority_avoid: crypto/web3 —
-    # the direct opposite of the "dull legacy stability" being sought.
-    # A real finding, 2026-07-30: "Senior DevOps Engineer (Web3)" reached the
-    # candidates.
-    - "web3"
-    - "crypto"
-    - "blockchain"
-    - "defi"
-    - "nft"
+  positive_points_per_keyword: 0
+  negative_points_per_keyword: 0
+  cap: 0
+  floor: 0
+  positive_keywords: []
+  negative_keywords: []
 
 compensation_signal:
   has_explicit_range_points: 8
@@ -1852,10 +1637,26 @@ compensation_signal:
   # plus, less than a rate stated in the vacancy. Filled in through
   # `tools/kb.py set-salary-estimate` into vacancy.external_signals.
   external_estimate_points: 3
-  no_range_points: 0
-  below_target_penalty: -6
-  above_target_bonus: 2
-  # the target range comes from profile.yaml goal.target_compensation
+  no_range_points: 0          # no data is not bad pay (CLAUDE.md §5)
+  below_target_penalty: -6    # unused while tiers are set
+  above_target_bonus: 2       # unused while tiers are set
+  # PAY IS THE SECOND PRIORITY (2026-10-05), so it is graded rather than merely
+  # noted. Every stated amount becomes US dollars an hour (score._hourly_equivalent):
+  # an hourly rate as it is, an annual salary over 2080 hours, a range as its
+  # middle. $250k a year is about $120 an hour.
+  #
+  # The top tier plus the 8 above for stating a range at all (34) is about the
+  # reachability bonus (30): the first priority and the second weigh about the
+  # same once both are known, and reachability is also guarded by the gates.
+  hours_per_year: 2080
+  hourly_equivalent_tiers:
+    - {at_least: 120, points: 26}
+    - {at_least: 100, points: 20}
+    - {at_least: 80, points: 14}
+    - {at_least: 65, points: 8}
+    - {at_least: 50, points: 2}
+    - {at_least: 35, points: -6}
+    - {at_least: 0, points: -18}
 
 company_reputation_signal:
   # The cost of a red flag in points, not only a "check by hand" mark.
@@ -1866,10 +1667,8 @@ company_reputation_signal:
   red_flag_points: -8
   red_flag_penalty_cap: -20   # the penalty does not go below this
   # Employer reputation from external sources (Glassdoor, Indeed reviews,
-  # Trustpilot, reviews on specialist sites). CRITICAL for this project in
-  # particular: the goal is a calm place with good work-life balance, and that
-  # is exactly what a vacancy text never says, while former employees write
-  # about it honestly in reviews.
+  # Trustpilot, reviews on specialist sites). Former employees write in
+  # reviews what a vacancy text never says: late payments, chaos, burnout.
   #
   # Filled in BY HAND by the agent through `tools/kb.py set-company-reputation`
   # (Glassdoor and the like cannot be scraped automatically — they answer 403;
@@ -1917,8 +1716,8 @@ company_reputation_signal:
   # Company maturity — gathered AUTOMATICALLY from Wikidata
   # (`tools/company_intel.py`), unlike the ratings above.
   # profile.yaml -> ideal_company_traits mentions "mature company (10+ years
-  # old)": an older company usually has settled processes, legacy systems and a
-  # calm pace — exactly what is wanted. Until 2026-07-31 that trait was
+  # old)": an older company is likelier to pay on time and to have settled
+  # processes for engaging people abroad. Until 2026-07-31 that trait was
   # recorded in the profile and checked nowhere.
   company_age:
     mature_threshold_years: 10
@@ -1957,8 +1756,8 @@ classification_thresholds:
   # Software Engineer (Magic Containers)" (18 points), for instance — did not
   # "Senior Vue Developer" (15), "Senior React Full-stack Developer" (15) —
   # reach the report at all. An ordinary, perfectly normal remote vacancy with
-  # no "legacy", no "part-time" and no stated range scores only about 15: the
-  # bonuses are awarded for tedium and low intensity, which few write down.
+  # no "legacy", no "part-time" and no stated range scored only about 15: the
+  # bonuses of that time went to tedium and low intensity, which few write down.
   # As a result, 1 of 966 vacancies was shown to the person — while about 50
   # had genuinely passed every suitability check.
   # RECALIBRATED 2026-08-05 along with the weights.

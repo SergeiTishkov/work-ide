@@ -10,12 +10,9 @@
   makes sense WITHOUT you.
 -->
 
-> **<PREFIX> = <what the abbreviation stands for>.**
+> **<PREFIX>** — <what the name means, if anything. It does not have to be an
+> abbreviation of the longer description below.>
 > <One sentence: what this search is.>
->
-> <Why this particular abbreviation was chosen — it should name what the search
-> is ABOUT rather than a person, so that it outlives a change of stack and
-> employer.>
 
 ## What this identity is
 

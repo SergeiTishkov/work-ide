@@ -54,7 +54,7 @@ segments:
     name: "Rest of the world"
     rest: true
 
-  # The whole shortlist, undivided. Also written to kisel_latest.md, because
+  # The whole shortlist, undivided. Also written to sharp_latest.md, because
   # that is the path RUNBOOK.md, the archive and habit all point at.
   - slug: full
     name: "Everything together"

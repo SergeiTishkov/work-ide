@@ -1,13 +1,13 @@
 """
-Reachability from abroad weighs in the score (KISEL template V20).
+Reachability from abroad weighs in the score (SHARP template V20).
 
 The owner, 2026-10-05: the top of the list is full of vacancies that cannot be
-taken from abroad. Measured on KISEL's 373 unanswered vacancies in view: the
+taken from abroad. Measured on SHARP's 373 unanswered vacancies in view: the
 location axis gave 0-8 points against ~37 for the stack, 50 hot leads offered
 a 401(k) or RRSP, and "hybrid remote", "anywhere within the United States" or
 "Must live in Houston" passed every existing pattern.
 
-The rules are read from the KISEL template itself and laid over the frozen
+The rules are read from the SHARP template itself and laid over the frozen
 fixture's criteria, so these tests check the template a person actually uses.
 """
 from __future__ import annotations
@@ -24,10 +24,10 @@ import score  # noqa: E402
 
 from test_score import CRITERIA, PROFILE, make_vacancy  # noqa: E402
 
-KISEL = yaml.safe_load(
+SHARP = yaml.safe_load(
     (Path(__file__).resolve().parent.parent / "identity-templates"
-     / "kisel-keep-it-simple-easy-legacy" / "kisel_criteria.yaml").read_text(encoding="utf-8"))
-KISEL_RL = KISEL["remote_location_fit"]
+     / "sharp-senior-dotnet-remote-engineering" / "sharp_criteria.yaml").read_text(encoding="utf-8"))
+SHARP_RL = SHARP["remote_location_fit"]
 
 NEW_HARD = {"hybrid remote", "work mode field says hybrid", "hybrid as a separate item",
             "work in a hybrid environment", "remote within one country, said at length",
@@ -41,17 +41,17 @@ STACK = (" Maintain a legacy ASP.NET and SQL Server platform in C#, with .NET Co
 def _criteria(points=None):
     rl = dict(CRITERIA["remote_location_fit"])
     wa = dict(rl["work_authorization"])
-    wa["rules"] = list(wa["rules"]) + [r for r in KISEL_RL["work_authorization"]["rules"]
+    wa["rules"] = list(wa["rules"]) + [r for r in SHARP_RL["work_authorization"]["rules"]
                                       if r["name"] == PAYROLL]
-    wa["international_hiring_patterns"] = KISEL_RL["work_authorization"]["international_hiring_patterns"]
+    wa["international_hiring_patterns"] = SHARP_RL["work_authorization"]["international_hiring_patterns"]
     rl["work_authorization"] = wa
     hard = dict(rl["hard_dealbreakers"])
     hard["patterns"] = list(hard.get("patterns") or []) + [
-        p for p in KISEL_RL["hard_dealbreakers"]["patterns"] if p["name"] in NEW_HARD]
+        p for p in SHARP_RL["hard_dealbreakers"]["patterns"] if p["name"] in NEW_HARD]
     rl["hard_dealbreakers"] = hard
     rl["residency_eligibility"] = {
         **(rl.get("residency_eligibility") or {}),
-        "points": KISEL_RL["residency_eligibility"]["points"] if points is None else points}
+        "points": SHARP_RL["residency_eligibility"]["points"] if points is None else points}
     return {**CRITERIA, "remote_location_fit": rl}
 
 
@@ -62,9 +62,9 @@ def _score(description, criteria=None, **fields):
 
 
 def test_the_template_carries_every_rule_these_tests_lay_over():
-    names = {p["name"] for p in KISEL_RL["hard_dealbreakers"]["patterns"]}
+    names = {p["name"] for p in SHARP_RL["hard_dealbreakers"]["patterns"]}
     assert NEW_HARD <= names
-    assert PAYROLL in {r["name"] for r in KISEL_RL["work_authorization"]["rules"]}
+    assert PAYROLL in {r["name"] for r in SHARP_RL["work_authorization"]["rules"]}
 
 
 @pytest.mark.parametrize("benefits", [
@@ -119,7 +119,7 @@ def test_a_board_saying_anywhere_makes_it_likely_and_adds_the_bonus():
     with_bonus = _score("Fully remote.", **fields)
     without = _score("Fully remote.", criteria=_criteria(points={}), **fields)
     assert with_bonus["residency_eligibility"] == score.ELIGIBILITY_LIKELY
-    bonus = KISEL_RL["residency_eligibility"]["points"]["likely"]
+    bonus = SHARP_RL["residency_eligibility"]["points"]["likely"]
     assert bonus > 0
     assert with_bonus["score_breakdown"]["reachability_bonus"] == {
         "points": bonus, "eligibility": score.ELIGIBILITY_LIKELY}

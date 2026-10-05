@@ -17,7 +17,9 @@ identity:
     <for example: the higher the score, the more the vacancy looks like calm
     legacy maintenance with little competition — what is wanted.>
   display_name: "<a short name, shown in the tools' banner>"
-  abbreviation: "<PREFIX> = <expansion>"
+  # An abbreviation of the description, or what the name means if it is not
+  # one: the short name need not match the longer description.
+  abbreviation: "<PREFIX> = <expansion, or what the name means>"
   created_at: "<YYYY-MM-DD>"
 
 contact:

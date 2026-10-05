@@ -33,7 +33,7 @@ def test_identity_prefix_matches_format(prefix):
 
 @pytest.mark.parametrize("prefix", ALL_IDENTITIES)
 def test_every_file_carries_its_own_prefix(prefix):
-    """The system's central rule: confusing kisel_notes.md with jvst_notes.md is
+    """The system's central rule: confusing sharp_notes.md with jvst_notes.md is
     practically impossible, whereas two files called notes.md is a matter of time."""
     d = identity.identity_dir(prefix)
     offenders = [

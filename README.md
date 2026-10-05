@@ -201,13 +201,13 @@ RUNBOOK.md             what to do in each search cycle
 identity-templates/    KINDS of search. In git. Not one personal fact.
   README.md              how to clone one, the naming rules
   blank-.../             an empty starting point if none of the others fit
-  kisel-.../, pjoice-.../  two opposite searches built for one CV: calm legacy
-                           work, and paid part-time side work
+  sharp-.../, pjoice-.../  two different searches built for one CV: remote
+                           senior work, and paid part-time side work
   <prefix>-<expansion>/  the folder explains itself by its name:
     template.yaml            the template version number
     CHANGELOG.md             what changed, newest first
-    <prefix>_profile.yaml    kisel-keep-it-simple-easy-legacy/
-    <prefix>_criteria.yaml   while the files inside stay short: kisel_profile.yaml
+    <prefix>_profile.yaml    sharp-senior-dotnet-remote-engineering/
+    <prefix>_criteria.yaml   while the files inside stay short: sharp_profile.yaml
 
 config/                shared machinery (nothing personal)
   sources.catalog.yaml   which sources exist and what they can do

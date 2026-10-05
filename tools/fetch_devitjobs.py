@@ -28,7 +28,7 @@ WHAT A RECORD OF devitjobs.com HOLDS (measured 2026-10-04, 2 918 records):
     id (enrich_descriptions._devitjobs_facts).
   * `workplace` — "office" 2 635, "remote" 142, "hybrid" 132: the board's own
     statement, so it goes into `workplace_type` (the arrangement gate). Before
-    it was read, four office jobs sat among KISEL's hot leads.
+    it was read, four office jobs sat among SHARP's hot leads.
   * `redirectJobUrl` — where the board's "Apply" button sends a person, for 2
     910 of them: jobg8 (1 940), appcast (428), Indeed (285), j-vers (233),
     Adzuna. Kept as `apply_url` and shown beside the vacancy. It is never

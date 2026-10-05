@@ -183,14 +183,14 @@ def test_a_group_claimed_by_two_segments_appears_in_both():
 
 # --- the configuration this repository actually ships ----------------------
 
-def test_the_shipped_kisel_segmentation_is_valid_and_complete():
+def test_the_shipped_sharp_segmentation_is_valid_and_complete():
     """The template is configuration, and configuration breaks silently. This
     fails the moment somebody adds a segment naming a group that does not
     exist, or removes `rest` and orphans half the world."""
     import common
 
     path = (common.ROOT / "identity-templates" /
-            "kisel-keep-it-simple-easy-legacy" / "kisel_reports.yaml")
+            "sharp-senior-dotnet-remote-engineering" / "sharp_reports.yaml")
     parsed = segments.parse_segments(common.load_yaml(path) or {})
 
     slugs = [s.slug for s in parsed]

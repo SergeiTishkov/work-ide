@@ -6,7 +6,7 @@ In the desktop app the person answers each vacancy with "applied", "not for
 me" (`rejected`) or "wrong pick" (`bugged`), with an optional reason. This
 command turns the last two into improvements of the search.
 
-The identity is given as the argument (`/feedback kisel`): `$ARGUMENTS`. If it is not, ask —
+The identity is given as the argument (`/feedback sharp`): `$ARGUMENTS`. If it is not, ask —
 unless you run headless (see below).
 
 ## The order

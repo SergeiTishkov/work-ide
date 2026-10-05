@@ -1,6 +1,6 @@
 # Company careers pages, through their ATS (hiring systems).
 #
-# Read by tools/fetch_ats.py — see the KISEL template's file of the same kind for
+# Read by tools/fetch_ats.py — see the SHARP template's file of the same kind for
 # how tokens are found and checked.
 #
 # EMPTY ON PURPOSE, and the `ats` source is disabled in pjoice_sources.yaml.

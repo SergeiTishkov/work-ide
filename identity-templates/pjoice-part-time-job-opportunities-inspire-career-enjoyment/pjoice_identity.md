@@ -2,7 +2,7 @@
 
 > **PJOICE = Part-time Job Opportunities Inspire Career Enjoyment.**
 >
-> The name is the owner's own. Like KISEL, it names what the search is for
+> The name is the owner's own. Like SHARP, it names what the search is for
 > rather than a person or a stack, and `pjoice_` greps cleanly out of vacancy
 > text.
 
@@ -23,7 +23,7 @@ After those, a small plus for work that is interesting — crypto, AI products,
 microservices, distributed and event-driven systems. Dull work is **neutral**:
 it costs nothing, it simply does not earn the plus.
 
-This is KISEL turned round, deliberately. KISEL wants calm legacy work and
+This is SHARP turned round, deliberately. SHARP wants calm legacy work and
 treats crypto as a dealbreaker; PJOICE wants money and a bit of interest and
 treats crypto as a plus. They are two identities rather than one with a filter
 because blending them would make both shortlists worse without the report
@@ -35,13 +35,13 @@ A senior developer in .NET/C# (and JS/TS) with a main job, who wants side work
 that pays. Who exactly is searching, where they live, and what money they
 expect live in the local identity, outside the repository.
 
-The identity is tuned, like KISEL, for a resident **outside the US and the EU**
+The identity is tuned, like SHARP, for a resident **outside the US and the EU**
 working as an international contractor. That is why the geography rules are the
-same as KISEL's: they follow from the residency, not from the kind of search.
+same as SHARP's: they follow from the residency, not from the kind of search.
 
 ## Hard disqualifiers (0% chance, not "low priority")
 
-Everything KISEL refuses on the CV's and the residency's account, plus one of
+Everything SHARP refuses on the CV's and the residency's account, plus one of
 its own:
 
 1. **A full-time engagement, stated by the employer or the board.** "Employment
@@ -50,7 +50,7 @@ its own:
    — so it is not a confirmation either.
 2. **Not remote**, **a residency requirement elsewhere**, **a language the person
    does not speak**, **not software development**, **a stack outside
-   .NET/JS** — as in KISEL.
+   .NET/JS** — as in SHARP.
 3. **Beyond this CV** (`role_complexity_signal`, repurposed): research and
    applied scientists, machine-learning and MLOps engineers, data scientists,
    data and analytics engineers, protocol engineers, cryptographers, quants.
@@ -73,7 +73,7 @@ refusal by guesswork (CLAUDE.md §5). Those vacancies get their own section,
 "Hours not confirmed — check by hand", with the score untouched: a 70 there is
 the same 70 it would be among the hot leads.
 
-**AI-training gigs** (Mercor, Outlier and the like). KISEL gates them as "not a
+**AI-training gigs** (Mercor, Outlier and the like). SHARP gates them as "not a
 job". Here they pay, sometimes $130 an hour, and whether a paid gig is worth it
 is the person's call — so they are shown with a visible minus and a label
 rather than hidden.
@@ -106,12 +106,12 @@ you apply once and are matched. Worth a person's hour once; not a fetcher.
 ## Decision log
 
 - **2026-09-13** — created, on the owner's request: "part-time; as well paid as
-  possible and fitting my CV; the full opposite of KISEL. Boring work is not a
+  possible and fitting my CV; the full opposite of SHARP. Boring work is not a
   plus now but neutral; interesting work a small plus — especially crypto, AI,
   microservices and complex technology, as long as they will still consider me
   with my CV."
 - **2026-09-13** — engagement is a gate with a manual section, on the same
   pattern the owner set for remote work on 2026-08-11.
 - **2026-09-13** — AI-training gigs shown with a minus rather than gated. An
-  assumption, not the owner's words: KISEL's reason for gating them ("not a
+  assumption, not the owner's words: SHARP's reason for gating them ("not a
   steady position") does not apply to side work that is paid by the hour.

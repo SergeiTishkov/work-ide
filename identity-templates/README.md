@@ -13,7 +13,7 @@ local-identities/<my folder>/      ← the working copy. Outside git. Edited.
 
 ```bash
 python tools/templates.py list
-python tools/templates.py clone kisel mypx "My Personal Search"
+python tools/templates.py clone sharp mypx "My Personal Search"
 ```
 
 Cloning puts the template's files into `local-identities/<folder>/template/`
@@ -55,34 +55,34 @@ radius).
 
 ```
 local-identities/
-  kisel-keep-it-simple-easy-legacy/     <- FOLDER: prefix plus expansion
-    kisel_profile.yaml                  <- FILES: the prefix alone
-    kisel_criteria.yaml
-    kisel_identity.md
+  sharp-senior-dotnet-remote-engineering/     <- FOLDER: prefix plus description
+    sharp_profile.yaml                  <- FILES: the prefix alone
+    sharp_criteria.yaml
+    sharp_identity.md
 ```
 
 The split is deliberate, and the levels should not be confused.
 
-**A folder is named `<prefix>-<expansion-with-hyphens>`.** A folder is seen
-rarely, but when it is, `kisel` alone gives no way to remember what that search
-was or why it was set up. The expansion answers that right in the project tree,
+**A folder is named `<prefix>-<description-with-hyphens>`.** A folder is seen
+rarely, but when it is, `sharp` alone gives no way to remember what that search
+was or why it was set up. The description answers that right in the project tree,
 without opening a file. `identity.py validate` checks it: a folder named by the
 prefix alone counts as a problem.
 
-**The files inside stay short: `kisel_criteria.yaml`.** Turning the file prefix
-into the full name (`kisel-keep-it-simple-easy-legacy_criteria.yaml`) is a bad
+**The files inside stay short: `sharp_criteria.yaml`.** Turning the file prefix
+into the full name (`sharp-senior-dotnet-remote-engineering_criteria.yaml`) is a bad
 idea, and here is why: file names occur incomparably more often than the folder
 name. They are in every command, in `grep` output, in editor tabs, in paths
 inside reports and error messages. A long name adds no information there (the
 context is clear anyway) while noticeably hurting readability — and the
 readability of names is exactly what the prefix rule exists for.
 
-There is no need to turn the expansion into a folder name by hand: the clone
+There is no need to turn the description into a folder name by hand: the clone
 command takes it as an ordinary phrase and does that itself.
 
 ```bash
-python tools/templates.py clone kisel kisel "Keep It Simple, Easy, Legacy"
-# -> local-identities/kisel-keep-it-simple-easy-legacy/
+python tools/templates.py clone sharp sharp "Senior dotnet remote engineering"
+# -> local-identities/sharp-senior-dotnet-remote-engineering/
 ```
 
 ## The single-prefix rule
@@ -91,7 +91,7 @@ python tools/templates.py clone kisel kisel "Keep It Simple, Easy, Legacy"
 
 This is not cosmetic but protection against a specific failure. An agent working
 with several identities at once will one day confuse two `notes.md` files from
-different folders — and will do it silently. `kisel_notes.md` and
+different folders — and will do it silently. `sharp_notes.md` and
 `jvst_notes.md` are practically impossible to confuse: the name identifies
 itself in any context — in a project search, in an editor tab, in grep output.
 
@@ -101,20 +101,24 @@ The rule is checked automatically: `python tools/identity.py validate`.
 
 - 3-6 characters, lowercase Latin letters and digits only, first character a
   letter.
-- **Pronounceable and meaningful**: it should describe what the search is about
-  rather than name a person. An identity outlives a change of stack and
-  employer, while "the search for calm legacy remote work" stays itself.
+- **Pronounceable**, and not a person's name.
+- **The short name does not have to match the longer description.** It may be
+  an abbreviation of it (`pjoice`), or simply a name (`sharp`). What the search
+  is about is said by the description: in the folder name and in
+  `<prefix>_identity.md`. The owner, 2026-10-05: the short name and the
+  description are separate things.
 - The source language does not matter; Latin script on the output does.
-  Non-Latin abbreviations are transliterated by sound.
-- Better not to take an ordinary English word: a prefix is often looked for with
-  grep, and `bore_` would drown in vacancy text where `kisel_` would not.
+  A non-Latin name is transliterated by sound.
+- Check that `<prefix>_` does not occur in vacancy text: a prefix is often
+  looked for with grep. Measured 2026-10-05 over 43,596 vacancies: the word
+  "sharp" occurs in 237 of them, "sharp_" in none.
 
 Some worked examples:
 
-| Prefix | Expansion | Comment |
+| Prefix | Longer description | Comment |
 |---|---|---|
-| `kisel` | **K**eep **I**t **S**imple, **E**asy, **L**egacy | Names the point, and happens to be pronounceable |
-| `pjoice` | **P**art-time **J**ob **O**pportunities **I**nspire **C**areer **E**njoyment | The same CV as `kisel`, the opposite search: paid side work |
+| `sharp` | Senior dotnet remote engineering | A name, not an abbreviation |
+| `pjoice` | **P**art-time **J**ob **O**pportunities **I**nspire **C**areer **E**njoyment | The same CV as `sharp`, the opposite search: paid side work |
 | `jvst` | **J**a**v**a **St**artup | Stack plus environment |
 | `usts` | **US** + **TS** (TypeScript) | Residency plus stack |
 
@@ -142,7 +146,7 @@ The required files (checked by `identity.py validate`):
 
 | File | What is inside |
 |---|---|
-| `<p>_identity.md` | The human-readable description: what this identity is, what the abbreviation means, for whom, which tools and sources it uses and why, how scoring works here in particular, and a log of decisions |
+| `<p>_identity.md` | The human-readable description: what this identity is, what the name means, for whom, which tools and sources it uses and why, how scoring works here in particular, and a log of decisions |
 | `<p>_profile.yaml` | Who the identity belongs to and what they seek: residency, languages, stack, expectations about money |
 | `<p>_criteria.yaml` | The full scoring rubric (machinery plus personal tuning, with section banners) |
 | `<p>_sources.yaml` | Which sources are enabled, and with what parameters |

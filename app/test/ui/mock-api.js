@@ -200,7 +200,7 @@ function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new', s
   };
 }
 
-// kisel: collected, three markets; pjoice: collected, one market;
+// sharp: collected, three markets; pjoice: collected, one market;
 // newbie: never collected.
 function standardFixture() {
   const full = [
@@ -211,13 +211,13 @@ function standardFixture() {
   const selection = { id: 7, run: 55, created_at: '2026-09-29T10:00:00+00:00', kind: 'run' };
   return {
     identities: [
-      { prefix: 'kisel', displayName: 'Calm legacy work', hasDatabase: true },
+      { prefix: 'sharp', displayName: 'Senior .NET/C# remote engineering', hasDatabase: true },
       { prefix: 'pjoice', displayName: 'Part-time side work', hasDatabase: true },
       { prefix: 'newbie', displayName: 'Nothing yet', hasDatabase: false },
     ],
     segments: {
-      kisel: {
-        selection, displayName: 'Calm legacy work',
+      sharp: {
+        selection, displayName: 'Senior .NET/C# remote engineering',
         segments: [
           { slug: 'worldwide', name: 'Worldwide', isDefault: false },
           { slug: 'uk', name: 'United Kingdom', isDefault: false },
@@ -230,7 +230,7 @@ function standardFixture() {
       },
     },
     rows: {
-      kisel: { full, uk: [row('u1'), row('u2', { fresh: false })], worldwide: [] },
+      sharp: { full, uk: [row('u1'), row('u2', { fresh: false })], worldwide: [] },
       pjoice: { full: [row('p1')] },
     },
   };

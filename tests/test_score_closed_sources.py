@@ -8,7 +8,7 @@ The owner's feedback of 2026-10-04 on a mycareersfuture vacancy:
     list completely"
 
 Turning the board off in the sources file stops new vacancies, but 1 175 were
-already in kisel's base, 14 of them as hot leads. `closed_sources` in the
+already in sharp's base, 14 of them as hot leads. `closed_sources` in the
 criteria rejects them all, with the reason as the dealbreaker.
 """
 from __future__ import annotations
@@ -54,7 +54,7 @@ def test_the_same_vacancy_from_another_board_is_untouched():
 def test_both_templates_close_mycareersfuture_and_turn_it_off():
     for criteria_file in TEMPLATES.glob("*/*_criteria.yaml"):
         folder = criteria_file.parent
-        if folder.name.startswith(("kisel-", "pjoice-")):
+        if folder.name.startswith(("sharp-", "pjoice-")):
             criteria = yaml.safe_load(criteria_file.read_text(encoding="utf-8"))
             assert "mycareersfuture" in criteria["closed_sources"], folder.name
             sources = yaml.safe_load(

@@ -76,7 +76,7 @@ version, and creates `documents/` for personal files.
 
 Do not copy files by hand, and preferably do not try. This step used to be a
 list of six `copy` commands with a rename each — and the project has already
-been burned on it: a file referencing `kisel_` ended up inside the test fixture,
+been burned on it: a file referencing `sharp_` ended up inside the test fixture,
 which is precisely the copy-paste the prefix rule protects against.
 
 ## Step 3a. Separate the personal from what describes the search

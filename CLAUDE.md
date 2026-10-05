@@ -66,7 +66,7 @@ for different people with different profiles.
 
 The profile is defined by a **search identity**
 (`local-identities/<prefix>-<expansion>/`), not by this file. One person is
-looking for calm legacy remote work part-time, another for onsite work at a
+looking for remote part-time side work, another for onsite work at a
 startup: the system is obliged to serve both without mixing their data.
 
 The system should not merely produce a list of links. It should **accumulate an

@@ -6,13 +6,12 @@
 # test_template_version_matches_changelog — a rule that rests on an agent's
 # memory has broken in this project before.
 
-name: kisel
-version: 20
+name: sharp
+version: 21
 summary: >
-  Calm, low-intensity legacy remote work for a .NET/JS developer.
-  It looks for dull, predictable, well-documented work with little competition:
-  legacy, enterprise, banks and the public sector are pluses, while greenfield,
-  startups and "move fast" are minuses.
+  Senior .NET/C# (and JS/TS) remote engineering for a person outside the US
+  and the EU. Ranked first by whether the employer can hire them remotely and
+  whether they fit the role, then by pay.
 suitable_for: >
-  A senior developer in .NET/C# or JS/TS to whom workload and predictability
-  matter more than interesting problems and career growth.
+  A senior developer in .NET/C# or JS/TS who wants remote work and is ranking
+  vacancies by reachability and pay.

@@ -2,7 +2,7 @@
 A board that hides the work arrangement confirms remote only on an explicit word.
 
 LinkedIn shows Remote/Hybrid/On-site to logged-in visitors only. Measured
-2026-10-04 on KISEL's base: 14 LinkedIn vacancies sat in the confident tiers
+2026-10-04 on SHARP's base: 14 LinkedIn vacancies sat in the confident tiers
 with no "remote" anywhere, on phrases that mean something else there — "WFH 3
 Days per week" (hybrid), "an allowance when you work from home" (a perk), "a
 distributed team", "work from any location in Belarus ... or our offices", a
@@ -101,7 +101,7 @@ def test_the_catalogue_marks_linkedin_and_both_templates_name_the_words():
     catalog = yaml.safe_load((root / "config" / "sources.catalog.yaml").read_text(encoding="utf-8"))
     hidden = {s["name"] for s in catalog["sources"] if s.get("workplace_hidden")}
     assert hidden == {"linkedin"}
-    for name in ("kisel", "pjoice"):
+    for name in ("sharp", "pjoice"):
         path = next((root / "identity-templates").glob(f"{name}-*/{name}_criteria.yaml"))
         criteria = yaml.safe_load(path.read_text(encoding="utf-8"))
         words = criteria["remote_location_fit"]["explicit_remote_keywords"]

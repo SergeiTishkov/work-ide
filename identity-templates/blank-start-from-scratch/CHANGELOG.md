@@ -2,6 +2,12 @@
 
 New versions go on TOP.
 
+## V3 — the short name need not be an abbreviation
+
+`blank_identity.md` and `blank_profile.yaml` no longer ask for the prefix to
+be an abbreviation of the longer description: the short name and the
+description are separate things (the owner, 2026-10-05).
+
 ## V2 — the template is in English
 
 Every comment, placeholder and question in the scaffolding was translated into

@@ -12,10 +12,10 @@ const ru = require('../../renderer/locales/ru.js');
 function fixtureRepo() {
   const root = tempDir('work-ide-smoke-');
   fs.cpSync(SCHEMA_DIR, path.join(root, 'schemas'), { recursive: true });
-  const database = standardDatabase(path.join(root, 'data', 'kisel', 'kisel.sqlite'));
+  const database = standardDatabase(path.join(root, 'data', 'sharp', 'sharp.sqlite'));
   const identities = path.join(root, 'identities.json');
   fs.writeFileSync(identities, JSON.stringify([
-    { prefix: 'kisel', display_name: 'Calm legacy work', database: 'data/kisel/kisel.sqlite' },
+    { prefix: 'sharp', display_name: 'Senior .NET/C# remote engineering', database: 'data/sharp/sharp.sqlite' },
     { prefix: 'pjoice', display_name: 'Part-time', database: 'data/pjoice/pjoice.sqlite' },
   ]));
   return { root, database, identities };
@@ -45,7 +45,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
   });
   try {
     const window = await app.firstWindow();
-    await expect(window.getByTestId('identity-tab-kisel')).toBeVisible();
+    await expect(window.getByTestId('identity-tab-sharp')).toBeVisible();
     await expect(window.getByTestId('identity-name')).toHaveText('Test search');
     await expect(window.getByTestId('segment-tab-full')).toHaveAttribute('aria-selected', 'true');
     await expect(window.getByTestId('list').locator('article')).toHaveCount(3);   // new0..new2
@@ -62,10 +62,10 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     expect({ ...row }).toEqual({ feedback_status: 'bugged', bugged_reason: 'onsite in fact' });
 
     await window.getByTestId('run-collect').click();
-    await expect(window.getByTestId('run-log')).toContainText('fake run: /run kisel');
+    await expect(window.getByTestId('run-log')).toContainText('fake run: /run sharp');
     await expect(window.getByTestId('run-status')).toContainText(ru['run.finished']);
     await expect(window.getByTestId('run-collect')).toBeEnabled();
-    expect(fs.readdirSync(path.join(repo.root, 'data', 'kisel', 'runs'))).toHaveLength(1);
+    expect(fs.readdirSync(path.join(repo.root, 'data', 'sharp', 'runs'))).toHaveLength(1);
 
     // The indicator reads tools/runstate.py's row: a live one (this test's own
     // pid, fresh heartbeat) shows, a finished one clears within a poll.

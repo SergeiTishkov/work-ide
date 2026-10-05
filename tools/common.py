@@ -233,13 +233,13 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
     RAW_DIR = DATA_DIR / "raw"
 
     # REPORTS_DIR is shared by every identity: the latest shortlist of each sits
-    # there, distinguished by the prefix in its name (kisel_latest.md,
+    # there, distinguished by the prefix in its name (sharp_latest.md,
     # jvst_latest.md). The archive, by contrast, is split per identity —
     # reports/archive/<prefix>/ — and inside it file names are just dates. The
     # single-prefix rule applies where files of DIFFERENT identities share a
     # folder; when the folder itself belongs to one identity, a prefix on every
     # name is redundant. The report identifies itself on its first line anyway:
-    # "# Work IDE [kisel] — …".
+    # "# Work IDE [sharp] — …".
     if reports_root is not None:
         reports_base = Path(reports_root)
     elif data_root is not None:

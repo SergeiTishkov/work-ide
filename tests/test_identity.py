@@ -16,7 +16,7 @@ import identity
 
 # --- Prefix format ---------------------------------------------------------
 
-@pytest.mark.parametrize("prefix", ["kisel", "ftf", "abc", "a1b2c3", "jvst"])
+@pytest.mark.parametrize("prefix", ["sharp", "ftf", "abc", "a1b2c3", "jvst"])
 def test_valid_prefixes_accepted(prefix):
     assert identity.PREFIX_RE.match(prefix), f"{prefix} should be accepted"
 
@@ -24,7 +24,7 @@ def test_valid_prefixes_accepted(prefix):
 @pytest.mark.parametrize("prefix", [
     "ab",           # too short
     "abcdefg",      # too long
-    "KISEL",        # uppercase: the Windows FS is case-insensitive, so confusion
+    "SHARP",        # uppercase: the Windows FS is case-insensitive, so confusion
                     # is guaranteed
     "1abc",         # starts with a digit
     "ka-lm",        # hyphen
@@ -57,9 +57,9 @@ def test_identity_file_path_uses_prefix():
     tell you what the search was; file names appear in every command and in
     grep output, where a long name only gets in the way.
     """
-    path = identity.identity_file("kisel", "criteria.yaml")
-    assert path.name == "kisel_criteria.yaml"
-    assert path.parent.name == "kisel-keep-it-simple-easy-legacy"
+    path = identity.identity_file("sharp", "criteria.yaml")
+    assert path.name == "sharp_criteria.yaml"
+    assert path.parent.name == "sharp-senior-dotnet-remote-engineering"
 
 
 # --- Validation ------------------------------------------------------------
@@ -266,7 +266,7 @@ def test_no_identity_error_message_is_actionable():
 #
 # This used to be a six-step procedure of manual `copy` commands, each renaming
 # a file. That is exactly where the project got burned: a file referencing
-# kisel_ ended up inside the ftf fixture. These tests protect the automation
+# sharp_ ended up inside the ftf fixture. These tests protect the automation
 # that makes the mistake impossible.
 
 @pytest.fixture
@@ -323,7 +323,7 @@ def test_scaffold_refuses_to_overwrite_existing_identity(sandbox_identities):
     assert "already exists" in str(exc.value)
 
 
-@pytest.mark.parametrize("bad", ["ab", "KISEL", "1abc", "ka-lm", "blank"])
+@pytest.mark.parametrize("bad", ["ab", "SHARP", "1abc", "ka-lm", "blank"])
 def test_scaffold_refuses_bad_prefix(sandbox_identities, bad):
     with pytest.raises(identity.InvalidIdentityError):
         identity.scaffold_identity(bad, "Some Search")
@@ -332,32 +332,32 @@ def test_scaffold_refuses_bad_prefix(sandbox_identities, bad):
 # --- Folder name: prefix plus expansion ------------------------------------
 #
 # The two levels of naming are deliberately different. A folder is seen rarely,
-# and `kisel` alone gives no way to remember what that search was — hence the
+# and `sharp` alone gives no way to remember what that search was — hence the
 # expansion right in the folder name. The files inside are the opposite:
 # short, because their names appear in every command, in grep output and in
 # paths inside reports.
 
 @pytest.mark.parametrize("folder,expected", [
-    ("kisel-keep-it-simple-easy-legacy", "kisel"),
+    ("sharp-senior-dotnet-remote-engineering", "sharp"),
     ("jvst-java-startup-onsite", "jvst"),
     ("ftf-frozen-test-fixture", "ftf"),
     ("abcd", "abcd"),                        # no expansion: recognised, but
                                              # validate() will complain
     ("blank-start-from-scratch", "blank"),   # the empty template is a valid name too
-    ("Kisel-Keep-It", None),                 # uppercase
-    ("kisel_keep_it", None),                 # underscores separate FILES, not folders
+    ("Sharp-Keep-It", None),                 # uppercase
+    ("sharp_keep_it", None),                 # underscores separate FILES, not folders
 ])
 def test_folder_prefix_extraction(folder, expected):
     assert identity.folder_prefix(folder) == expected
 
 
 @pytest.mark.parametrize("full_name,expected", [
-    ("Keep It Simple, Easy, Legacy", "kisel-keep-it-simple-easy-legacy"),
-    ("KISEL — Keep It Simple", "kisel-keep-it-simple"),   # the prefix is not doubled
-    ("Java  Startup / onsite", "kisel-java-startup-onsite"),
+    ("Senior dotnet remote engineering", "sharp-senior-dotnet-remote-engineering"),
+    ("SHARP — senior remote", "sharp-senior-remote"),   # the prefix is not doubled
+    ("Java  Startup / onsite", "sharp-java-startup-onsite"),
 ])
 def test_folder_name_generated_from_a_spoken_phrase(full_name, expected):
-    assert identity.folder_name_for("kisel", full_name) == expected
+    assert identity.folder_name_for("sharp", full_name) == expected
 
 
 def test_folder_without_description_is_reported(tmp_path, monkeypatch):
@@ -438,14 +438,14 @@ def test_shipped_identity_is_complete_except_for_personal_data():
     """A shipped identity must be filled in COMPLETELY — apart from the personal
     fields, which have no business being in a shared repository at all.
 
-    A fresh-clone run on 2026-08-04 exercised this: kisel came out "not ready",
+    A fresh-clone run on 2026-08-04 exercised this: sharp came out "not ready",
     quite correctly, because the overlay holding personal data lives outside
     git. That is right behaviour rather than breakage — a new person has to
     supply their own. But everything else (stack, criteria, sources) must be
     ready to run immediately, or the gate is tuned too strictly and blocks the
     normal path.
     """
-    assert identity.readiness_problems("kisel") == [], (
+    assert identity.readiness_problems("sharp") == [], (
         "a shipped identity must be ready to run straight away"
     )
 

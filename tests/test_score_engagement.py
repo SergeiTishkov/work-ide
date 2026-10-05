@@ -218,7 +218,7 @@ def test_a_role_ruled_out_is_not_parked_for_a_person_when_the_identity_says_so()
 
 
 def test_without_the_option_a_ruled_out_role_still_waits_for_a_person():
-    """KISEL's order, kept on purpose: there a single "agentic" in boilerplate
+    """SHARP's order, kept on purpose: there a single "agentic" in boilerplate
     gates an ordinary .NET Developer, and 51 such vacancies would vanish."""
     criteria = _criteria(engagement_fit=ENGAGEMENT)
     criteria["role_complexity_signal"] = dict(criteria["role_complexity_signal"],

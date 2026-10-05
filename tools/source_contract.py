@@ -16,7 +16,7 @@ ContractRun. Sources without one are reported as having no contract.
 
 python tools/source_contract.py                     -> every source with a contract
 python tools/source_contract.py --source linkedin
-python tools/source_contract.py --identity kisel    -> the sources that identity has enabled
+python tools/source_contract.py --identity sharp    -> the sources that identity has enabled
 python tools/source_contract.py --json
 
 Four outcomes, and they call for different things:

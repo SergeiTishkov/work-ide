@@ -1,24 +1,26 @@
 # =============================================================================
-#  KISEL — the identity profile
+#  SHARP — the identity profile
 # =============================================================================
 #  The human-readable truth about who is searching, and for what.
-#  tools/score.py reads kisel_criteria.yaml; this file is context for the agent
+#  tools/score.py reads sharp_criteria.yaml; this file is context for the agent
 #  and the person, which must not get lost in the code.
 #
-#  The full description of the identity is in kisel_identity.md.
-#  Why the settings are what they are is in kisel_questionnaire.yaml.
+#  The full description of the identity is in sharp_identity.md.
+#  Why the settings are what they are is in sharp_questionnaire.yaml.
 # =============================================================================
 
 identity:
   kind: personal
-  display_name: "Calm, low-intensity legacy remote work (.NET/JS)"
-  abbreviation: "KISEL = Keep It Simple, Easy, Legacy"
+  display_name: "Senior .NET/C# remote engineering"
+  # A name, not an abbreviation: the short name need not match the longer
+  # description (docs/IDENTITIES.md, requirements for a prefix).
+  abbreviation: "SHARP: a name; the description is senior dotnet remote engineering"
   created_at: "2026-07-31"
   # How to explain the score scale to a person in their report. Every identity
   # has its own: what is a plus here is a minus for an onsite startup search.
   scoring_philosophy: >
-    The higher the score (0-100), the more the vacancy looks like "dull,
-    legacy, well paid, little competition" — exactly what is wanted.
+    The higher the score (0-100), the more likely the employer can hire you
+    remotely, the better you fit the role, and the higher the pay.
 
 contact:
   # The contact in the User-Agent. The template sets no value: an address is
@@ -45,7 +47,7 @@ owner:
   #
   # Name, LinkedIn, CV files, languages, residency and time zone are properties
   # of a person rather than of a search. The template is in git and is meant
-  # for anyone looking for calm legacy work; somebody else's residency would
+  # for anyone running this kind of search; somebody else's residency would
   # make it unusable, and their personal data would make it dangerous.
   #
   # Residency matters especially: the geography rules are DERIVED from it. The
@@ -108,26 +110,15 @@ target_regions:
 
 goal:
   purpose: >
-    Easy work. The goal is INTENSITY rather than a number of hours: an
-    undemanding full-time role suits as well as a moderately loaded part-time
-    one. Reduced hours, a four-day week and part-time work are forms of low
-    intensity rather than requirements in themselves, and the absence of any
-    of them is not a minus.
-
-    What is valued is predictability, low cognitive load, settled processes and
-    little competition for the position. Interesting problems and career growth
-    are NOT the goal here — a deliberate choice rather than a compromise.
-  # A guide to actual hours rather than a contractual requirement: a full-time
-  # vacancy with clear signs of low intensity is suitable.
-  effective_hours_per_day_target: [2, 4]
+    Remote senior .NET/C# engineering. In order of priority: the employer can
+    hire the person remotely from their country and the person fits the role;
+    then pay; technology decides only between otherwise equal vacancies.
+    Legacy or new, calm or intense, enterprise or startup: none of it ranks a
+    vacancy (the owner, 2026-10-05).
   ai_assisted: true
   ai_tools_note: >
-    AI (Claude/Cursor/Copilot) is to be used actively for efficiency. So the
-    technologies that suit especially well are the ones modern LLMs understand
-    excellently: ASP.NET (Framework and Core), C#, classic REST/SOAP — that is,
-    ASP.NET MVC/WebForms, EF6/EF Core, jQuery, Angular(JS), SQL Server,
-    a widespread, well-documented stack in its "ageing" edition.
-    
+    AI tools (Claude/Cursor/Copilot) are used actively in the work.
+
   # Pay expectations are personal: they depend on the person and their
   # circumstances rather than on the kind of search.
   # Pay expectations. The amounts are personal — only the SHAPE the scoring
@@ -149,7 +140,7 @@ goal:
 employment_type_priority:
   high: ["contractor", "1099", "part-time", "fractional", "freelance", "hourly"]
   medium: ["W-2 part-time", "temporary", "contract-to-hire"]
-  # Full-time is NOT lower priority in itself — what matters is the intensity.
+  # Full-time is NOT lower priority in itself.
   low_but_possible: ["W-2 full-time remote without any workload signal"]
   dealbreaker_signals:
     - "exclusive employment"
@@ -244,36 +235,22 @@ tech_stack:
     - "Redux"
     - "MobX"
   # NOTE: "WebForms", "VB.NET" and "Classic ASP" are deliberately NOT in
-  # tech_stack (the CV does not confirm the person really worked with them) —
-  # but they remain in criteria.yaml -> legacy_enterprise_signal, because they
-  # signal the character of the VACANCY (legacy) rather than a personal skill.
-  # Do not confuse those two axes in future edits.
+  # tech_stack: the CV does not confirm the person really worked with them.
 
 ideal_company_traits:
   high_priority:
     - "remote-first or fully distributed"
     - "US or Canada based (dream scenario)"
     - "Israel, UAE, or Europe based and open to hiring outside their home country (solid, realistic scenario — see target_regions)"
-    - "mature company (10+ years old)"
-    - "enterprise / corporate software"
-    - "legacy system maintenance / support"
-    - "calm engineering culture"
-    - "good work-life balance"
-    - "low stress"
-    - "few meetings"
-    - "well-understood, boring technology"
     - "hires internationally via EOR (Deel, Remote.com, Oyster, Papaya Global, Multiplier, G-P/Globalization Partners) or as 1099 contractor"
+    - "pays at the top of the market and states the amount"
+    - "mature company (10+ years old)"
+  # Since 2026-10-05 reachability, fit and pay rank a vacancy; the kind of work
+  # or company does not. Crypto and web3 stay: criteria.yaml ->
+  # industry_dealbreaker_gate still rejects them.
   low_priority_avoid:
-    - "startup"
-    - "AI-first company"
     - "crypto"
     - "web3"
-    - "constant deadlines"
-    - "high pace of change"
-    - "chronic overtime"
-    - "hero culture"
-    - "move fast and break things"
-    - "wear many hats"
 
 eor_platforms_signal:
   # A mention of an employment platform is a strong signal that a company is

@@ -1,4 +1,4 @@
-# Sources for the KISEL identity.
+# Sources for the SHARP identity.
 #
 # ONLY preferences here: which sources are enabled, and with what parameters.
 # Endpoints, source kind, the remote_only flag and the documentation for each
@@ -31,7 +31,7 @@ sources:
   # --- Vacancies straight from employers -----------------------------------
   - name: ats
     enabled: true
-    # The company list is in kisel_ats_targets.yaml. That is the main lever on
+    # The company list is in sharp_ats_targets.yaml. That is the main lever on
     # quality: the source itself works well, but its yield is determined
     # entirely by which companies are on the list.
 
@@ -39,10 +39,9 @@ sources:
   - name: hn_whoishiring
     enabled: true
     params:
-      # Set explicitly rather than taken from tech_stack.core: "legacy" and
-      # "SQL Server" are not languages, but for THIS identity they are worth
-      # more than half the stack, because legacy maintenance is what is being
-      keywords: [".NET", "C#", "ASP.NET", "legacy", "SQL Server"]
+      # Set explicitly rather than taken from tech_stack.core: "SQL Server" is
+      # not a language, but it is half of the work this stack does.
+      keywords: [".NET", "C#", "ASP.NET", "SQL Server"]
       hits_per_keyword: 50
 
   - name: arbeitnow
@@ -60,14 +59,14 @@ sources:
       # list is deliberately short: 6 words x 28 countries is 168 queries
       # before any is split. Start from the core of the stack.
       # The basis is the stack: it finds what the person can actually do.
-      # Plus a few queries along the INTENSITY AXIS: measured 2026-08-05, calm
-      # part-time work barely turns up if you search by stack alone and filter
-      # afterwards (8 vacancies with such a sign out of 10,215).
-      # LinkedIn's f_JT=P/C filter will not do for this — verified, the guest
-      # endpoint ignores it and the result sets match byte for byte.
+      # "contract C# developer" because a contract is what an employer abroad
+      # can most easily sign; "senior .NET engineer" and ".NET architect"
+      # because they are where the pay is (2026-10-05, replacing two queries
+      # for part-time work). LinkedIn's f_JT=P/C filter will not do for a
+      # contract search — verified, the guest endpoint ignores it.
       keywords: [".NET developer", "C# developer", "ASP.NET",
-                 "part-time .NET developer", "contract C# developer",
-                 "fractional software engineer"]
+                 "senior .NET engineer", "contract C# developer",
+                 ".NET architect"]
       # Every page of every (word x country) pair, postings of the last week
       # (measured 2026-10-03: ten cards a page and at most 100 per query to an
       # anonymous request; a query that reaches that ceiling is split by the
@@ -96,7 +95,7 @@ sources:
   - name: mycareersfuture
     # Off since 2026-10-04: applying needs a Singpass login, which is for
     # Singapore residents. Its vacancies are rejected through closed_sources
-    # in kisel_criteria.yaml.
+    # in sharp_criteria.yaml.
     enabled: false
     params:
       queries: ["software engineer", "backend developer", ".NET developer"]
@@ -120,8 +119,8 @@ sources:
     enabled: true
     # The manual channel: the agent's finds from Indeed and careers pages,
     # entered through tools/ingest_manual.py. It matters especially for this
-    # identity: the public boards cover the combination "legacy + worldwide
-    # remote + a high rate" poorly.
+    # identity: the public boards cover the combination "worldwide remote + a
+    # high rate" poorly.
 
   # --- The UK, added 2026-09-08 ---------------------------------------------
   #

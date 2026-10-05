@@ -46,7 +46,7 @@ to a person.
 
 ```
 python tools/source_contract.py                    # every source with a contract
-python tools/source_contract.py --identity kisel   # the sources kisel has enabled
+python tools/source_contract.py --identity sharp   # the sources sharp has enabled
 python tools/source_contract.py --source linkedin
 python -m pytest --live tests/test_source_contracts_live.py
 python tools/source_doctor.py scope linkedin

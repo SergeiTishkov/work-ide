@@ -137,7 +137,7 @@ Hence:
 * **an identity holds no regexes at all.** Pinned by the test
   `test_dotnet_pattern_lives_in_the_global_vocabulary_not_in_identities`.
 
-The first draft of this fix put the regexes in `kisel_profile.yaml`, that is,
+The first draft of this fix put the regexes in `sharp_profile.yaml`, that is,
 into one person's layer. Wrong layer: the owner and their friends share .NET,
 and every new identity would have started with the same bug.
 

@@ -1,4 +1,4 @@
-# Change log for the KISEL template
+# Change log for the SHARP template
 
 New versions go on TOP. A section's number must match `version` in
 `template.yaml` — that is checked by a test.
@@ -6,9 +6,49 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V21 — renamed from KISEL to SHARP; reachability and pay first, 2026-10-05
+
+**Renamed.** The prefix `kisel` became `sharp`, the folder
+`sharp-senior-dotnet-remote-engineering`, the files `sharp_*`. SHARP is a name,
+not an abbreviation: the short name need not match the longer description
+(`docs/IDENTITIES.md`). A local identity made from this template is renamed
+the same way: folder, files, `prefix`, `template` in `identity.yaml`, and the
+data folder `data/sharp/`.
+
+**Priorities** (`sharp_identity.md`, `sharp_profile.yaml` → `goal.purpose`):
+1. the employer can hire the person remotely, and the person fits the role;
+2. pay;
+3. technology, only between otherwise equal vacancies.
+
+**Changed** (`sharp_criteria.yaml`):
+- `legacy_enterprise_signal`, `low_intensity_signal`: zero points, empty word
+  lists. Legacy or new, calm or intense is neither a plus nor a minus.
+- `compensation_signal.hourly_equivalent_tiers`: pay is graded by the hourly
+  equivalent, from -18 under $35 an hour to +26 from $120 an hour, plus the 8
+  for stating a range at all.
+- `role_complexity_signal`: only another profession is gated (science, ML,
+  research, AI leadership). The description words ("greenfield", "agentic",
+  "founding engineer" and the like) no longer gate a role.
+- `role_relevance_signal`: "dispute analyst", "fraud analyst", "ML systems
+  engineer", "demo engineer" — other professions that until now only the
+  description words above happened to catch.
+
+**Changed** (`sharp_profile.yaml`): `display_name`, `scoring_philosophy`,
+`goal.purpose`; `effective_hours_per_day_target` removed;
+`ideal_company_traits` without the calm and legacy items;
+`low_priority_avoid` emptied.
+
+**Changed** (`sharp_sources.yaml`): HN without the word "legacy"; LinkedIn
+queries "senior .NET engineer" and ".NET architect" replace the two part-time
+queries.
+
+**Why.** The owner, 2026-10-05: what matters is whether the employer can hire
+the person remotely and whether the person fits, then the pay. Legacy work
+can be hard and new work relaxed, so neither ranks a vacancy.
+
 ## V20 — reachability from abroad weighs in the score, 2026-10-05
 
-**Changed** (`kisel_criteria.yaml` → `remote_location_fit`):
+**Changed** (`sharp_criteria.yaml` → `remote_location_fit`):
 - `residency_eligibility.points`: +30 to the score when the verdict is
   `confirmed` or `likely`. A board location of "Anywhere in the World" /
   "Worldwide" now makes the verdict `likely` too.
@@ -34,26 +74,26 @@ and no rule read it; "hybrid remote", "anywhere within the United States",
 ## V19 — devitjobs.uk closed, 2026-10-04
 
 **Changed:**
-- `kisel_sources.yaml` → `devitjobs`: `boards: [us]` (was `[uk, us]`).
-- `kisel_criteria.yaml` → `closed_sources`: `devitjobs.uk`. A key can now be
+- `sharp_sources.yaml` → `devitjobs`: `boards: [us]` (was `[uk, us]`).
+- `sharp_criteria.yaml` → `closed_sources`: `devitjobs.uk`. A key can now be
   a website as well as a source name; the vacancies already in the base from
   that site are rejected with the reason.
 
 **Why.** The owner opened a devitjobs.uk vacancy and landed on
 https://devitjobs.jobcopilot.com/signup?utm_source=dot_uk_old. Every
 devitjobs.uk address does that now, the API too; on 2026-10-03 the API still
-served its list. 178 UK vacancies were in view in KISEL's base.
+served its list. 178 UK vacancies were in view in SHARP's base.
 
 ## V18 — LinkedIn counts as remote only where it says so, 2026-10-04
 
-**Changed:** `kisel_criteria.yaml` → `remote_location_fit`: new
+**Changed:** `sharp_criteria.yaml` → `remote_location_fit`: new
 `explicit_remote_keywords` ("remote", "telecommute", "telework"). For a board
 marked `workplace_hidden` in the shared catalogue (LinkedIn) only these words
 or the employer's TELECOMMUTE confirm remote; worldwide, contractor and region
 phrases no longer skip the question for it.
 
 **Why.** LinkedIn shows Remote/Hybrid/On-site to logged-in visitors only. In
-KISEL's base 14 LinkedIn vacancies sat in the confident tiers on "WFH 3 Days
+SHARP's base 14 LinkedIn vacancies sat in the confident tiers on "WFH 3 Days
 per week" (hybrid), "an allowance when you work from home", "a distributed
 team", "work from any location in Belarus ... or our offices", or a named EOR
 platform on a Rome posting with three office days a week. They now wait in
@@ -62,10 +102,10 @@ platform on a Rome posting with three office days a week. They now wait in
 ## V17 — mycareersfuture is closed: applying needs a Singapore ID, 2026-10-04
 
 **Changed:**
-- `kisel_criteria.yaml`: new `closed_sources`, boards the person cannot apply
+- `sharp_criteria.yaml`: new `closed_sources`, boards the person cannot apply
   through. Every vacancy from one is rejected with the reason as its
   dealbreaker, including those already in the base.
-- `kisel_sources.yaml`: `mycareersfuture` is off.
+- `sharp_sources.yaml`: `mycareersfuture` is off.
 
 **Why.** The owner's feedback: mycareersfuture.gov.sg wants a Singpass login
 to apply, and Singpass is for Singapore residents. Turning the board off only
@@ -73,7 +113,7 @@ stops new vacancies; 1 175 were already in the base, 14 of them as hot leads.
 
 ## V16 — LinkedIn is read to the end of every list, 2026-10-03
 
-**Changed:** `kisel_sources.yaml` → `linkedin`. `max_pages: 2` is gone (the
+**Changed:** `sharp_sources.yaml` → `linkedin`. `max_pages: 2` is gone (the
 fetcher's own bound applies), `posted_within_days: 7` is new, and
 `enrich_limit` went from 150 to 0. If your local file overrides the LinkedIn
 parameters, compare it with this version.
@@ -97,7 +137,7 @@ scoring, by verdict, instead of by title before it. Details:
 
 ## V15 — work authorization is read in its sentence, and W-2 is US payroll, 2026-10-01
 
-**Changed:** `kisel_criteria.yaml` → `remote_location_fit`. The citizenship,
+**Changed:** `sharp_criteria.yaml` → `remote_location_fit`. The citizenship,
 permit, clearance and sponsorship rules left `hard_dealbreakers` (patterns and
 keywords) and `absolute_residency_phrases` ("eligible to work in", "authorized
 to work in", "residency in" and the like). They now live in a new
@@ -164,7 +204,7 @@ Rescoring the whole base takes about 14% longer.
 
 ## V14 — a space at the edge of a keyword now means a word boundary, 2026-09-13
 
-No setting changed; two comments in `kisel_criteria.yaml` were wrong and are
+No setting changed; two comments in `sharp_criteria.yaml` were wrong and are
 corrected, because the machinery under them was.
 
 Keywords such as the Dutch markers " je ", " het ", " in de " were written with
@@ -253,7 +293,7 @@ ever. Enrichment now knows which sources it can read, and reads Reed through
 the schema.org markup its pages publish.
 
 **Does this affect your local settings?** Only if you kept your own
-`kisel_sources.yaml`: lists are replaced rather than merged, so a local copy
+`sharp_sources.yaml`: lists are replaced rather than merged, so a local copy
 must name the new sources to receive them.
 
 ## V11 — the exemptions in V10 had to be earned, 2026-08-12
@@ -339,18 +379,18 @@ Two changes, and they answer the same complaint: a single list sorted by score
 mixes a Singapore agency posting with a UK contract at four times the rate, and
 puts a well-paid job that cannot be taken above a modest one that can.
 
-**Several shortlists, one per market.** `kisel_reports.yaml` — a new file,
+**Several shortlists, one per market.** `sharp_reports.yaml` — a new file,
 layered like every other setting — says which market groups get a file of their
 own. This search now produces eight:
 
-    kisel_worldwide_latest.md   geography is not in the way at all
-    kisel_uk_latest.md
-    kisel_eu_latest.md          the EU and EEA as one group, not 30 files
-    kisel_canada_latest.md
-    kisel_usa_latest.md
-    kisel_anz_latest.md         Australia and New Zealand
-    kisel_rest_latest.md        everything the others did not claim
-    kisel_full_latest.md        all of it, also written to kisel_latest.md
+    sharp_worldwide_latest.md   geography is not in the way at all
+    sharp_uk_latest.md
+    sharp_eu_latest.md          the EU and EEA as one group, not 30 files
+    sharp_canada_latest.md
+    sharp_usa_latest.md
+    sharp_anz_latest.md         Australia and New Zealand
+    sharp_rest_latest.md        everything the others did not claim
+    sharp_full_latest.md        all of it, also written to sharp_latest.md
 
 Worldwide is first on purpose. It is not the leftovers: it is the only group
 where being outside every market above is not an obstacle to begin with.
@@ -387,7 +427,7 @@ order changed.
   base; each happened to be caught by something else, which is luck, not a rule.
 
 **Does this affect your local settings?** Only if you had overridden
-`remote_location_fit`. If you keep your own `kisel_reports.yaml`, remember that
+`remote_location_fit`. If you keep your own `sharp_reports.yaml`, remember that
 lists are replaced rather than merged: name every segment you want.
 
 **What you will notice.** Eight files instead of one, each saying which

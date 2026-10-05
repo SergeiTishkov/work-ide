@@ -13,7 +13,7 @@ const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.h
 async function open(page, fixture = standardFixture()) {
   await page.addInitScript(installMockApi, fixture);
   await page.goto(PAGE);
-  await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
 }
 
 function calls(page, name) {
@@ -24,10 +24,10 @@ const byId = (page, id) => page.getByTestId(`vacancy-${id}`);
 
 test('opens on the first identity, its default market, fresh without feedback', async ({ page }) => {
   await open(page);
-  await expect(page.getByTestId('identity-tab-kisel')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('identity-tab-sharp')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('segment-tab-full')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
-  expect((await calls(page, 'loadListing'))[0]).toEqual(['kisel', 'full', 'fresh_new']);
+  expect((await calls(page, 'loadListing'))[0]).toEqual(['sharp', 'full', 'fresh_new']);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(3);   // a1, a2r, b1
   await expect(byId(page, 'a3')).toHaveCount(0);   // not fresh
   await expect(byId(page, 'x1')).toHaveCount(0);   // has feedback
@@ -43,7 +43,7 @@ test('sections follow the class order, with their titles from the locale', async
 test('"Collect vacancies" starts the agent for this identity and locks the buttons', async ({ page }) => {
   await open(page);
   await page.getByTestId('run-collect').click();
-  expect(await calls(page, 'startRun')).toEqual([[{ identity: 'kisel', kind: 'collect' }]]);
+  expect(await calls(page, 'startRun')).toEqual([[{ identity: 'sharp', kind: 'collect' }]]);
   await expect(page.getByTestId('run-collect')).toBeDisabled();
   await expect(page.getByTestId('run-feedback')).toBeDisabled();
   await expect(page.getByTestId('run-stop')).toBeVisible();
@@ -54,7 +54,7 @@ test('"Collect vacancies" starts the agent for this identity and locks the butto
   await page.getByTestId('run-stop').click();
   expect(await calls(page, 'stopRun')).toHaveLength(1);
 
-  await page.evaluate(() => window.__emitRunEvent({ type: 'exit', code: 0, identity: 'kisel', kind: 'collect' }));
+  await page.evaluate(() => window.__emitRunEvent({ type: 'exit', code: 0, identity: 'sharp', kind: 'collect' }));
   await expect(page.getByTestId('run-collect')).toBeEnabled();
   await expect(page.getByTestId('run-status')).toContainText(ru['run.finished']);
   expect((await calls(page, 'listIdentities')).length).toBe(2);   // reloaded after the run
@@ -72,7 +72,7 @@ test('"Review feedback" shows the pending count and starts the feedback run', as
   await open(page);
   await expect(page.getByTestId('run-feedback')).toHaveText(ru['run.feedback'].replace('{n}', '1'));
   await page.getByTestId('run-feedback').click();
-  expect(await calls(page, 'startRun')).toEqual([[{ identity: 'kisel', kind: 'feedback' }]]);
+  expect(await calls(page, 'startRun')).toEqual([[{ identity: 'sharp', kind: 'feedback' }]]);
 });
 
 test('"Review feedback" is disabled when nothing is pending', async ({ page }) => {
@@ -91,14 +91,14 @@ test('"Wrong pick" asks for a reason, saves it, and leaves an undoable stub', as
   await row.getByTestId('reason-save').click();
 
   expect(await calls(page, 'setFeedback')).toEqual([
-    ['kisel', 'a1', 'bugged', 'A Java role, .NET only in the company blurb']]);
+    ['sharp', 'a1', 'bugged', 'A Java role, .NET only in the company blurb']]);
   await expect(byId(page, 'a1')).toHaveCount(0);
   const stub = page.getByTestId('stub-a1');
   await expect(stub).toContainText(ru['stub.marked'].replace('{status}', ru['status.bugged']));
   await expect(page.getByTestId('run-feedback')).toHaveText(ru['run.feedback'].replace('{n}', '2'));
 
   await stub.getByTestId('btn-undo').click();
-  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['kisel', 'a1']);
+  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'a1']);
   await expect(byId(page, 'a1')).toBeVisible();
   await expect(page.getByTestId('stub-a1')).toHaveCount(0);
 });
@@ -107,15 +107,15 @@ test('"Not for me" with an empty reason is saved without one', async ({ page }) 
   await open(page);
   await byId(page, 'a2r').getByTestId('btn-rejected').click();
   await byId(page, 'a2r').getByTestId('reason-save').click();
-  expect(await calls(page, 'setFeedback')).toEqual([['kisel', 'a2r', 'rejected', '']]);
+  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a2r', 'rejected', '']]);
 });
 
 test('a double click on "Not for me" or "Wrong pick" saves without "Save"', async ({ page }) => {
   await open(page);
   await byId(page, 'a2r').getByTestId('btn-rejected').dblclick();
-  expect(await calls(page, 'setFeedback')).toEqual([['kisel', 'a2r', 'rejected', '']]);
+  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a2r', 'rejected', '']]);
   await byId(page, 'a1').getByTestId('btn-bugged').dblclick();
-  expect((await calls(page, 'setFeedback')).at(-1)).toEqual(['kisel', 'a1', 'bugged', '']);
+  expect((await calls(page, 'setFeedback')).at(-1)).toEqual(['sharp', 'a1', 'bugged', '']);
 });
 
 test('two slow clicks only open the reason, and a typed reason survives', async ({ page }) => {
@@ -140,7 +140,7 @@ test('cancelling the reason form saves nothing', async ({ page }) => {
 test('"Applied" is recorded at once, with no reason form', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('btn-applied').click();
-  expect(await calls(page, 'setFeedback')).toEqual([['kisel', 'a1', 'applied', null]]);
+  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'applied', null]]);
   await expect(page.getByTestId('reason-form')).toHaveCount(0);
   await expect(page.getByTestId('stub-a1')).toBeVisible();
 });
@@ -150,12 +150,12 @@ test('filters ask for their own list and show their counts', async ({ page }) =>
   await expect(page.getByTestId('filter-option-all')).toContainText('(5)');
   await expect(page.getByTestId('filter-option-bugged')).toContainText('(1)');
   await page.getByTestId('filter').selectOption('bugged');
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'bugged']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'bugged']);
   await expect(byId(page, 'x1')).toBeVisible();
   await expect(byId(page, 'x1').getByTestId('status-badge')).toHaveText(ru['status.bugged']);
 
   await byId(page, 'x1').getByTestId('btn-undo').click();
-  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['kisel', 'x1']);
+  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'x1']);
 });
 
 test('each market of each identity keeps its own filter', async ({ page }) => {
@@ -163,7 +163,7 @@ test('each market of each identity keeps its own filter', async ({ page }) => {
   await page.getByTestId('filter').selectOption('all');
   await page.getByTestId('segment-tab-uk').click();
   await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'uk', 'fresh_new']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'uk', 'fresh_new']);
 
   await page.getByTestId('segment-tab-full').click();
   await expect(page.getByTestId('filter')).toHaveValue('all');
@@ -172,7 +172,7 @@ test('each market of each identity keeps its own filter', async ({ page }) => {
   await expect(page.getByTestId('filter')).toHaveValue('fresh_new');
   await page.getByTestId('filter').selectOption('applied');
 
-  await page.getByTestId('identity-tab-kisel').click();
+  await page.getByTestId('identity-tab-sharp').click();
   await expect(page.getByTestId('segment-tab-full')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('filter')).toHaveValue('all');
   await page.getByTestId('identity-tab-pjoice').click();
@@ -329,7 +329,7 @@ test('a missing claude is explained', async ({ page }) => {
 
 test('data text is shown as text, never as markup', async ({ page }) => {
   const fixture = standardFixture();
-  fixture.rows.kisel.full[0].view.highlights = ['<img src=x onerror="window.__xss=1"> _fine_'];
+  fixture.rows.sharp.full[0].view.highlights = ['<img src=x onerror="window.__xss=1"> _fine_'];
   await open(page, fixture);
   await expect(byId(page, 'a1').locator('.highlights em')).toHaveText('fine');
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
@@ -360,17 +360,17 @@ test('"Open the vacancy link" hands the URL to the system browser, marked or not
 
 test('a pipeline run going anywhere shows on the button and the tab, then clears', async ({ page }) => {
   await open(page);
-  await page.evaluate(() => window.__setPipeline('kisel',
+  await page.evaluate(() => window.__setPipeline('sharp',
     { running: true, stage: 'check links', startedAt: '2026-09-30T00:23:41+00:00' }));
   const button = page.getByTestId('run-collect');
   await expect(button).toContainText(ru['run.collecting_stage'].replace('{stage}', 'check links'));
   await expect(button).toBeDisabled();
   await expect(button.getByTestId('collect-indicator')).toBeVisible();
-  await expect(page.getByTestId('identity-tab-kisel').getByTestId('tab-collecting')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-sharp').getByTestId('tab-collecting')).toBeVisible();
   await expect(page.getByTestId('identity-tab-pjoice').getByTestId('tab-collecting')).toHaveCount(0);
 
   const loadsBefore = (await calls(page, 'loadSegments')).length;
-  await page.evaluate(() => window.__setPipeline('kisel', { running: false }));
+  await page.evaluate(() => window.__setPipeline('sharp', { running: false }));
   await expect(button).toHaveText(ru['run.collect']);
   await expect(button).toBeEnabled();
   await expect(page.getByTestId('tab-collecting')).toHaveCount(0);
@@ -381,14 +381,14 @@ test('a reason being typed survives the indicator re-rendering the list', async 
   await open(page);
   await byId(page, 'a1').getByTestId('btn-bugged').click();
   await byId(page, 'a1').getByTestId('reason-input').fill('half typed');
-  await page.evaluate(() => window.__setPipeline('kisel', { running: true, stage: 'rescore' }));
+  await page.evaluate(() => window.__setPipeline('sharp', { running: true, stage: 'rescore' }));
   await expect(page.getByTestId('run-collect')).toContainText('rescore');
   await expect(byId(page, 'a1').getByTestId('reason-input')).toHaveValue('half typed');
 });
 
 test('"Refresh" reloads the interface and keeps the tab, market and filter', async ({ page }) => {
   await open(page);
-  await page.getByTestId('identity-tab-kisel').click();
+  await page.getByTestId('identity-tab-sharp').click();
   await page.getByTestId('segment-tab-uk').click();
   await page.getByTestId('filter').selectOption('all');
   await expect(page.getByTestId('refresh')).toHaveText(ru['app.refresh']);
@@ -398,14 +398,14 @@ test('"Refresh" reloads the interface and keeps the tab, market and filter', asy
   await expect(page.getByTestId('segment-tab-uk')).toHaveAttribute('aria-selected', 'true');
   expect(await page.evaluate(() => window.__beforeRefresh)).toBeUndefined();   // a new page
   await expect(page.getByTestId('filter')).toHaveValue('all');
-  expect((await calls(page, 'loadListing'))[0]).toEqual(['kisel', 'uk', 'all']);
+  expect((await calls(page, 'loadListing'))[0]).toEqual(['sharp', 'uk', 'all']);
 });
 
 // n fresh hot leads h00..h<n-1>, best first, and the worth-a-look b1
 function manyHotLeads(n) {
   const fixture = standardFixture();
   fixture.limit = 15;   // section_limit
-  fixture.rows.kisel.full = [
+  fixture.rows.sharp.full = [
     ...Array.from({ length: n }, (_, i) => row(`h${String(i).padStart(2, '0')}`, { score: 99 - i })),
     row('b1', { cls: 'worth_a_look', score: 45, source: 'devitjobs' }),
   ];
@@ -420,7 +420,7 @@ test('"All without feedback" lists every unanswered vacancy, fresh or not', asyn
   await expect(page.getByTestId('filter-option-no_feedback'))
     .toHaveText(`${ru['filter.no_feedback']} (4)`);   // a1, a2r, a3, b1; not x1
   await page.getByTestId('filter').selectOption('no_feedback');
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'no_feedback']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'no_feedback']);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(4);
   await expect(byId(page, 'a3')).toBeVisible();   // not fresh
   await expect(byId(page, 'x1')).toHaveCount(0);   // has feedback
@@ -441,7 +441,7 @@ test('a capped class says how much is shown and brings ten more at a time', asyn
 
   await page.getByTestId('show-more-hot_lead').click();
   expect((await calls(page, 'loadListing')).at(-1))
-    .toEqual(['kisel', 'full', 'fresh_new', [], '', { shown: { hot_lead: 25 } }]);
+    .toEqual(['sharp', 'full', 'fresh_new', [], '', { shown: { hot_lead: 25 } }]);
   await expect(section.locator('article')).toHaveCount(25);
   const five = ru['list.show_more'].replace('{n}', '5');
   await expect(count).toHaveText(fill(ru['list.shown_of'], { shown: 25, total: 30, n: 5, button: five }));
@@ -469,9 +469,9 @@ test('"Fit" narrows the list to one class, and the other filters count within it
   await expect(page.getByTestId('section-worth_a_look')).toHaveCount(0);
   await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(2);
   expect((await calls(page, 'loadListing')).at(-1))
-    .toEqual(['kisel', 'full', 'fresh_new', [], '', { fit: 'hot_lead' }]);
-  expect((await calls(page, 'listingCounts')).at(-1)).toEqual(['kisel', 'full', '', 'hot_lead']);
-  expect((await calls(page, 'listSources')).at(-1)).toEqual(['kisel', 'full', 'fresh_new', 'hot_lead']);
+    .toEqual(['sharp', 'full', 'fresh_new', [], '', { fit: 'hot_lead' }]);
+  expect((await calls(page, 'listingCounts')).at(-1)).toEqual(['sharp', 'full', '', 'hot_lead']);
+  expect((await calls(page, 'listSources')).at(-1)).toEqual(['sharp', 'full', 'fresh_new', 'hot_lead']);
   await expect(page.getByTestId('filter-option-fresh_new')).toContainText('(2)');
   await expect(page.getByTestId('source-option-devitjobs')).toHaveCount(0);   // b1 is worth a look
   await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${ru['class.worth_a_look']} (1)`);
@@ -518,7 +518,7 @@ test('Ctrl+Enter in a reason saves it, as "Save" does', async ({ page }) => {
   await row.getByTestId('reason-input').press('Enter');   // a new line, not a save
   expect(await calls(page, 'setFeedback')).toEqual([]);
   await row.getByTestId('reason-input').press('Control+Enter');
-  expect(await calls(page, 'setFeedback')).toEqual([['kisel', 'a1', 'bugged', 'Java, not .NET\n']]);
+  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'bugged', 'Java, not .NET\n']]);
   await expect(page.getByTestId('stub-a1')).toBeVisible();
 });
 
@@ -527,7 +527,7 @@ test('a failing request shows the error over the real screen, not the start one'
   fixture.failClassTotals = true;   // what an outdated main process answered
   await open(page, fixture);
   await expect(page.getByTestId('error')).toContainText("No handler registered for 'class-totals'");
-  await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
   await expect(page.getByTestId('identity-tab-pjoice')).toBeVisible();
   await expect(page.getByTestId('no-identities')).toHaveCount(0);
   await expect(page.getByTestId('run-collect')).toBeVisible();
@@ -544,7 +544,7 @@ test('until the identities arrive the window shows a spinner, not "no identities
   await expect(page.getByTestId('loading')).toContainText(ru['app.loading']);
   await expect(page.getByTestId('no-identities')).toHaveCount(0);
   await page.evaluate(() => window.__releaseIdentities());
-  await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
   await expect(page.getByTestId('loading')).toHaveCount(0);
   await expect(page.getByTestId('no-identities')).toHaveCount(0);
 });
@@ -580,7 +580,7 @@ test('"Refresh" leaves the reload to the app when the app restarts itself', asyn
   await expect.poll(() => calls(page, 'refresh')).toHaveLength(1);
   expect(await page.evaluate(() => window.__beforeRefresh)).toBe(true);   // not reloaded here
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('work-ide-view')));
-  expect(saved.filters['kisel/full']).toBe('all');   // the restarted app picks the view up
+  expect(saved.filters['sharp/full']).toBe('all');   // the restarted app picks the view up
 });
 
 test('"Refresh" still reloads against an older main process without the channel', async ({ page }) => {
@@ -589,7 +589,7 @@ test('"Refresh" still reloads against an older main process without the channel'
   await open(page, fixture);
   await page.evaluate(() => { window.__beforeRefresh = true; });
   await page.getByTestId('refresh').click();
-  await expect(page.getByTestId('identity-tab-kisel')).toBeVisible();
+  await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__beforeRefresh)).toBeUndefined();
 });
 
@@ -598,17 +598,17 @@ test('"Vacancy expired" is recorded at once, with no reason, and has its own fil
   const button = byId(page, 'a1').getByTestId('btn-expired');
   await expect(button).toHaveText(ru['action.expired']);
   await button.click();
-  expect(await calls(page, 'setFeedback')).toEqual([['kisel', 'a1', 'expired', null]]);
+  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'expired', null]]);
   await expect(page.getByTestId('reason-form')).toHaveCount(0);
   await expect(page.getByTestId('stub-a1'))
     .toContainText(ru['stub.marked'].replace('{status}', ru['status.expired']));
   await expect(page.getByTestId('filter-option-expired')).toContainText('(1)');
 
   await page.getByTestId('filter').selectOption('expired');
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'expired']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'expired']);
   await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(ru['status.expired']);
   await byId(page, 'a1').getByTestId('btn-undo').click();
-  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['kisel', 'a1']);
+  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'a1']);
 });
 
 // --- the source filter (the owner, 2026-10-04) --------------------------------
@@ -620,7 +620,7 @@ test('"Source" lists the boards of the current filter, each with its count', asy
   await expect(page.getByTestId('source-option-all')).toHaveText(`${ru['filter.source_all']} (3)`);
   await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (2)');
   await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs.uk, devitjobs.com (1)');
-  expect(await calls(page, 'listSources')).toContainEqual(['kisel', 'full', 'fresh_new']);
+  expect(await calls(page, 'listSources')).toContainEqual(['sharp', 'full', 'fresh_new']);
 });
 
 test('the details open with the website the vacancy came from', async ({ page }) => {
@@ -636,8 +636,8 @@ test('choosing a source lists only its vacancies, and the filter counts follow i
   await page.getByTestId('source-filter').selectOption('devitjobs');
   await expect(page.getByTestId('list').locator('article')).toHaveCount(1);
   await expect(byId(page, 'b1')).toBeVisible();
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'fresh_new', [], 'devitjobs']);
-  expect((await calls(page, 'listingCounts')).at(-1)).toEqual(['kisel', 'full', 'devitjobs']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'fresh_new', [], 'devitjobs']);
+  expect((await calls(page, 'listingCounts')).at(-1)).toEqual(['sharp', 'full', 'devitjobs']);
   await expect(page.getByTestId('filter-option-bugged')).toContainText('(1)');
   await expect(page.getByTestId('filter-option-all')).toContainText('(2)');
 });
@@ -647,7 +647,7 @@ test('the status filter and the source apply together', async ({ page }) => {
   await page.getByTestId('source-filter').selectOption('linkedin');
   await page.getByTestId('filter').selectOption('bugged');
   await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'bugged', [], 'linkedin']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'bugged', [], 'linkedin']);
   // the chosen board stays on the list with nothing in it; the others follow the filter
   await expect(page.getByTestId('source-filter')).toHaveValue('linkedin');
   await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (0)');
@@ -655,7 +655,7 @@ test('the status filter and the source apply together', async ({ page }) => {
   await page.getByTestId('source-filter').selectOption('devitjobs');
   await expect(byId(page, 'x1')).toBeVisible();
   await page.getByTestId('source-filter').selectOption('');
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['kisel', 'full', 'bugged']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'bugged']);
 });
 
 test('each market keeps its own source, and a refresh brings it back', async ({ page }) => {

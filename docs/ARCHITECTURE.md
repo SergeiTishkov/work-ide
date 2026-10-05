@@ -231,7 +231,7 @@ else's file.
 
 **Templates plus a verbatim copy, instead of inheritance from a shared base.**
 The property this buys: *the blast radius of a change equals the prefix of the
-file changed*. An edit to `kisel_criteria.yaml` physically cannot touch another
+file changed*. An edit to `sharp_criteria.yaml` physically cannot touch another
 identity.
 
 The reason inheritance did not fit is specific: the boundary between machinery
@@ -372,8 +372,8 @@ vacancy is the cheap direction to be wrong in.
 **Why "contract" confirms nothing.** A UK day-rate contract is five days a week.
 A contract says who invoices whom, not how many hours.
 
-**Why a search without the block notices nothing.** It is absent from KISEL's
-criteria, and every test asserting KISEL's behaviour kept passing unchanged.
+**Why a search without the block notices nothing.** It is absent from SHARP's
+criteria, and every test asserting SHARP's behaviour kept passing unchanged.
 When both remote and hours are unknown, the older remote class takes the
 vacancy and both objections stay listed, so the report can say what is left to
 confirm.
@@ -412,7 +412,7 @@ than trusted. No salary stays neutral, as the constitution requires.
 employer-of-record platforms, and a hit on that list skipped the check that a
 vacancy is remote at all. The first part-time run surfaced a Brussels "freelance
 mission, 50% remote" in its worth_a_look; the same override, measured over
-KISEL's base, held eight vacancies in the confident tiers on those words alone,
+SHARP's base, held eight vacancies in the confident tiers on those words alone,
 not one of them remote — including a Stripe posting whose "1099" is a tax form.
 
 Only a NAMED platform now exempts (`eor_platform_hits`), as it already did for
@@ -433,7 +433,7 @@ candidate. For PJOICE, where the gate means "this CV will not be considered", a
 Principal Data Engineer sat at 55 in "hours not confirmed".
 
 It is an opt-in, `role_complexity_signal.applies_to_unconfirmed`, rather than a
-fix for everybody, because the measurement for KISEL came out the other way: 51
+fix for everybody, because the measurement for SHARP came out the other way: 51
 vacancies would leave its check-by-hand sections, the top ones ordinary ".NET
 Developer" postings gated by a single "agentic" in a consultancy's boilerplate.
 Hiding those would trade a small inconsistency for real false negatives.

@@ -92,8 +92,8 @@ employment_type_priority:
     - "on-site required"
     - "in-office"
 
-# The stack is the CV's, and the CV is the same as KISEL's — the frequencies
-# below were counted across the last 8 roles (2018-2026). See the KISEL
+# The stack is the CV's, and the CV is the same as SHARP's — the frequencies
+# below were counted across the last 8 roles (2018-2026). See the SHARP
 # template's profile for the reasoning behind every omission.
 tech_stack:
   core:
@@ -164,7 +164,7 @@ ideal_company_traits:
 
 eor_platforms_signal:
   # Names that coincide with ordinary words are written as a domain — see the
-  # KISEL template for the 345 false matches that taught this.
+  # SHARP template for the 345 false matches that taught this.
   - "Deel"
   - "Remote.com"
   - "Oyster HR"

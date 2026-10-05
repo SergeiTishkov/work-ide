@@ -110,7 +110,7 @@ The fetcher no longer reads vacancy pages by title before scoring
 (`enrich_limit: 0` in the templates). `enrich_descriptions.py` reads them after
 scoring, by verdict, and its budgets went from 120/300 to 300/1000.
 
-The POC used kisel's 6 words × 28 countries:
+The POC used sharp's 6 words × 28 countries:
 
 | | before | every page, last week |
 |---|---|---|
@@ -126,7 +126,7 @@ longer than 53 minutes. Its numbers belong in the next entry.
 
 **2026-10-03: the first full runs.** With the split:
 
-| | kisel | pjoice |
+| | sharp | pjoice |
 |---|---|---|
 | pairs (word x country) | 168 | 140 |
 | queries, at the ceiling / narrower | 446, 92 / 278 | 378, 83 / 238 |
@@ -135,7 +135,7 @@ longer than 53 minutes. Its numbers belong in the next entry.
 | 429 (each retried once) | 0 | 8 |
 | LinkedIn time / whole run | 2:24 / 3:40 | 2:08 / 3:18 |
 
-Where kisel's 9 841 new ones landed after the run: 8 797 rejected, 982 in
+Where sharp's 9 841 new ones landed after the run: 8 797 rejected, 982 in
 "remote not confirmed", 9 hot leads, 5 worth a look. Of the rejected, 4 305
 have a developer's title and are waiting for their page to name the stack
 (`description_wanted`). The queue reads 1 000 a run, so a one-off pass read
