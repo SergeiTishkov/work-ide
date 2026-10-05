@@ -85,7 +85,7 @@ function summarizeInput(input) {
 // Follows the pipeline's own log while a run is going. The agent receives a
 // command's output only when the command ends, and a pipeline run takes an
 // hour: without this the panel would show "> Bash: python tools/pipeline.py"
-// and then nothing. tools/progress.py writes data/<p>/runs/pipeline_*.log.
+// and then nothing. tools/progress.py writes data/identities/<p>/runs/pipeline_*.log.
 class PipelineLogFollower {
   constructor({ dir, since, onLine, interval = 1000 }) {
     this.dir = dir;

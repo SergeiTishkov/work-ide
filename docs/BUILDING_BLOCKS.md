@@ -40,8 +40,8 @@ profile. A starting list of technology companies gave 1526 vacancies and zero
 candidates for a .NET profile: the mechanism worked, the list was wrong.
 
 Where to find candidates: companies with high legacy/enterprise signals in
-the identity's knowledge base (the `companies` table of
-`data/<prefix>/<prefix>.sqlite`), or by searching the industry.
+the knowledge base (the `companies` table of `data/workide.sqlite`), or by
+searching the industry.
 A board token can be checked with one request:
 `curl https://boards-api.greenhouse.io/v1/boards/<token>/jobs`
 

@@ -94,7 +94,9 @@ distributed across two layers, split along the git boundary:
 | **Identity template** | `identity-templates/<name>/` | yes | The KIND of search: stack, criteria, sources. Not one personal fact |
 | **Local identity** | `local-identities/<prefix>-<expansion>/` | **no** | MY search: who I am, where I live, what I expect to be paid |
 
-Accumulated data lives in `data/<prefix>/`, finished shortlists in `reports/`.
+Accumulated data lives in `data/` — the vacancy base every identity shares
+(`data/workide.sqlite`) and each identity's own files
+(`data/identities/<prefix>/`) — finished shortlists in `reports/`.
 Both folders are outside git and both are created by the tools automatically: a
 fresh clone does not have them, and that is a normal state rather than breakage.
 
@@ -164,9 +166,10 @@ The project is succeeding if:
 
 ## 5. Engineering principles
 
-- **The database is a file.** No SQL or NoSQL servers. The knowledge base of
-  each identity is one SQLite file (`data/<prefix>/<prefix>.sqlite`, schema in
-  `schemas/db.sql`) — since 2026-09-29, when the desktop app became a second
+- **The database is a file.** No SQL or NoSQL servers. The knowledge base is
+  one SQLite file for every identity (`data/workide.sqlite`, schema in
+  `schemas/db.sql`): a vacancy is stored once, its score and the person's
+  answer per identity (since 2026-10-05). SQLite since 2026-09-29, when the desktop app became a second
   writer beside the pipeline and a 150 MB JSON file could no longer be written
   by both safely. Everything else stays human-readable: JSON for small
   machine-readable state, Markdown for reports and accumulated conclusions,
@@ -427,7 +430,7 @@ history.
 - `<prefix>_identity.md` — what this search is, for whom, which tools it uses, a
   log of decisions.
 - `<prefix>_questionnaire.yaml` — why the settings are what they are.
-- `data/<prefix>/knowledge/<prefix>_insights.md` — a growing log of conclusions
+- `data/identities/<prefix>/knowledge/<prefix>_insights.md` — a growing log of conclusions
   about the market for this profile.
 
 **Language.** The documentation is in English, like the rest of the

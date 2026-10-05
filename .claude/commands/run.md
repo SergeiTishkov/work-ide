@@ -84,7 +84,7 @@ an hourly rate; design roles passing as development.
 
 Fix what you find **systemically**: edit `<p>_criteria.yaml` rather than
 discarding one vacancy by hand. And record the conclusions in
-`data/<p>/knowledge/<p>_insights.md` — the next run should be more accurate than
+`data/identities/<p>/knowledge/<p>_insights.md` — the next run should be more accurate than
 this one.
 
 ## Feedback from the app

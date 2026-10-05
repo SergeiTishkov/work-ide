@@ -17,7 +17,7 @@ unless you run headless (see below).
    python tools/feedback.py --identity <p> collect
    ```
 
-   It prints the path of `data/<p>/feedback/pending_<time>.yaml`, or "Nothing
+   It prints the path of `data/identities/<p>/feedback/pending_<time>.yaml`, or "Nothing
    to review" — then say so and stop.
 
 2. **Read every reason as one of two things.** A reason is either the
@@ -75,7 +75,7 @@ unless you run headless (see below).
 
 5. **`rejected` items are preferences**, not bugs. Fix the filter only when a
    pattern is clear and the person's reasons support it; otherwise record the
-   observation in `data/<p>/knowledge/<p>_insights.md` and leave the filter
+   observation in `data/identities/<p>/knowledge/<p>_insights.md` and leave the filter
    alone. One "not for me" is an opinion, five with the same reason are a rule.
    The exception is a quote from the posting (step 2). A quote is a fact about
    the vacancy, and if it breaks the criteria, handle it the way step 4
@@ -84,7 +84,7 @@ unless you run headless (see below).
 6. Run `pytest`. Then, if the filter changed, re-select without fetching:
    `python tools/report.py --identity <p>` — the app shows the result at once.
 
-7. Record the conclusions in `data/<p>/knowledge/<p>_insights.md`, then mark
+7. Record the conclusions in `data/identities/<p>/knowledge/<p>_insights.md`, then mark
    what you handled:
 
    ```

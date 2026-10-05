@@ -283,8 +283,10 @@ python tools/doctor.py   --identity <new-prefix>
 python tools/pipeline.py --identity <new-prefix>
 ```
 
-A new identity has its own `data/<prefix>/` folder — the base starts from
-nothing, and that is normal. The first runs will yield few candidates.
+A new identity gets its own `data/identities/<prefix>/` folder (insights,
+state, run logs). The vacancy base is shared by every identity: its first run
+scores everything the others have already fetched, then fetches what its own
+search asks for.
 
 ## Checking the isolation
 
@@ -293,14 +295,17 @@ not overlap:
 
 ```bash
 python tools/identity.py list                       # both present
-python tools/kb.py stats --identity <first>         # its own base
-python tools/kb.py stats --identity <second>        # its own, different
+python tools/kb.py stats --identity <first>         # its own verdicts
+python tools/kb.py stats --identity <second>        # the same vacancies, other verdicts
 ```
 
-The numbers must differ, and `data/<first>/` and `data/<second>/` must be
-different folders. The isolation is guaranteed by code
-(`common.require_identity()` and the `data/<prefix>/.identity` marker), but
-seeing it once is useful.
+The total is the same — the vacancies are shared — and the split by class
+differs: each identity scores them against its own criteria. Its answers in
+the app, its insights and its state are its own too, in
+`data/identities/<prefix>/` and in its rows of the base. The isolation is
+guaranteed by code (`common.require_identity()`, the
+`data/identities/<prefix>/.identity` marker, and `:identity` in every query
+of `schemas/queries.sql`), but seeing it once is useful.
 
 ---
 

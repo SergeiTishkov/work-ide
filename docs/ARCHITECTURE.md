@@ -10,9 +10,8 @@ section 6).
 No SQL or NoSQL server — the repository has to be both the program and the
 knowledge base at once (a requirement of the brief and of CLAUDE.md).
 
-Vacancies and companies live in one SQLite file per identity,
-`data/<prefix>/<prefix>.sqlite` (schema: `schemas/db.sql`, access:
-`tools/db.py`). Until 2026-09-29 they were `vacancies.json` and
+Vacancies and companies live in one SQLite file, `data/workide.sqlite`
+(schema: `schemas/db.sql`, access: `tools/db.py`). Until 2026-09-29 they were `vacancies.json` and
 `companies.json`; the move came with the desktop app, which records a person's
 feedback while the pipeline may be rewriting the base. With a 150 MB JSON file
 every click rewrote the whole file and two writers could silently lose each
@@ -20,6 +19,26 @@ other's work. In SQLite **each column has exactly one writer** (listed at the
 top of `schemas/db.sql`): the pipeline the record and the selections, the app
 the feedback, `tools/feedback.py` the review mark. `kb.load_vacancies()` still
 returns a dict, so the rest of the code did not change.
+
+### One base for every identity
+Until 2026-10-05 each identity had its own file, and the same posting fetched
+by two searches was stored, checked and read twice. Now `vacancies` holds what
+a posting IS — what the source said, what its page said, whether its link is
+alive — and `vacancy_identity` what one identity made of it: the score and
+class, the near-duplicate mark (the best-scored copy depends on the scorer),
+the rows shown in the app, the person's answer and the application funnel.
+`load_vacancies()` returns the facts with the active identity's `computed` on
+top; a vacancy that identity has not scored yet comes without it and is scored
+at the end of its next run (`pipeline.finalize_and_report` rescores the whole
+base). Every query of `schemas/queries.sql` takes `:identity`; selections and
+pipeline runs carry it. One pipeline run at a time, whichever identity it is
+for: a run saves the base it loaded an hour earlier
+(`tools/runstate.py`). The per-identity files of versions 1-7 were merged once
+by `tools/merge_shared_base.py`.
+
+What is the identity's alone lives in `data/identities/<prefix>/`: insights,
+state, feedback packages, run logs. Raw source responses are the sources', in
+`data/raw/`.
 
 `state.json` stays JSON (small, one writer), Markdown stays for reports and
 `<prefix>_insights.md`, YAML for configuration.
@@ -256,11 +275,11 @@ The derivation tables are in `config/derivation/`. Naive copy-paste of somebody
 else's config breaks the search silently here, which is why onboarding is built
 around a questionnaire rather than around "copy this and edit it".
 
-**Data lives in `data/<prefix>/` at the repository root, not inside the identity
+**Data lives in `data/` at the repository root, not inside the identity
 folder.** Otherwise negative-ignore rules would be needed inside a tracked
 directory, and those break the moment any file is added. The file
-`data/<prefix>/.identity` records who owns the folder and catches "the data
-folder was moved by hand".
+`data/identities/<prefix>/.identity` records who owns the folder and catches
+"the data folder was moved by hand".
 
 **The `ftf` test fixture is a byte-for-byte copy of the configuration at the
 moment of transition.** A synthetic "neutral" fixture would have meant rewriting

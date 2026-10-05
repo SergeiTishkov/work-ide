@@ -229,7 +229,10 @@ reports/               OUTSIDE GIT: finished shortlists, created automatically
                          identity asks for it (worldwide, uk, eu, canada, …)
   archive/<prefix>/      history: 2026-07-31.md, 2026-08-01.md, …
 
-data/<prefix>/         OUTSIDE GIT: the accumulated base, raw dumps, state
+data/                  OUTSIDE GIT, created automatically
+  workide.sqlite         the vacancy base, shared: a vacancy once, its score per identity
+  raw/                   the sources' raw responses, by day
+  identities/<prefix>/   each identity's own: insights, state, feedback, run logs
 ```
 
 **However many folders are in `local-identities/`, that is how many shortlists

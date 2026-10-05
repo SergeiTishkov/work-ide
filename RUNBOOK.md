@@ -49,7 +49,7 @@ python tools/pipeline.py --identity <p>
 This is the one command mandatory on every run. A full run takes about an
 hour (most of it checking links and rescoring); it reports every stage with
 its duration, every source with its counts, and progress on the long loops, on
-stderr and in `data/<p>/runs/pipeline_<time>.log` (the desktop app shows that
+stderr and in `data/identities/<p>/runs/pipeline_<time>.log` (the desktop app shows that
 file live). It:
 - collects vacancies from the sources enabled in `<p>_sources.yaml`;
 - never fails wholesale, even when one source is unavailable — watch the output
@@ -73,7 +73,7 @@ file live). It:
   applicant-tracking system, their board, or an address they wrote into the
   posting. Only for the top of the shortlist, and "nothing found" is recorded
   as a fact with a date rather than left silent;
-- updates `data/<p>/knowledge/*.json` and generates the shortlist —
+- updates the shared base (`data/workide.sqlite`) and generates the shortlist —
   `reports/<p>_latest.md`, plus one file per market if the identity configured
   any (`<p>_reports.yaml`; see `tools/segments.py`). Every file gets a dated
   copy in `reports/archive/<p>/`. The folders are created automatically if
@@ -104,7 +104,7 @@ the final word.** For every vacancy at `long_shot` and above (including
    `<p>_criteria.yaml` or `tools/score.py`, add a test for the specific case
    found, re-run `tools/pipeline.py`, and repeat the checklist for the remaining
    candidates. This is a loop rather than a one-off: almost every run of the
-   checklist finds something new (see `data/<p>/knowledge/<p>_insights.md`).
+   checklist finds something new (see `data/identities/<p>/knowledge/<p>_insights.md`).
 4. Only vacancies that pass the checklist in full count as confirmed finds.
 
 ## Step 2 — manual extension (what the scripts do not read)
@@ -172,7 +172,7 @@ tools (WebSearch/WebFetch):
 5. If a non-obvious pattern about the market turns up along the way (for
    instance: "companies with word X in their description are nearly always
    willing to hire a contractor outside the US"), append it to
-   `data/<p>/knowledge/<p>_insights.md` — appending, not rewriting the file.
+   `data/identities/<p>/knowledge/<p>_insights.md` — appending, not rewriting the file.
 
 ## Step 3 — self-examination (see CLAUDE.md, section 10)
 
@@ -182,7 +182,7 @@ good next?" and implement it straight away. Things worth looking at:
   `needs_manual_review` records or duplicates? If it has grown again, improve
   `score.py` or `kb.py` (this has happened before, see `docs/ARCHITECTURE.md` →
   "Rejected approaches").
-- `data/<p>/<p>_state.json` → `sources` — has a source degraded
+- `data/identities/<p>/<p>_state.json` → `sources` — has a source degraded
   (`consecutive_failures` climbing)? Find out what changed in its API or feed.
 - Has a new public source of vacancies appeared that is not here yet? Add
   `tools/fetch_<name>.py` following the existing ones.

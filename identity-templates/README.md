@@ -183,4 +183,5 @@ disqualification. Copy-paste here breaks the search silently.
 - These folders are **in git** and are shared. A template can be offered to
   others through a PR.
 - Your own searches live in `local-identities/`, outside git.
-- Accumulated data is in `data/<prefix>/`, also outside git.
+- Accumulated data is in `data/` (the shared base, and `data/identities/<prefix>/`),
+  also outside git.

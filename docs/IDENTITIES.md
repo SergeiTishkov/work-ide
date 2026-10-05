@@ -26,7 +26,9 @@ So isolation here is not a convenience but a correctness requirement.
 | **Identity template** | `identity-templates/<name>/` | yes | Everyone who searches with this kind of profile |
 | **Local identity** | `local-identities/<prefix>-<expansion>/` | **no** | You alone, on this machine |
 
-Plus the data: `data/<prefix>/`, the accumulated base, outside git.
+Plus the data, outside git: `data/workide.sqlite`, the base every identity
+shares (a vacancy is stored once, its score per identity), and
+`data/identities/<prefix>/`, what is the identity's alone.
 
 ## The template copy inside a local identity
 
@@ -97,7 +99,7 @@ in different folders, and that will be a silent mistake. `sharp_notes.md` and
 in any context: in a project-wide search, in an editor tab, in `grep` output.
 
 The rule extends to the data:
-`data/sharp/sharp.sqlite`, `reports/sharp_latest.md`. A report
+`data/identities/sharp/knowledge/sharp_insights.md`, `reports/sharp_latest.md`. A report
 opened in its own tab or forwarded to somebody has to identify itself.
 
 Checked automatically: `python tools/identity.py validate`.
@@ -284,7 +286,7 @@ not be: a list can drift away from what is on disk, and folders cannot.
 identity. It is called from `identity_config()`, `ensure_dirs()` and all six
 loaders in `kb.py`. Rule zero of the constitution is executable.
 
-In addition, `data/<prefix>/.identity` records who owns the folder. If the data
+In addition, `data/identities/<prefix>/.identity` records who owns the folder. If the data
 folder was moved or renamed by hand, the mismatch is detected on the first
 access rather than after somebody else's data has been written.
 
@@ -292,7 +294,7 @@ access rather than after somebody else's data has been written.
 
 The one folder in the project a person opens by hand. So it sits **at the
 repository root**, beside `tools/` and `docs/`, rather than inside
-`data/<prefix>/`: hunting for a finished shortlist in a tree of accumulated data
+`data/`: hunting for a finished shortlist in a tree of accumulated data
 is a nuisance, especially with several identities.
 
 ```
@@ -338,7 +340,7 @@ python tools/clean_fixture_artifacts.py             # clear
 ```
 
 The tool deletes exactly three paths, and only for an identity with `kind:
-fixture`: `reports/<p>_latest.md`, `reports/archive/<p>/` and `data/<p>/`. It
+fixture`: `reports/<p>_latest.md`, `reports/archive/<p>/` and `data/identities/<p>/`. It
 will not touch a live identity even if you pass its prefix explicitly — mixing
 up a flag is easier than restoring an accumulated base.
 

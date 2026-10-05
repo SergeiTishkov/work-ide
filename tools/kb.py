@@ -253,7 +253,7 @@ def cmd_stats(_args) -> None:
         return
     by_class = {}
     for v in vacancies.values():
-        cls = v.get("computed", {}).get("classification", "unknown")
+        cls = (v.get("computed") or {}).get("classification", "not scored for this identity yet")
         by_class[cls] = by_class.get(cls, 0) + 1
     print(f"Vacancies in the database: {len(vacancies)}")
     for cls, n in sorted(by_class.items(), key=lambda kv: -kv[1]):

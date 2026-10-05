@@ -405,7 +405,7 @@ def ensure_dirs() -> None:
 
 
 def _ensure_identity_marker() -> None:
-    """Writes data/<prefix>/.identity and checks it on every run.
+    """Writes data/identities/<prefix>/.identity and checks it on every run.
 
     Protection against "the data folder was renamed or moved by hand": the
     paths look right and somebody else's database sits inside. The mistake is

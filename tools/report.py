@@ -1092,7 +1092,7 @@ def write_report(markdown_text: str, run_date: Optional[str] = None,
 
     Two separate decisions, each with its own reason:
       * `reports/` sits at the repository ROOT rather than inside
-        `data/<prefix>/`. The report is the one file a person opens by hand,
+        `data/`. The report is the one file a person opens by hand,
         and hunting for it in a tree of accumulated data is a nuisance.
       * latest is kept apart from the dated copies. Otherwise, after a couple
         of months, the folder becomes a hundred files to search by eye for the
