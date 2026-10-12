@@ -8,9 +8,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn: nodeSpawn, execFile } = require('node:child_process');
 
+// The feedback review is not here: the person starts /feedback in an agent
+// session of their own, where they can follow and steer it (the owner,
+// 2026-10-07).
 const KINDS = {
   collect: (identity) => `/run ${identity}`,
-  feedback: (identity) => `/feedback ${identity}`,
 };
 
 // What a run from the app may do without asking: run the project's Python

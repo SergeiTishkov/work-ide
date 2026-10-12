@@ -90,9 +90,9 @@ this one.
 ## Feedback from the app
 
 The pipeline ends with a line like `pending feedback: 3 wrong picks, 1 not for
-me` when the person has marked vacancies in the desktop app. A "wrong pick" is
-a bug report against the filter. After the steps above, handle it as
-`/feedback` describes (`.claude/commands/feedback.md`).
+me` when the person has marked vacancies in the desktop app. Do not review it
+in this run: the person starts `/feedback <p>` in a session of their own, to
+follow and steer the review (2026-10-07). Name the count in the summary.
 
 ## Started from the desktop app (headless)
 

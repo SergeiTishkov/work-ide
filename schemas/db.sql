@@ -134,6 +134,9 @@ CREATE TABLE IF NOT EXISTS selection_segments (
   names        TEXT,               -- JSON {language: name}, English included (version 9)
   position     INTEGER NOT NULL,
   is_default   INTEGER NOT NULL DEFAULT 0,
+  -- 1: the market holding the whole shortlist (`everything: true` in the
+  -- configuration), the app's "all markets" row (version 10)
+  everything   INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (selection_id, slug)
 );
 

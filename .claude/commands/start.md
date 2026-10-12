@@ -34,6 +34,11 @@ from reality and folders cannot.
    of the three will do. Without it there is no way to assemble a stack or a
    level.
 
+   Then offer, once and as optional, a **parent CV**: every achievement of their
+   working life in one long file. Generate CV draws on it for the CV of each
+   vacancy; the ordinary CV stays the example of the layout and of what goes
+   in first. "Later" is a full answer. `docs/ONBOARDING.md`, step 2.
+
 3. **Show the templates and help them choose.**
    `python tools/templates.py list`
 
@@ -87,6 +92,10 @@ from reality and folders cannot.
 
 9. **Run the first cycle** (`/run`) and go through the shortlist together with
    the person.
+
+10. **No parent CV yet (`cv.parent` not set)? Say in one line that it can be
+    added at any time** and makes the CV for each vacancy better
+    (`docs/ONBOARDING.md`, step 6b). Do not press.
 
 ## What not to do
 

@@ -3,13 +3,37 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
-const { Store, SchemaMismatchError, nowIso } = require('../../main/store');
+const {
+  Store, SchemaMismatchError, nowIso, NEW, VIEW_STATUSES, FRESHNESS,
+} = require('../../main/store');
 const { SCHEMA_DIR, standardDatabase, tempDir } = require('../helpers/fixture-db');
 
 function setup() {
   const file = standardDatabase(path.join(tempDir(), 'test.sqlite'));
   const store = new Store({ schemaDir: SCHEMA_DIR, databasePathOf: (p) => (p === 'test' ? file : null) });
   return { store, file };
+}
+
+// The single filters the app had before 2026-10-07, as views of the four
+// drop-downs (tests/test_selections.py, _view).
+const FILTERS = ['fresh_new', 'no_feedback', 'all', 'fresh', ...VIEW_STATUSES.filter((s) => s !== 'new')];
+function v(segments = 'full', filter = 'fresh_new', { source, fit } = {}) {
+  return {
+    segments: segments == null ? null : [].concat(segments),
+    statuses: { fresh_new: NEW, no_feedback: NEW, all: VIEW_STATUSES, fresh: VIEW_STATUSES }[filter] || [filter],
+    fresh: ['fresh_new', 'fresh'].includes(filter) ? ['fresh'] : FRESHNESS,
+    sources: source ? [source] : null,
+    fits: fit ? [fit] : null,
+  };
+}
+
+// The view's size by the "Show" drop-down's numbers; both axes agree.
+function count(store, identity, view) {
+  const counts = store.counts(identity, view);
+  const byStatus = view.statuses.reduce((n, s) => n + counts.statuses[s], 0);
+  const byFresh = view.fresh.reduce((n, f) => n + counts.fresh[f], 0);
+  assert.equal(byStatus, byFresh, JSON.stringify(view));
+  return byStatus;
 }
 
 test('segments of the latest selection, default marked', () => {
@@ -19,6 +43,7 @@ test('segments of the latest selection, default marked', () => {
   assert.equal(data.displayName, 'Test search');
   assert.deepEqual(data.segments.map((s) => [s.slug, s.isDefault]),
     [['worldwide', false], ['uk', false], ['full', true]]);
+  assert.deepEqual(data.segments.map((s) => s.everything), [false, false, true]);
   // Each name in every language the configuration gives; none before version 9.
   assert.deepEqual(data.segments.map((s) => s.names),
     [{}, {}, { en: 'Everything', ru: 'Vsyo vmeste' }]);
@@ -28,30 +53,30 @@ test('segments of the latest selection, default marked', () => {
 test('an identity never collected has no selection and lists nothing', () => {
   const { store } = setup();
   assert.deepEqual(store.segments('other'), { selection: null, displayName: null, segments: [] });
-  assert.deepEqual(store.listing('other', 'full', 'all'), []);
-  assert.equal(store.counts('other', 'full').all, 0);
+  assert.deepEqual(store.listing('other', v('full', 'all')), []);
+  assert.equal(count(store, 'other', v('full', 'all')), 0);
   assert.deepEqual(store.pendingFeedback('other'), { bugged: 0, rejected: 0 });
 });
 
 test('listing: fresh ones by default, the per-class limit on "all"', () => {
   const { store } = setup();
-  assert.deepEqual(store.listing('test', 'full', 'fresh_new').map((r) => r.id), ['new0', 'new1', 'new2']);
-  const all = store.listing('test', 'full', 'all');
+  assert.deepEqual(store.listing('test', v('full', 'fresh_new')).map((r) => r.id), ['new0', 'new1', 'new2']);
+  const all = store.listing('test', v('full', 'all'));
   assert.equal(all.filter((r) => r.class === 'hot_lead').length, 15);
   assert.equal(all[0].view.title, 'Senior .NET Developer old00');
   assert.equal(all[0].fresh, false);
-  assert.deepEqual(store.listing('test', 'uk', 'fresh').map((r) => r.id), ['new0', 'new1', 'new2']);
+  assert.deepEqual(store.listing('test', v('uk', 'fresh')).map((r) => r.id), ['new0', 'new1', 'new2']);
   store.closeAll();
 });
 
 test('feedback writes only the feedback columns, and the next one moves up', () => {
   const { store, file } = setup();
   store.setFeedback('test', 'old00', 'bugged', '  Java, not .NET  ');
-  const all = store.listing('test', 'full', 'all');
+  const all = store.listing('test', v('full', 'all'));
   const hot = all.filter((r) => r.class === 'hot_lead');
   assert.equal(hot.filter((r) => r.feedback.status === 'new').length, 15);
   assert.ok(hot.some((r) => r.id === 'old15'), 'the 16th moved up');
-  const [bugged] = store.listing('test', 'full', 'bugged');
+  const [bugged] = store.listing('test', v('full', 'bugged'));
   assert.equal(bugged.id, 'old00');
   assert.equal(bugged.feedback.buggedReason, 'Java, not .NET');
   assert.equal(bugged.feedback.rejectedReason, null);
@@ -71,7 +96,7 @@ test('undo returns a vacancy to new and erases its reason', () => {
   store.setFeedback('test', 'new0', 'rejected', 'too much travel');
   assert.deepEqual(store.pendingFeedback('test'), { bugged: 0, rejected: 1 });
   store.setFeedback('test', 'new0', 'new');
-  const [row] = store.listing('test', 'full', 'fresh_new');
+  const [row] = store.listing('test', v('full', 'fresh_new'));
   assert.equal(row.id, 'new0');
   assert.equal(row.feedback.rejectedReason, null);
   assert.deepEqual(store.pendingFeedback('test'), { bugged: 0, rejected: 0 });
@@ -83,10 +108,9 @@ test('counts agree with the fully expanded listing for every filter', () => {
   store.setFeedback('test', 'old00', 'applied');
   store.setFeedback('test', 'new1', 'rejected');
   for (const segment of ['full', 'uk', 'worldwide']) {
-    const counts = store.counts('test', segment);
-    for (const filter of Object.keys(counts)) {
-      const all = store.listing('test', segment, filter, ['hot_lead', 'worth_a_look']);
-      assert.equal(counts[filter], all.length, `${segment}/${filter}`);
+    for (const filter of FILTERS) {
+      const all = store.listing('test', v(segment, filter), { expanded: ['hot_lead', 'worth_a_look'] });
+      assert.equal(count(store, 'test', v(segment, filter)), all.length, `${segment}/${filter}`);
     }
   }
   store.closeAll();
@@ -96,7 +120,8 @@ test('bad input is refused', () => {
   const { store } = setup();
   assert.throws(() => store.setFeedback('test', 'old00', 'maybe'));
   assert.throws(() => store.setFeedback('test', 'nope', 'applied'));
-  assert.throws(() => store.listing('test', 'full', 'whatever'));
+  assert.throws(() => store.listing('test', v('full', 'whatever')), /unknown status/);
+  assert.throws(() => store.counts('test', { ...v('full'), fresh: ['stale'] }), /unknown status or freshness/);
   store.closeAll();
 });
 
@@ -196,48 +221,50 @@ test('finished runs and a missing database mean not running', () => {
 
 test('counts are whole numbers; the list is capped unless a class is expanded', () => {
   const { store } = setup();
-  const counts = store.counts('test', 'full');
-  assert.equal(counts.all, 23, 'every vacancy, not the 15 + 3 on screen');
-  assert.deepEqual(store.classTotals('test', 'full', 'all'), { hot_lead: 20, worth_a_look: 3 });
-  assert.equal(store.listing('test', 'full', 'all').length, 18);
-  assert.equal(store.listing('test', 'full', 'all', ['hot_lead']).length, 23);
-  const byMarket = store.counts('test', 'uk').all + store.counts('test', 'worldwide').all;
-  assert.equal(byMarket, counts.all, 'markets add up to everything');
+  const all = count(store, 'test', v('full', 'all'));
+  assert.equal(all, 23, 'every vacancy, not the 15 + 3 on screen');
+  assert.deepEqual(store.classTotals('test', v('full', 'all')), { hot_lead: 20, worth_a_look: 3 });
+  assert.equal(store.listing('test', v('full', 'all')).length, 18);
+  assert.equal(store.listing('test', v('full', 'all'), { expanded: ['hot_lead'] }).length, 23);
+  const byMarket = count(store, 'test', v('uk', 'all')) + count(store, 'test', v('worldwide', 'all'));
+  assert.equal(byMarket, all, 'markets add up to everything');
   store.closeAll();
 });
 
 test('"shown" raises one class\'s limit; "fit" narrows the list, the counts and the sources', () => {
   const { store } = setup();
   const hot = (rows) => rows.filter((r) => r.class === 'hot_lead').length;
-  assert.equal(hot(store.listing('test', 'full', 'all', [], '', { shown: { hot_lead: 17 } })), 17);
-  assert.equal(hot(store.listing('test', 'full', 'all', [], '', { shown: { worth_a_look: 17 } })), 15);
+  assert.equal(hot(store.listing('test', v('full', 'all'), { shown: { hot_lead: 17 } })), 17);
+  assert.equal(hot(store.listing('test', v('full', 'all'), { shown: { worth_a_look: 17 } })), 15);
 
-  const worth = store.listing('test', 'full', 'all', [], '', { fit: 'worth_a_look' });
+  const worth = store.listing('test', v('full', 'all', { fit: 'worth_a_look' }));
   assert.deepEqual(worth.map((r) => r.class), ['worth_a_look', 'worth_a_look', 'worth_a_look']);
-  assert.equal(store.counts('test', 'full', '', 'worth_a_look').all, 3);
-  assert.deepEqual(store.sources('test', 'full', 'all', 'worth_a_look').map((s) => [s.source, s.total]),
+  assert.equal(count(store, 'test', v('full', 'all', { fit: 'worth_a_look' })), 3);
+  assert.deepEqual(store.sources('test', v('full', 'all', { fit: 'worth_a_look' })).map((s) => [s.source, s.total]),
     [['devitjobs', 3]]);
-  assert.deepEqual(store.classTotals('test', 'full', 'all'), { hot_lead: 20, worth_a_look: 3 });
+  assert.deepEqual(store.classTotals('test', v('full', 'all')), { hot_lead: 20, worth_a_look: 3 });
+  assert.deepEqual(store.classTotals('test', v('full', 'all', { fit: 'worth_a_look' })),
+    { hot_lead: 20, worth_a_look: 3 }, 'the "Fit" drop-down counts each class whatever is chosen in it');
 
   // the funnel reads the class from the view
   store.setFeedback('test', 'old00', 'applied');
-  assert.equal(store.listing('test', 'full', 'applied', [], '', { fit: 'hot_lead' }).length, 1);
-  assert.equal(store.listing('test', 'full', 'applied', [], '', { fit: 'worth_a_look' }).length, 0);
-  assert.equal(store.counts('test', 'full', '', 'worth_a_look').applied, 0);
-  assert.equal(store.counts('test', 'full', '', 'hot_lead').applied, 1);
-  assert.deepEqual(store.sources('test', 'full', 'applied', 'worth_a_look'), []);
+  assert.equal(store.listing('test', v('full', 'applied', { fit: 'hot_lead' })).length, 1);
+  assert.equal(store.listing('test', v('full', 'applied', { fit: 'worth_a_look' })).length, 0);
+  assert.equal(count(store, 'test', v('full', 'applied', { fit: 'worth_a_look' })), 0);
+  assert.equal(count(store, 'test', v('full', 'applied', { fit: 'hot_lead' })), 1);
+  assert.deepEqual(store.sources('test', v('full', 'applied', { fit: 'worth_a_look' })), []);
   store.closeAll();
 });
 
 test('"expired" is a status of its own: no reason, out of the list, not pending review', () => {
   const { store } = setup();
   store.setFeedback('test', 'new0', 'expired', 'ignored');
-  assert.deepEqual(store.listing('test', 'full', 'fresh_new').map((r) => r.id), ['new1', 'new2']);
-  const [row] = store.listing('test', 'full', 'expired');
+  assert.deepEqual(store.listing('test', v('full', 'fresh_new')).map((r) => r.id), ['new1', 'new2']);
+  const [row] = store.listing('test', v('full', 'expired'));
   assert.equal(row.id, 'new0');
   assert.equal(row.feedback.rejectedReason, null);
   assert.equal(row.feedback.buggedReason, null);
-  assert.equal(store.counts('test', 'full').expired, 1);
+  assert.equal(count(store, 'test', v('full', 'expired')), 1);
   assert.deepEqual(store.pendingFeedback('test'), { bugged: 0, rejected: 0 });
   store.closeAll();
 });
@@ -280,14 +307,14 @@ test('the new funnel filters count and list applications across markets', () => 
   store.advance('test', 'old01', 'contacted', '');
   store.advance('test', 'old01', 'awaiting_final', '');
   store.advance('test', 'old01', 'awaiting_offer', '');
-  const counts = store.counts('test', 'uk');
+  const counts = store.counts('test', v('uk', 'all')).statuses;
   assert.equal(counts.declined, 1);
   assert.equal(counts.awaiting_offer, 1);
-  const [declined] = store.listing('test', 'uk', 'declined');
+  const [declined] = store.listing('test', v('uk', 'declined'));
   assert.equal(declined.feedback.declinedComment, 'not enough Azure');
-  assert.deepEqual(store.listing('test', 'uk', 'awaiting_offer').map((r) => r.id), ['old01']);
+  assert.deepEqual(store.listing('test', v('uk', 'awaiting_offer')).map((r) => r.id), ['old01']);
   store.stepBack('test', 'old00');
-  assert.equal(store.listing('test', 'uk', 'applied')[0].id, 'old00', 'undo returns to applied');
+  assert.equal(store.listing('test', v('uk', 'applied'))[0].id, 'old00', 'undo returns to applied');
   store.closeAll();
 });
 
@@ -296,17 +323,17 @@ test('funnel filters list applications in every market, and undo steps back', ()
   store.setFeedback('test', 'old00', 'applied');       // an old01..: worldwide / old00: worldwide
   store.advance('test', 'old00', 'contacted', 'hr');
   for (const segment of ['full', 'uk', 'worldwide']) {
-    assert.deepEqual(store.listing('test', segment, 'contacted').map((r) => r.id), ['old00'], segment);
-    assert.equal(store.counts('test', segment).contacted, 1);
+    assert.deepEqual(store.listing('test', v(segment, 'contacted')).map((r) => r.id), ['old00'], segment);
+    assert.equal(count(store, 'test', v(segment, 'contacted')), 1);
   }
-  const [row] = store.listing('test', 'full', 'contacted');
+  const [row] = store.listing('test', v('full', 'contacted'));
   assert.equal(row.feedback.contactComment, 'hr');
   assert.deepEqual(row.feedback.interviewComments, []);
 
   store.stepBack('test', 'old00');
-  assert.deepEqual(store.listing('test', 'full', 'applied').map((r) => r.id), ['old00']);
+  assert.deepEqual(store.listing('test', v('full', 'applied')).map((r) => r.id), ['old00']);
   store.stepBack('test', 'old00');
-  assert.equal(store.counts('test', 'full').applied, 0);
+  assert.equal(count(store, 'test', v('full', 'applied')), 0);
   store.closeAll();
 });
 
@@ -317,13 +344,13 @@ test('comments are edited in place', () => {
   store.advance('test', 'new1', 'interview', '');
   store.editComment('test', 'new1', 'interview', 0, 'system design, went fine');
   store.editComment('test', 'new1', 'contact', null, 'recruiter on LinkedIn');
-  const [row] = store.listing('test', 'full', 'interview');
+  const [row] = store.listing('test', v('full', 'interview'));
   assert.deepEqual(row.feedback.interviewComments, ['system design, went fine']);
   assert.equal(row.feedback.contactComment, 'recruiter on LinkedIn');
 
   store.setFeedback('test', 'new2', 'rejected', 'travel');
   store.editComment('test', 'new2', 'rejected', null, 'travel 50%');
-  assert.equal(store.listing('test', 'full', 'rejected')[0].feedback.rejectedReason, 'travel 50%');
+  assert.equal(store.listing('test', v('full', 'rejected'))[0].feedback.rejectedReason, 'travel 50%');
   store.closeAll();
 });
 
@@ -334,11 +361,11 @@ test('a row carries its lines in every language, and in funnel filters too', () 
   db.prepare("UPDATE vacancy_identity SET views = ? WHERE identity_id = 'test' AND vacancy_id = ?")
     .run(JSON.stringify(views), 'old00');
   db.close();
-  const all = store.listing('test', 'full', 'all');
+  const all = store.listing('test', v('full', 'all'));
   assert.deepEqual(all.find((r) => r.id === 'old00').views, views);
   assert.equal(all.find((r) => r.id === 'old01').views, null, 'a row from before has only its view');
   store.setFeedback('test', 'old00', 'applied', null);
-  assert.deepEqual(store.listing('test', 'full', 'applied')[0].views, views);
+  assert.deepEqual(store.listing('test', v('full', 'applied'))[0].views, views);
   store.closeAll();
 });
 
@@ -348,8 +375,8 @@ test('an offer and the first day are written to their own columns', () => {
   for (const step of ['contacted', 'awaiting_final', 'awaiting_offer']) store.advance('test', 'new1', step, '');
   store.advance('test', 'new1', 'offered', 'from November');
   store.advance('test', 'new1', 'started', '');
-  assert.deepEqual(store.listing('test', 'uk', 'started').map((r) => r.id), ['new1']);
-  assert.equal(store.counts('test', 'uk').started, 1);
+  assert.deepEqual(store.listing('test', v('uk', 'started')).map((r) => r.id), ['new1']);
+  assert.equal(count(store, 'test', v('uk', 'started')), 1);
   store.closeAll();
   const db = new DatabaseSync(file);
   const row = db.prepare("SELECT * FROM vacancy_identity WHERE identity_id = 'test' AND vacancy_id = ?").get('new1');
@@ -364,28 +391,28 @@ test('an offer and the first day are written to their own columns', () => {
 // at once.
 test('the source narrows the listing, the counts and the class totals', () => {
   const { store } = setup();
-  assert.deepEqual(store.listing('test', 'full', 'all', [], 'devitjobs').map((r) => r.id),
+  assert.deepEqual(store.listing('test', v('full', 'all', { source: 'devitjobs' })).map((r) => r.id),
     ['new0', 'new1', 'new2']);
-  assert.equal(store.listing('test', 'full', 'all', [], 'linkedin').length, 15, 'still capped per class');
-  assert.equal(store.counts('test', 'full', 'linkedin').all, 20);
-  assert.equal(store.counts('test', 'full', 'devitjobs').fresh_new, 3);
-  assert.equal(store.counts('test', 'full', 'linkedin').fresh_new, 0);
-  assert.deepEqual(store.classTotals('test', 'full', 'all', 'devitjobs'), { worth_a_look: 3 });
-  assert.equal(store.counts('test', 'full').all, 23, 'no source: every board');
+  assert.equal(store.listing('test', v('full', 'all', { source: 'linkedin' })).length, 15, 'still capped per class');
+  assert.equal(count(store, 'test', v('full', 'all', { source: 'linkedin' })), 20);
+  assert.equal(count(store, 'test', v('full', 'fresh_new', { source: 'devitjobs' })), 3);
+  assert.equal(count(store, 'test', v('full', 'fresh_new', { source: 'linkedin' })), 0);
+  assert.deepEqual(store.classTotals('test', v('full', 'all', { source: 'devitjobs' })), { worth_a_look: 3 });
+  assert.equal(count(store, 'test', v('full', 'all')), 23, 'no source: every board');
   store.closeAll();
 });
 
 test('the source list counts each board under the status filter', () => {
   const { store } = setup();
-  assert.deepEqual(store.sources('test', 'full', 'all'),
+  assert.deepEqual(store.sources('test', v('full', 'all')),
     [{ source: 'linkedin', site: null, total: 20 }, { source: 'devitjobs', site: null, total: 3 }]);
-  assert.deepEqual(store.sources('test', 'full', 'fresh_new'), [{ source: 'devitjobs', site: null, total: 3 }]);
+  assert.deepEqual(store.sources('test', v('full', 'fresh_new')), [{ source: 'devitjobs', site: null, total: 3 }]);
   store.setFeedback('test', 'old00', 'applied');
-  assert.deepEqual(store.sources('test', 'full', 'applied'), [{ source: 'linkedin', site: null, total: 1 }]);
-  assert.deepEqual(store.listing('test', 'full', 'applied', [], 'devitjobs'), []);
-  assert.equal(store.counts('test', 'full', 'linkedin').applied, 1);
-  assert.equal(store.counts('test', 'full', 'devitjobs').applied, 0);
-  assert.deepEqual(store.sources('other', 'full', 'all'), []);
+  assert.deepEqual(store.sources('test', v('full', 'applied')), [{ source: 'linkedin', site: null, total: 1 }]);
+  assert.deepEqual(store.listing('test', v('full', 'applied', { source: 'devitjobs' })), []);
+  assert.equal(count(store, 'test', v('full', 'applied', { source: 'linkedin' })), 1);
+  assert.equal(count(store, 'test', v('full', 'applied', { source: 'devitjobs' })), 0);
+  assert.deepEqual(store.sources('other', v('full', 'all')), []);
   store.closeAll();
 });
 
@@ -395,7 +422,34 @@ test('each board comes with its website when the selection recorded them', () =>
   db.prepare("INSERT INTO meta (key, value) VALUES ('source_sites', ?)")
     .run(JSON.stringify({ linkedin: 'linkedin.com' }));
   db.close();
-  assert.deepEqual(store.sources('test', 'full', 'all'),
+  assert.deepEqual(store.sources('test', v('full', 'all')),
     [{ source: 'linkedin', site: 'linkedin.com', total: 20 }, { source: 'devitjobs', site: null, total: 3 }]);
+  store.closeAll();
+});
+
+// The owner, 2026-10-07: check boxes in the four drop-downs, several rows at once.
+test('several markets, statuses, boards and classes at once; an empty choice lists nothing', () => {
+  const { store } = setup();
+  store.setFeedback('test', 'old00', 'applied');
+  store.setFeedback('test', 'new1', 'rejected');
+  const view = {
+    segments: ['uk', 'worldwide'], statuses: ['new', 'applied', 'rejected'], fresh: FRESHNESS,
+    sources: ['linkedin', 'devitjobs'], fits: null,
+  };
+  const every = ['hot_lead', 'worth_a_look'];
+  assert.equal(store.listing('test', view, { expanded: every }).length, 23, 'each vacancy once');
+  assert.equal(count(store, 'test', view), 23);
+  assert.deepEqual(store.listing('test', { ...view, segments: null }, { expanded: every }).map((r) => r.id).sort(),
+    store.listing('test', view, { expanded: every }).map((r) => r.id).sort(), 'no market chosen: everything');
+  assert.equal(count(store, 'test', { ...view, sources: [] }), 0);
+  assert.deepEqual(store.listing('test', { ...view, fits: [] }), []);
+  assert.deepEqual(store.listing('test', { ...view, statuses: [] }), []);
+
+  // each half of "Show" is counted under the other
+  const fresh = store.counts('test', { ...view, fresh: ['fresh'] });
+  assert.equal(fresh.statuses.new, 2);
+  assert.equal(fresh.statuses.rejected, 1);
+  assert.equal(fresh.statuses.applied, 0, 'old00 is from an earlier run');
+  assert.deepEqual(store.counts('test', { ...view, statuses: ['applied'] }).fresh, { fresh: 0, earlier: 1 });
   store.closeAll();
 });

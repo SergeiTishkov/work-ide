@@ -1,24 +1,27 @@
-// The renderer: identity tabs, a market drop-down, a filter per market, the
-// vacancy rows with their three answers, and the agent-run controls.
+// The renderer: identity tabs, four filter drop-downs (markets, what to show,
+// boards, classes), the vacancy rows with their answers, and the agent-run
+// controls.
 //
 // Everything it does to the world goes through window.api (main/preload.js);
 // the UI tests replace window.api with a mock and assert on the calls.
 (function () {
   const api = window.api;
 
-  const FILTERS = ['fresh_new', 'no_feedback', 'all', 'fresh', 'rejected', 'bugged', 'expired',
-    'applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered', 'started',
-    'declined'];
-  const DEFAULT_FILTER = 'fresh_new';
-  // The drop-down's sections: what the selection holds, the person's own
-  // answers about the pick, and their applications.
-  const FILTER_GROUPS = [
-    { key: 'filter.group.selection', filters: ['fresh_new', 'no_feedback', 'fresh', 'all'] },
-    { key: 'filter.group.answers', filters: ['rejected', 'bugged', 'expired'] },
-    { key: 'filter.group.applications',
-      filters: ['applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered',
+  // The "Show" drop-down (the owner, 2026-10-07): how fresh, then which
+  // statuses. A row is listed when both its freshness and its status are
+  // checked. "Not applied or denied" is one check box with no master row.
+  const FRESHNESS = ['fresh', 'earlier'];
+  const STATUS_GROUPS = [
+    { key: 'new', statuses: ['new'] },
+    { key: 'applications', label: 'filter.group.applications',
+      statuses: ['applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered',
         'started', 'declined'] },
+    { key: 'denied', label: 'filter.group.denied', statuses: ['rejected', 'bugged', 'expired'] },
   ];
+  const STATUSES = STATUS_GROUPS.flatMap((group) => group.statuses);
+  // What the four drop-downs choose (schemas/queries.sql, THE VIEW). null
+  // markets, boards or classes: all of them, also the ones a later run adds.
+  const DEFAULT_VIEW = { segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, fits: null };
   const CLASS_KEYS = {
     hot_lead: 'class.hot_lead',
     worth_a_look: 'class.worth_a_look',
@@ -27,10 +30,9 @@
     engagement_unconfirmed: 'class.engagement_unconfirmed',
   };
   const FILTER_KEYS = {
-    fresh_new: 'filter.fresh_new',
-    no_feedback: 'filter.no_feedback',
-    all: 'filter.all',
     fresh: 'filter.fresh',
+    earlier: 'filter.earlier',
+    new: 'filter.new',
     applied: 'filter.applied',
     rejected: 'filter.rejected',
     bugged: 'filter.bugged',
@@ -90,7 +92,7 @@
     bugged: 'timeline.bugged',
     expired: 'timeline.expired',
   };
-  const RUN_KIND_KEYS = { collect: 'run.kind.collect', feedback: 'run.kind.feedback' };
+  const RUN_KIND_KEYS = { collect: 'run.kind.collect' };
   const REASON_KEYS = { rejected: 'reason.rejected', bugged: 'reason.bugged' };
   const LOG_LIMIT = 500;
   // How often the pipeline indicator asks the databases. Tests shorten it.
@@ -103,20 +105,20 @@
     // is "not known yet", not "there are none"
     booted: false,
     active: null,
-    // prefix -> { loaded, selection, segments, activeSegment, pending }
+    // prefix -> { loaded, selection, segments, pending }
     byIdentity: {},
-    // "identity/segment" -> filter; every market remembers its own choice
-    filters: {},
-    // "identity/segment" -> source ('' or missing: every board), applied
-    // together with the filter above
-    sourceFilters: {},
-    // "identity/segment" -> class ('' or missing: every class), the third
-    // drop-down, applied together with the two above
-    fitFilters: {},
-    // [{ source, total }]: the boards the current filter holds in this market
+    // prefix -> the view (DEFAULT_VIEW's shape): every identity keeps its own
+    views: {},
+    // the check list left open while the list reloads under it, its cursor
+    // and scroll: every click redraws the page
+    openDropdown: null,
+    dropdownCursor: 0,
+    dropdownScroll: 0,
+    // [{ source, site, total }]: the boards the view holds, the boards aside
     sources: [],
     listing: [],
-    counts: {},
+    // the "Show" drop-down's numbers: { statuses: { status: n }, fresh: { fresh, earlier } }
+    counts: { statuses: {}, fresh: {} },
     // vacancy id -> { class, index, status, expires }: rows marked out of the
     // current filter, or turned down, kept as a one-line stub with an undo
     // for STUB_LIFETIME_MS
@@ -126,12 +128,21 @@
     gone: new Set(),
     reasonFor: null,   // { id, status } while a reason form is open
     stepFor: null,     // { id, step, draft } while a funnel step's comment is written
+    // "Generate CV" and "Generate Cover Letter": the one being generated (one
+    // at a time, of either kind), and the last result per card until closed
+    cvBusy: null,      // { identity, id, kind }: a CV ('cv') or a cover letter ('letter') being made
+    cvResults: new Map(),   // "<identity>/<id>/<kind>" -> the result shown on the card
+    cvFor: null,       // { identity, id, kind, draft } while the instructions are written
+    cvLast: { cv: null, letter: null },   // { identity, id } of the last one of each kind
     editing: null,     // { key, id, kind, index, draft } while a timeline comment is edited
     openEntries: new Set(),   // timeline entries shown opened, by key
     shown: {},             // class -> rows without feedback asked for ("Show more")
     stalled: new Set(),    // classes where "more" brought nothing: the scroll stops asking
     loadingMore: false,
-    classTotals: {},       // class -> how many the current filter holds
+    classTotals: {},       // class -> how many the view holds, the classes aside
+    // the number of the list load a drop-down started, 0 when none is going:
+    // a spinner stands in for the vacancies meanwhile
+    listLoading: 0,
     run: { running: false },
     // a function, so the status follows a change of language
     runStatus: null,
@@ -139,8 +150,6 @@
     // prefix -> { running, stage, startedAt }: a pipeline run of that
     // identity, however it was started (tools/runstate.py)
     pipelines: {},
-    // restored after "Refresh" (page reload): which tab, market and filter
-    restored: null,
     openPicker: null,   // which top-bar drop-down is open: 'theme', 'language' or null
   };
 
@@ -149,33 +158,24 @@
   // the tab, market and filter should come back after that too.
 
   function saveView() {
-    const segments = {};
-    for (const [prefix, info] of Object.entries(state.byIdentity)) {
-      if (info && info.activeSegment) segments[prefix] = info.activeSegment;
-    }
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(
-        {
-          active: state.active, segments, filters: state.filters, sources: state.sourceFilters,
-          fits: state.fitFilters,
-        }));
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ active: state.active, views: state.views }));
     } catch {
       // storage unavailable: a refresh starts from the defaults
     }
   }
 
+  // A view saved before 2026-10-07 (one filter per market) has no `views`:
+  // the defaults it is.
   function restoreView() {
     try {
       const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
       if (saved) {
         state.active = saved.active || null;
-        state.filters = saved.filters || {};
-        state.sourceFilters = saved.sources || {};
-        state.fitFilters = saved.fits || {};
-        state.restored = saved;
+        state.views = saved.views || {};
       }
     } catch {
-      state.restored = null;
+      state.views = {};
     }
   }
 
@@ -241,30 +241,19 @@
     return t('date.format', { day: match[3], mm: match[2], month, year: match[1] });
   }
 
-  function filterKey(identity, segment) {
-    return `${identity}/${segment}`;
-  }
-
   function current() {
     return state.active ? state.byIdentity[state.active] : null;
   }
 
-  function currentFilter() {
-    const info = current();
-    if (!info || !info.activeSegment) return DEFAULT_FILTER;
-    return state.filters[filterKey(state.active, info.activeSegment)] || DEFAULT_FILTER;
+  function currentView() {
+    return { ...DEFAULT_VIEW, ...(state.views[state.active] || {}) };
   }
 
-  function currentSource() {
-    const info = current();
-    if (!info || !info.activeSegment) return '';
-    return state.sourceFilters[filterKey(state.active, info.activeSegment)] || '';
-  }
-
-  function currentFit() {
-    const info = current();
-    if (!info || !info.activeSegment) return '';
-    return state.fitFilters[filterKey(state.active, info.activeSegment)] || '';
+  // The class the view narrows to, when it is one: the list then loads more
+  // as it is scrolled.
+  function onlyFit() {
+    const { fits } = currentView();
+    return fits && fits.length === 1 ? fits[0] : '';
   }
 
   function showError(error) {
@@ -302,66 +291,60 @@
     if (state.active) await loadIdentity(state.active);
   }
 
-  async function loadIdentity(prefix, { keepSegment = true } = {}) {
-    const previous = state.byIdentity[prefix];
+  async function loadIdentity(prefix) {
     const data = await api.loadSegments(prefix);
-    const segments = data.segments || [];
-    let activeSegment = keepSegment && previous ? previous.activeSegment : null;
-    if (!activeSegment && state.restored && state.restored.segments) {
-      activeSegment = state.restored.segments[prefix] || null;
-    }
-    if (!segments.some((s) => s.slug === activeSegment)) {
-      const preferred = segments.find((s) => s.isDefault) || segments[0];
-      activeSegment = preferred ? preferred.slug : null;
-    }
     state.byIdentity[prefix] = {
       loaded: true,
       selection: data.selection,
       displayName: data.displayName,
-      segments,
-      activeSegment,
+      segments: data.segments || [],
       pending: await api.pendingFeedbackCount(prefix),
     };
     await loadList();
   }
 
+  // The view sent to the database: markets the latest selection no longer
+  // has are left out, and when none of the chosen is left, every market.
+  function viewToLoad(info) {
+    const view = currentView();
+    if (view.segments && view.segments.length) {
+      const known = view.segments.filter((slug) => info.segments.some((s) => s.slug === slug));
+      view.segments = known.length ? known : null;
+    }
+    return view;
+  }
+
+  // Every loadList is numbered; an answer that arrives after a newer one was
+  // asked for is dropped, so quick clicks never end on an older list.
+  let listRequest = 0;
+
   async function loadList() {
+    const asked = ++listRequest;
     const info = current();
-    if (!info || !info.activeSegment) {
+    if (!info || !info.segments.length) {
       state.listing = [];
-      state.counts = {};
+      state.counts = { statuses: {}, fresh: {} };
       state.sources = [];
+      state.classTotals = {};
       render();
       return;
     }
-    const segment = info.activeSegment;
-    const filter = currentFilter();
-    // The source, the class and the rows asked for travel only when set:
-    // without them every call is what it was before they existed.
-    const source = currentSource();
-    const fit = currentFit();
-    const view = {};
-    if (Object.keys(state.shown).length) view.shown = { ...state.shown };
-    if (fit) view.fit = fit;
-    const listingArgs = [state.active, segment, filter];
-    if (source || fit || view.shown) listingArgs.push([], source);
-    if (fit || view.shown) listingArgs.push(view);
-    const countArgs = [state.active, segment];
-    if (source || fit) countArgs.push(source);
-    if (fit) countArgs.push(fit);
+    const view = viewToLoad(info);
+    // the rows asked for travel only when set
+    const page = Object.keys(state.shown).length ? [{ shown: { ...state.shown } }] : [];
     const [listing, counts, totals, pending, sources] = await Promise.all([
-      api.loadListing(...listingArgs),
-      api.listingCounts(...countArgs),
-      source ? api.classTotals(state.active, segment, filter, source)
-        : api.classTotals(state.active, segment, filter),
+      api.loadListing(state.active, view, ...page),
+      api.listingCounts(state.active, view),
+      api.classTotals(state.active, view),
       api.pendingFeedbackCount(state.active),
-      fit ? api.listSources(state.active, segment, filter, fit) : api.listSources(state.active, segment, filter),
+      api.listSources(state.active, view),
     ]);
+    if (asked !== listRequest) return;
     state.listing = listing;
     state.counts = counts;
     state.classTotals = totals;
     state.sources = sources;
-    // a chosen board the filter has emptied keeps its website on the list
+    // a chosen board the view has emptied keeps its website on the list
     state.sourceSites = state.sourceSites || {};
     for (const s of sources) if (s.site) state.sourceSites[s.source] = s.site;
     info.pending = pending;
@@ -437,44 +420,34 @@
     });
   }
 
-  function selectSegment(slug) {
-    const info = current();
-    if (!info || info.activeSegment === slug) return;
-    return guarded(async () => {
-      resetView();
-      info.activeSegment = slug;
-      await loadList();
-    });
-  }
+  // A click in a drop-down: the view changes, the list reloads from the top.
+  // A click in a drop-down: the check box changes at once, the list follows
+  // once the clicks stop for VIEW_DEBOUNCE_MS, and a spinner stands in for
+  // the vacancies until it has come (the owner, 2026-10-12: the window
+  // froze after each click). body[data-list-pending] is set from the click
+  // until the list is in, for the UI tests to wait on.
+  const VIEW_DEBOUNCE_MS = 200;
+  let viewTimer = null;
 
-  function selectFilter(name) {
-    const info = current();
-    if (!info || !info.activeSegment) return;
-    return guarded(async () => {
-      resetView();
-      state.filters[filterKey(state.active, info.activeSegment)] = name;
-      await loadList();
-    });
-  }
-
-  function selectSource(source) {
-    const info = current();
-    if (!info || !info.activeSegment) return;
-    return guarded(async () => {
-      resetView();
-      state.sourceFilters[filterKey(state.active, info.activeSegment)] = source;
-      await loadList();
-    });
-  }
-
-  function selectFit(cls) {
-    const info = current();
-    if (!info || !info.activeSegment) return;
-    return guarded(async () => {
-      resetView();
-      state.fitFilters[filterKey(state.active, info.activeSegment)] = cls;
-      await loadList();
-    });
+  function changeView(change) {
+    if (!current()) return;
+    resetView();
+    state.views[state.active] = { ...currentView(), ...change };
+    saveView();
+    document.body.dataset.listPending = '1';
+    render();
+    clearTimeout(viewTimer);
+    viewTimer = setTimeout(() => {
+      viewTimer = null;
+      const mine = ++state.listLoading;
+      render();
+      guarded(loadList).finally(() => {
+        if (state.listLoading !== mine) return;   // a later change is loading
+        state.listLoading = 0;
+        if (!viewTimer) delete document.body.dataset.listPending;
+        render();
+      });
+    }, VIEW_DEBOUNCE_MS);
   }
 
   // After an answer: reload, and when the row left the current filter leave
@@ -772,7 +745,13 @@
     } else {
       parts.push(renderFilters(info), renderList());
     }
+    const focused = document.activeElement && document.activeElement.closest
+      && document.activeElement.closest('.dropdown');
     panel.replaceChildren(...parts);
+    // a check list stays open across the redraw its own click caused
+    const open = state.openDropdown && panel.querySelector(`[data-dropdown="${state.openDropdown}"]`);
+    if (open) open.reopen(Boolean(focused));
+    else state.openDropdown = null;
   }
 
   function collectButton(running) {
@@ -812,67 +791,126 @@
       el('div', { class: 'actions' },
         el('button', { testid: 'refresh', title: t('app.refresh_hint'), onclick: refresh }, t('app.refresh')),
         collectButton(running),
-        el('button', {
-          testid: 'run-feedback', disabled: running || pending === 0,
-          onclick: () => startRun('feedback'),
-        }, t('run.feedback', { n: pending })),
+        feedbackHint(pending),
         running && el('button', { class: 'danger', testid: 'run-stop', onclick: stopRun }, t('run.stop'))));
   }
 
-  // --- the filters' drop-down ----------------------------------------------------
+  // "Review feedback (N)" starts nothing: the review runs in an agent session
+  // the person opens, where they follow and steer it (the owner, 2026-10-07).
+  // The count stays, and hovering or clicking says where to go. Not
+  // `disabled`: a disabled button gets no clicks, and the click must show it.
+  function feedbackHint(pending) {
+    const hint = el('span', { class: 'feedback-hint', onmouseleave: () => hint.classList.remove('open') },
+      el('button', {
+        class: 'inert', testid: 'run-feedback', type: 'button', 'aria-disabled': 'true',
+        'aria-describedby': 'feedback-hint-tip',
+        onclick: (event) => { event.stopPropagation(); hint.classList.add('open'); },
+        onblur: () => hint.classList.remove('open'),
+      }, t('run.feedback', { n: pending })),
+      el('span', { class: 'tip', id: 'feedback-hint-tip', role: 'tooltip', testid: 'run-feedback-tip' },
+        t('run.feedback_hint', { identity: state.active })));
+    return hint;
+  }
+
+  // --- the filters' drop-downs ---------------------------------------------------
   // An outlined box with its name on the top edge (Material's outlined field),
   // all four the same width. Not a <select>: a native list cannot wrap a long
   // option onto a second line, and the four are the same width only if a long
   // option may take two (2026-10-06). The list stays in the page while closed
   // (hidden), so what it offers can be read without opening it.
   //
-  // groups: [{ label (or none), options: [{ value, text, testid }] }]
-  function dropdown({ id, testid, label, labelTestid, value, groups, onChange }) {
-    const options = groups.flatMap((group) => group.options);
-    const chosen = options.find((option) => option.value === value) || options[0] || { text: '' };
+  // Each is a check list (the owner, 2026-10-07): several rows at once. A
+  // group's master row is on when all its rows are, partly on when some are,
+  // off when none; a click turns it off from on, and on from the other two.
+  // A click leaves the list open: the page redraws under it.
+  //
+  // groups: [{ key, label (or none), master: { text, testid } (or none),
+  //   whole (the master shows on whatever the rows: the view takes all),
+  //   options: [{ value, text, testid, checked }] }]
+  // onToggle(group, values): the group's checked values after the click.
+  function checklist({ testid, label, labelTestid, summary, groups, onToggle }) {
+    const id = `${testid}-select`;
     const button = el('button', {
       id, class: 'dropdown-button', testid, type: 'button',
-      'data-value': chosen.value === undefined ? '' : chosen.value,
-      'aria-haspopup': 'listbox', 'aria-expanded': 'false', title: chosen.text,
-    }, el('span', { class: 'dropdown-value' }, chosen.text), el('span', { class: 'dropdown-arrow' }));
-    const optionNode = (option) => el('li', {
-      role: 'option', testid: option.testid, 'data-value': option.value,
-      class: option.value === chosen.value ? 'active' : null,
-      'aria-selected': option.value === chosen.value ? 'true' : 'false',
-      onclick: (event) => { event.stopPropagation(); pick(option.value); },
-    }, option.text);
-    const menu = el('ul', { class: 'dropdown-menu', role: 'listbox', testid: `${testid}-menu`, hidden: true },
-      groups.flatMap((group) => (group.label
-        ? el('li', { class: 'dropdown-group', role: 'presentation' },
-          el('div', { class: 'dropdown-group-label' }, group.label),
-          el('ul', { role: 'group', 'aria-label': group.label }, group.options.map(optionNode)))
-        : group.options.map(optionNode))));
-    const box = el('span', { class: 'field dropdown' },
+      'aria-haspopup': 'listbox', 'aria-expanded': 'false', title: summary,
+    }, el('span', { class: 'dropdown-value', testid: `${testid}-value` }, summary),
+    el('span', { class: 'dropdown-arrow' }));
+    const rows = [];   // { node, toggle }, top to bottom
+    const row = (rowTestid, value, text, mark, master, toggle) => {
+      const node = el('li', {
+        role: 'option', testid: rowTestid, class: master ? 'master' : null, 'data-value': value,
+        'aria-selected': mark === 'on' ? 'true' : 'false', 'data-state': mark,
+        onclick: (event) => { event.stopPropagation(); choose(node); },
+      }, el('span', { class: `check ${mark}`, 'aria-hidden': 'true' }), el('span', { class: 'option-text' }, text));
+      rows.push({ node, toggle });
+      return node;
+    };
+    const groupNodes = groups.map((group) => {
+      const values = group.options.map((option) => option.value);
+      const checked = group.options.filter((option) => option.checked).map((option) => option.value);
+      let mark = 'partial';
+      if (group.whole || (values.length && checked.length === values.length)) mark = 'on';
+      else if (!checked.length) mark = 'off';
+      const nodes = [];
+      if (group.master) {
+        nodes.push(row(group.master.testid, null, group.master.text, mark, true,
+          () => onToggle(group, mark === 'on' ? [] : values)));
+      }
+      for (const option of group.options) {
+        nodes.push(row(option.testid, option.value, option.text, option.checked ? 'on' : 'off', false,
+          () => onToggle(group, values.filter((v) => (v === option.value ? !option.checked : checked.includes(v))))));
+      }
+      return el('li', { class: 'dropdown-group', role: 'presentation' },
+        group.label && el('div', { class: 'dropdown-group-label' }, group.label),
+        el('ul', { role: 'group', 'aria-label': group.label || null }, nodes));
+    });
+    const menu = el('ul', {
+      class: 'dropdown-menu', role: 'listbox', 'aria-multiselectable': 'true', testid: `${testid}-menu`,
+      hidden: true, onclick: (event) => event.stopPropagation(),
+      onscroll: () => { if (state.openDropdown === testid) state.dropdownScroll = menu.scrollTop; },
+    }, groupNodes);
+    const box = el('span', { class: 'field dropdown', 'data-dropdown': testid },
       button, el('label', { for: id, testid: labelTestid }, label), menu);
 
-    const items = () => [...menu.querySelectorAll('[role="option"]')];
+    const items = () => rows.map((r) => r.node);
     function setCursor(item) {
       for (const node of items()) node.classList.toggle('cursor', node === item);
-      if (item) item.scrollIntoView({ block: 'nearest' });
+      if (item) {
+        state.dropdownCursor = items().indexOf(item);
+        item.scrollIntoView({ block: 'nearest' });
+      }
     }
-    function open() {
+    function show() {
       closeDropdowns(box);
+      state.openDropdown = testid;
       menu.hidden = false;
       box.classList.add('open');
       button.setAttribute('aria-expanded', 'true');
-      setCursor(menu.querySelector('.active') || items()[0]);
+    }
+    function open() {
+      show();
+      state.dropdownScroll = 0;
+      setCursor(menu.querySelector('[data-state="on"]') || items()[0]);
     }
     function close() {
+      if (state.openDropdown === testid) state.openDropdown = null;
       menu.hidden = true;
       box.classList.remove('open');
       button.setAttribute('aria-expanded', 'false');
     }
-    function pick(chosenValue) {
-      close();
-      button.focus();
-      if (chosenValue !== chosen.value) onChange(chosenValue);
+    function choose(node) {
+      setCursor(node);
+      rows[items().indexOf(node)].toggle();
     }
     box.closeDropdown = close;
+    // after a redraw: open again where it was
+    box.reopen = (focus) => {
+      show();
+      menu.scrollTop = state.dropdownScroll;
+      const item = items()[Math.min(state.dropdownCursor, rows.length - 1)];
+      for (const node of items()) node.classList.toggle('cursor', node === item);
+      if (focus) button.focus();
+    };
     button.addEventListener('click', (event) => {
       event.stopPropagation();
       if (menu.hidden) open(); else close();
@@ -890,7 +928,7 @@
       else if (event.key === 'End') { event.preventDefault(); setCursor(list[list.length - 1]); }
       else if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        if (at >= 0) pick(list[at].dataset.value);
+        if (at >= 0) choose(list[at]);
       } else if (event.key === 'Escape') { event.stopPropagation(); close(); }
       else if (event.key === 'Tab') close();
     });
@@ -898,6 +936,7 @@
       const item = event.target.closest('[role="option"]');
       if (item && !item.classList.contains('cursor')) {
         for (const node of items()) node.classList.toggle('cursor', node === item);
+        state.dropdownCursor = items().indexOf(item);
       }
     });
     return box;
@@ -911,88 +950,150 @@
 
   document.addEventListener('click', () => closeDropdowns());
 
-  // The markets of the selection: a drop-down like the filters beside it
-  // (tabs until 2026-10-06; eight of them took a line of their own).
-  // A market's name comes from the identity's configuration, translated there;
-  // English when it gives no translation for the current language.
+  // What a check list shows closed: its master's name when every row is on,
+  // the rows that are when some are, "Nothing chosen" when none.
+  function summaryOf(all, options) {
+    const on = options.filter((option) => option.checked);
+    if (on.length === options.length) return all;
+    return on.length ? on.map((option) => option.label).join(', ') : t('filter.none');
+  }
+
+  function counted(label, n) {
+    return `${label} ${t('filter.count', { n: n || 0 })}`;
+  }
+
+  // The markets of the selection (tabs until 2026-10-06; eight of them took a
+  // line of their own). The market holding everything is the master row; the
+  // others, each a part of it, are its rows. A market's name comes from the
+  // identity's configuration, translated there; English when it gives no
+  // translation for the current language.
   function segmentName(segment) {
     return (segment.names && segment.names[I18n.language()]) || segment.name;
   }
 
-  function renderSegmentFilter(info) {
-    return dropdown({
-      id: 'segment-select', testid: 'segment-filter',
-      label: t('filter.segment_legend'), labelTestid: 'segment-label',
-      value: info.activeSegment,
-      groups: [{ options: info.segments.map((segment) => ({
-        value: segment.slug, text: segmentName(segment), testid: `segment-option-${segment.slug}`,
-      })) }],
-      onChange: selectSegment,
+  function renderSegmentFilter(info, view) {
+    const everything = info.segments.find((segment) => segment.everything);
+    const parts = info.segments.filter((segment) => segment !== everything);
+    const markets = parts.length ? parts : info.segments;
+    const options = markets.map((segment) => ({
+      value: segment.slug, label: segmentName(segment), text: segmentName(segment),
+      testid: `segment-option-${segment.slug}`, checked: !view.segments || view.segments.includes(segment.slug),
+    }));
+    let all = t('filter.segment_all');
+    if (markets.length === 1) all = segmentName(markets[0]);
+    else if (everything) all = segmentName(everything);
+    return checklist({
+      testid: 'segment-filter', label: t('filter.segment_legend'), labelTestid: 'segment-label',
+      summary: summaryOf(all, options),
+      groups: [{
+        key: 'segments', options, whole: !view.segments && options.length > 1,
+        master: options.length > 1 && { text: all, testid: 'segment-option-all' },
+      }],
+      onToggle: (group, values) => changeView({ segments: values.length === options.length ? null : values }),
     });
   }
 
-  // One drop-down, its options grouped, each with how many it holds.
+  // How fresh, and which statuses, each row with how many it holds: the
+  // statuses counted under the chosen freshness, the freshness under the
+  // chosen statuses.
+  function renderShowFilter(view) {
+    const { counts } = state;
+    const option = (value, n, checked) => ({
+      value, label: t(FILTER_KEYS[value]), text: counted(t(FILTER_KEYS[value]), n),
+      testid: `filter-option-${value}`, checked,
+    });
+    const sum = (values, of) => values.reduce((n, value) => n + (of[value] || 0), 0);
+    const freshness = {
+      key: 'fresh', label: t('filter.group.freshness'),
+      master: { text: counted(t('filter.all'), sum(FRESHNESS, counts.fresh)), testid: 'filter-master-fresh' },
+      options: FRESHNESS.map((f) => option(f, counts.fresh[f], view.fresh.includes(f))),
+    };
+    const statusGroups = STATUS_GROUPS.map((group) => ({
+      key: group.key, label: group.label && t(group.label),
+      master: group.statuses.length > 1
+        && { text: counted(t('filter.all'), sum(group.statuses, counts.statuses)), testid: `filter-master-${group.key}` },
+      options: group.statuses.map((status) => option(status, counts.statuses[status], view.statuses.includes(status))),
+    }));
+    const parts = [];
+    if (view.fresh.length === 1) parts.push(t(FILTER_KEYS[view.fresh[0]]));
+    for (const group of statusGroups) {
+      const on = group.options.filter((o) => o.checked);
+      if (on.length && on.length === group.options.length) parts.push(group.label || on[0].label);
+      else parts.push(...on.map((o) => o.label));
+    }
+    const nothing = !view.fresh.length || !view.statuses.length;
+    return checklist({
+      testid: 'filter', label: t('filter.legend'), labelTestid: 'filter-label',
+      summary: nothing ? t('filter.none') : parts.join(' · '),
+      groups: [freshness, ...statusGroups],
+      onToggle: (group, values) => {
+        if (group.key === 'fresh') return changeView({ fresh: values });
+        const others = view.statuses.filter((status) => !group.options.some((o) => o.value === status));
+        const chosen = new Set([...others, ...values]);
+        return changeView({ statuses: STATUSES.filter((status) => chosen.has(status)) });
+      },
+    });
+  }
+
   function renderFilters(info) {
-    const active = currentFilter();
-    const option = (name) => ({
-      value: name, testid: `filter-option-${name}`,
-      text: `${t(FILTER_KEYS[name])} ${t('filter.count', { n: state.counts[name] || 0 })}`,
-    });
+    const view = currentView();
     return el('div', { class: 'filters', testid: 'filters' },
-      renderSegmentFilter(info),
-      dropdown({
-        id: 'filter-select', testid: 'filter',
-        label: t('filter.legend'), labelTestid: 'filter-label',
-        value: active,
-        groups: FILTER_GROUPS.map((group) => ({ label: t(group.key), options: group.filters.map(option) })),
-        onChange: selectFilter,
-      }),
-      renderSourceFilter(),
-      renderFitFilter());
+      renderSegmentFilter(info, view),
+      renderShowFilter(view),
+      renderSourceFilter(view),
+      renderFitFilter(view));
   }
 
-  // The classes ("Hot leads", "Worth a look", ...) under the other two
-  // filters, each with how many; the chosen one stays even when empty.
-  function renderFitFilter() {
-    const active = currentFit();
+  // The classes ("Hot leads", "Worth a look", ...) under the other three
+  // drop-downs, each with how many; a chosen one stays even when empty.
+  function renderFitFilter(view) {
+    const chosen = view.fits;
     const totals = state.classTotals;
     const order = Object.keys(CLASS_KEYS);
     const classes = [...order, ...Object.keys(totals).filter((cls) => !order.includes(cls))]
-      .filter((cls) => totals[cls] || cls === active);
+      .filter((cls) => totals[cls] || (chosen && chosen.includes(cls)));
     const all = Object.values(totals).reduce((sum, n) => sum + n, 0);
-    const option = (value, label, n) => ({
-      value, testid: `fit-option-${value || 'all'}`, text: `${label} ${t('filter.count', { n })}`,
+    const options = classes.map((cls) => {
+      const name = CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls;
+      return {
+        value: cls, label: name, text: counted(name, totals[cls]), testid: `fit-option-${cls}`,
+        checked: !chosen || chosen.includes(cls),
+      };
     });
-    return dropdown({
-      id: 'fit-select', testid: 'fit-filter',
-      label: t('filter.fit_legend'), labelTestid: 'fit-label',
-      value: active || '',
-      groups: [{ options: [option('', t('filter.fit_all'), all),
-        ...classes.map((cls) => option(cls, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls, totals[cls] || 0))] }],
-      onChange: selectFit,
+    return checklist({
+      testid: 'fit-filter', label: t('filter.fit_legend'), labelTestid: 'fit-label',
+      summary: !chosen ? t('filter.fit_all') : summaryOf(t('filter.fit_all'), options),
+      groups: [{
+        key: 'fits', options, whole: !chosen,
+        master: { text: counted(t('filter.fit_all'), all), testid: 'fit-option-all' },
+      }],
+      onToggle: (group, values) => changeView({ fits: values.length === options.length ? null : values }),
     });
   }
 
-  // The boards the current filter holds, each with how many; the chosen one
-  // stays on the list even when the filter leaves nothing from it.
-  function renderSourceFilter() {
-    const active = currentSource();
-    const sources = [...state.sources];
-    if (active && !sources.some((s) => s.source === active)) {
-      const known = (state.sourceSites || {})[active];
-      sources.push({ source: active, site: known || null, total: 0 });
+  // The boards under the other three drop-downs, each with how many; a
+  // chosen one stays on the list even when nothing is left from it.
+  function renderSourceFilter(view) {
+    const chosen = view.sources;
+    const sources = state.sources.filter((s) => s.source);
+    for (const source of chosen || []) {
+      if (!sources.some((s) => s.source === source)) {
+        sources.push({ source, site: (state.sourceSites || {})[source] || null, total: 0 });
+      }
     }
     const all = state.sources.reduce((sum, s) => sum + s.total, 0);
-    const option = (value, label, n) => ({
-      value, testid: `source-option-${value || 'all'}`, text: `${label} ${t('filter.count', { n })}`,
-    });
-    return dropdown({
-      id: 'source-select', testid: 'source-filter',
-      label: t('filter.source_legend'), labelTestid: 'source-label',
-      value: active || '',
-      groups: [{ options: [option('', t('filter.source_all'), all),
-        ...sources.filter((s) => s.source).map((s) => option(s.source, s.site || s.source, s.total))] }],
-      onChange: selectSource,
+    const options = sources.map((s) => ({
+      value: s.source, label: s.site || s.source, text: counted(s.site || s.source, s.total),
+      testid: `source-option-${s.source}`, checked: !chosen || chosen.includes(s.source),
+    }));
+    return checklist({
+      testid: 'source-filter', label: t('filter.source_legend'), labelTestid: 'source-label',
+      summary: !chosen ? t('filter.source_all') : summaryOf(t('filter.source_all'), options),
+      groups: [{
+        key: 'sources', options, whole: !chosen,
+        master: { text: counted(t('filter.source_all'), all), testid: 'source-option-all' },
+      }],
+      onToggle: (group, values) => changeView({ sources: values.length === options.length ? null : values }),
     });
   }
 
@@ -1026,6 +1127,10 @@
   }
 
   function renderList() {
+    if (state.listLoading) {
+      return el('div', { class: 'loading', role: 'status', testid: 'list-loading' },
+        el('span', { class: 'spinner' }), el('span', {}, t('app.loading')));
+    }
     const { sections, byClass } = arranged();
     if (!sections.length) {
       return el('p', { class: 'empty', testid: 'list-empty' }, t('list.empty'));
@@ -1052,7 +1157,7 @@
     const hidden = hiddenIn(cls);
     if (!hidden) return t('list.shown_all', { n: total });
     const n = Math.min(PAGE, hidden);
-    if (currentFit() === cls && !state.stalled.has(cls)) return t('list.shown_scroll', { shown, total, n });
+    if (onlyFit() === cls && !state.stalled.has(cls)) return t('list.shown_scroll', { shown, total, n });
     return t('list.shown_of', { shown, total, n, button: t('list.show_more', { n }) });
   }
 
@@ -1064,7 +1169,7 @@
     const less = state.shown[cls] && el('button', {
       class: 'more', testid: `show-less-${cls}`, onclick: () => showLess(cls),
     }, t('list.show_less'));
-    const scroll = hidden > 0 && currentFit() === cls && !state.stalled.has(cls)
+    const scroll = hidden > 0 && onlyFit() === cls && !state.stalled.has(cls)
       && el('div', { class: 'scroll-more', testid: `scroll-more-${cls}`, 'data-scroll-more': cls });
     if (!more && !less) return null;
     return el('div', { class: 'more-bar' }, more, less, scroll);
@@ -1137,6 +1242,9 @@
     }
     children.push(renderDetails(view));
     children.push(status === 'new' ? renderAnswers(item) : renderMarked(item));
+    children.push(renderDocForm(item));
+    children.push(renderDocResult(item, 'cv'));
+    children.push(renderDocResult(item, 'letter'));
     children.push(renderTimeline(item));
     children.push(renderStepForm(item));
     return el('article', { class: `row status-${status}`, testid: `vacancy-${item.id}` }, children);
@@ -1181,7 +1289,8 @@
   // "Open", and beside it a small "Copy URL" (the owner, 2026-10-04: the link
   // is sometimes wanted elsewhere). The copy says so on the button for a
   // moment, since nothing else on screen changes.
-  function openButton(view) {
+  function openButton(item) {
+    const view = viewOf(item);
     return [
       el('button', {
         class: 'open', testid: 'btn-open', disabled: !view.url, onclick: () => openLink(view),
@@ -1190,7 +1299,166 @@
         class: 'copy', testid: 'btn-copy-url', disabled: !view.url,
         onclick: (event) => copyLink(view, event.currentTarget),
       }, t('action.copy_url')),
+      docButton(item, 'cv'),
+      docButton(item, 'letter'),
     ];
+  }
+
+  // "Generate CV" (the owner, 2026-10-06): a CV tailored to this vacancy,
+  // .docx and .pdf in Downloads under the common CV's name
+  // (tools/cv_tailor.py). "Generate Cover Letter" beside it (2026-10-12): a
+  // cover letter from the same CVs, as "Cover Letter <name>.docx/.pdf"
+  // (tools/cover_letter.py). Each takes a minute or three; one generation at
+  // a time, of either kind (app/main/cv.js says why).
+  //
+  // Both buttons behave alike. Like the reason of a rejection (the owner,
+  // 2026-10-12): the first click opens a field for instructions to this one
+  // document, the second click on the same button generates with whatever
+  // the field holds, empty included. The button that made the last document
+  // of its kind reads "CV is generated" / "Cover letter is generated" until
+  // the next one of that kind starts, and still makes another one when
+  // pressed — for a generation that went wrong.
+  const DOC_KINDS = {
+    cv: {
+      testid: 'cv', button: 'btn-generate-cv', css: 'cv', call: (...args) => api.generateCv(...args),
+      generate: 'action.generate_cv', generating: 'action.generating_cv', done: 'action.cv_generated',
+      failed: 'cv.failed', ready: 'cv.ready', readyPages: 'cv.ready_pages',
+      instructionsTitle: 'cv.instructions_title', instructionsHint: 'cv.instructions_hint',
+    },
+    letter: {
+      testid: 'letter', button: 'btn-generate-letter', css: 'cv letter',
+      call: (...args) => api.generateCoverLetter(...args),
+      generate: 'action.generate_letter', generating: 'action.generating_letter', done: 'action.letter_generated',
+      failed: 'letter.failed', ready: 'letter.ready', readyPages: 'letter.ready_pages',
+      instructionsTitle: 'letter.instructions_title', instructionsHint: 'letter.instructions_hint',
+    },
+  };
+
+  const sameCard = (mark, item) => Boolean(mark && mark.identity === state.active && mark.id === item.id);
+
+  function docButton(item, kind) {
+    const k = DOC_KINDS[kind];
+    const busy = state.cvBusy;
+    const mine = sameCard(busy, item) && busy.kind === kind;
+    const done = !busy && sameCard(state.cvLast[kind], item);
+    const classes = [k.css, docFormOpen(item, kind) && 'pressed', done && 'done'].filter(Boolean).join(' ');
+    return el('button', {
+      class: classes, testid: k.button, disabled: Boolean(busy),
+      title: busy && !mine ? t('cv.busy_other') : null,
+      onclick: () => askDoc(item, kind),
+    }, mine ? t(k.generating) : done ? t(k.done) : t(k.generate));
+  }
+
+  function docFormOpen(item, kind) {
+    return sameCard(state.cvFor, item) && state.cvFor.kind === kind;
+  }
+
+  function askDoc(item, kind) {
+    if (state.cvBusy) return;
+    if (docFormOpen(item, kind)) return generateDoc(item, kind, state.cvFor.draft || '');
+    state.cvFor = { identity: state.active, id: item.id, kind, draft: '' };
+    render();
+  }
+
+  // The draft lives in the state, as a reason's does: the list re-renders
+  // now and then and must not wipe instructions half typed.
+  function renderDocForm(item) {
+    const form = state.cvFor;
+    if (!sameCard(form, item)) return null;
+    const k = DOC_KINDS[form.kind];
+    const input = el('textarea', {
+      class: 'big', testid: `${k.testid}-instructions`, rows: '4', placeholder: t(k.instructionsHint),
+      oninput: (event) => { form.draft = event.target.value; },
+      onkeydown: saveOnCtrlEnter(() => generateDoc(item, form.kind, input.value)),
+    });
+    input.value = form.draft || '';
+    setTimeout(() => {
+      if (document.activeElement !== input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    }, 0);
+    return el('div', { class: 'step-form cv-form', testid: `${k.testid}-form` },
+      el('div', { class: 'step-form-title' }, t(k.instructionsTitle)),
+      input,
+      el('div', { class: 'reason-actions' },
+        el('button', {
+          class: 'primary', testid: `${k.testid}-instructions-generate`,
+          onclick: () => generateDoc(item, form.kind, input.value),
+        }, t(k.generate)),
+        el('button', {
+          testid: `${k.testid}-instructions-cancel`, onclick: () => { state.cvFor = null; render(); },
+        }, t('reason.cancel'))));
+  }
+
+  function generateDoc(item, kind, instructions) {
+    if (state.cvBusy) return;
+    const identity = state.active;
+    const key = `${identity}/${item.id}/${kind}`;
+    state.cvFor = null;
+    state.cvBusy = { identity, id: item.id, kind };
+    state.cvLast[kind] = null;
+    state.cvResults.delete(key);
+    render();
+    guarded(async () => {
+      try {
+        const result = await DOC_KINDS[kind].call(identity, item.id, (instructions || '').trim());
+        state.cvResults.set(key, result && result.ok ? result
+          : { ok: false, error: (result && result.error) || 'unknown error' });
+        if (result && result.ok) state.cvLast[kind] = { identity, id: item.id };
+      } catch (error) {
+        state.cvResults.set(key, { ok: false, error: error.message });
+      } finally {
+        state.cvBusy = null;
+        render();
+      }
+    });
+  }
+
+  // What the generation produced: the files, the page count, and what to
+  // look at before sending — claims the fact check could not find in the
+  // CVs, the vacancy's requirements with no evidence, what came from the
+  // parent CV, what was cut for length.
+  function renderDocResult(item, kind) {
+    const k = DOC_KINDS[kind];
+    const key = `${state.active}/${item.id}/${kind}`;
+    const result = state.cvResults.get(key);
+    if (!result) return null;
+    const id = (name) => `${k.testid}-${name}`;
+    const close = el('button', {
+      class: 'link', testid: id('close'), onclick: () => { state.cvResults.delete(key); render(); },
+    }, t('cv.close'));
+    if (!result.ok) {
+      const text = result.error === 'busy' ? t('cv.busy_other') : `${t(k.failed)}: ${result.error}`;
+      return el('div', { class: 'cv-result failed', testid: id('result') },
+        el('div', { class: 'cv-head' }, el('span', {}, text), close));
+    }
+    const fileButton = (file, label, testid) => file && el('button', {
+      testid, onclick: () => guarded(() => api.openCvFile(file)),
+    }, label);
+    const report = result.report || {};
+    const list = (title, items, testid) => (items && items.length
+      ? el('div', { class: 'cv-list', testid },
+        el('div', { class: 'cv-list-title' }, title),
+        el('ul', {}, items.map((x) => el('li', {}, x))))
+      : null);
+    const findings = (result.findings || []).map((f) => `${f.where}: ${f.text ? `"${f.text}" — ` : ''}${f.message}`);
+    return el('div', { class: 'cv-result', testid: id('result') },
+      el('div', { class: 'cv-head' },
+        el('span', { testid: id('summary') }, result.pages
+          ? t(k.readyPages, { pages: result.pages }) : t(k.ready)),
+        fileButton(result.pdf, t('cv.open_pdf'), id('open-pdf')),
+        fileButton(result.docx, t('cv.open_docx'), id('open-docx')),
+        (result.pdf || result.docx) && el('button', {
+          testid: id('show-folder'), onclick: () => guarded(() => api.showCvFile(result.pdf || result.docx)),
+        }, t('cv.show_folder')),
+        close),
+      list(t('cv.findings'), findings, id('findings')),
+      list(t('cv.warnings'), result.warnings, id('warnings')),
+      list(t('cv.gaps'), report.gaps, id('gaps')),
+      list(t('cv.from_parent'), report.from_parent, id('from-parent')),
+      list(t('cv.notes'), report.notes, id('notes')),
+      list(t('cv.removed'), result.removed_for_length, id('removed')));
   }
 
   function copyLink(view, button) {
@@ -1223,7 +1491,7 @@
   function renderAnswers(item) {
     const open = state.reasonFor && state.reasonFor.id === item.id ? state.reasonFor.status : null;
     const answers = el('div', { class: 'answers' },
-      openButton(viewOf(item)),
+      openButton(item),
       el('button', { testid: 'btn-applied', onclick: () => mark(item, 'applied', null) }, t('action.applied')),
       el('button', {
         testid: 'btn-rejected', class: open === 'rejected' ? 'pressed' : null,
@@ -1266,7 +1534,7 @@
     const { status } = item.feedback;
     const pressed = state.stepFor && state.stepFor.id === item.id ? state.stepFor.step : null;
     return el('div', { class: 'marked' },
-      openButton(viewOf(item)),
+      openButton(item),
       el('span', { class: `badge status ${status}`, testid: 'status-badge' }, t(STATUS_KEYS[status])),
       Funnel.nextSteps(status).map((step) => el('button', {
         testid: `btn-step-${step}`, class: pressed === step ? 'pressed' : null,

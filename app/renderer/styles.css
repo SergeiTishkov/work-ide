@@ -124,6 +124,17 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .identity-heading h1 { font-size: 18px; margin: 0 0 2px; }
 .selection-caption { display: block; margin: 4px 0; }
 .actions { display: flex; gap: 8px; }
+/* "Review feedback (N)": looks disabled, yet takes hover and clicks to show
+   its tooltip (app.js, feedbackHint). The tip opens below, right-aligned:
+   the button sits at the toolbar's right edge. */
+.feedback-hint { position: relative; display: inline-flex; }
+.feedback-hint .inert { opacity: .5; cursor: default; }
+.feedback-hint .tip {
+  display: none; position: absolute; right: 0; top: calc(100% + 6px); width: 280px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 10px; font-size: 12px; line-height: 1.4; z-index: 10;
+}
+.feedback-hint:hover .tip, .feedback-hint.open .tip, .feedback-hint .inert:focus-visible + .tip { display: block; }
 
 /* The filters: Material's outlined field — the name sits on the box's top
    edge, over the chosen value. The label's background is split at its middle:
@@ -163,11 +174,29 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 }
 .dropdown-menu ul { margin: 0; padding: 0; list-style: none; }
 .dropdown-menu [role="option"] {
+  display: flex; align-items: flex-start; gap: 8px;
   padding: 6px 10px; border-radius: 4px; cursor: pointer;
   white-space: normal; overflow-wrap: anywhere; line-height: 1.35;
 }
 .dropdown-menu [role="option"].cursor { background: var(--accent-soft); }
-.dropdown-menu [role="option"].active { color: var(--accent); font-weight: 600; }
+.dropdown-menu [role="option"].master { font-weight: 600; }
+/* the rows under a group's master row stand in from it */
+.dropdown-menu .master ~ [role="option"] { padding-left: 30px; }
+.option-text { flex: 1; min-width: 0; }
+/* The check box: on (a tick), partly on (a dash: some of the group's rows),
+   off (empty). Drawn, so it looks the same in every theme. */
+.check {
+  flex: none; position: relative; width: 14px; height: 14px; margin-top: 2px;
+  border: 1.5px solid var(--muted); border-radius: 3px; background: var(--surface);
+}
+.check.on, .check.partial { border-color: var(--accent); background: var(--accent); }
+.check.on::after {
+  content: ''; position: absolute; left: 3.5px; top: 0.5px; width: 4px; height: 8px;
+  border: solid var(--surface); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.check.partial::after {
+  content: ''; position: absolute; left: 2px; right: 2px; top: 4.5px; height: 2px; background: var(--surface);
+}
 .dropdown-group + .dropdown-group { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
 .dropdown-group-label {
   padding: 6px 10px 2px; font-size: 11.5px; color: var(--muted);
@@ -217,7 +246,16 @@ button.more { color: var(--accent); }
 .details ul { margin: 4px 0; padding-left: 18px; }
 .answers, .marked { display: flex; gap: 6px; align-items: center; margin: 8px 0 0 38px; }
 button.open { margin-right: 6px; color: var(--accent); border-color: var(--accent); }
-button.copy { margin-right: 10px; padding: 2px 8px; font-size: 0.85em; color: var(--muted); white-space: nowrap; }
+button.copy, button.cv { padding: 2px 8px; font-size: 0.85em; color: var(--muted); white-space: nowrap; }
+button.cv.letter { margin-right: 10px; }
+button.cv.done { color: var(--applied); border-color: var(--applied); }
+.cv-result { margin: 8px 0 0 38px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; }
+.cv-result.failed { border-color: var(--danger); color: var(--danger); }
+.cv-head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cv-head > span { margin-right: 6px; font-weight: 600; }
+.cv-list { margin-top: 6px; }
+.cv-list-title { color: var(--muted); font-size: 0.9em; }
+.cv-list ul { margin: 2px 0 0; padding-left: 20px; }
 .reason { margin: 6px 0 0 38px; }
 .reason textarea { width: 100%; max-width: 640px; font: inherit; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
 .reason-actions { display: flex; gap: 6px; margin-top: 4px; }

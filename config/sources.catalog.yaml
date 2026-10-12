@@ -16,8 +16,9 @@
 #
 #  `workplace_hidden: true` marks a board that shows remote/hybrid/on-site to
 #  logged-in visitors only. Its vacancies count as remote only on an explicit
-#  word (`explicit_remote_keywords` in the criteria) or the employer's
-#  schema.org TELECOMMUTE; see tools/score.py, _score_remote_location.
+#  word in the text (`explicit_remote_keywords` in the criteria). Its
+#  schema.org TELECOMMUTE does not count since 2026-10-12: 66 vacancies had it
+#  with not one word of remote work. See tools/score.py, _score_remote_location.
 #
 #  `site` is the website the vacancies come from, as a person knows it: the
 #  app's "Source" drop-down shows it instead of the source's code name.

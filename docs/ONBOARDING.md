@@ -44,6 +44,19 @@ Any one of the three will do, and several are better:
   with the CV or with the person, believe the person;
 - **an account in their own words** — a perfectly workable option too.
 
+**Offer a parent CV — optional, and say so.** A parent CV is one document with
+every achievement of the person's working life: every job, project, number and
+episode they remember, however long. It is not sent to anyone. It is the
+material **Generate CV** draws on when it tailors a CV to one vacancy; the
+ordinary CV stays the example of the layout and of what goes in first. Without
+it, Generate CV can only reshuffle and reword the ordinary CV. Ask once,
+plainly: "Do you have, or want to make, a parent CV — everything you have done
+at work in one long file? It is optional: it makes the CV for each vacancy
+better, and it can be added at any time later." A yes: the file goes into
+`documents/` under its own name and its path into `cv.parent` (step 5). A no
+or "later" is a full answer — do not press, and remind them at the end
+(step 6b).
+
 If the person sent a CV before the folder exists, create the identity in step 3
 and put the file there rather than leaving it at the repository root: personal
 documents must not reach the shared repository (they are in `.gitignore`, but
@@ -138,6 +151,16 @@ person will never be hired for.
 Put the CV in `local-identities/<prefix>-<expansion>/documents/`, under its own
 name. The whole folder is outside git.
 
+A parent CV, when the person has one, goes in the same folder under its own
+name, and its path into the profile (relative to the identity folder):
+
+```yaml
+cv:
+  parent: "documents/Master CV Ivan Petrov.docx"   # .docx, .md or .txt
+```
+
+The rest of the `cv:` section is in `docs/IDENTITIES.md`, "The CV per vacancy".
+
 If the person has an email address to use in the User-Agent, put it in their
 `<prefix>_profile.yaml` under `contact.user_agent_contact`. The address stays
 outside the shared repository.
@@ -177,6 +200,14 @@ Exactly two things need saying:
 Do not push. It is enough that the person knows the possibility exists and can
 come back to it later — the procedure for "later" is below, under "Second and
 subsequent identities".
+
+## Step 6b. If there is no parent CV, remind them it can be added
+
+When the identity is done and `cv.parent` is not set — the person said no,
+"later", or the question never came up — end with one line, for example: "One
+more thing, optional: a parent CV — everything you have done at work in one
+long file — makes Generate CV much better for each vacancy. Put it in
+`documents/` whenever you like and I will add it to the profile." Then leave it.
 
 ## Step 7. The first run
 
@@ -254,7 +285,9 @@ answers, and the two identities' goals differ by definition.
 If it is the same person, whose CV is already in another identity's
 `documents/`, there is no need to copy the file: point the new
 `<prefix>_profile.yaml → owner.cv_files` at the existing path. Personal
-documents are not duplicated.
+documents are not duplicated. The same goes for the parent CV: `cv.parent` may
+point into the other identity's `documents/`. When the new identity has none,
+remind the person at the end, as in step 6b.
 
 **3. Check how a run will be launched from now on.** With one identity, tools
 pick it silently. With two, a command without `--identity` refuses, naming both:

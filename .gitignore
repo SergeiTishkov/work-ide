@@ -29,6 +29,10 @@
 # --- (local-identities/<folder>/documents/), not in the shared repository.
 CV *.pdf
 CV *.docx
+# "Master CV Ivan Petrov.docx", "My CV.pdf": a CV's name need not start with it.
+*CV *.pdf
+*CV *.docx
+*CV *.md
 *_cv.pdf
 *_cv.docx
 

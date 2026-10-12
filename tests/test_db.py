@@ -194,6 +194,35 @@ def test_version_8_gains_the_markets_names_in_other_languages(isolated_data_dir)
     assert version == str(db.SCHEMA_VERSION)
 
 
+def test_version_10_marks_the_market_holding_the_whole_shortlist(isolated_data_dir):
+    kb.save_vacancies({"a1": _vacancy("a1"), "b1": _vacancy("b1")})
+    with db.session() as conn:
+        # The table as version 9 made it, two selections: one with markets
+        # (uk and worldwide split "full"), one with a single market.
+        conn.execute("DROP TABLE selection_segments")
+        conn.execute("CREATE TABLE selection_segments (selection_id INTEGER NOT NULL, "
+                     "slug TEXT NOT NULL, name TEXT NOT NULL, names TEXT, position INTEGER NOT NULL, "
+                     "is_default INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (selection_id, slug))")
+        for selection_id in (1, 2):
+            conn.execute("INSERT INTO selections (id, identity_id, run, created_at, kind) "
+                         "VALUES (?, ?, ?, '2026-10-01', 'run')", (selection_id, db.identity(), selection_id))
+        segments = [(1, "uk", 0), (1, "worldwide", 1), (1, "full", 2), (2, "full", 0)]
+        conn.executemany("INSERT INTO selection_segments (selection_id, slug, name, position) "
+                         "VALUES (?, ?, ?, ?)", [(s, slug, slug, p) for s, slug, p in segments])
+        items = [(1, "uk", "a1"), (1, "worldwide", "b1"), (1, "full", "a1"), (1, "full", "b1"),
+                 (2, "full", "a1")]
+        conn.executemany("INSERT INTO selection_items (selection_id, segment, vacancy_id, class, "
+                         "class_position, section_limit, score, eligibility_rank) "
+                         "VALUES (?, ?, ?, 'hot_lead', 0, 15, 50, 1)", items)
+        conn.execute("UPDATE meta SET value = '9' WHERE key = 'schema_version'")
+    kb.load_vacancies()
+    with db.session() as conn:
+        rows = conn.execute("SELECT selection_id, slug, everything FROM selection_segments "
+                            "ORDER BY selection_id, position").fetchall()
+    # a selection of one market has no "all markets" row to stand for
+    assert rows == [(1, "uk", 0), (1, "worldwide", 0), (1, "full", 1), (2, "full", 0)]
+
+
 def test_a_base_from_before_the_shared_one_is_refused_with_the_way_out(isolated_data_dir):
     """Versions 1-7 were one file per identity; they were merged once by a
     script, never upgraded in place — an upgrade could not know which

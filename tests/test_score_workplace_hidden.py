@@ -9,6 +9,11 @@ distributed team", "work from any location in Belarus ... or our offices", a
 named EOR platform on a Rome posting with three office days a week. The owner:
 everything from LinkedIn where remote is not stated goes to "remote not
 confirmed".
+
+2026-10-12: LinkedIn's own TELECOMMUTE markup no longer confirms it either (66
+vacancies in the confident tiers had it and not one word of remote work), and
+"remote" in another sense ("remote team members", "remote monitoring") is cut
+out before the words are looked for.
 """
 from __future__ import annotations
 
@@ -39,9 +44,21 @@ def _linkedin(description, **fields):
                         description_text=description + STACK, **fields)
 
 
+def _template_rl():
+    import yaml
+
+    path = (Path(__file__).resolve().parent.parent / "identity-templates"
+            / "sharp-senior-dotnet-remote-engineering" / "sharp_criteria.yaml")
+    return yaml.safe_load(path.read_text(encoding="utf-8"))["remote_location_fit"]
+
+
+TEMPLATE_RL = _template_rl()
+
+
 def _criteria():
     rl = {**CRITERIA["remote_location_fit"],
-          "explicit_remote_keywords": ["remote", "telecommute", "telework"]}
+          "explicit_remote_keywords": TEMPLATE_RL["explicit_remote_keywords"],
+          "remote_word_other_meanings": TEMPLATE_RL["remote_word_other_meanings"]}
     return {**CRITERIA, "remote_location_fit": rl}
 
 
@@ -50,6 +67,13 @@ def _criteria():
     "Collaborate closely with distributed team members.",
     "You can work from any location in Belarus, whether it's your home or our offices.",
     "Payroll through Deel.",
+    # "remote" about something else (2026-10-12)
+    "Communication including collaboration with local and remote team members.",
+    "A vacancy has just opened at a company developing remote monitoring systems.",
+    "Use of a personal or government vehicle to drive to local and/or remote office locations.",
+    "Integrate server APIs, remote configuration, and analytics reporting.",
+    "Home office allowance set up for remote employees.",
+    "Experience with privileged remote access software.",
 ])
 def test_a_phrase_that_is_not_remote_leaves_a_linkedin_vacancy_unconfirmed(description):
     result = score.score_vacancy(_linkedin(description), _criteria(), PROFILE)
@@ -66,7 +90,12 @@ def test_the_title_saying_wfh_three_days_is_not_remote_either():
 @pytest.mark.parametrize("fields", [
     {"title": "Remote Senior C# Developer"},
     {"description": "This is a fully remote position."},
-    {"workplace_type": "remote"},
+    {"description": "Location: Work From Home. Here's what we do."},
+    {"description": "Location: UK : Home Based Position. Position category: IT."},
+    {"title": "Full Stack Engineer (WFH Role)"},
+    {"description": "You're a fantastic communicator, especially in a remote team."},
+    {"description": "As a remote employee, you will join from home."},
+    {"description": "Collaborate with remote teams. This role is fully remote."},
 ])
 def test_an_explicit_remote_confirms_it(fields):
     description = fields.pop("description", "")
@@ -74,6 +103,25 @@ def test_an_explicit_remote_confirms_it(fields):
     result = score.score_vacancy(vacancy, _criteria(), PROFILE)
     assert score.REMOTE_UNCONFIRMED not in result["dealbreakers"]
     assert result["classification"] != "remote_unconfirmed"
+
+
+def test_linkedins_telecommute_markup_alone_does_not_confirm_it():
+    """The checklist of 2026-10-12 found offices in Philadelphia, New York and
+    Kraków behind it: LinkedIn's markup cannot be checked."""
+    result = score.score_vacancy(_linkedin("Join our team.", workplace_type="remote"), _criteria(), PROFILE)
+    assert result["classification"] == "remote_unconfirmed"
+
+
+def test_another_boards_declared_remote_still_confirms_it():
+    vacancy = make_vacancy(source="devitjobs", remote=None, workplace_type="remote",
+                           location_raw="Rotterdam", description_text="Join our team." + STACK)
+    assert score.REMOTE_UNCONFIRMED not in score.score_vacancy(vacancy, _criteria(), PROFILE)["dealbreakers"]
+
+
+def test_remote_in_another_sense_does_not_confirm_it_on_another_board_either():
+    vacancy = make_vacancy(source="reed", remote=None, location_raw="Rotterdam",
+                           description_text="Collaborate with local and remote team members." + STACK)
+    assert score.REMOTE_UNCONFIRMED in score.score_vacancy(vacancy, _criteria(), PROFILE)["dealbreakers"]
 
 
 def test_another_board_keeps_the_wider_synonyms():
@@ -106,3 +154,4 @@ def test_the_catalogue_marks_linkedin_and_both_templates_name_the_words():
         criteria = yaml.safe_load(path.read_text(encoding="utf-8"))
         words = criteria["remote_location_fit"]["explicit_remote_keywords"]
         assert "remote" in words and "work from home" not in words
+        assert criteria["remote_location_fit"]["remote_word_other_meanings"]

@@ -144,6 +144,15 @@ def _vacancy_text(vacancy: dict) -> str:
     )
 
 
+def _without_other_remote_meanings(text: str, rl: dict) -> str:
+    """The text with remote_word_other_meanings cut out, for the question
+    "does it say this job is remote": "remote team members" and "remote
+    monitoring" say nothing about it."""
+    for pattern in rl.get("remote_word_other_meanings") or []:
+        text = _regex(pattern).sub(" ", text)
+    return text
+
+
 _TECH_PATTERNS_CACHE = {}
 
 
@@ -1276,7 +1285,13 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         remote_words = rl["remote_synonym_keywords"]
         if workplace_hidden:
             remote_words = rl.get("explicit_remote_keywords") or remote_words
-        remote_word_hits = _matches(text, remote_words)
+        # "Remote" that is about something other than where this job is done
+        # — "local and remote team members", "remote monitoring systems",
+        # "drive to remote office locations" — is cut out first
+        # (remote_word_other_meanings). Measured 2026-10-12 on SHARP's base:
+        # 25 LinkedIn vacancies in the confident tiers had "remote" in no
+        # other sense.
+        remote_word_hits = _matches(_without_other_remote_meanings(text, rl), remote_words)
         # A board that publishes ONLY remote roles (WWR, RemoteOK, Remotive,
         # Jobicy, Himalayas — see remote_only in the sources catalogue) is
         # sufficient proof of remoteness by itself. Found 2026-07-30:
@@ -1289,7 +1304,15 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
         # one. schema.org marks a genuinely remote posting TELECOMMUTE; the
         # absence of it means the employer said nothing, NOT that the job is
         # onsite. See fetch_linkedin.workplace_type.
-        declared_remote = vacancy.get("workplace_type") == "remote"
+        #
+        # Not on a board that hides the arrangement. Measured 2026-10-12 on
+        # SHARP's base: 66 LinkedIn vacancies in the confident tiers had
+        # TELECOMMUTE and not one word of remote work in the text, and the
+        # checklist found what they were: a Philadelphia, a New York and a
+        # Kraków office, "free lunches", "on our shop floor". The owner: what
+        # does not say remote in its text goes to "remote not confirmed" —
+        # LinkedIn's own markup cannot be checked.
+        declared_remote = vacancy.get("workplace_type") == "remote" and not workplace_hidden
         # max(), not an overwrite: a region_hits bonus already computed above
         # (e.g. 16 for Israel/UAE) must survive even when this branch runs.
         # An exempt vacancy is here only for the remote question above; what

@@ -1,6 +1,7 @@
 """Selections in the database (tools/selections.py) and the queries the app
-lists them with (schemas/queries.sql): markets, the per-class limit, the six
-filters, freshness across runs, and the row view shared with the report."""
+lists them with (schemas/queries.sql): markets, the per-class limit, the view
+(several markets, statuses, freshness, boards and classes at once), freshness
+across runs, and the row view shared with the report."""
 import json
 
 import pytest
@@ -57,9 +58,32 @@ def _set_feedback(vid, status, reason=None, selection_id=None):
         })
 
 
-def _listing(selection_id, segment="full", filter_name="fresh_new"):
+# The single filters the app had before 2026-10-07, as views: the guarantees
+# below were written against them and still hold.
+FILTERS = ("fresh_new", "no_feedback", "all", "fresh") + selections.FUNNEL + selections.DENIED
+
+
+def _view(segment="full", filter_name="fresh_new", source=None, fit=None):
+    fresh = ("fresh",) if filter_name in ("fresh_new", "fresh") else selections.FRESHNESS
+    statuses = {"fresh_new": selections.NEW, "no_feedback": selections.NEW,
+                "all": selections.STATUSES, "fresh": selections.STATUSES}.get(filter_name, (filter_name,))
+    segments_ = [segment] if isinstance(segment, str) else segment
+    return selections.view(segments_, statuses, fresh,
+                           sources=[source] if source else None, fits=[fit] if fit else None)
+
+
+def _listing(selection_id, segment="full", filter_name="fresh_new", **kw):
     with db.session() as conn:
-        return selections.listing(conn, selection_id, segment, filter_name)
+        return selections.listing(conn, selection_id, _view(segment, filter_name), **kw)
+
+
+def _count(conn, selection_id, chosen):
+    """The view's size by the "Show" drop-down's numbers — both axes agree."""
+    counts = selections.counts(conn, selection_id, chosen)
+    by_status = sum(counts["statuses"][s] for s in chosen["statuses"])
+    by_fresh = sum(counts["fresh"][f] for f in chosen["fresh"])
+    assert by_status == by_fresh, chosen
+    return by_status
 
 
 def _ids(rows):
@@ -79,6 +103,8 @@ def test_vacancy_lands_in_every_market_that_holds_it(isolated_data_dir):
     with db.session() as conn:
         rows = conn.execute(selections.load_queries()["segments"], {"selection_id": sel}).fetchall()
     assert [r[0] for r in rows] == ["worldwide", "uk", "rest", "full"]
+    # The market holding everything is the app's "all markets" row.
+    assert [r[5] for r in rows] == [0, 0, 0, 1]
     # Each market's name in every language the configuration gives.
     assert json.loads(rows[3][2]) == {"en": "Everything", "ru": "Vsyo vmeste"}
     assert json.loads(rows[1][2]) == {"en": "United Kingdom"}
@@ -197,15 +223,15 @@ def test_counts_are_whole_numbers_and_the_list_says_how_many_more(isolated_data_
     _set_feedback("f01", "applied", selection_id=sel)
 
     with db.session() as conn:
-        counts = selections.listing_counts(conn, sel, "full")
-        for name in selections.FILTERS:
-            everything = selections.listing(conn, sel, "full", name, expanded=_all_classes())
-            totals = selections.class_totals(conn, sel, "full", name)
-            assert counts[name] == len(everything) == sum(totals.values()), name
+        for name in FILTERS:
+            chosen = _view("full", name)
+            everything = selections.listing(conn, sel, chosen, expanded=_all_classes())
+            totals = selections.class_totals(conn, sel, chosen)
+            assert _count(conn, sel, chosen) == len(everything) == sum(totals.values()), name
     # fresh worth_a_look: limit+4 of which 2 marked -> limit+2 new, capped on screen
     with db.session() as conn:
-        shown = selections.listing(conn, sel, "full", "fresh_new")
-        totals = selections.class_totals(conn, sel, "full", "fresh_new")
+        shown = selections.listing(conn, sel, _view())
+        totals = selections.class_totals(conn, sel, _view())
     assert totals == {"worth_a_look": limit + 2}
     assert len(shown) == limit, "the list stays capped; the count does not"
 
@@ -222,20 +248,32 @@ def test_markets_add_up_to_everything(isolated_data_dir):
     sel = _store(vacancies)
     _set_feedback("v00", "rejected", selection_id=sel)
     with db.session() as conn:
-        for name in selections.FILTERS:
-            full = selections.listing_counts(conn, sel, "full")[name]
-            parts = sum(selections.listing_counts(conn, sel, seg)[name]
-                        for seg in ("worldwide", "uk", "rest"))
-            assert parts == full, name
+        for name in FILTERS:
+            full = _count(conn, sel, _view("full", name))
+            parts = sum(_count(conn, sel, _view(seg, name)) for seg in ("worldwide", "uk", "rest"))
+            together = _count(conn, sel, _view(["worldwide", "uk", "rest"], name))
+            assert parts == full == together, name
+
+
+def test_several_markets_list_a_vacancy_once(isolated_data_dir):
+    """Markets chosen together (the owner, 2026-10-07): a vacancy in two of
+    them is one row."""
+    sel = _store({
+        "w": _vacancy("w"),
+        "uk": _vacancy("uk", "London, United Kingdom"),
+        "ca": _vacancy("ca", "Toronto, Ontario, Canada"),
+    })
+    assert set(_ids(_listing(sel, ["uk", "worldwide"]))) == {"uk", "w"}
+    assert sorted(_ids(_listing(sel, ["uk", "full"]))) == ["ca", "uk", "w"]
+    assert _listing(sel, []) == []
 
 
 def test_an_expanded_class_shows_every_row(isolated_data_dir):
     limit = report.TOP_N_PER_SECTION
     sel = _store({f"v{i:02}": _vacancy(f"v{i:02}", score=100 - i) for i in range(limit + 5)})
-    with db.session() as conn:
-        assert len(selections.listing(conn, sel, "full", "all")) == limit
-        assert len(selections.listing(conn, sel, "full", "all", expanded=("hot_lead",))) == limit + 5
-        assert len(selections.listing(conn, sel, "full", "all", expanded=("long_shot",))) == limit
+    assert len(_listing(sel, filter_name="all")) == limit
+    assert len(_listing(sel, filter_name="all", expanded=("hot_lead",))) == limit + 5
+    assert len(_listing(sel, filter_name="all", expanded=("long_shot",))) == limit
 
 
 def test_shown_raises_the_limit_of_one_class(isolated_data_dir):
@@ -247,14 +285,14 @@ def test_shown_raises_the_limit_of_one_class(isolated_data_dir):
                       for i in range(limit + 5)})
     sel = _store(vacancies)
     _set_feedback("v00", "applied", selection_id=sel)
-    with db.session() as conn:
-        def count(cls, **kw):
-            return sum(r["class"] == cls for r in selections.listing(conn, sel, "full", "all", **kw))
-        assert count("hot_lead", shown={"hot_lead": limit + 10}) == 1 + limit + 10, "feedback rows uncapped"
-        assert count("worth_a_look", shown={"hot_lead": limit + 10}) == limit
-        assert count("hot_lead", shown={"hot_lead": 1000}) == limit + 20
-        rows = selections.listing(conn, sel, "full", "all", shown={"hot_lead": limit + 1})
-        assert _ids(rows)[:3] == ["v00", "v01", "v02"], "the order stays"
+    def count(cls, **kw):
+        return sum(r["class"] == cls for r in _listing(sel, filter_name="all", **kw))
+    assert count("hot_lead", shown={"hot_lead": limit + 10}) == 1 + limit + 10, "feedback rows uncapped"
+    assert count("worth_a_look", shown={"hot_lead": limit + 10}) == limit
+    assert count("hot_lead", shown={"hot_lead": 1000}) == limit + 20
+    rows = _listing(sel, filter_name="all", shown={"hot_lead": limit + 1})
+    # The vacancies without an answer by score, the application after them.
+    assert _ids(rows)[:3] == ["v01", "v02", "v03"] and "v00" in _ids(rows), "the order stays"
 
 
 def test_fit_narrows_the_listing_counts_and_sources_to_one_class(isolated_data_dir):
@@ -264,19 +302,20 @@ def test_fit_narrows_the_listing_counts_and_sources_to_one_class(isolated_data_d
     _set_feedback("d0", "rejected", selection_id=sel)
     with db.session() as conn:
         for fit in ("hot_lead", "worth_a_look"):
-            counts = selections.listing_counts(conn, sel, "full", fit=fit)
-            totals = selections.class_totals(conn, sel, "full", "all")
-            for name in selections.FILTERS:
-                rows = selections.listing(conn, sel, "full", name, expanded=_all_classes(), fit=fit)
+            totals = selections.class_totals(conn, sel, _view("full", "all", fit=fit))
+            for name in FILTERS:
+                chosen = _view("full", name, fit=fit)
+                rows = selections.listing(conn, sel, chosen, expanded=_all_classes())
                 assert {r["class"] for r in rows} <= {fit}, (fit, name)
-                assert counts[name] == len(rows), (fit, name)
-            assert counts["all"] == totals[fit]
-        assert selections.listing_sources(conn, sel, "full", "all", fit="worth_a_look") == {"devitjobs": 3}
-        assert selections.listing_sources(conn, sel, "full", "applied", fit="worth_a_look") == {}
-        assert selections.listing_sources(conn, sel, "full", "applied", fit="hot_lead") == {"linkedin": 1}
-        assert _ids(selections.listing(conn, sel, "full", "rejected", source="devitjobs",
-                                       fit="worth_a_look")) == ["d0"]
-        assert selections.listing(conn, sel, "full", "rejected", source="linkedin", fit="worth_a_look") == []
+                assert _count(conn, sel, chosen) == len(rows), (fit, name)
+            assert _count(conn, sel, _view("full", "all", fit=fit)) == totals[fit]
+        assert selections.sources(conn, sel, _view("full", "all", fit="worth_a_look")) == {"devitjobs": 3}
+        assert selections.sources(conn, sel, _view("full", "applied", fit="worth_a_look")) == {}
+        assert selections.sources(conn, sel, _view("full", "applied", fit="hot_lead")) == {"linkedin": 1}
+        assert _ids(selections.listing(conn, sel, _view("full", "rejected", source="devitjobs",
+                                                        fit="worth_a_look"))) == ["d0"]
+        assert selections.listing(conn, sel, _view("full", "rejected", source="linkedin",
+                                                   fit="worth_a_look")) == []
 
 
 def test_row_view_is_the_one_the_report_renders(isolated_data_dir):
@@ -314,10 +353,10 @@ def test_decisions_from_earlier_collections_are_settled_and_hidden(isolated_data
 
     second = _store({"old": _vacancy("old"), "kept": _vacancy("kept"),
                      "new": _vacancy("new")}, run=2)
-    for name in selections.FILTERS:
+    for name in FILTERS:
         assert "old" not in _ids(_listing(second, filter_name=name)), name
     with db.session() as conn:
-        assert selections.listing_counts(conn, second, "full")["rejected"] == 0
+        assert _count(conn, second, _view("full", "rejected")) == 0
 
     # Decided now, then re-selected without fetching: same collection, still shown.
     _set_feedback("new", "rejected", "not for me", selection_id=second)
@@ -341,9 +380,10 @@ def test_applications_stay_listed_across_collections_and_markets(isolated_data_d
     second = _store({"b": _vacancy("b"), "c": _vacancy("c")}, run=2)   # "a" gone from the list
     for segment in ("full", "uk", "worldwide"):
         with db.session() as conn:
-            assert _ids(selections.listing(conn, second, segment, "applied")) == ["a"], segment
-            assert selections.listing_counts(conn, second, segment)["applied"] == 1
-            assert selections.class_totals(conn, second, segment, "applied") == {"hot_lead": 1}
+            chosen = _view(segment, "applied")
+            assert _ids(selections.listing(conn, second, chosen)) == ["a"], segment
+            assert _count(conn, second, chosen) == 1
+            assert selections.class_totals(conn, second, chosen) == {"hot_lead": 1}
 
 
 def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
@@ -426,7 +466,7 @@ def test_the_source_narrows_the_listing_and_works_with_the_status_filter(isolate
     _set_feedback("d0", "rejected", selection_id=sel)
     with db.session() as conn:
         def ids(name, source):
-            return set(_ids(selections.listing(conn, sel, "full", name, source=source)))
+            return set(_ids(selections.listing(conn, sel, _view("full", name, source=source))))
         assert ids("fresh_new", "devitjobs") == {"d1", "d2"}
         assert ids("rejected", "linkedin") == {"l0"}
         assert ids("rejected", "devitjobs") == {"d0"}
@@ -439,14 +479,13 @@ def test_counts_and_totals_follow_the_source(isolated_data_dir):
     _set_feedback("l0", "applied", selection_id=sel)
     with db.session() as conn:
         for source in ("", "linkedin", "devitjobs"):
-            counts = selections.listing_counts(conn, sel, "full", source)
-            for name in selections.FILTERS:
-                rows = selections.listing(conn, sel, "full", name,
-                                          expanded=_all_classes(), source=source)
-                totals = selections.class_totals(conn, sel, "full", name, source)
-                assert counts[name] == len(rows) == sum(totals.values()), (source, name)
-        assert selections.listing_counts(conn, sel, "full", "devitjobs")["applied"] == 0
-        assert selections.listing_counts(conn, sel, "full", "linkedin")["applied"] == 1
+            for name in FILTERS:
+                chosen = _view("full", name, source=source)
+                rows = selections.listing(conn, sel, chosen, expanded=_all_classes())
+                totals = selections.class_totals(conn, sel, chosen)
+                assert _count(conn, sel, chosen) == len(rows) == sum(totals.values()), (source, name)
+        assert _count(conn, sel, _view("full", "applied", source="devitjobs")) == 0
+        assert _count(conn, sel, _view("full", "applied", source="linkedin")) == 1
 
 
 def test_the_source_list_counts_under_the_status_filter(isolated_data_dir):
@@ -454,11 +493,14 @@ def test_the_source_list_counts_under_the_status_filter(isolated_data_dir):
     _set_feedback("d0", "rejected", selection_id=sel)
     _set_feedback("l0", "applied", selection_id=sel)
     with db.session() as conn:
-        assert selections.listing_sources(conn, sel, "full", "all") == {"linkedin": 6, "devitjobs": 3}
-        assert list(selections.listing_sources(conn, sel, "full", "all")) == ["linkedin", "devitjobs"]
-        assert selections.listing_sources(conn, sel, "full", "fresh_new") == {"linkedin": 5, "devitjobs": 2}
-        assert selections.listing_sources(conn, sel, "full", "rejected") == {"devitjobs": 1}
-        assert selections.listing_sources(conn, sel, "full", "applied") == {"linkedin": 1}
+        def boards(name, **kw):
+            return selections.sources(conn, sel, _view("full", name, **kw))
+        assert boards("all") == {"linkedin": 6, "devitjobs": 3}
+        assert list(boards("all")) == ["linkedin", "devitjobs"]
+        assert boards("fresh_new") == {"linkedin": 5, "devitjobs": 2}
+        assert boards("rejected") == {"devitjobs": 1}
+        assert boards("applied") == {"linkedin": 1}
+        assert boards("all", source="linkedin") == boards("all"), "the chosen board aside"
 
 
 def test_a_view_written_before_it_carried_the_source_is_still_filtered(isolated_data_dir):
@@ -467,8 +509,9 @@ def test_a_view_written_before_it_carried_the_source_is_still_filtered(isolated_
     with db.session() as conn:
         conn.execute("UPDATE vacancy_identity SET view = json_remove(view, '$.source')")
     with db.session() as conn:
-        assert set(_ids(selections.listing(conn, sel, "full", "all", source="devitjobs"))) == {"d0", "d1", "d2"}
-        assert selections.listing_sources(conn, sel, "full", "all") == {"linkedin": 6, "devitjobs": 3}
+        assert set(_ids(selections.listing(conn, sel, _view("full", "all", source="devitjobs")))) \
+            == {"d0", "d1", "d2"}
+        assert selections.sources(conn, sel, _view("full", "all")) == {"linkedin": 6, "devitjobs": 3}
 
 
 def test_a_selection_carries_the_websites_of_the_sources(isolated_data_dir):
@@ -489,3 +532,80 @@ def test_every_automatic_source_in_the_catalogue_names_its_website():
     missing = [s["name"] for s in catalog["sources"]
                if s.get("kind") != "manual_ingest" and not s.get("site")]
     assert missing == []
+
+
+# --- the view: several rows of each drop-down at once -------------------------
+# The owner, 2026-10-07: checkboxes in all four drop-downs; "Show" is two axes,
+# freshness and status, applied together.
+
+def _two_runs():
+    def v(vid, source="linkedin", **kw):
+        return _vacancy(vid, source=source, **kw)
+    _store({"old_new": v("old_new"), "old_applied": v("old_applied"), "old_rejected": v("old_rejected")})
+    sel = _store({
+        "old_new": v("old_new"), "old_applied": v("old_applied"), "old_rejected": v("old_rejected"),
+        "new": v("new"), "applied": v("applied"),
+        "rejected": v("rejected", source="devitjobs"),
+        "bugged": v("bugged", classification="worth_a_look"),
+    }, run=2)
+    for vid, status in (("old_applied", "applied"), ("applied", "applied"),
+                        ("old_rejected", "rejected"), ("rejected", "rejected"),
+                        ("bugged", "bugged")):
+        _set_feedback(vid, status, selection_id=sel)
+    return sel
+
+
+def test_freshness_and_status_are_applied_together(isolated_data_dir):
+    sel = _two_runs()
+    with db.session() as conn:
+        def ids(statuses, fresh=selections.FRESHNESS, **kw):
+            chosen = selections.view(["full"], statuses, fresh, **kw)
+            return set(_ids(selections.listing(conn, sel, chosen, expanded=_all_classes())))
+        assert ids(selections.NEW, ("fresh",)) == {"new"}, "the default"
+        assert ids(selections.NEW, ("earlier",)) == {"old_new"}
+        assert ids(selections.FUNNEL, ("fresh",)) == {"applied"}
+        assert ids(selections.FUNNEL) == {"applied", "old_applied"}
+        assert ids(selections.NEW + selections.DENIED, ("fresh",)) == {"new", "rejected", "bugged"}
+        assert ids(("rejected", "bugged")) == {"old_rejected", "rejected", "bugged"}
+        assert ids(selections.STATUSES, ()) == set(), "no freshness chosen: nothing"
+        assert ids((), selections.FRESHNESS) == set(), "no status chosen: nothing"
+
+
+def test_several_boards_and_classes_and_none_of_them(isolated_data_dir):
+    sel = _two_runs()
+    with db.session() as conn:
+        def ids(**kw):
+            chosen = selections.view(["full"], selections.STATUSES, **kw)
+            return set(_ids(selections.listing(conn, sel, chosen, expanded=_all_classes())))
+        everything = ids()
+        assert ids(sources=["devitjobs"]) == {"rejected"}
+        assert ids(sources=["devitjobs", "linkedin"]) == ids(sources=None) == everything
+        assert ids(sources=[]) == set()
+        assert ids(fits=["worth_a_look"]) == {"bugged"}
+        assert ids(fits=["worth_a_look", "hot_lead"]) == everything
+        assert ids(fits=[]) == set()
+
+
+def test_each_axis_of_show_is_counted_under_the_other(isolated_data_dir):
+    sel = _two_runs()
+    with db.session() as conn:
+        counts = selections.counts(conn, sel, selections.view(["full"], selections.NEW, ("fresh",)))
+    # statuses under "fresh"; freshness under "not applied or denied"
+    assert counts["statuses"]["new"] == 1 and counts["statuses"]["applied"] == 1
+    assert counts["statuses"]["rejected"] == 1 and counts["statuses"]["bugged"] == 1
+    assert counts["fresh"] == {"fresh": 1, "earlier": 1}
+
+
+def test_class_totals_leave_the_chosen_classes_aside(isolated_data_dir):
+    sel = _two_runs()
+    with db.session() as conn:
+        chosen = selections.view(["full"], selections.STATUSES, fits=["worth_a_look"])
+        assert selections.class_totals(conn, sel, chosen) == {"hot_lead": 6, "worth_a_look": 1}
+
+
+def test_an_unknown_status_or_freshness_is_refused(isolated_data_dir):
+    sel = _store({"a": _vacancy("a")})
+    with db.session() as conn, pytest.raises(ValueError):
+        selections.listing(conn, sel, selections.view(["full"], ("archived",)))
+    with db.session() as conn, pytest.raises(ValueError):
+        selections.listing(conn, sel, selections.view(["full"], fresh=("stale",)))

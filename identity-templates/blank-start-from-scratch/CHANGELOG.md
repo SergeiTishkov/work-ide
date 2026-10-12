@@ -2,6 +2,12 @@
 
 New versions go on TOP.
 
+## V5 — an optional parent CV, 2026-10-12
+
+**Added** (`blank_questionnaire.yaml`): `person.parent_cv` — an optional file
+with every achievement of the person's working life, which Generate CV draws on
+(`cv.parent` in the profile; see docs/IDENTITIES.md, "The CV per vacancy").
+
 ## V4 — exclusivity can be a line on the card, 2026-10-05
 
 **Changed** (`blank_profile.yaml`): new `employment_type_priority.exclusivity_signals`,

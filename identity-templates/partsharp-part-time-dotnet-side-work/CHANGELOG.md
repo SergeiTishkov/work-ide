@@ -6,6 +6,125 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V16 — remote on LinkedIn only in words, 2026-10-12
+
+**Changed** (`tools/score.py`, `_score_remote_location`): on a board that
+hides the work arrangement (LinkedIn) the employer's schema.org TELECOMMUTE no
+longer confirms remote — only the text does. The owner, 2026-10-12: a vacancy
+with no explicit sign of remote work goes to "remote not confirmed"; LinkedIn's
+markup cannot be checked. Measured on SHARP's base: 66 LinkedIn vacancies in the
+confident tiers had TELECOMMUTE and not one word of remote work; the checklist
+had found offices in Philadelphia, New York and Kraków among them.
+
+**Changed** (`partsharp_criteria.yaml` → `remote_location_fit.explicit_remote_keywords`):
+"location: work from home", "home based position", "home-based position",
+"(wfh role)" — the explicit forms without the word "remote" found in the base.
+
+**Added** (`partsharp_criteria.yaml` → `remote_location_fit.remote_word_other_meanings`): "remote" in
+another sense is cut out before the remote words are looked for — "local and
+remote team members", "remote monitoring systems", "remote office locations",
+"remote configuration", "remote employees" (of the company). 25 LinkedIn
+vacancies in SHARP's confident tiers had "remote" only in these senses.
+
+## V15 — one state, a country before (remote), clearance fields, 2026-10-12
+
+**Changed** (`partsharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers.patterns`):
+four patterns from SHARP's third checklist round of 2026-10-12:
+- "remote in one place only": "LOCATION: Remote in CA only" (a hot_lead at 55);
+- "location: a country (remote)": "Location: Canada (remote)" — V25 knew only
+  the order "Remote – Canada";
+- "one country's applicants only": "US applicants only";
+- "only candidates who reside": "we are only able to consider candidates who
+  reside and work in British Columbia, Alberta, Manitoba, or Ontario".
+
+**Changed** (`partsharp_criteria.yaml` → `remote_location_fit.work_authorization.rules`):
+- "security clearance required" also reads "Minimum Clearance Secret" and
+  "a government-issued Secret-level clearance";
+- "US payroll only (W-2)" also reads "Contract: W2" in a header of fields.
+
+Measured over SHARP's base before adding: 21 location matches and 20 clearance
+matches, every one a single country, state or province list, or a clearance.
+
+## V14 — one country, named offices, a second language, 2026-10-12
+
+**Changed** (`partsharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers.patterns`):
+eight patterns from the second checklist round of 2026-10-12, quoted from its
+vacancies:
+- "remote within a named country": "fully remote candidates within New
+  Zealand" — the old pattern knew only the US, the UK and Canada;
+- "remote, then one country": "Remote (US Region)", "Location: Remote –
+  Canada", "fully remote, United States", "Remote UK";
+- "partner based in one country": Jobgether's "Our partner is looking for a
+  ... based in Switzerland";
+- "workplace model says hybrid": "Workplace model: Hybrid";
+- "days a week in a named office" and "a named office, days a week": "3 days
+  per week in the Espoo office", "at our Coleshill office 2 days per week";
+- "remote on US western hours": "Remote (MST)", "Remote PST Hours";
+- "office stated plainly": "We work mainly from the office", "a fully remote
+  work policy is not offered", "within commuting distance of our office".
+
+**Changed** (`partsharp_criteria.yaml` → `language_requirement_signal.explicit_requirement_patterns`):
+"English and another language" — "Excellent English and Korean verbal and
+written communication skills", "both Norwegian and English".
+
+Measured over SHARP's base before adding: 75 location matches and 15 language
+matches among the vacancies not yet rejected; every sampled match was a
+single country, a hybrid role, US western hours or a demanded language.
+
+**Changed** (`partsharp_criteria.yaml` → `engagement_fit.confirming_patterns`):
+"part-time" no longer counts "Salaries for part-time roles will be prorated"
+or "full or part-time status" — US benefits text that confirmed Capital One's
+full-time Staff role as part-time (a hot_lead at 68). "Full-time or
+part-time" still confirms.
+
+## V13 — office days and an Asian language, 2026-10-12
+
+**Changed** (`partsharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers.patterns`):
+three patterns for office days written without "in/at/from the office":
+- "attend the office": "required to attend the office a minimum of 3 days per
+  week";
+- "office at least some days": "require office attendance at least 2 days per
+  week";
+- "work from home some days": "work from home typically two days per week".
+
+**Changed** (`partsharp_criteria.yaml` → `language_requirement_signal.explicit_requirement_patterns`):
+"an Asian language demanded" — "Language : Japanese", "native Mandarin
+fluency", "Japanese required".
+
+Found by PARTSHARP's checklist on 2026-10-12 (Nuix ×3, Apogee, PerkUP).
+Measured over the base before adding: 15 office matches, every one a hybrid
+role; 2 language matches, both a demand.
+
+**Changed** (`partsharp_criteria.yaml` → `engagement_fit.contradicting_patterns`):
+"a five-day week" — Apogee's "two days per week in a five-day working week"
+passed "three days a week or fewer" as part-time.
+
+**Changed** (`partsharp_criteria.yaml` → `extra_signals.ai_training_gig.keywords`):
+13 markers — "llm-generated code", "paid per task", "minimum weekly
+submission", "golden reference solution" and others. Four of the ten
+AI-training gigs among the 19 fresh vacancies carried none of the old markers,
+the top of the shortlist among them. "ai-generated code" was measured and left
+out: product roles use it too.
+
+## V12 — SHARP's reachability rules, 2026-10-12
+
+**Changed** (`partsharp_criteria.yaml` → `remote_location_fit`): the rules
+SHARP gained in its V20 and V23 are here too, word for word.
+- `hard_dealbreakers.patterns`: "hybrid remote", "work mode field says
+  hybrid", "hybrid as a separate item", "work in a hybrid environment",
+  "remote within one country, said at length", "based in one country", "must
+  live in a named place", and V23's "anywhere in one country", "open to
+  applicants in one country", "remote role based in one country", "some US
+  states only", "candidates from one country", "office now and then".
+- `work_authorization.rules`: "US or Canadian payroll benefits (401(k),
+  RRSP)", lifted for an employer that engages people abroad.
+- `language_requirement_signal.foreign_language_posting_indicators`: SHARP
+  V23's wider Italian and its new `scandinavian` entry.
+
+**Why.** Both identities belong to one person in one country; where an
+employer can hire them is the same question for part-time work. PARTSHARP
+had only the patterns of before 2026-10-05.
+
 ## V11 — renamed from PJOICE to PARTSHARP, 2026-10-05
 
 **Renamed.** The prefix `pjoice` became `partsharp` (part-time SHARP: the same

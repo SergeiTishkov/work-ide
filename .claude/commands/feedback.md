@@ -6,8 +6,11 @@ In the desktop app the person answers each vacancy with "applied", "not for
 me" (`rejected`) or "wrong pick" (`bugged`), with an optional reason. This
 command turns the last two into improvements of the search.
 
-The identity is given as the argument (`/feedback sharp`): `$ARGUMENTS`. If it is not, ask —
-unless you run headless (see below).
+The identity is given as the argument (`/feedback sharp`): `$ARGUMENTS`. If it is not, ask.
+
+The person starts this in a session of their own, to follow and steer the
+review; the desktop app only counts what is pending (2026-10-07). Ask when a
+reason is unclear or a fix would change what the search accepts.
 
 ## The order
 
@@ -93,12 +96,10 @@ unless you run headless (see below).
    ```
 
    Items you could not resolve stay unmarked — say why in the summary.
-
-## Started from the desktop app (headless)
-
-The app runs this as `claude -p "/feedback <p>"`. Do not ask anything; do not
-commit (the person reviews the changes); say briefly what each step is doing,
-since the app shows your text as a live log.
+   **Mark every item you reviewed**, including a review done without this
+   command (reading the database by hand, a retune prompted by the answers).
+   An unmarked item stays in the app's count as pending: on 2026-10-04 a
+   retune built from 46 answers (commit 8b6906c) left all 46 there.
 
 ## At the end
 

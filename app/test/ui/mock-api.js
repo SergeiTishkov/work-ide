@@ -12,18 +12,40 @@ function installMockApi(fixture) {
   window.__emitRunEvent = (event) => listeners.forEach((l) => l(event));
   window.__setPipeline = (identity, status) => { data.pipelines = { ...(data.pipelines || {}), [identity]: status }; };
   window.__WORK_IDE_POLL_MS = 50;
+  window.__holdListing = () => { data.holdListing = true; };
 
   function record(name, args) {
     calls.push({ name, args });
   }
 
-  function matches(row, filter) {
-    const status = row.feedback.status;
-    if (filter === 'fresh_new') return row.fresh && status === 'new';
-    if (filter === 'no_feedback') return status === 'new';
-    if (filter === 'all') return true;
-    if (filter === 'fresh') return row.fresh;
-    return status === filter;
+  // The view as schemas/queries.sql reads it (THE VIEW): the rows of the
+  // chosen markets, each once, and the applications from every market.
+  const FUNNEL = ['applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered',
+    'started', 'declined'];
+  const STATUSES = ['new', ...FUNNEL, 'rejected', 'bugged', 'expired'];
+
+  function poolOf(identity, view) {
+    const segments = (data.segments[identity] || {}).segments || [];
+    let chosen = view.segments;
+    if (chosen == null) {
+      const everything = segments.filter((s) => s.everything);
+      chosen = (everything.length ? everything : segments).map((s) => s.slug);
+    }
+    const byId = new Map();
+    for (const [slug, rows] of Object.entries(data.rows[identity] || {})) {
+      for (const row of rows) {
+        if (!byId.has(row.id) && (chosen.includes(slug) || FUNNEL.includes(row.feedback.status))) byId.set(row.id, row);
+      }
+    }
+    return [...byId.values()];
+  }
+
+  // the view's rows; `aside` names the one choice a drop-down's own numbers leave out
+  function narrowed(identity, view, aside) {
+    return poolOf(identity, view).filter((row) => (aside === 'statuses' || view.statuses.includes(row.feedback.status))
+      && (aside === 'fresh' || view.fresh.includes(row.fresh ? 'fresh' : 'earlier'))
+      && (aside === 'sources' || view.sources == null || view.sources.includes(row.view.source))
+      && (aside === 'fits' || view.fits == null || view.fits.includes(row.class)));
   }
 
   const NOW = '2026-10-01T10:00:00+00:00';
@@ -32,11 +54,6 @@ function installMockApi(fixture) {
     for (const rows of Object.values(data.rows[identity] || {})) {
       for (const row of rows) if (row.id === id) row.feedback = change(row.feedback);
     }
-  }
-
-  function rowsOf(identity, segment, source, fit) {
-    const rows = ((data.rows[identity] || {})[segment]) || [];
-    return rows.filter((row) => (!source || row.view.source === source) && (!fit || row.class === fit));
   }
 
   window.api = {
@@ -55,46 +72,41 @@ function installMockApi(fixture) {
       record('loadSegments', [identity]);
       return data.segments[identity] || { selection: null, displayName: null, segments: [] };
     },
-    async loadListing(identity, segment, filter, expanded, source, view) {
-      const args = [identity, segment, filter];
-      if (expanded) args.push(expanded);
-      if (source !== undefined) args.push(source);
-      if (view) args.push(view);
-      record('loadListing', args);
-      const { shown = {}, fit = '' } = view || {};
+    async loadListing(identity, view, page) {
+      record('loadListing', page ? [identity, view, page] : [identity, view]);
+      // holdListing: the answer waits for window.__releaseListing(), so a
+      // test sees what stands in for the list meanwhile
+      if (data.holdListing) {
+        await new Promise((resolve) => { window.__releaseListing = resolve; });
+        data.holdListing = false;
+      }
+      const { shown = {}, expanded = [] } = page || {};
       const seen = {};
-      return rowsOf(identity, segment, source, fit).filter((row) => matches(row, filter)).filter((row) => {
-        if (row.feedback.status !== 'new' || (expanded || []).includes(row.class)) return true;
+      return narrowed(identity, view).filter((row) => {
+        if (row.feedback.status !== 'new' || expanded.includes(row.class)) return true;
         seen[row.class] = (seen[row.class] || 0) + 1;
         return seen[row.class] <= (shown[row.class] || data.limit || 1000);
       });
     },
-    async classTotals(identity, segment, filter, source) {
-      record('classTotals', source ? [identity, segment, filter, source] : [identity, segment, filter]);
+    async classTotals(identity, view) {
+      record('classTotals', [identity, view]);
       if (data.failClassTotals) throw new Error("No handler registered for 'class-totals'");
       const totals = {};
-      for (const row of rowsOf(identity, segment, source).filter((r) => matches(r, filter))) {
-        totals[row.class] = (totals[row.class] || 0) + 1;
-      }
+      for (const row of narrowed(identity, view, 'fits')) totals[row.class] = (totals[row.class] || 0) + 1;
       return totals;
     },
-    async listingCounts(identity, segment, source, fit) {
-      const args = [identity, segment];
-      if (source !== undefined) args.push(source);
-      if (fit) args.push(fit);
-      record('listingCounts', args);
-      const counts = {};
-      for (const f of ['fresh_new', 'no_feedback', 'all', 'fresh', 'applied', 'rejected', 'bugged', 'expired',
-        'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered', 'started',
-        'declined']) {
-        counts[f] = rowsOf(identity, segment, source, fit).filter((row) => matches(row, f)).length;
-      }
+    async listingCounts(identity, view) {
+      record('listingCounts', [identity, view]);
+      const counts = { statuses: {}, fresh: { fresh: 0, earlier: 0 } };
+      for (const status of STATUSES) counts.statuses[status] = 0;
+      for (const row of narrowed(identity, view, 'statuses')) counts.statuses[row.feedback.status] += 1;
+      for (const row of narrowed(identity, view, 'fresh')) counts.fresh[row.fresh ? 'fresh' : 'earlier'] += 1;
       return counts;
     },
-    async listSources(identity, segment, filter, fit) {
-      record('listSources', fit ? [identity, segment, filter, fit] : [identity, segment, filter]);
+    async listSources(identity, view) {
+      record('listSources', [identity, view]);
       const totals = new Map();
-      for (const row of rowsOf(identity, segment, '', fit).filter((r) => matches(r, filter))) {
+      for (const row of narrowed(identity, view, 'sources')) {
         totals.set(row.view.source, (totals.get(row.view.source) || 0) + 1);
       }
       const sites = { linkedin: 'linkedin.com', devitjobs: 'devitjobs.uk, devitjobs.com' };
@@ -170,6 +182,37 @@ function installMockApi(fixture) {
     async copyText(text) {
       record('copyText', [text]);
     },
+    // cvReply: what "Generate CV" answers; holdCv: the answer waits for
+    // window.__releaseCv(), so a test sees the button while it runs
+    async generateCv(identity, id, instructions) {
+      record('generateCv', [identity, id, instructions]);
+      if (data.holdCv) await new Promise((resolve) => { window.__releaseCv = resolve; });
+      if (data.failCv) throw new Error('generate-cv failed');
+      return data.cvReply || {
+        ok: true, pages: 3, docx: '/home/me/Downloads/CV.docx', pdf: '/home/me/Downloads/CV.pdf',
+        findings: [], warnings: [], removed_for_length: [], report: {},
+      };
+    },
+    // the same for "Generate Cover Letter": letterReply, holdCv, failCv
+    async generateCoverLetter(identity, id, instructions) {
+      record('generateCoverLetter', [identity, id, instructions]);
+      if (data.holdCv) await new Promise((resolve) => { window.__releaseCv = resolve; });
+      if (data.failCv) throw new Error('generate-cover-letter failed');
+      return data.letterReply || {
+        ok: true, pages: 1, docx: '/home/me/Downloads/Cover Letter.docx', pdf: '/home/me/Downloads/Cover Letter.pdf',
+        findings: [], warnings: [], report: {},
+      };
+    },
+    async cvState() {
+      record('cvState', []);
+      return { running: false };
+    },
+    async openCvFile(file) {
+      record('openCvFile', [file]);
+    },
+    async showCvFile(file) {
+      record('showCvFile', [file]);
+    },
     ...(fixture.withoutRefresh ? { refresh: undefined } : {}),
     onRunEvent(listener) {
       listeners.push(listener);
@@ -222,12 +265,12 @@ function standardFixture() {
         segments: [
           { slug: 'worldwide', name: 'Worldwide', isDefault: false },
           { slug: 'uk', name: 'United Kingdom', names: { en: 'United Kingdom', ru: 'Velikobritaniya' }, isDefault: false },
-          { slug: 'full', name: 'Everything', isDefault: true },
+          { slug: 'full', name: 'Everything', isDefault: true, everything: true },
         ],
       },
       partsharp: {
         selection: { ...selection, id: 3 }, displayName: 'Part-time side work',
-        segments: [{ slug: 'full', name: 'Everything', isDefault: true }],
+        segments: [{ slug: 'full', name: 'Everything', isDefault: true, everything: true }],
       },
     },
     rows: {

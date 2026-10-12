@@ -4,7 +4,7 @@
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test, expect } = require('@playwright/test');
-const { choose } = require('../helpers/dropdown');
+const { choose, view, BOTH } = require('../helpers/dropdown');
 const { installMockApi, standardFixture, row } = require('./mock-api');
 const ru = require('../../renderer/locales/ru.js');
 
@@ -221,9 +221,10 @@ test('funnel filters are among the filters, with their counts', async ({ page })
   inFunnel(fixture, 'p1', { status: 'awaiting_final', at: CONTACT_AT, appliedAt: APPLIED_AT,
     contactAt: CONTACT_AT, contactComment: '', finalAt: CONTACT_AT, finalComment: '' });
   await open(page, fixture);
-  await expect(page.getByTestId('filter-option-awaiting_final')).toContainText('(1)');
   await choose(page, 'filter', 'awaiting_final');
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'awaiting_final']);
+  expect((await calls(page, 'loadListing')).at(-1))
+    .toEqual(['sharp', view({ statuses: ['awaiting_final'], fresh: BOTH })]);
+  await expect(page.getByTestId('filter-option-awaiting_final')).toContainText('(1)');
   await expect(byId(page, 'p1').getByTestId('entry-final').getByTestId('entry-label'))
     .toHaveText(ru['timeline.final']);
   // After the final resolution: the offer, or a no.
@@ -246,7 +247,7 @@ test('"Rejected" can close an application at any step, with an optional comment'
   expect(await calls(page, 'advance')).toEqual([['sharp', 'p1', 'declined', 'not enough Azure']]);
 
   await choose(page, 'filter', 'declined');
-  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', 'full', 'declined']);
+  expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', view({ statuses: ['declined'], fresh: BOTH })]);
   const closed = byId(page, 'p1');
   await expect(closed.getByTestId('status-badge')).toHaveText(ru['status.declined']);
   await expect(closed.getByTestId('entry-declined').getByTestId('entry-label'))
@@ -262,8 +263,8 @@ test('waiting for the offer comes after the final resolution and shows in the ti
     offerComment: 'within two weeks',
   });
   await open(page, fixture);
-  await expect(page.getByTestId('filter-option-awaiting_offer')).toContainText('(1)');
   await choose(page, 'filter', 'awaiting_offer');
+  await expect(page.getByTestId('filter-option-awaiting_offer')).toContainText('(1)');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('entry-offer').getByTestId('entry-label')).toHaveText(ru['timeline.offer']);
   await card.getByTestId('entry-offer').getByTestId('entry-toggle').click();
@@ -282,8 +283,8 @@ test('"Started working" follows only the offer, and closes the funnel', async ({
     offeredAt: CONTACT_AT, offeredComment: '$7k a month',
   });
   await open(page, fixture);
-  await expect(page.getByTestId('filter-option-offered')).toContainText('(1)');
   await choose(page, 'filter', 'offered');
+  await expect(page.getByTestId('filter-option-offered')).toContainText('(1)');
   const card = byId(page, 'p1');
   await expect(card.getByTestId('entry-offered').getByTestId('entry-label')).toHaveText(ru['timeline.offered']);
   await expect(card.locator('[data-testid^="btn-step-"]')).toHaveCount(1);

@@ -34,6 +34,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -41,6 +43,8 @@ import common  # noqa: E402
 import kb  # noqa: E402
 import normalize  # noqa: E402
 import pipeline  # noqa: E402
+import progress  # noqa: E402
+import runstate  # noqa: E402
 import score  # noqa: E402
 
 
@@ -111,7 +115,24 @@ def main() -> None:
         sys.exit(1)
 
     records = load_manual_file(path)
-    result = ingest(records, source_name=args.source_name)
+    # A rebuild loads the whole base, rescores it for half an hour and saves it
+    # whole — as a pipeline run does, so it is marked the same way: the app
+    # shows it going, and neither starts while the other is alive (the second
+    # save would undo the first). Until 2026-10-12 it was not marked: the app
+    # showed nothing during a rebuild and "Collect vacancies" stayed open.
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    log_path = progress.open_log(common.DATA_DIR / "runs" / f"rebuild_{stamp}.log")
+    started = time.monotonic()
+    try:
+        with runstate.PipelineRun(log_path=log_path):
+            result = ingest(records, source_name=args.source_name)
+    except runstate.AlreadyRunningError as exc:
+        progress.log(f"!! not started: {exc}")
+        progress.close_log()
+        sys.exit(2)
+    finally:
+        progress.log(f"manual import finished in {progress.duration(time.monotonic() - started)}")
+        progress.close_log()
     print("Manual import finished:")
     for k, v in result.items():
         print(f"  {k}: {v}")

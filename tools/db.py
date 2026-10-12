@@ -38,7 +38,7 @@ import common  # noqa: E402
 
 # 8: one base for every identity. The per-identity files of versions 1-7 are
 # not upgraded in place: tools/merge_shared_base.py merged them once.
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 SCHEMA_PATH = common.ROOT / "schemas" / "db.sql"
 
 # How long a writer waits for another writer's transaction before giving up.
@@ -83,9 +83,38 @@ def _to_9(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE selection_segments ADD COLUMN names TEXT")
 
 
+def _to_10(conn: sqlite3.Connection) -> None:
+    """Which market holds the whole shortlist: the app's "all markets" row
+    (2026-10-07). Older selections did not record it; there it is the market
+    holding every vacancy of a selection with more than one market, the last
+    such one when several do (the configuration lists it last)."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(selection_segments)")}
+    with conn:
+        if "everything" not in columns:
+            conn.execute("ALTER TABLE selection_segments "
+                         "ADD COLUMN everything INTEGER NOT NULL DEFAULT 0")
+        rows = conn.execute("""
+            SELECT s.selection_id, s.slug, s.position,
+                   (SELECT COUNT(*) FROM selection_items i
+                    WHERE i.selection_id = s.selection_id AND i.segment = s.slug) AS held,
+                   (SELECT COUNT(DISTINCT vacancy_id) FROM selection_items i
+                    WHERE i.selection_id = s.selection_id) AS total,
+                   (SELECT COUNT(*) FROM selection_segments o
+                    WHERE o.selection_id = s.selection_id) AS markets
+            FROM selection_segments s""").fetchall()
+        chosen = {}
+        for selection_id, slug, position, held, total, markets in rows:
+            if markets > 1 and total and held == total:
+                if selection_id not in chosen or position > chosen[selection_id][1]:
+                    chosen[selection_id] = (slug, position)
+        conn.executemany(
+            "UPDATE selection_segments SET everything = 1 WHERE selection_id = ? AND slug = ?",
+            ((selection_id, slug) for selection_id, (slug, _) in chosen.items()))
+
+
 # version reached -> the step that reaches it. Version 8 started the shared
 # base afresh.
-MIGRATIONS: dict = {9: _to_9}
+MIGRATIONS: dict = {9: _to_9, 10: _to_10}
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:

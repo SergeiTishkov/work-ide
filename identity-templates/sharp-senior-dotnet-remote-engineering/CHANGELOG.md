@@ -6,6 +6,118 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V27 — remote on LinkedIn only in words, 2026-10-12
+
+**Changed** (`tools/score.py`, `_score_remote_location`): on a board that
+hides the work arrangement (LinkedIn) the employer's schema.org TELECOMMUTE no
+longer confirms remote — only the text does. The owner, 2026-10-12: a vacancy
+with no explicit sign of remote work goes to "remote not confirmed"; LinkedIn's
+markup cannot be checked. Measured on SHARP's base: 66 LinkedIn vacancies in the
+confident tiers had TELECOMMUTE and not one word of remote work; the checklist
+had found offices in Philadelphia, New York and Kraków among them.
+
+**Changed** (`sharp_criteria.yaml` → `remote_location_fit.explicit_remote_keywords`):
+"location: work from home", "home based position", "home-based position",
+"(wfh role)" — the explicit forms without the word "remote" found in the base.
+
+**Added** (`sharp_criteria.yaml` → `remote_location_fit.remote_word_other_meanings`): "remote" in
+another sense is cut out before the remote words are looked for — "local and
+remote team members", "remote monitoring systems", "remote office locations",
+"remote configuration", "remote employees" (of the company). 25 LinkedIn
+vacancies in SHARP's confident tiers had "remote" only in these senses.
+
+## V26 — one state, a country before (remote), clearance fields, 2026-10-12
+
+**Changed** (`sharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers.patterns`):
+four patterns from SHARP's third checklist round of 2026-10-12:
+- "remote in one place only": "LOCATION: Remote in CA only" (a hot_lead at 55);
+- "location: a country (remote)": "Location: Canada (remote)" — V25 knew only
+  the order "Remote – Canada";
+- "one country's applicants only": "US applicants only";
+- "only candidates who reside": "we are only able to consider candidates who
+  reside and work in British Columbia, Alberta, Manitoba, or Ontario".
+
+**Changed** (`sharp_criteria.yaml` → `remote_location_fit.work_authorization.rules`):
+- "security clearance required" also reads "Minimum Clearance Secret" and
+  "a government-issued Secret-level clearance";
+- "US payroll only (W-2)" also reads "Contract: W2" in a header of fields.
+
+Measured over SHARP's base before adding: 21 location matches and 20 clearance
+matches, every one a single country, state or province list, or a clearance.
+
+## V25 — one country, named offices, a second language, 2026-10-12
+
+**Changed** (`sharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers.patterns`):
+eight patterns from the second checklist round of 2026-10-12, quoted from its
+vacancies:
+- "remote within a named country": "fully remote candidates within New
+  Zealand" — the old pattern knew only the US, the UK and Canada;
+- "remote, then one country": "Remote (US Region)", "Location: Remote –
+  Canada", "fully remote, United States", "Remote UK";
+- "partner based in one country": Jobgether's "Our partner is looking for a
+  ... based in Switzerland";
+- "workplace model says hybrid": "Workplace model: Hybrid";
+- "days a week in a named office" and "a named office, days a week": "3 days
+  per week in the Espoo office", "at our Coleshill office 2 days per week";
+- "remote on US western hours": "Remote (MST)", "Remote PST Hours";
+- "office stated plainly": "We work mainly from the office", "a fully remote
+  work policy is not offered", "within commuting distance of our office".
+
+**Changed** (`sharp_criteria.yaml` → `language_requirement_signal.explicit_requirement_patterns`):
+"English and another language" — "Excellent English and Korean verbal and
+written communication skills", "both Norwegian and English".
+
+Measured over SHARP's base before adding: 75 location matches and 15 language
+matches among the vacancies not yet rejected; every sampled match was a
+single country, a hybrid role, US western hours or a demanded language.
+
+## V24 — office days and an Asian language, 2026-10-12
+
+**Changed** (`sharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers.patterns`):
+three patterns for office days written without "in/at/from the office":
+- "attend the office": "required to attend the office a minimum of 3 days per
+  week";
+- "office at least some days": "require office attendance at least 2 days per
+  week";
+- "work from home some days": "work from home typically two days per week".
+
+**Changed** (`sharp_criteria.yaml` → `language_requirement_signal.explicit_requirement_patterns`):
+"an Asian language demanded" — "Language : Japanese", "native Mandarin
+fluency", "Japanese required".
+
+Found by PARTSHARP's checklist on 2026-10-12 (Nuix ×3, Apogee, PerkUP).
+Measured over the base before adding: 15 office matches, every one a hybrid
+role; 2 language matches, both a demand.
+
+## V23 — remote in one country, and office now and then, 2026-10-12
+
+**Changed** (`sharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers`):
+six new patterns, and "must live in a named place" also reads "must live and
+work in". They reject:
+- "anywhere in one country": "work from anywhere in the U.S.", "remotely from
+  within Ireland", "fully remote work in Canada and the United States";
+- "open to applicants in one country": "a remote position open to qualified
+  applicants in Canada";
+- "remote role based in one country": "This remote role is based in
+  USA/Canada";
+- "some US states only": "reside in one of these states: CO, GA, FL",
+  "approved states", "must be CURRENT WI residents";
+- "candidates from one country": "Candidates UK wide can be considered",
+  "we recruit across the UK";
+- "office now and then": "a remote role, with occasional office work",
+  "required to be present at a ... office", "mandatory office days",
+  "1-2 days per month in the Frankfurt headquarters".
+
+**Changed** (`language_requirement_signal.foreign_language_posting_indicators`):
+Italian has function words and a threshold of 4 (186 detections in the base
+became 224, none lost); a new `scandinavian` entry catches Danish, Norwegian
+and Swedish postings (136 in the base).
+
+**Why.** The checklist of 2026-10-12 read the 97 fresh vacancies at
+long_shot and above in full; 79 were rejected by hand, and these wordings
+were the most frequent among them, several in hot_lead. A posting written
+wholly in Italian and one in Danish were among them.
+
 ## V22 — crypto by fit; exclusivity is a line on the card, 2026-10-05
 
 **Changed** (`sharp_criteria.yaml`): new `domain_fit_signals` with `crypto`.

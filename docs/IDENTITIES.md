@@ -363,6 +363,38 @@ The routing rule (in full in `CLAUDE.md`, §13):
 The test question: *"would this be useful to another person who cloned the
 repository?"*
 
+## The CV per vacancy: `cv:`
+
+**Generate CV** (tools/cv_tailor.py) starts from the CV named in
+`owner.primary_cv`: the tailored files get its file name, and its `.docx`
+beside it (or one in `owner.cv_files`) is the common CV. An optional `cv:`
+section in the local profile adds the rest:
+
+```yaml
+cv:
+  parent: "documents/Master CV Ivan Petrov.docx"  # every achievement: .docx, .md or .txt
+  common: "documents/My CV.docx"     # only when it is not beside primary_cv
+  model: opus                        # the claude CLI model
+  target_pages: 3                    # cut lower-priority bullets above this
+  max_pages: 3                       # never above this (2-3 pages)
+```
+
+Paths are relative to the identity folder.
+
+**The parent CV** is optional and can be added at any time. It is one document
+with every achievement of the person's working life — far longer than any CV,
+never sent to anyone. When it is set, the two CVs have different jobs:
+
+- the parent CV is **where the facts come from**: any job, bullet, number or
+  skill in it may go into a tailored CV when the vacancy calls for it;
+- the common CV is **the example**: of the layout, and of what to include
+  first when the vacancy asks for nothing in particular.
+
+The fact check accepts what either CV holds. Without `cv.parent` the CV is
+tailored from the common CV alone, and the result says so and that a parent CV
+can be added. Each identity sets its own `cv.parent`; two identities of one
+person may point at the same file.
+
 ## Practical commands
 
 ```bash

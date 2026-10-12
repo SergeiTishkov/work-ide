@@ -12,7 +12,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { loadQueries } = require('./queries');
 const funnel = require('../renderer/funnel.js');
 
-const SCHEMA_VERSION = '9';
+const SCHEMA_VERSION = '10';
 // The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
 // beaten for this long is gone, whatever its row still says.
 const STALE_AFTER_MS = 45000;
@@ -28,10 +28,14 @@ function pidAlive(pid) {
   }
 }
 const BUSY_TIMEOUT_MS = 60000;
-// The funnel filters list the person's applications across collections and
-// markets (funnel_listing); the others look at the latest selection.
+// The view: what the four drop-downs chose (schemas/queries.sql, THE VIEW).
+// Statuses: no answer yet ("not applied or denied"), the applications —
+// listed across collections and markets — and the ones denied.
 const FUNNEL = funnel.FUNNEL;
-const FILTERS = ['fresh_new', 'no_feedback', 'all', 'fresh', 'rejected', 'bugged', 'expired', ...FUNNEL];
+const NEW = ['new'];
+const DENIED = ['rejected', 'bugged', 'expired'];
+const VIEW_STATUSES = [...NEW, ...FUNNEL, ...DENIED];
+const FRESHNESS = ['fresh', 'earlier'];
 // The first answers, set directly; the funnel beyond "applied" is reached
 // only step by step (advance).
 const STATUSES = ['new', 'applied', 'rejected', 'bugged', 'expired'];
@@ -153,26 +157,51 @@ class Store {
       ? db.prepare(this.queries.segments).all({ selection_id: selection.id })
         .map((s) => ({
           slug: s.slug, name: s.name, names: parseNames(s.names), isDefault: s.is_default === 1,
+          everything: s.everything === 1,
         }))
       : [];
     return { selection, displayName: name ? name.value : null, segments };
   }
 
+  // The view's query parameters. `segments` null means every market: the one
+  // holding everything, or all of them when the selection names none.
+  // `sources` and `fits` null mean every board and class.
+  viewParams(db, identity, selection, view = {}) {
+    const statuses = view.statuses || [];
+    const fresh = view.fresh || [];
+    const unknown = [...statuses.filter((s) => !VIEW_STATUSES.includes(s)),
+      ...fresh.filter((f) => !FRESHNESS.includes(f))];
+    if (unknown.length) throw new Error(`unknown status or freshness: ${unknown.join(', ')}`);
+    let segments = view.segments;
+    if (segments == null) {
+      const markets = db.prepare(this.queries.segments).all({ selection_id: selection.id });
+      const everything = markets.filter((m) => m.everything === 1);
+      segments = (everything.length ? everything : markets).map((m) => m.slug);
+    }
+    const listed = (values) => (values == null ? null : JSON.stringify(values));
+    return {
+      identity,
+      selection_id: selection.id,
+      segments: JSON.stringify(segments),
+      statuses: JSON.stringify(statuses),
+      fresh: JSON.stringify(fresh.map((f) => (f === 'fresh' ? 1 : 0))),
+      sources: listed(view.sources),
+      fits: listed(view.fits),
+    };
+  }
+
   // The top of each class — as many as `shown` asks for a class
-  // ({ hot_lead: 25 }) — and every row of the classes in `expanded`; the
-  // funnel filters list every application, uncapped. `source` narrows any of
-  // them to one board, `fit` to one class ('' for all).
-  listing(identity, segment, filter, expanded = [], source = '', { shown = {}, fit = '' } = {}) {
-    if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
+  // ({ hot_lead: 25 }) — and every row of the classes in `expanded`; rows
+  // with an answer are never capped.
+  listing(identity, view, { shown = {}, expanded = [] } = {}) {
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db, identity);
     if (!selection) return [];
-    const rows = FUNNEL.includes(filter)
-      ? db.prepare(this.queries.funnel_listing).all({ identity, filter, source, fit })
-      : db.prepare(this.queries.listing).all({
-        identity, selection_id: selection.id, segment, filter, expanded: `,${expanded.join(',')},`,
-        source, shown: JSON.stringify(shown), fit,
-      });
+    const rows = db.prepare(this.queries.view_listing).all({
+      ...this.viewParams(db, identity, selection, view),
+      expanded: `,${expanded.join(',')},`,
+      shown: JSON.stringify(shown),
+    });
     return rows.map((row) => ({
       id: row.vacancy_id,
       class: row.class,
@@ -185,39 +214,45 @@ class Store {
     }));
   }
 
-  // { class: how many the filter holds } — "N more" under a capped class.
-  classTotals(identity, segment, filter, source = '') {
-    if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
+  // { class: how many the view holds }, the chosen classes aside: the "Fit"
+  // drop-down, and "N more" under a capped class.
+  classTotals(identity, view) {
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db, identity);
     if (!selection) return {};
-    if (FUNNEL.includes(filter)) {
-      const totals = {};
-      for (const row of this.listing(identity, segment, filter, [], source)) {
-        totals[row.class] = (totals[row.class] || 0) + 1;
-      }
-      return totals;
-    }
-    const rows = db.prepare(this.queries.listing_class_totals)
-      .all({ identity, selection_id: selection.id, segment, filter, source });
+    // node:sqlite refuses a parameter the query does not name: this one ignores the classes
+    const { fits, ...params } = this.viewParams(db, identity, selection, view);
+    const rows = db.prepare(this.queries.view_class_totals).all(params);
     return Object.fromEntries(rows.map((r) => [r.class, r.total]));
   }
 
-  // [{ source, total }], largest first: the boards the status filter holds in
-  // this market — the "Source" drop-down. The source filter does not apply;
-  // the class (`fit`) does.
-  sources(identity, segment, filter, fit = '') {
-    if (!FILTERS.includes(filter)) throw new Error(`unknown filter: ${filter}`);
+  // [{ source, site, total }], largest first, the chosen boards aside: the
+  // "Source" drop-down.
+  sources(identity, view) {
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db, identity);
     if (!selection) return [];
-    const rows = FUNNEL.includes(filter)
-      ? db.prepare(this.queries.funnel_sources).all({ identity, filter, fit })
-      : db.prepare(this.queries.listing_sources).all({
-        identity, selection_id: selection.id, segment, filter, fit,
-      });
+    const { sources, ...params } = this.viewParams(db, identity, selection, view);   // the boards aside
+    const rows = db.prepare(this.queries.view_sources).all(params);
     const sites = this.sourceSites(db);
     return rows.map((r) => ({ source: r.source, site: sites[r.source] || null, total: r.total }));
+  }
+
+  // The "Show" drop-down's numbers: { statuses: { status: n } } under the
+  // chosen freshness, { fresh: { fresh, earlier } } under the chosen statuses.
+  counts(identity, view) {
+    const result = {
+      statuses: Object.fromEntries(VIEW_STATUSES.map((s) => [s, 0])),
+      fresh: Object.fromEntries(FRESHNESS.map((f) => [f, 0])),
+    };
+    const db = this.connection(identity);
+    const selection = db && this.latestSelection(db, identity);
+    if (!selection) return result;
+    for (const row of db.prepare(this.queries.view_counts).all(this.viewParams(db, identity, selection, view))) {
+      if (row.axis === 'status') result.statuses[row.key] = row.total;
+      else result.fresh[row.key === '1' ? 'fresh' : 'earlier'] = row.total;
+    }
+    return result;
   }
 
   // { source: website } — a database collected before 2026-10-04 has none,
@@ -230,17 +265,6 @@ class Store {
     } catch {
       return {};
     }
-  }
-
-  counts(identity, segment, source = '', fit = '') {
-    const empty = Object.fromEntries(FILTERS.map((f) => [f, 0]));
-    const db = this.connection(identity);
-    const selection = db && this.latestSelection(db, identity);
-    if (!selection) return empty;
-    const row = db.prepare(this.queries.listing_counts)
-      .get({ identity, selection_id: selection.id, segment, source, fit });
-    const inFunnel = db.prepare(this.queries.funnel_counts).get({ identity, source, fit });
-    return Object.fromEntries(FILTERS.map((f) => [f, (FUNNEL.includes(f) ? inFunnel[f] : row[f]) || 0]));
   }
 
   // The first answer on a vacancy. 'new' takes it back; a reason is kept only
@@ -333,4 +357,6 @@ class Store {
   }
 }
 
-module.exports = { Store, SchemaMismatchError, FILTERS, STATUSES, FUNNEL, nowIso };
+module.exports = {
+  Store, SchemaMismatchError, STATUSES, FUNNEL, NEW, DENIED, VIEW_STATUSES, FRESHNESS, nowIso,
+};

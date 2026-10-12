@@ -175,7 +175,7 @@ the description, and all three previously thrown away:
 
 | Field | Where | Note |
 |---|---|---|
-| `jobLocationType` | schema.org JSON-LD | `TELECOMMUTE` where the employer declares remote, absent otherwise. Absence means silence, NOT onsite — 27 of 28 head vacancies had nothing here |
+| `jobLocationType` | schema.org JSON-LD | `TELECOMMUTE` where the employer declares remote, absent otherwise. Absence means silence, NOT onsite — 27 of 28 head vacancies had nothing here. Stored as `workplace_type`, but since 2026-10-12 it does NOT confirm remote for LinkedIn: 66 vacancies in SHARP's confident tiers had it and not one word of remote work in the text, and the checklist found offices behind them. Only the text confirms it (`explicit_remote_keywords`) |
 | `baseSalary` | schema.org JSON-LD | A salary stated in the vacancy is the highest of the three levels of trust; every LinkedIn record was storing `None` |
 | "no longer accepting applications" | page HTML | Present for a closed posting, absent for open ones. Of 260 vacancies in view, **36 were already closed** |
 

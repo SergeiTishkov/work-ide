@@ -82,3 +82,31 @@ def test_a_run_of_another_identity_blocks_this_one_too(isolated_data_dir, monkey
             with runstate.PipelineRun():
                 pass
         assert runstate.current()["identity"] == "ftf"
+
+
+def test_a_rebuild_is_marked_as_a_run_and_refused_while_another_is_alive(isolated_data_dir, monkeypatch, tmp_path):
+    """ingest_manual.py loads and saves the whole base like a pipeline run: the
+    app must see it, and it must not overlap another run (2026-10-12)."""
+    import sys as _sys
+
+    import ingest_manual
+
+    empty = tmp_path / "empty.json"
+    empty.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(_sys, "argv", ["ingest_manual.py", "--file", str(empty)])
+    monkeypatch.setattr("identity.activate_or_exit", lambda *_: None)
+    seen = {}
+
+    def fake_ingest(records, source_name="manual"):
+        seen["live"] = runstate.current()
+        return {}
+
+    monkeypatch.setattr(ingest_manual, "ingest", fake_ingest)
+    ingest_manual.main()
+    assert seen["live"] is not None
+    assert runstate.current() is None
+
+    with runstate.PipelineRun():
+        with pytest.raises(SystemExit) as stop:
+            ingest_manual.main()
+    assert stop.value.code == 2

@@ -105,6 +105,23 @@ answers:
     answer: null
     drives: ["profile.owner.cv_files"]
 
+  - id: person.parent_cv
+    personal: true   # the answer goes into the local identity, not here
+    tier: later
+    q: >
+      Optional: a parent CV — every achievement of your working life in one
+      long file (every job, project, number and episode you remember, however
+      long). Nobody receives it; "Generate CV" draws on it to tailor a CV to
+      each vacancy, while your ordinary CV stays the example of the layout and
+      of what goes in first. Have one, want to make one, or later?
+    note_for_agent: >
+      Optional, and "later" is a full answer. A yes: the file goes into
+      documents/ under its own name and its path into cv.parent. When the
+      identity is finished without one, remind the person in one line that it
+      can be added at any time (docs/ONBOARDING.md, step 6b).
+    answer: null
+    drives: ["profile.cv.parent"]
+
   - id: person.experience
     personal: true   # the answer goes into the local identity, not here
     tier: later

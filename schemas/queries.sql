@@ -20,26 +20,42 @@
 -- is settled and appears in none of the filters; otherwise "rejected" and
 -- "all" fill up with old decisions (the owner, 2026-09-30).
 --
+-- THE VIEW. The app's four drop-downs (the owner, 2026-10-07) each choose
+-- several rows, so a query takes lists, as JSON arrays:
+--   :segments  the markets (selection_segments.slug); the app sends the
+--              market with everything = 1 for "all markets";
+--   :statuses  feedback statuses: 'new' ("not applied or denied"), the
+--              funnel's (applications) and 'rejected'/'bugged'/'expired'
+--              (denied);
+--   :fresh     1 (fresh), 0 (seen in an earlier run), or both;
+--   :sources   boards, NULL for every board (new boards included);
+--   :fits      classes, NULL for every class.
+-- A row is shown when its status is one of :statuses AND its freshness one
+-- of :fresh, and the board and class match. view_pool is what all four
+-- queries read; `-- include: view_pool` stands for its text (the loaders in
+-- tools/selections.py and app/main/queries.js put it in).
+--
+-- WHERE THE ROWS COME FROM. Vacancies without an answer, and the ones turned
+-- down in this collection (see DECIDED EARLIER), come from the latest
+-- selection, in the chosen markets. Applications live for weeks: they come
+-- from every collection and every market, whatever :segments says; a later
+-- run must not make an application disappear. Their freshness is counted the
+-- same way as everyone's.
+--
 -- LIMIT. The LIST shows vacancies without feedback up to section_limit per
--- class, ranked AFTER the filter, so "fresh without feedback" shows the top of
--- the fresh ones. :shown ('{"hot_lead": 25}') raises a class's limit: "Show
--- more" and the scroll add ten at a time (the owner, 2026-10-04). A class the
--- person expanded (:expanded, ",hot_lead,...,") shows all of them. Vacancies
--- with feedback are never capped. The COUNTS are
--- never capped either: a count is how many there are, not how many rows are
--- on screen — capped counts did not add up across markets (the owner,
--- 2026-09-30: UK 40 + ANZ 15 > "everything" 54), and the list says "N more"
--- under a capped class instead.
+-- class, ranked AFTER the filter, so "fresh" shows the top of the fresh ones.
+-- :shown ('{"hot_lead": 25}') raises a class's limit: "Show more" and the
+-- scroll add ten at a time (the owner, 2026-10-04). A class the person
+-- expanded (:expanded, ",hot_lead,...,") shows all of them. Vacancies with
+-- feedback are never capped. The COUNTS are never capped either: a count is
+-- how many there are, not how many rows are on screen; capped counts did not
+-- add up across markets (the owner, 2026-09-30: UK 40 + ANZ 15 > "everything"
+-- 54), and the list says "N more" under a capped class instead.
 --
--- SOURCE. Every listing and count takes :source, the board a vacancy came
--- from ('' for all of them), and applies it together with the status filter
--- (the owner, 2026-10-04: "both work at the same time"). It is read from the
--- view, where report.vacancy_view puts it, and from the vacancy for views
--- written before that.
---
--- FIT. The listing, the counts and the source list take :fit, one class
--- ('' for all of them): the third drop-down next to "Show" and "Source".
--- The class totals do not: they are that drop-down's own numbers.
+-- EACH DROP-DOWN'S OWN NUMBERS. A drop-down counts its rows under the other
+-- drop-downs, not under itself: view_sources ignores :sources,
+-- view_class_totals ignores :fits, and view_counts counts the statuses under
+-- :fresh and the freshness under :statuses.
 
 -- name: latest_selection
 SELECT MAX(id) AS id FROM selections WHERE identity_id = :identity;
@@ -49,7 +65,7 @@ SELECT id, run, created_at, kind FROM selections
 WHERE id = :selection_id AND identity_id = :identity;
 
 -- name: segments
-SELECT slug, name, names, position, is_default
+SELECT slug, name, names, position, is_default, everything
 FROM selection_segments
 WHERE selection_id = :selection_id
 ORDER BY position;
@@ -62,177 +78,138 @@ SELECT display_name AS value FROM identities WHERE id = :identity;
 -- with every selection (selections.write_source_sites).
 SELECT value FROM meta WHERE key = 'source_sites';
 
--- name: listing
-WITH runs AS (
+-- name: view_pool
+-- Not a query of its own: the common start of the four below.
+runs AS (
   SELECT id, kind FROM selections WHERE identity_id = :identity
 ),
 baseline AS (
   SELECT MAX(id) AS id FROM runs WHERE kind = 'run' AND id <= :selection_id
 ),
-base AS (
-  SELECT i.vacancy_id, i.class, i.class_position, i.section_limit, i.score,
-         i.eligibility_rank, v.view, v.views, v.feedback_status, v.rejected_reason,
-         v.bugged_reason, v.feedback_at, v.applied_at, v.contact_comment, v.contact_at,
+-- a vacancy in two chosen markets is one row
+in_markets AS (
+  SELECT i.vacancy_id, MIN(i.class) AS class, MIN(i.class_position) AS class_position,
+         MIN(i.section_limit) AS section_limit, MAX(i.score) AS score,
+         MIN(i.eligibility_rank) AS eligibility_rank
+  FROM selection_items i
+  WHERE i.selection_id = :selection_id AND i.selection_id IN (SELECT id FROM runs)
+    AND i.segment IN (SELECT value FROM json_each(:segments))
+  GROUP BY i.vacancy_id
+),
+candidates AS (
+  SELECT m.vacancy_id, m.class, m.class_position, m.section_limit, m.score,
+         m.eligibility_rank, 0 AS application
+  -- CROSS JOIN keeps this order: the market's rows looked up by key, not every
+  -- verdict of the identity scanned (seconds on 46k rows, 2026-10-12)
+  FROM in_markets m
+  CROSS JOIN vacancy_identity v ON v.vacancy_id = m.vacancy_id AND v.identity_id = :identity
+  WHERE v.feedback_status = 'new'
+     OR (v.feedback_status IN ('rejected', 'bugged', 'expired')
+         AND v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
+  UNION ALL
+  SELECT v.vacancy_id, json_extract(v.view, '$.classification'), NULL, NULL,
+         COALESCE(json_extract(v.view, '$.score'), 0), 0, 1
+  FROM vacancy_identity v
+  WHERE v.identity_id = :identity AND v.view IS NOT NULL
+    AND v.feedback_status IN ('applied', 'contacted', 'interview', 'awaiting_final',
+                              'awaiting_offer', 'declined', 'offered', 'started')
+),
+pool AS (
+  SELECT c.*, v.view, v.views, v.feedback_status, v.rejected_reason, v.bugged_reason,
+         v.feedback_at, v.applied_at, v.contact_comment, v.contact_at,
          v.interview_comments, v.interview_at, v.final_comment, v.final_at,
          v.awaiting_offer_comment, v.awaiting_offer_at, v.declined_comment, v.declined_at,
          v.offered_comment, v.offered_at, v.started_comment, v.started_at,
+         COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source')) AS source,
          CASE
            WHEN (SELECT id FROM baseline) IS NULL THEN 1
            WHEN EXISTS (SELECT 1 FROM selection_items o JOIN runs r ON r.id = o.selection_id
-                        WHERE o.vacancy_id = i.vacancy_id
+                        WHERE o.vacancy_id = c.vacancy_id
                           AND o.selection_id < (SELECT id FROM baseline)) THEN 0
            ELSE 1
          END AS fresh
-  FROM selection_items i
-  JOIN vacancy_identity v ON v.vacancy_id = i.vacancy_id AND v.identity_id = :identity
-  JOIN vacancies d ON d.id = i.vacancy_id
-  WHERE i.selection_id = :selection_id AND i.selection_id IN (SELECT id FROM runs)
-    AND i.segment = :segment
-    AND (v.feedback_status = 'new'
-         OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
-    AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source')) = :source)
-    AND (:fit = '' OR i.class = :fit)
-),
-filtered AS (
-  SELECT * FROM base
-  WHERE CASE :filter
-          WHEN 'fresh_new' THEN fresh = 1 AND feedback_status = 'new'
-          WHEN 'no_feedback' THEN feedback_status = 'new'
-          WHEN 'all'       THEN 1
-          WHEN 'fresh'     THEN fresh = 1
-          ELSE feedback_status = :filter
-        END
+  FROM candidates c
+  CROSS JOIN vacancy_identity v ON v.vacancy_id = c.vacancy_id AND v.identity_id = :identity
+  CROSS JOIN vacancies d ON d.id = c.vacancy_id
+)
+
+-- name: view_listing
+-- Ordered by class, then: the selection's rows by score, the applications
+-- after them, newest step first.
+WITH
+-- include: view_pool
+,
+matched AS (
+  SELECT * FROM pool
+  WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
+    AND fresh IN (SELECT value FROM json_each(:fresh))
+    AND (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
+    AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
 ),
 ranked AS (
   SELECT *, ROW_NUMBER() OVER (
            PARTITION BY class, feedback_status = 'new'
            ORDER BY score DESC, eligibility_rank, vacancy_id) AS rank_in_class
-  FROM filtered
+  FROM matched
 )
 SELECT vacancy_id, class, score, eligibility_rank, fresh, view, views, feedback_status,
        rejected_reason, bugged_reason, feedback_at, applied_at, contact_comment,
        contact_at, interview_comments, interview_at, final_comment, final_at,
        awaiting_offer_comment, awaiting_offer_at, declined_comment, declined_at,
        offered_comment, offered_at, started_comment, started_at
-FROM ranked
+FROM ranked r
 WHERE feedback_status <> 'new'
    OR rank_in_class <= COALESCE(json_extract(:shown, '$.' || class), section_limit)
    OR instr(:expanded, ',' || class || ',') > 0
-ORDER BY class_position, score DESC, eligibility_rank, vacancy_id;
+ORDER BY COALESCE(class_position,
+                  (SELECT MIN(i.class_position) FROM selection_items i
+                   WHERE i.selection_id = :selection_id AND i.class = r.class), 99),
+         class, application,
+         CASE WHEN application = 1 THEN feedback_at END DESC,
+         score DESC, eligibility_rank, vacancy_id;
 
--- name: listing_counts
--- How many vacancies each filter holds — the whole number, not the rows shown.
-WITH runs AS (
-  SELECT id, kind FROM selections WHERE identity_id = :identity
-),
-baseline AS (
-  SELECT MAX(id) AS id FROM runs WHERE kind = 'run' AND id <= :selection_id
-),
+-- name: view_counts
+-- The "Show" drop-down's numbers: (axis 'status', a status, how many) under
+-- :fresh, and (axis 'fresh', '1' or '0', how many) under :statuses.
+WITH
+-- include: view_pool
+,
 base AS (
-  SELECT i.class, v.feedback_status,
-         CASE
-           WHEN (SELECT id FROM baseline) IS NULL THEN 1
-           WHEN EXISTS (SELECT 1 FROM selection_items o JOIN runs r ON r.id = o.selection_id
-                        WHERE o.vacancy_id = i.vacancy_id
-                          AND o.selection_id < (SELECT id FROM baseline)) THEN 0
-           ELSE 1
-         END AS fresh
-  FROM selection_items i
-  JOIN vacancy_identity v ON v.vacancy_id = i.vacancy_id AND v.identity_id = :identity
-  JOIN vacancies d ON d.id = i.vacancy_id
-  WHERE i.selection_id = :selection_id AND i.selection_id IN (SELECT id FROM runs)
-    AND i.segment = :segment
-    AND (v.feedback_status = 'new'
-         OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
-    AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source')) = :source)
-    AND (:fit = '' OR i.class = :fit)
+  SELECT feedback_status, fresh FROM pool
+  WHERE (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
+    AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
 )
-SELECT COALESCE(SUM(fresh = 1 AND feedback_status = 'new'), 0) AS fresh_new,
-       COALESCE(SUM(feedback_status = 'new'), 0)               AS no_feedback,
-       COUNT(*)                                                AS "all",
-       COALESCE(SUM(fresh = 1), 0)                             AS fresh,
-       COALESCE(SUM(feedback_status = 'applied'), 0)           AS applied,
-       COALESCE(SUM(feedback_status = 'rejected'), 0)          AS rejected,
-       COALESCE(SUM(feedback_status = 'bugged'), 0)            AS bugged,
-       COALESCE(SUM(feedback_status = 'expired'), 0)           AS expired
-FROM base;
-
--- name: listing_class_totals
--- Per class, how many the filter holds: the list says "N more" under a
--- capped class.
-WITH runs AS (
-  SELECT id, kind FROM selections WHERE identity_id = :identity
-),
-baseline AS (
-  SELECT MAX(id) AS id FROM runs WHERE kind = 'run' AND id <= :selection_id
-),
-base AS (
-  SELECT i.class, v.feedback_status,
-         CASE
-           WHEN (SELECT id FROM baseline) IS NULL THEN 1
-           WHEN EXISTS (SELECT 1 FROM selection_items o JOIN runs r ON r.id = o.selection_id
-                        WHERE o.vacancy_id = i.vacancy_id
-                          AND o.selection_id < (SELECT id FROM baseline)) THEN 0
-           ELSE 1
-         END AS fresh
-  FROM selection_items i
-  JOIN vacancy_identity v ON v.vacancy_id = i.vacancy_id AND v.identity_id = :identity
-  JOIN vacancies d ON d.id = i.vacancy_id
-  WHERE i.selection_id = :selection_id AND i.selection_id IN (SELECT id FROM runs)
-    AND i.segment = :segment
-    AND (v.feedback_status = 'new'
-         OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
-    AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source')) = :source)
-)
-SELECT class, COUNT(*) AS total
+SELECT 'status' AS axis, feedback_status AS key, COUNT(*) AS total
 FROM base
-WHERE CASE :filter
-        WHEN 'fresh_new' THEN fresh = 1 AND feedback_status = 'new'
-        WHEN 'no_feedback' THEN feedback_status = 'new'
-        WHEN 'all'       THEN 1
-        WHEN 'fresh'     THEN fresh = 1
-        ELSE feedback_status = :filter
-      END
+WHERE fresh IN (SELECT value FROM json_each(:fresh))
+GROUP BY feedback_status
+UNION ALL
+SELECT 'fresh', CAST(fresh AS TEXT), COUNT(*)
+FROM base
+WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
+GROUP BY fresh;
+
+-- name: view_class_totals
+-- Per class, how many the view holds: the "Fit" drop-down, and "N more"
+-- under a capped class.
+WITH
+-- include: view_pool
+SELECT class, COUNT(*) AS total
+FROM pool
+WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
+  AND fresh IN (SELECT value FROM json_each(:fresh))
+  AND (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
 GROUP BY class;
 
--- name: listing_sources
--- The "Source" drop-down: the boards of one market under the status filter,
--- and how many each holds. The source filter itself does not apply, so the
--- list always offers every board.
-WITH runs AS (
-  SELECT id, kind FROM selections WHERE identity_id = :identity
-),
-baseline AS (
-  SELECT MAX(id) AS id FROM runs WHERE kind = 'run' AND id <= :selection_id
-),
-base AS (
-  SELECT COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source')) AS source,
-         v.feedback_status,
-         CASE
-           WHEN (SELECT id FROM baseline) IS NULL THEN 1
-           WHEN EXISTS (SELECT 1 FROM selection_items o JOIN runs r ON r.id = o.selection_id
-                        WHERE o.vacancy_id = i.vacancy_id
-                          AND o.selection_id < (SELECT id FROM baseline)) THEN 0
-           ELSE 1
-         END AS fresh
-  FROM selection_items i
-  JOIN vacancy_identity v ON v.vacancy_id = i.vacancy_id AND v.identity_id = :identity
-  JOIN vacancies d ON d.id = i.vacancy_id
-  WHERE i.selection_id = :selection_id AND i.selection_id IN (SELECT id FROM runs)
-    AND i.segment = :segment
-    AND (v.feedback_status = 'new'
-         OR v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
-    AND (:fit = '' OR i.class = :fit)
-)
+-- name: view_sources
+-- The "Source" drop-down: the boards the view holds, and how many each.
+WITH
+-- include: view_pool
 SELECT source, COUNT(*) AS total
-FROM base
-WHERE CASE :filter
-        WHEN 'fresh_new' THEN fresh = 1 AND feedback_status = 'new'
-        WHEN 'no_feedback' THEN feedback_status = 'new'
-        WHEN 'all'       THEN 1
-        WHEN 'fresh'     THEN fresh = 1
-        ELSE feedback_status = :filter
-      END
+FROM pool
+WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
+  AND fresh IN (SELECT value FROM json_each(:fresh))
+  AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
 GROUP BY source
 ORDER BY total DESC, source;
 
@@ -272,56 +249,6 @@ SET feedback_status = :status,
     started_comment    = CASE WHEN :status = 'new' THEN NULL ELSE started_comment END,
     started_at         = CASE WHEN :status = 'new' THEN NULL ELSE started_at END
 WHERE identity_id = :identity AND vacancy_id = :id;
-
--- name: funnel_listing
--- THE FUNNEL (applied, contacted, interview, awaiting_final, awaiting_offer,
--- declined, offered, started) is the person's
--- applications, which live for weeks: its filters list every vacancy in that
--- status, whatever the collection, selection or market — a later run must
--- not make an application disappear. Newest step first.
-SELECT v.vacancy_id,
-       json_extract(v.view, '$.classification') AS class,
-       COALESCE(json_extract(v.view, '$.score'), 0) AS score,
-       0 AS eligibility_rank, 0 AS fresh, v.view, v.views, v.feedback_status,
-       v.rejected_reason, v.bugged_reason, v.feedback_at, v.applied_at, v.contact_comment, v.contact_at, v.interview_comments, v.interview_at, v.final_comment, v.final_at,
-       v.awaiting_offer_comment, v.awaiting_offer_at, v.declined_comment, v.declined_at,
-       v.offered_comment, v.offered_at, v.started_comment, v.started_at
-FROM vacancy_identity v
-JOIN vacancies d ON d.id = v.vacancy_id
-WHERE v.identity_id = :identity AND v.feedback_status = :filter AND v.view IS NOT NULL
-  AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source')) = :source)
-  AND (:fit = '' OR json_extract(v.view, '$.classification') = :fit)
-ORDER BY v.feedback_at DESC, v.vacancy_id;
-
--- name: funnel_counts
-SELECT COALESCE(SUM(feedback_status = 'applied'), 0)        AS applied,
-       COALESCE(SUM(feedback_status = 'contacted'), 0)      AS contacted,
-       COALESCE(SUM(feedback_status = 'interview'), 0)      AS interview,
-       COALESCE(SUM(feedback_status = 'awaiting_final'), 0) AS awaiting_final,
-       COALESCE(SUM(feedback_status = 'awaiting_offer'), 0) AS awaiting_offer,
-       COALESCE(SUM(feedback_status = 'declined'), 0)       AS declined,
-       COALESCE(SUM(feedback_status = 'offered'), 0)        AS offered,
-       COALESCE(SUM(feedback_status = 'started'), 0)        AS started
-FROM vacancy_identity v
-JOIN vacancies d ON d.id = v.vacancy_id
-WHERE v.identity_id = :identity AND v.view IS NOT NULL
-  -- only the funnel's rows: the source below reads JSON, not over the whole base
-  AND v.feedback_status IN ('applied', 'contacted', 'interview', 'awaiting_final',
-                            'awaiting_offer', 'declined', 'offered', 'started')
-  AND (:source = '' OR COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source')) = :source)
-  AND (:fit = '' OR json_extract(v.view, '$.classification') = :fit);
-
--- name: funnel_sources
--- The "Source" drop-down under a funnel filter: every application in that
--- status, by board.
-SELECT COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source')) AS source,
-       COUNT(*) AS total
-FROM vacancy_identity v
-JOIN vacancies d ON d.id = v.vacancy_id
-WHERE v.identity_id = :identity AND v.feedback_status = :filter AND v.view IS NOT NULL
-  AND (:fit = '' OR json_extract(v.view, '$.classification') = :fit)
-GROUP BY source
-ORDER BY total DESC, source;
 
 -- name: vacancy_progress
 SELECT vacancy_id AS id, feedback_status, feedback_at, rejected_reason, bugged_reason, applied_at, contact_comment, contact_at, interview_comments, interview_at, final_comment, final_at,

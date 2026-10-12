@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const { test, expect, _electron: electron } = require('@playwright/test');
-const { choose } = require('../helpers/dropdown');
+const { check } = require('../helpers/dropdown');
 const { SCHEMA_DIR, standardDatabase, tempDir } = require('../helpers/fixture-db');
 const ru = require('../../renderer/locales/ru.js');
 
@@ -53,7 +53,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     const window = await app.firstWindow();
     await expect(window.getByTestId('identity-tab-sharp')).toBeVisible();
     await expect(window.getByTestId('identity-name')).toHaveText('Test search');
-    await expect(window.getByTestId('segment-filter')).toHaveAttribute('data-value', 'full');
+    await expect(window.getByTestId('segment-filter-value')).toHaveText('Vsyo vmeste');   // the market holding everything
     await expect(window.getByTestId('list').locator('article')).toHaveCount(3);   // new0..new2
 
     await window.getByTestId('vacancy-new0').getByTestId('btn-bugged').click();
@@ -89,12 +89,14 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await expect(window.getByTestId('run-collect')).toBeEnabled();
 
     // Refresh through the real IPC: the main process's code has not changed
-    // since start, so the page reloads, keeps the view and works.
-    await choose(window, 'filter', 'all');
+    // since start, so the page reloads, keeps the view and works. One click:
+    // in the hidden window each takes about 2 s, and a row redrawn under it
+    // (the check box, then the spinner, then the list) makes Playwright retry.
+    await check(window, 'filter', ['fresh', 'earlier', 'new']);
     await window.evaluate(() => { window.__beforeRefresh = true; });
     await window.getByTestId('refresh').click();
     await expect.poll(() => window.evaluate(() => window.__beforeRefresh)).toBeUndefined();
-    await expect(window.getByTestId('filter')).toHaveAttribute('data-value', 'all');
+    await expect(window.getByTestId('filter-option-earlier')).toHaveAttribute('data-state', 'on');
     await expect(window.getByTestId('error')).toBeHidden();
 
     await window.getByTestId('identity-tab-partsharp').click();

@@ -120,9 +120,15 @@ window; pin it to the taskbar like any program). `WorkIDE.cmd` does the same
 from the repository folder; elsewhere, `cd app && npm install && npm start`.
 It opens a window over the knowledge base:
 
-- a tab per identity, and inside it a tab per market of the latest selection;
-- a filter per market: fresh without feedback (the default), all, all fresh,
-  applied, not for me, wrong pick — each market remembers its own;
+- a tab per identity, and inside it four drop-downs of check boxes: **Region**
+  (the markets of the latest selection), **Show**, **Source** (the job boards)
+  and **Category** (the classes). Several rows can be checked at once; each
+  group's top row checks or clears the whole group, and shows a dash when only
+  part of it is checked. **Show** has four groups: freshness (fresh, from
+  earlier runs), *not applied or denied*, the applications and the denied
+  ones (not for me, wrong pick, vacancy expired); a vacancy is listed when
+  both its freshness and its status are checked. The default is fresh and not
+  applied or denied. Each identity remembers its own choice;
 - four answers on every vacancy: **Applied**, **Not for me**, **Wrong pick**
   (these two with an optional reason) and **Vacancy expired** — closed at the
   source or a dead link, which says nothing about the pick. A wrong pick is a
@@ -133,16 +139,37 @@ It opens a window over the knowledge base:
   closes it at any step up to the offer: the employer's no, not the person's
   "not for me". Each step takes an optional comment and its date. Under the vacancy the steps
   form a dated column: a commented step opens like an accordion, the pencil
-  edits any comment in place, and undo goes back one step. The funnel's
-  filters list every application, across runs and markets;
+  edits any comment in place, and undo goes back one step. The applications
+  are listed from every run and market;
 - **Collect vacancies** runs `/run` for the identity in Claude Code, headless,
-  with a live log; **Review feedback (N)** runs `/feedback`, which gathers the
-  pending answers (`tools/feedback.py`) and fixes the filter. The agent edits
-  and tests but never commits — the changes wait for you.
+  with a live log. The agent edits and tests but never commits — the changes
+  wait for you;
+- **Review feedback (N)** counts the answers not yet reviewed and starts
+  nothing: run `/feedback <prefix>` in a Claude Code session of your own, where
+  you follow and steer the review. It gathers the pending answers
+  (`tools/feedback.py`), fixes the filter and marks them reviewed;
 - the collect button shows when a run of that identity is going, and at what
   stage — whoever started it (the app, the agent, a terminal); a dot marks the
   identity's tab. **Refresh** re-reads everything and reloads the interface
-  itself (markup, styles, code), keeping the tab, market and filter.
+  itself (markup, styles, code), keeping the tab and the drop-downs' choice.
+- **Generate CV** on a vacancy writes a CV tailored to it — `.docx` and `.pdf`
+  in Downloads, under the name of your own CV (the old pair is replaced) —
+  and lists below the card what to check before sending: claims the fact
+  check could not find in your CVs, the vacancy's requirements with no
+  evidence, what came from the parent CV (an optional file with every
+  achievement of your working life, `cv.parent` in the profile; your own CV
+  stays the example of the layout and of what goes in first), what was cut
+  for length. The CV is 2-3 pages. The first
+  click opens a field for instructions to this one CV (what to stress, the
+  language); the second click generates with what the field holds, empty
+  included. The CV is in English unless the instructions ask for another
+  language. See "A CV per vacancy" in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md);
+  after a generation the button reads "CV is generated" until the next CV
+  starts, and pressing it makes another one;
+- **Generate Cover Letter**, right of it, works the same way: a one-page
+  cover letter from the same CVs, `.docx` and `.pdf` in Downloads as
+  "Cover Letter <your name>", with what to check before sending. One
+  generation at a time, CV or letter;
 - the interface speaks Russian or English: a flag in the top right opens a
   drop-down of flags, and the choice is remembered. Left of it the same kind
   of button picks the theme: as in the system, light or dark. The lines the pipeline
@@ -300,6 +327,8 @@ Apache License 2.0 — see [LICENSE](LICENSE). Use it, change it, share it.
 
 ## Requirements
 
-Python 3.9+ and three dependencies (`requests`, `PyYAML`, `pytest`); SQLite
-comes with Python. No API keys, no paid subscriptions, no external services.
-The desktop app additionally needs Node.js.
+Python 3.9+ and four dependencies (`requests`, `PyYAML`, `pytest`,
+`python-docx`); SQLite comes with Python. No API keys, no paid subscriptions,
+no external services. The desktop app additionally needs Node.js. **Generate
+CV** needs the `claude` CLI, and Microsoft Word or LibreOffice for the PDF
+(without either, only the `.docx` is written).

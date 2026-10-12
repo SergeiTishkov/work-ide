@@ -133,9 +133,11 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
             (prefix, run, db.now_iso(), kind),
         ).lastrowid
         conn.executemany(
-            "INSERT INTO selection_segments (selection_id, slug, name, names, position, is_default) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ((selection_id, s.slug, s.name, json.dumps(s.names(), ensure_ascii=False), i, int(s.default))
+            "INSERT INTO selection_segments "
+            "(selection_id, slug, name, names, position, is_default, everything) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ((selection_id, s.slug, s.name, json.dumps(s.names(), ensure_ascii=False), i, int(s.default),
+              int(s.everything))
              for i, s in enumerate(configured)),
         )
         conn.executemany(UPDATE_VIEWS, views)
@@ -170,7 +172,10 @@ def _display_name() -> str:
 # --- Queries (shared with the app through schemas/queries.sql) ----------------
 
 def load_queries() -> dict:
-    """The named queries of schemas/queries.sql: `-- name: <name>` starts one."""
+    """The named queries of schemas/queries.sql: `-- name: <name>` starts one,
+    and a line `-- include: <name>` inside a query stands for that query's
+    text (the view's common start, view_pool). app/main/queries.js reads the
+    file the same way."""
     queries, name, lines = {}, None, []
     for line in QUERIES_PATH.read_text(encoding="utf-8").splitlines():
         if line.startswith("-- name:"):
@@ -181,100 +186,103 @@ def load_queries() -> dict:
             lines.append(line)
     if name:
         queries[name] = "\n".join(lines).strip()
+    for key, text in queries.items():
+        queries[key] = "\n".join(
+            queries[line.split(":", 1)[1].strip()] if line.startswith("-- include:") else line
+            for line in text.split("\n"))
     return queries
 
 
+# --- The view: what the app's four drop-downs chose ----------------------------
+# Several markets, statuses, boards and classes at once (the owner,
+# 2026-10-07); see THE VIEW in schemas/queries.sql.
+
+# "Not applied or denied": no answer yet.
+NEW = ("new",)
 # The person's applications: listed across collections, selections and
-# markets, since an application lives for weeks (see funnel_listing in
-# schemas/queries.sql). The other filters look at the selection.
+# markets, since an application lives for weeks.
 FUNNEL = ("applied", "contacted", "interview", "awaiting_final", "awaiting_offer", "offered",
           "started", "declined")
-FILTERS = ("fresh_new", "no_feedback", "all", "fresh", "rejected", "bugged", "expired") + FUNNEL
+# Denied: turned down in this collection.
+DENIED = ("rejected", "bugged", "expired")
+STATUSES = NEW + FUNNEL + DENIED
+# Fresh: no selection before the latest run held it; earlier: one did.
+FRESHNESS = ("fresh", "earlier")
+
+
+def view(segments, statuses=NEW, fresh=FRESHNESS, sources=None, fits=None) -> dict:
+    """What to list. `sources` and `fits` are None for every board and class
+    (a list, even an empty one, names them)."""
+    return {"segments": list(segments), "statuses": list(statuses), "fresh": list(fresh),
+            "sources": None if sources is None else list(sources),
+            "fits": None if fits is None else list(fits)}
+
+
+def _params(selection_id: int, chosen: dict) -> dict:
+    unknown = [s for s in chosen["statuses"] if s not in STATUSES]
+    unknown += [f for f in chosen["fresh"] if f not in FRESHNESS]
+    if unknown:
+        raise ValueError(f"unknown status or freshness: {unknown}")
+
+    def listed(values):
+        return None if values is None else json.dumps(list(values))
+
+    return {
+        "identity": db.identity(), "selection_id": selection_id,
+        "segments": json.dumps(list(chosen["segments"])),
+        "statuses": json.dumps(list(chosen["statuses"])),
+        "fresh": json.dumps([1 if f == "fresh" else 0 for f in chosen["fresh"]]),
+        "sources": listed(chosen.get("sources")),
+        "fits": listed(chosen.get("fits")),
+    }
+
+
+def listing(conn, selection_id: int, chosen: dict, shown=None, expanded=()) -> list:
+    """The rows of the view: the top of each class, as many as `shown` asks
+    for a class ({"hot_lead": 25}), and every row of the classes named in
+    `expanded`. Rows with an answer are never capped."""
+    conn.row_factory = _dict_row
+    try:
+        return conn.execute(load_queries()["view_listing"], {
+            **_params(selection_id, chosen),
+            "expanded": "," + ",".join(expanded) + ",", "shown": json.dumps(shown or {}),
+        }).fetchall()
+    finally:
+        conn.row_factory = None
+
+
+def counts(conn, selection_id: int, chosen: dict) -> dict:
+    """The "Show" drop-down's numbers: {"statuses": {status: n}} under the
+    chosen freshness, {"fresh": {"fresh": n, "earlier": n}} under the chosen
+    statuses."""
+    result = {"statuses": {s: 0 for s in STATUSES}, "fresh": {f: 0 for f in FRESHNESS}}
+    for axis, key, total in conn.execute(load_queries()["view_counts"],
+                                         _params(selection_id, chosen)):
+        if axis == "status":
+            result["statuses"][key] = total
+        else:
+            result["fresh"]["fresh" if key == "1" else "earlier"] = total
+    return result
+
+
+def class_totals(conn, selection_id: int, chosen: dict) -> dict:
+    """{class: how many the view holds}, the chosen classes aside: the "Fit"
+    drop-down, and "N more" under a capped class."""
+    rows = conn.execute(load_queries()["view_class_totals"], _params(selection_id, chosen))
+    return {cls: total for cls, total in rows.fetchall()}
+
+
+def sources(conn, selection_id: int, chosen: dict) -> dict:
+    """{board: how many the view holds from it}, largest first, the chosen
+    boards aside: the "Source" drop-down."""
+    rows = conn.execute(load_queries()["view_sources"], _params(selection_id, chosen))
+    return {source: total for source, total in rows.fetchall()}
 
 
 def latest_selection_id(conn) -> Optional[int]:
     """The active identity's latest selection."""
     row = conn.execute(load_queries()["latest_selection"], {"identity": db.identity()}).fetchone()
     return row[0] if row and row[0] is not None else None
-
-
-def _check_filter(filter_name: str) -> None:
-    if filter_name not in FILTERS:
-        raise ValueError(f"unknown filter {filter_name!r}")
-
-
-def listing(conn, selection_id: int, segment: str, filter_name: str,
-            expanded=(), source: str = "", shown=None, fit: str = "") -> list:
-    """The rows of one market under one filter: the top of each class, as many
-    as `shown` asks for a class ({"hot_lead": 25}), and every row of the
-    classes named in `expanded`. Funnel filters list every application,
-    uncapped. `source` narrows it to one board, `fit` to one class ("" for
-    all)."""
-    _check_filter(filter_name)
-    conn.row_factory = _dict_row
-    try:
-        if filter_name in FUNNEL:
-            return conn.execute(load_queries()["funnel_listing"],
-                                {"identity": db.identity(), "filter": filter_name,
-                                 "source": source, "fit": fit}).fetchall()
-        return conn.execute(load_queries()["listing"], {
-            "identity": db.identity(),
-            "selection_id": selection_id, "segment": segment, "filter": filter_name,
-            "expanded": "," + ",".join(expanded) + ",", "source": source,
-            "shown": json.dumps(shown or {}), "fit": fit,
-        }).fetchall()
-    finally:
-        conn.row_factory = None
-
-
-def class_totals(conn, selection_id: int, segment: str, filter_name: str,
-                 source: str = "") -> dict:
-    """{class: how many the filter holds} — for "N more" under a capped class."""
-    _check_filter(filter_name)
-    if filter_name in FUNNEL:
-        totals = {}
-        for row in listing(conn, selection_id, segment, filter_name, source=source):
-            totals[row["class"]] = totals.get(row["class"], 0) + 1
-        return totals
-    rows = conn.execute(load_queries()["listing_class_totals"], {
-        "identity": db.identity(), "selection_id": selection_id, "segment": segment, "filter": filter_name,
-        "source": source,
-    }).fetchall()
-    return {cls: total for cls, total in rows}
-
-
-def listing_sources(conn, selection_id: int, segment: str, filter_name: str,
-                    fit: str = "") -> dict:
-    """{board: how many the status filter holds from it}, largest first —
-    the app's "Source" drop-down. The source filter itself does not apply;
-    the class (`fit`) does."""
-    _check_filter(filter_name)
-    if filter_name in FUNNEL:
-        rows = conn.execute(load_queries()["funnel_sources"],
-                            {"identity": db.identity(), "filter": filter_name, "fit": fit})
-    else:
-        rows = conn.execute(load_queries()["listing_sources"], {
-            "identity": db.identity(), "selection_id": selection_id, "segment": segment, "filter": filter_name,
-            "fit": fit,
-        })
-    return {source: total for source, total in rows.fetchall()}
-
-
-def listing_counts(conn, selection_id: int, segment: str, source: str = "",
-                   fit: str = "") -> dict:
-    conn.row_factory = _dict_row
-    try:
-        row = conn.execute(load_queries()["listing_counts"], {
-            "identity": db.identity(), "selection_id": selection_id, "segment": segment,
-            "source": source, "fit": fit,
-        }).fetchone()
-        funnel = conn.execute(load_queries()["funnel_counts"],
-                              {"identity": db.identity(), "source": source, "fit": fit}).fetchone()
-    finally:
-        conn.row_factory = None
-    counts = {name: row[name] or 0 for name in FILTERS if name not in FUNNEL}
-    counts.update({name: funnel[name] or 0 for name in FUNNEL})
-    return counts
 
 
 def _dict_row(cursor, row) -> dict:

@@ -52,6 +52,25 @@ place in the top at once. Selections are never changed, only added: feedback
 remembers the selection it was given in, and `tools/feedback.py` shows the
 agent the class then and now, so a fix can be seen to have taken.
 
+The app's four drop-downs (2026-10-07) are check lists, so one query takes
+sets: markets, statuses, freshness, boards and classes, as JSON arrays read
+with `json_each` (THE VIEW at the top of `schemas/queries.sql`). The queries
+share their start, `view_pool`, through `-- include:` lines, which both
+readers (`selections.load_queries`, `app/main/queries.js`) expand. "Every
+market" is the segment holding the whole shortlist: `selection_segments.everything`,
+from the configuration's `everything: true`; schema version 10 added it and
+marked it on older selections. Each drop-down's own numbers are counted with
+its own choice left aside, so a row that is unchecked still shows how many
+it would add.
+
+node:sqlite is synchronous, and Electron's main thread also carries the
+window's input, so the app reads and writes the base on a thread of its own
+(`app/main/store-worker.js`, driven by `store-thread.js`). Before 2026-10-12
+the queries ran on the main thread, and a slow one (a pipeline busy on the
+base, or the view queries before their `CROSS JOIN` order) froze the window
+after a click. The renderer also waits for the clicks to stop for 200 ms
+before asking for the list, and shows a spinner in its place until it comes.
+
 ### Whether a run is going: a heartbeat, not a flag
 `pipeline_runs` (tools/runstate.py) holds one row per pipeline run. A plain
 "running" flag would stay set forever after a hard kill, since the code that
@@ -76,7 +95,8 @@ for the report and the feedback package. The app shows the one picked and
 falls back to `view` for a row recorded before `views` existed.
 
 ### Boring, minimal dependencies
-Only `requests` and `PyYAML` (plus `pytest` for the tests). RSS is parsed with
+Only `requests` and `PyYAML` (plus `pytest` for the tests, and `python-docx`
+for the CV per vacancy, below). RSS is parsed with
 the standard library's `xml.etree.ElementTree`, HTML is cleaned by our own regex
 stripper (`tools/common.py:strip_html`), and fuzzy comparison turned out not to
 be needed at all (see "Rejected approaches" below). Fewer dependencies means
@@ -485,7 +505,119 @@ integrating smart contracts naturally repeats "smart contract", "Solidity",
 "EVM"; counting would refuse exactly the vacancy the owner described. The title
 is where an employer says what the job is.
 
-## Rejected approaches
+### A CV per vacancy (2026-10-06)
+
+**Generate CV** in the app runs `tools/cv_tailor.py --identity <prefix>
+--vacancy <id>`. Three inputs: the **common CV** (`owner.primary_cv`, read
+from its `.docx`), the **parent CV** (`cv.parent`: every achievement of the
+person's working life, far longer than one CV; optional, added at any time)
+and the vacancy from the base.
+
+With both CVs given, the prompt splits their roles (2026-10-12): the parent CV
+is the source of the material, the common CV the example of the layout and of
+the priorities — what goes in when the vacancy asks for nothing special. The
+parent CV's own length and layout are no model; the result is 2-3 pages.
+Onboarding offers a parent CV as optional and, when there is none, reminds the
+person at the end that it can be added later (`docs/ONBOARDING.md`, steps 2
+and 6b).
+
+Since 2026-10-12 a fourth, optional: the person's **instructions** for this
+one CV. The first click on **Generate CV** opens a text field under the card,
+the second click on the same button (or the form's own button, or
+Ctrl+Enter) sends what it holds, empty included — as a rejection's reason
+works. They reach the tool as `--instructions` and the model as
+`<person_instructions>`, apart from the vacancy: unlike the vacancy, they are
+instructions, but they never make a fact true. The prompt's one hard rule on
+language: the CV is in English, whatever the language of the vacancy or the
+CVs, unless the instructions explicitly ask for another language; an
+instruction written in Russian is not such a request. Without instructions
+the message says so and repeats that the CV is in English.
+
+The steps:
+
+1. `claude -p` with no tools, `config/cv_tailor_prompt.md` as the system
+   prompt and a JSON schema for the answer (`--json-schema`): the model
+   returns the CV's content, each bullet marked with a priority (1 the vacancy
+   needs it, 3 filler) and a source (common or parent), plus a report —
+   the vacancy's keywords, which are covered, which are gaps, what came from
+   the parent CV. The vacancy is put in the message as data; the prompt says
+   it is not instructions.
+2. A fact check in code (`check_facts`): name and contacts against the common
+   CV; employer, title and dates of every job against both CVs; the jobs in
+   reverse chronological order; every number and every technology name found
+   in one of the CVs; no job and no skill category of the common CV left out.
+   What fails is a finding for the person to look at, not a refusal: a
+   reworded bullet is often right, and the person reads the CV before sending.
+3. `tools/cv_docx.py` renders the content in the common CV's layout (the
+   measurements are in its `LAYOUT`), and Word, driven through COM
+   (`tools/cv_convert.py`), exports the PDF and reports the real page count.
+   Over `cv.target_pages` (3) the bullets marked 3, then 2, of the oldest jobs
+   are cut and the CV rendered again; `cv.max_pages` (3 by default, 4 until
+   2026-10-12) is allowed only when nothing but priority 1 is left.
+4. The pair is built in `data/identities/<prefix>/cvs/<vacancy>/<time>/` with
+   the model's input and output, then copied to Downloads under the common
+   CV's file name, the previous pair deleted first. A failed run leaves the
+   previous pair where it was.
+
+**Taken from career-ops** (github.com/santifer/career-ops, its CV mode and
+history): the model returns content only, never markup; a requirements →
+evidence map before writing; the employer's job description is data; a
+reworded keyword sits only where it is true, and an interview or a review
+never becomes "developed in"; the real page count is measured, not
+estimated; every generated CV is archived per vacancy.
+
+**What differs from career-ops.** career-ops renders HTML through a headless
+browser into a PDF only. Here the person edits a CV the model got wrong, so
+the `.docx` is the primary output and the PDF is made from it; the layout is
+the person's own CV rather than a designed template. career-ops' facts are
+checked by the model itself; here the check is code, after the model.
+
+**Alternatives not taken.** The Anthropic API directly: needs a key, and the
+project runs on the `claude` CLI already. Filling the person's own `.docx`
+in place: its paragraphs carry per-run formatting that a model's text breaks
+apart; a fresh document in the same measurements is predictable. LibreOffice
+first: Word is what the person edits in and what employers open with, so its
+pagination is the one that counts; LibreOffice is the fallback.
+
+**The button after a generation** (2026-10-12). The button that made the last
+CV reads "CV is generated" until the next CV starts anywhere in the list, and
+then goes back to "Generate CV". Pressed in that state it works as before —
+the instructions, then another CV — for a generation that went wrong. A
+failed generation leaves the button at "Generate CV".
+
+### A cover letter per vacancy (2026-10-12)
+
+**Generate Cover Letter**, right of **Generate CV**, runs
+`tools/cover_letter.py` with the same inputs: the common CV, the parent CV
+when there is one, the vacancy, and the person's instructions (the same
+two-click field). It behaves as Generate CV does, its "Cover letter is
+generated" state included; the two kinds keep their states apart, so a CV
+generated after a letter does not reset the letter's button.
+
+1. `claude -p` with `config/cover_letter_prompt.md` and its own schema
+   (`LETTER_SCHEMA`; `cv_tailor.call_model` takes the prompt and the schema):
+   name, headline and contacts from the common CV, today's date (given in the
+   message), the address block and greeting from the vacancy only, 3-4
+   paragraphs of 250-350 words, the technologies the letter names, and a
+   report — covered, gaps, from the parent CV, notes. English unless the
+   instructions ask for another language, as for the CV. Nothing about the
+   company that the vacancy does not say.
+2. A fact check in code: name and contacts against the common CV, every
+   number and every named technology against both CVs. Findings, not
+   refusals, as for the CV.
+3. `cv_docx.render_letter` writes the `.docx` under the CV's header (name,
+   headline, contacts), so the two read as one set; Word or LibreOffice makes
+   the PDF and counts the pages. More than one page is a warning; nothing is
+   cut.
+4. Archived in `data/identities/<prefix>/cover_letters/<vacancy>/<time>/`,
+   then copied to Downloads as the common CV's name with "CV" turned into
+   "Cover Letter" (`CV Ivan Petrov.pdf` → `Cover Letter Ivan Petrov.pdf`),
+   the previous letter replaced.
+
+One generation at a time, of either kind (`app/main/cv.js`): both tools drive
+Word through COM, and two at once could share one Word instance, whose
+`Quit()` at the end of one run would close the other's document.
+
 
 ### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)
 

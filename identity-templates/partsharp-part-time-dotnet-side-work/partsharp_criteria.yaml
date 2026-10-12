@@ -438,10 +438,12 @@ remote_location_fit:
       # Clearances go only to citizens or long-term residents: "active NV1",
       # "SC Cleared", "DoD Secret clearance", "TS/SCI with polygraph",
       # "eligible to obtain eDV clearance".
+      # V26/V15: "Minimum Clearance Secret", "Eligible for a government-issued
+      # Secret-level clearance" (two hot_leads at 38 and 40).
       - name: "security clearance required"
         unless_near: *preference_guard
         trigger: 'clearance|cleared|vetting|polygraph|\bnv ?[12]\b|\bbpss\b|public trust|ts/sci'
-        pattern: '\bsecurity clearance\b|\b(sc|dv|edv|ctc|tssci|ts/sci|ts|top secret|secret|baseline|nato secret|dod secret|government|federal|active|current) (security )?(clearance|cleared)\b|\bclearance (level|required|is required|eligibility)\b|\b(security|negative|positive) vetting\b|\bnv ?[12]\b|\bbpss\b|\bts/sci\b|\bpolygraph\b|\b(obtain|maintain|hold|have|active|current|eligible for|eligibility for)\b.{0,20}\bpublic trust\b'
+        pattern: '\bsecurity clearance\b|\b(sc|dv|edv|ctc|tssci|ts/sci|ts|top secret|secret|baseline|nato secret|dod secret|government|federal|active|current) (security )?(clearance|cleared)\b|\bclearance (level|required|is required|eligibility)\b|\b(security|negative|positive) vetting\b|\bnv ?[12]\b|\bbpss\b|\bts/sci\b|\bpolygraph\b|\b(obtain|maintain|hold|have|active|current|eligible for|eligibility for)\b.{0,20}\bpublic trust\b|\bclearance\s*:?\s*(secret|top secret|ts)\b|\bsecret[- ]level clearance\b'
       # "This role requires residency in Colorado", "US tax residency
       # required", "must be a resident of", "UAE residency required".
       - name: "residency required"
@@ -454,12 +456,26 @@ remote_location_fit:
       # there. Not a refusal when C2C, corp-to-corp or 1099 is offered as well
       # ("W-2, 1099, C2C") — unless that is refused too ("No C2C, ONLY W2") —
       # nor where W-2 is a document ("paystubs, W-2s, bank statements").
+      # V26/V15: "Contract: W2" in a header of fields.
       - name: "US payroll only (W-2)"
         trigger: '\bw-?2\b'
         lifted_by_international: true
         unless_anywhere: '\b(c2c|corp[- ]to[- ]corp|1099|independent contractors?|international contractors?)\b'
         negated: '\b(no|not|non|without|excluding|unable to accommodate|not accepting|cannot accept|can[’'']t accept|does not accept|not open to)\b[^.;]{0,30}\b(c2c|corp[- ]to[- ]corp|1099)\b(\s*(or|and|/|,)\s*(c2c|corp[- ]to[- ]corp|1099|third[- ]party))*'
-        pattern: '\b(on|in) (a |the )?(competitive )?w-?2\b|(\d|/|per |an? )\s?(hour|hr|h)\.? ?w-?2\b|\bw-?2[- ](only|role|position|contract|contractors?|employment|employees?|consultants?|basis|arrangement|candidates?|benefits|pay|hourly|rate|salary|opportunity|tax|engagement|employer|long[- ]term|terms|status|payroll)\b|\b(direct|full[- ]time|part[- ]time|contract|only|strictly|exclusively|hourly) \(?w-?2\b|\bw-?2\)|\bemployment type\s*:\s*w-?2\b'
+        pattern: '\b(on|in) (a |the )?(competitive )?w-?2\b|(\d|/|per |an? )\s?(hour|hr|h)\.? ?w-?2\b|\bw-?2[- ](only|role|position|contract|contractors?|employment|employees?|consultants?|basis|arrangement|candidates?|benefits|pay|hourly|rate|salary|opportunity|tax|engagement|employer|long[- ]term|terms|status|payroll)\b|\b(direct|full[- ]time|part[- ]time|contract|only|strictly|exclusively|hourly) \(?w-?2\b|\bw-?2\)|\bemployment type\s*:\s*w-?2\b|\b(contract|tax terms?|engagement|type)\s*:\s*w-?2\b'
+      # A US or Canadian retirement plan among the benefits: 401(k), 403(b),
+      # RRSP, DPSP. Only somebody on that country's payroll has one. Measured
+      # 2026-10-05: 50 of SHARP's hot leads and 1992 vacancies across the base
+      # name one — Kforce, Randstad Digital, Actalent, Paychex, Experian... —
+      # in an employee benefits list, and none of the hot leads said anything
+      # about engaging people abroad. Lifted for an employer that does, and
+      # cancelled where the sentence limits the plan to its US or Canadian staff.
+      - name: "US or Canadian payroll benefits (401(k), RRSP)"
+        trigger: '\b40[13]\s?\(?[kb]\b|\brrsp\b|\bdpsp\b'
+        lifted_by_international: true
+        ignores_owner_place: true
+        pattern: '\b40[13]\s?\(?[kb]\b|\brrsp\b|\bdpsp\b'
+        unless: '\b(us|u\.s\.|usa|american|canadian|canada)[- ]?(based )?(employees|team members|staff|hires)\b|\bfor (our )?(us|u\.s\.|canadian) (employees|team|staff)\b'
 
   hard_dealbreakers:
     points: -1000  # in effect removes the vacancy from the "hot" categories
@@ -531,6 +547,116 @@ remote_location_fit:
         pattern: "\\b(\\d+|one|two|three|four|five)\\s*(\\+)?\\s*days?[^.]{0,25}\\b(in|at|from)\\s+(the\\s+)?office"
       - name: "office days per week"
         pattern: "\\b(in|at|from)\\s+(the\\s+)?office[^.]{0,25}\\b(\\d+|one|two|three|four|five)\\s*(\\+)?\\s*days?"
+      # Added 2026-10-12 from PARTSHARP's checklist: "required to attend the
+      # office a minimum of 3 days per week" (Nuix, three postings) and "work
+      # from home typically two days per week in a five-day working week"
+      # (Apogee) — the patterns above expect "in/at/from the office". Measured
+      # over the base: 15 matches, every one a hybrid role.
+      - name: "attend the office"
+        pattern: "\\b(required|expected|need|needs|must|will)\\b[^.]{0,20}\\battend (the|our|an?) (\\w+ )?office\\b"
+      - name: "office at least some days"
+        pattern: "\\boffice\\b[^.]{0,25}\\b(minimum|at least)\\s+(of\\s+)?(\\d+|one|two|three|four)\\s*days?"
+      - name: "work from home some days"
+        pattern: "\\b(work|working) from home\\b[^.]{0,20}\\b([1-4]|one|two|three|four)\\s*days?\\s*(per|a|each|/|in a)\\s*week"
+      # Added 2026-10-12 from the second checklist round (131 SHARP and 12
+      # PARTSHARP vacancies whose descriptions arrived in the rebuild): "Remote
+      # (US Region)", "Location: Remote – Canada", "fully remote, United
+      # States", "fully remote candidates within New Zealand" (a hot_lead at
+      # 65), Jobgether's "Our partner is looking for a ... based in
+      # Switzerland", "Workplace model: Hybrid", "3 days per week in the Espoo
+      # office", "Remote (MST)", "We work mainly from the office". Measured over
+      # SHARP's base before adding: 75 matches among the vacancies not yet
+      # rejected; every sampled one a single country, a hybrid role or US
+      # western hours.
+      - name: "remote within a named country"
+        pattern: "\\b(remote|anywhere|distributed|work from home|wfh|telework)\\b[^.]{0,40}\\bwithin (?:the )?(?:continental )?(?:us|u\\.s|usa|united states|uk|united kingdom|canada|ireland|northern ireland|australia|new zealand|switzerland|germany|netherlands|france|spain|portugal|italy|poland|sweden|norway|denmark|finland|japan|india|singapore|brazil|mexico)\\b"
+      - name: "remote, then one country"
+        pattern: "\\bremote\\s*(?:\\(|-|–|,|:)?\\s*(?:only\\s+)?(?:in\\s+)?(?:the )?(?:continental )?(?:us|u\\.s|usa|united states|uk|united kingdom|canada|ireland|northern ireland|australia|new zealand|switzerland|germany|netherlands|france|spain|portugal|italy|poland|sweden|norway|denmark|finland|japan|india|singapore|brazil|mexico)\\b(?:\\s*only)?\\)?(?!\\s*(?:or|/|,|and|&|\\+|-|–)\\s*\\w)(?!\\s*(?:time|hours|timezone|time zone|tz|eastern|pacific|central|based|clients|customers|company|team|market|working hours|business hours|overlap))"
+      - name: "partner based in one country"
+        pattern: "\\b(?:partner|client|we)\\b (?:is|are) (?:looking|seeking|searching) for an? [^.]{0,80}\\bbased in (?:the )?(?:continental )?(?:us|u\\.s|usa|united states|uk|united kingdom|canada|ireland|northern ireland|australia|new zealand|switzerland|germany|netherlands|france|spain|portugal|italy|poland|sweden|norway|denmark|finland|japan|india|singapore|brazil|mexico)\\b"
+      - name: "workplace model says hybrid"
+        pattern: "\\b(?:workplace model|work model|workplace)\\s*[:\\-]\\s*hybrid"
+      - name: "days a week in a named office"
+        pattern: "\\b(?:\\d+|one|two|three|four)\\s*days?\\s*(?:per|a|each|/)\\s*week\\s*(?:in|at|from)\\s+(?:the|our)\\s+(?:[\\w-]+\\s+){1,2}office\\b"
+      - name: "a named office, days a week"
+        pattern: "\\b(?:in|at|from)\\s+(?:the|our)\\s+(?:[\\w-]+\\s+){1,2}office[^.]{0,25}\\b(?:\\d+|one|two|three|four)\\s*days?\\s*(?:per|a|each|/)\\s*week"
+      - name: "remote on US western hours"
+        pattern: "\\bremote\\s*[\\(\\-–,]?\\s*(?:pst|mst|pt|mt|pacific|mountain)(?:\\s*(?:hours|time))?\\b"
+      - name: "office stated plainly"
+        pattern: "\\bwe work mainly from (?:the|our) office\\b|\\b(?:fully )?remote (?:work )?(?:policy |options? |working )?(?:is|are) not (?:offered|available|possible)\\b|\\bnot able to (?:consider|offer) remote\\b|\\bwithin (?:a )?commut\\w* distance\\b"
+      # Added 2026-10-12 from the third checklist round (39 SHARP vacancies):
+      # "LOCATION: Remote in CA only" (a hot_lead at 55), "Location: Canada
+      # (remote)" (43), "US applicants only", "we are only able to consider
+      # candidates who reside and work in British Columbia, Alberta, ..." (48).
+      # Measured over SHARP's base: 21 matches, every one a single country,
+      # state or set of provinces.
+      - name: "remote in one place only"
+        pattern: "\\bremote\\s+(?:in|within|from)\\s+(?:the\\s+)?(?:(?:the )?(?:continental )?(?:us|u\\.s|usa|united states|uk|united kingdom|canada|ireland|northern ireland|australia|new zealand|switzerland|germany|netherlands|france|spain|portugal|italy|poland|sweden|norway|denmark|finland|japan|india|singapore|brazil|mexico)|[a-z]{2})\\s+only\\b"
+      - name: "location: a country (remote)"
+        pattern: "\\blocation\\s*:\\s*(?:the )?(?:continental )?(?:us|u\\.s|usa|united states|uk|united kingdom|canada|ireland|northern ireland|australia|new zealand|switzerland|germany|netherlands|france|spain|portugal|italy|poland|sweden|norway|denmark|finland|japan|india|singapore|brazil|mexico)\\s*\\(\\s*remote(?: only)?\\s*\\)(?!\\s*(?:or|/|,|and|&)\\s*\\w)"
+      - name: "one country's applicants only"
+        pattern: "\\b(?:us|u\\.s\\.?|usa|united states|uk|canadian|canada|american|eu)[- ](?:based )?(?:applicants|candidates|residents)\\s+only\\b"
+      - name: "only candidates who reside"
+        pattern: "\\bonly (?:able to )?consider(?:ing)? (?:candidates|applicants) who (?:reside|live|are located|are based)\\b"
+      # The forms the rules above missed, quoted from SHARP's hot leads on
+      # 2026-10-05; each pattern was run over the whole base first and every
+      # match read in a sample. "Hybrid or remote" and "hybrid / remote" offer
+      # a choice and match none of them.
+      #   "a hybrid remote role based in Verdun, QC", "listed as hybrid remote",
+      #   "flexible hybrid remote work options" — 73 in the base, 17 in view
+      - name: "hybrid remote"
+        pattern: "\\bhybrid[- ]remote\\b"
+      #   "Mode of work: Hybrid", "Location Type: hybrid (ATL)" — 37 in the base
+      - name: "work mode field says hybrid"
+        pattern: "(mode of work|work mode|working mode|location type|workplace type|working model|work location)\\s*[:\\-]\\s*hybrid"
+      #   "- Hybrid - Outside IR35", "Central London | Hybrid | FTSE250",
+      #   "Edinburgh, Hybrid." — 263 in the base. Not before "remote" or a
+      #   technology word: "on-prem, hybrid, cloud deployments" is not a commute.
+      - name: "hybrid as a separate item"
+        pattern: "[,|/\u2013-]\\s*hybrid\\s*(?=[,.|\u2013(-])(?![^.]{0,3}remote)(?![^.]{0,30}\\b(cloud|on-?prem\\w*|deployments?|infrastructure|environments?|architectures?|apps?|solutions?|systems?)\\b)"
+      #   "Work in a hybrid environment with opportunities for remote collaboration"
+      - name: "work in a hybrid environment"
+        pattern: "\\bwork(ing)? in a hybrid (environment|model|setting)\\b"
+      # Remote with the country fence a few words later: "the option to work
+      # anywhere within the United States", "a remote work arrangement within
+      # the US", "fully remote, within Canada". 52 in the base, 8 in view.
+      - name: "remote within one country, said at length"
+        pattern: "\\b(remote|anywhere|distributed|work from home|wfh|telework)\\b[^.]{0,40}\\bwithin (the )?(continental )?(us|u\\.s\\.|usa|united states|uk|united kingdom|canada)\\b"
+      # "Remote (UK-based)", "You MUST be UK based to be considered". 24.
+      - name: "based in one country"
+        pattern: "\\bremote \\((us|u\\.s\\.|uk|eu|canada)[- ]based\\)|\\bmust be (uk|us|u\\.s\\.|eu|canada|london)[- ]based\\b"
+      # "Must reside within the United States", "must live within the
+      # continental U.S.", "Must live in Houston, TX". 53.
+      - name: "must live in a named place"
+        pattern: "\\bmust (live|reside)( and work)? (in|within|near)\\b"
+      # Found by the checklist on 2026-10-12: 97 fresh vacancies read in full,
+      # and these wordings of "remote, but in one country" or "remote, but in
+      # the office now and then" passed every pattern above. The sentences
+      # are in tests/test_score_reachability.py.
+      #
+      # "the flexibility to work from anywhere in the U.S.", "remotely from
+      # within Ireland", "fully remote work in Canada and the United States"
+      - name: "anywhere in one country"
+        pattern: "\\b(anywhere|remote\\w*)( work| working)? (from )?(in|within|across|throughout) (the )?(continental )?(us|u\\.s|usa|united states|uk|united kingdom|canada|ireland|australia|new zealand|portugal|spain|finland|japan)\\b"
+      # "a remote position open to qualified applicants in Canada", "This role
+      # is open to applicants in the US and Canada"
+      - name: "open to applicants in one country"
+        pattern: "\\b(open|available|limited|restricted) (only )?to (qualified |eligible )?(applicants|candidates|residents|individuals|people|talent) (who are )?(located |based |residing |living )?(in|from|within) (the )?(us|u\\.s|usa|united states|uk|united kingdom|canada|ireland|australia|new zealand)\\b"
+      # "This remote role is based in USA/Canada"
+      - name: "remote role based in one country"
+        pattern: "\\bremote (role|position|job|opportunity) (is )?(based|located) in (the )?(us|u\\.s|usa|united states|uk|united kingdom|canada|ireland)\\b"
+      # "Currently reside in one of these states: CO, GA, FL ...", "employees
+      # based in the approved states", "must be CURRENT WI residents"
+      - name: "some US states only"
+        pattern: "\\breside in one of (these|the following)\\b|\\b(approved|eligible) states\\b|\\bmust be (current |existing )?[a-z]{2} residents\\b"
+      # "Candidates UK wide can be considered", "we recruit across the UK"
+      - name: "candidates from one country"
+        pattern: "\\bcandidates (uk|us|u\\.s)[- ]wide\\b|\\brecruit\\w* (across|throughout) (the )?(uk|united kingdom|us|united states|canada)\\b"
+      # "a remote role, with occasional office work", "you may be required to
+      # be present at a CohnReznick office", "cover mandatory office days",
+      # "a minimum of 1-2 days per month in the Frankfurt headquarters"
+      - name: "office now and then"
+        pattern: "\\b(occasional|regular|periodic|monthly|quarterly) (office|in-office|on-?site) (work|attendance|days?|visits?|presence)\\b|\\bmandatory office days\\b|\\brequired to be present at (a|an|our|the)\\b[^.]{0,40}\\boffice\\b|\\bdays? (per|a|each) month (in|at) the\\b[^.]{0,30}\\b(office|headquarters|hq)\\b"
     keywords:
       - "must relocate"
       - "on-site required"
@@ -765,6 +891,28 @@ remote_location_fit:
     - "remote"
     - "telecommute"
     - "telework"
+    # Added 2026-10-12, when LinkedIn's TELECOMMUTE stopped confirming remote:
+    # the explicit forms without the word, read in the 66 vacancies that had
+    # only TELECOMMUTE and in the 2164 already unconfirmed — "Location: Work
+    # From Home" (Sherweb), "Location: UK : Home Based Position", "(WFH role)".
+    # The rest of "work from home" there was a perk or a hybrid.
+    - "location: work from home"
+    - "home based position"
+    - "home-based position"
+    - "(wfh role)"
+  # "Remote" in another sense, cut out of the text before the words above (and
+  # remote_synonym_keywords) are looked for. Measured 2026-10-12 on SHARP's
+  # base: 25 LinkedIn vacancies in the confident tiers had "remote" only in
+  # these senses — "collaboration with local and remote team members",
+  # "developing remote monitoring systems", "drive to local and/or remote
+  # office locations", "remote configuration", "home office allowance set up
+  # for remote employees". "A remote team" and "as a remote employee" are left
+  # alone: they may be this job.
+  remote_word_other_meanings:
+    - "\\bremote (?:team members|teams|colleagues|stakeholders)\\b"
+    - "\\b(?<!as a )(?<!as an )remote (?:employees|staff|workers|workforce)\\b"
+    - "\\bremote (?:monitoring|sensing|patients?|access|desktops?|control\\w*|servers?|sites|devices?|debugging|procedure calls?|config\\w*|diagnostic\\w*|connectivity|execution|repositor\\w*|branch\\w*|assets|operations|scenarios|office locations|data (?:persistence|sources?|access|storage|sync\\w*))\\b"
+    - "\\bremote and autonomous\\b"
   # ==== IDENTITY TUNING ====
   # Ambiguous place names: one name, two different places. It does not affect
   # the score but sets needs_manual_review so a person checks with their eyes.
@@ -1404,6 +1552,17 @@ language_requirement_signal:
       pattern: '\b(?:fluen\w*|command of|proficien\w*|communicate fluently)\b[^.;]{0,20}\b(?:dutch|french|german|flemish)\b(?![^.;]{0,40}\b(?:desirable|optional\w*|a plus|plus|nice to have|advantage|asset|bonus|preferred|beneficial)\b)'
     - name: "a language, then the demand"
       pattern: '\b(?:dutch|french|german|flemish)\b[^.;]{0,20}:\s*(?:fluent|native|required|mandatory|must)'
+    # Added 2026-10-12 from PARTSHARP's checklist: PerkUP listed "Required
+    # Skills & Experience (MUST) ... Language : Japanese", and the Japanese
+    # characters stayed under the script threshold. Measured over the base:
+    # 2 matches, both a demand for the language.
+    - name: "an Asian language demanded"
+      pattern: '\blanguages?\s*(?:requirements?)?\s*:\s*(?:japanese|chinese|mandarin|cantonese|korean)\b|\b(?:fluent|native|business[- ]level|proficient|proficiency in)\s+(?:japanese|chinese|mandarin|cantonese|korean)\b|\b(?:japanese|mandarin|korean)\s+(?:required|is required|is a must|speaker)\b'
+    # Added 2026-10-12: "Excellent English and Korean verbal and written
+    # communication skills", "both Norwegian and English", "Fluent in Swedish
+    # and English". 15 matches in SHARP's base, every one a demand.
+    - name: "English and another language"
+      pattern: "\\b(?:english (?:and|&) (?:korean|japanese|chinese|mandarin|norwegian|swedish|danish|finnish|dutch|german|french|italian|spanish|portuguese|polish|czech|hebrew|arabic|turkish)|(?:both )?(?:korean|japanese|chinese|mandarin|norwegian|swedish|danish|finnish|dutch|german|french|italian|spanish|portuguese|polish|czech|hebrew|arabic|turkish) (?:and|&) english)\\b[^.;]{0,60}\\b(?:communication|skills|written|verbal|fluen\\w*|proficien\\w*)|\\b(?:communication|skills|fluen\\w*|proficien\\w*)\\b[^.;]{0,20}\\b(?:in )?(?:both )?(?:korean|japanese|chinese|mandarin|norwegian|swedish|danish|finnish|dutch|german|french|italian|spanish|portuguese|polish|czech|hebrew|arabic|turkish) (?:and|&) english\\b"
   # TOTAL REJECTION (a dealbreaker). Confirmed by the owner explicitly
   # (2026-07-30): the person speaks only Russian and English (see profile.yaml
   # -> owner.languages). An explicit requirement for another language — German,
@@ -1564,10 +1723,28 @@ language_requirement_signal:
       threshold: 3
       markers: ["estamos à procura", "responsabilidades", "experiência",
                 "equipe", "vaga", "requisitos"]
+    # Widened 2026-10-12: an Italian LinkedIn posting ("Stiamo cercando un
+    # .NET Core Developer ... Modalità: Full remote sede: Italia") held one
+    # marker, "esperienza", and reached long_shot. Functional words added, as
+    # for French. Measured over SHARP's base: 224 detections, every one of the
+    # 27 not yet rejected written in Italian.
     - language: italian
-      threshold: 3
+      threshold: 4
       markers: ["cerchiamo", "requisiti", "esperienza", "azienda",
-                "competenze", "il candidato"]
+                "competenze", "il candidato", "stiamo cercando",
+                "responsabilità", "sviluppo", " della ", " delle ", " nel ",
+                " nella ", " degli ", " il tuo ", " siamo ", " nostra ",
+                " nostro ", " sono ", " anche "]
+    # Added 2026-10-12: a Danish posting ("Arbejdssted: Billund (Hybrid /
+    # Remote efter aftale)") had no language to be detected as. The function
+    # words are shared with Norwegian and Swedish, and catch those too:
+    # measured over SHARP's base, 136 detections, every one of the 92 not
+    # yet rejected written in one of the three.
+    - language: scandinavian
+      threshold: 4
+      markers: ["arbejdssted", "vi søger", "erfaring", "arbejdsopgaver",
+                "kompetencer", "ansøgning", "du bliver", " og ", " til ",
+                " med ", " af ", " det ", " på ", " ikke ", " hos "]
 
 
 # The industry gate: not "lower priority" but total rejection.
@@ -1876,8 +2053,12 @@ engagement_fit:
   confirming_types: [part-time]
   contradicting_types: [full-time, internship]
   confirming_patterns:
+    # V14: the benefits text of US employers — "Salaries for part-time roles
+    # will be prorated", "full or part-time status" — confirmed Capital One's
+    # full-time Staff role as part-time (a hot_lead at 68). "Full-time or
+    # part-time" is still an offer of part-time.
     - name: "part-time"
-      pattern: '\bpart[- ]?time\b'
+      pattern: '\bpart[- ]?time\b(?! (?:roles?|employees|positions|associates) (?:will be |are )?(?:prorated|pro-rated))(?! status)'
     - name: "fractional"
       pattern: '\bfractional\b'
     # Twenty-five, not thirty, and never after "minimum" or "at least": the
@@ -1912,6 +2093,10 @@ engagement_fit:
       pattern: '\bfull[- ]?time\s*(?:&|and|/|\+)\s*(?:long[- ]term\s*)?contract'
     - name: "to work full-time"
       pattern: '\b(?:work|working|available|availability)\s+full[- ]?time\b'
+    # Added in V13: "work from home typically two days per week in a five-day
+    # working week" (Apogee) passed "three days a week or fewer" as part-time.
+    - name: "a five-day week"
+      pattern: '\bfive[- ]day (?:working |work )?week\b'
     - name: "contract to hire"
       pattern: '\bcontract[- ]to[- ](?:hire|perm)'
   unconfirmed_policy: manual_check
@@ -2036,6 +2221,25 @@ extra_signals:
       # V4: micro1's "Backend C#/.NET Developer" — "apply your expertise to
       # help train" an AI model.
       - "expertise to help train"
+      # V13, from the 2026-10-12 checklist: 10 of the 19 fresh vacancies
+      # were AI-training gigs, and four carried none of the markers above —
+      # among them the top of the shortlist (Synthires, "review LLM-generated
+      # code patches", hot_lead at 55). "ai-generated code" was measured and
+      # left out: it also sits in product roles ("Productionize AI-generated
+      # code with tests").
+      - "llm-generated code"
+      - "code patches generated by llms"
+      - "ai training and evaluation"
+      - "training advanced ai systems"
+      - "help train ai systems"
+      - "coding tasks for ai"
+      - "deterministic verifiers"
+      - "golden reference solution"
+      - "paid per completed task"
+      - "paid per task"
+      - "minimum weekly submission"
+      - "experts must submit a minimum"
+      - "aitrainingjobs"
 
 # Boards the person cannot apply through, whatever the vacancy: source name ->
 # the reason, shown as the vacancy's dealbreaker. Every vacancy from such a

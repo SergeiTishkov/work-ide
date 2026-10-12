@@ -4,9 +4,11 @@
 // renderer only asks.
 const path = require('node:path');
 const { app, BrowserWindow, clipboard, ipcMain, shell } = require('electron');
-const { repoRoot, schemaDir } = require('./paths');
+const { repoRoot, schemaDir, pythonExecutable } = require('./paths');
 const { Store } = require('./store');
+const { StoreThread } = require('./store-thread');
 const { Runner } = require('./runner');
+const { CvGenerator } = require('./cv');
 const { listIdentities } = require('./identities');
 const { codeStamp, refreshAction } = require('./code-stamp');
 
@@ -21,13 +23,32 @@ const root = repoRoot();
 const UI_ZOOM = 1.2;
 let identities = [];
 
-const store = new Store({
+function databaseOf(prefix) {
+  const entry = identities.find((e) => e.prefix === prefix);
+  return entry ? entry.database : null;
+}
+
+// The data calls run on a thread of their own (store-thread.js), so a slow
+// query never freezes the window. The pipeline indicator stays here: one
+// small query, and it checks a pid, which the main thread does.
+const data = new StoreThread({
   schemaDir: schemaDir(root),
-  databasePathOf: (prefix) => {
-    const entry = identities.find((e) => e.prefix === prefix);
-    return entry ? entry.database : null;
-  },
+  databases: () => Object.fromEntries(identities.map((e) => [e.prefix, e.database])),
 });
+const store = new Store({ schemaDir: schemaDir(root), databasePathOf: databaseOf });
+
+// The tailored CV goes to Downloads; WORK_IDE_CV_OUT_DIR points it elsewhere
+// in tests.
+let cvGenerator = null;
+function cv() {
+  if (!cvGenerator) {
+    cvGenerator = new CvGenerator({
+      root, python: pythonExecutable(root),
+      outDir: process.env.WORK_IDE_CV_OUT_DIR || app.getPath('downloads'),
+    });
+  }
+  return cvGenerator;
+}
 
 const fake = process.env.WORK_IDE_FAKE_RUNNER === '1' ? require('./fake-runner') : null;
 const runner = new Runner({
@@ -55,24 +76,23 @@ function registerIpc(window) {
     identities = await listIdentities({ root });
     return identities.map(({ prefix, displayName, hasDatabase }) => ({ prefix, displayName, hasDatabase }));
   });
-  handle('segments', (identity) => store.segments(identity));
-  handle('listing', (identity, segment, filter, expanded, source, view) =>
-    store.listing(identity, segment, filter, expanded || [], source || '', view || {}));
-  handle('class-totals', (identity, segment, filter, source) =>
-    store.classTotals(identity, segment, filter, source || ''));
-  handle('counts', (identity, segment, source, fit) => store.counts(identity, segment, source || '', fit || ''));
-  handle('sources', (identity, segment, filter, fit) => store.sources(identity, segment, filter, fit || ''));
-  handle('set-feedback', (identity, id, status, reason) => store.setFeedback(identity, id, status, reason));
-  handle('advance', (identity, id, step, comment) => store.advance(identity, id, step, comment));
-  handle('step-back', (identity, id) => store.stepBack(identity, id));
+  handle('segments', (identity) => data.call('segments', identity));
+  handle('listing', (identity, view, page) => data.call('listing', identity, view || {}, page || {}));
+  handle('class-totals', (identity, view) => data.call('classTotals', identity, view || {}));
+  handle('counts', (identity, view) => data.call('counts', identity, view || {}));
+  handle('sources', (identity, view) => data.call('sources', identity, view || {}));
+  handle('set-feedback', (identity, id, status, reason) => data.call('setFeedback', identity, id, status, reason));
+  handle('advance', (identity, id, step, comment) => data.call('advance', identity, id, step, comment));
+  handle('step-back', (identity, id) => data.call('stepBack', identity, id));
   handle('edit-comment', (identity, id, kind, index, text) =>
-    store.editComment(identity, id, kind, index, text));
-  handle('pending-feedback', (identity) => store.pendingFeedback(identity));
+    data.call('editComment', identity, id, kind, index, text));
+  handle('pending-feedback', (identity) => data.call('pendingFeedback', identity));
   handle('pipeline-status', (identity) => store.pipelineStatus(identity));
   handle('run-state', () => runner.state());
   handle('start-run', ({ identity, kind }) => {
     // The agent may create or rebuild the database; do not hold it open.
     store.closeAll();
+    data.call('closeAll').catch(() => {});
     return runner.start(kind, identity);
   });
   handle('stop-run', () => runner.stop());
@@ -97,9 +117,21 @@ function registerIpc(window) {
   handle('copy-text', (text) => {
     clipboard.writeText(String(text));
   });
+  handle('generate-cv', (identity, vacancyId, instructions) => cv().generate(identity, vacancyId, instructions));
+  handle('generate-cover-letter', (identity, vacancyId, instructions) =>
+    cv().generate(identity, vacancyId, instructions, 'letter'));
+  handle('cv-state', () => cv().state());
+  handle('open-cv-file', async (file) => {
+    const problem = await shell.openPath(cv().checkProduced(file));
+    if (problem) throw new Error(problem);
+  });
+  handle('show-cv-file', (file) => shell.showItemInFolder(cv().checkProduced(file)));
 
   runner.onEvent((event) => {
-    if (event.type === 'exit') store.closeAll();
+    if (event.type === 'exit') {
+      store.closeAll();
+      data.call('closeAll').catch(() => {});
+    }
     if (!window.isDestroyed()) window.webContents.send('run-event', event);
   });
 }
@@ -136,5 +168,6 @@ app.whenReady().then(createWindow);
 app.on('window-all-closed', () => {
   if (runner.state().running) runner.stop();
   store.closeAll();
+  data.close();
   app.quit();
 });

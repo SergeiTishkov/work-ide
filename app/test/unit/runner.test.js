@@ -16,8 +16,8 @@ test('collect runs /run for the identity, headless, with the allowed tools', () 
     '--allowedTools', ALLOWED_TOOLS.join(',')]);
 });
 
-test('feedback runs /feedback for the identity', () => {
-  assert.equal(buildCommand('feedback', 'partsharp', { root: '/repo' }).args[1], '/feedback partsharp');
+test('the app does not start a feedback review', () => {
+  assert.throws(() => buildCommand('feedback', 'partsharp', { root: '/repo' }));
 });
 
 test('the agent may not commit', () => {
@@ -55,7 +55,7 @@ test('one run at a time; output is described and logged; exit is reported', asyn
   assert.equal(spawned[0].args[1], '/run sharp');
   assert.equal(spawned[0].options.cwd, '/repo');
   assert.deepEqual(runner.state(), { running: true, identity: 'sharp', kind: 'collect' });
-  assert.equal(runner.start('feedback', 'sharp').error, 'busy');
+  assert.equal(runner.start('collect', 'partsharp').error, 'busy');
 
   child.stdout.write(`${JSON.stringify({ type: 'assistant', message: { content: [
     { type: 'text', text: 'Running the pipeline' },
