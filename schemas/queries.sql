@@ -105,10 +105,16 @@ runs AS (
 baseline AS (
   SELECT MAX(id) AS id FROM runs WHERE kind = 'run' AND id <= :selection_id
 ),
--- the intermediaries (COMPANY KINDS above)
+-- the intermediaries (COMPANY KINDS above). GROUP BY keeps it a table built
+-- once: without it SQLite folds it into the join below and parses the meta
+-- value (148 companies, 11 KB) again for every row of the pool — measured
+-- 2026-10-18 on 103 000 rows: 250-560 ms a query, 1.9 s for the list's six,
+-- every click; with it 30-75 ms. (MATERIALIZED would say the same, but the
+-- Python side runs SQLite 3.34, older than the keyword.)
 company_kinds AS (
   SELECT key AS company, json_extract(value, '$.kind') AS kind, json_extract(value, '$.name') AS name
   FROM json_each(COALESCE((SELECT value FROM meta WHERE key = 'company_kinds'), '{}'))
+  GROUP BY key
 ),
 -- a vacancy in two chosen markets is one row
 in_markets AS (
