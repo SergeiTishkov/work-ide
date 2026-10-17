@@ -387,18 +387,11 @@ def _fetch_search_page(keyword: str, location: str, start: int, timeout: int,
     return _fetch_page(keyword, location, start, timeout, posted_within_days)
 
 
-# What the note says when fetch() stopped at its time budget; the pipeline
-# looks for it to know the window it asked for was not read to the end.
-TIME_BUDGET_NOTE = "stopped at the time budget"
-
-
 class _Walk:
     """The state of one fetch() across all its queries."""
 
-    def __init__(self, max_pages, posted_within_days, timeout, deadline=None):
+    def __init__(self, max_pages, posted_within_days, timeout):
         self.max_pages = max_pages
-        self.deadline = deadline        # time.monotonic() value, or None
-        self.cut = False
         self.posted_within_days = posted_within_days
         self.timeout = timeout
         self.records: List[dict] = []
@@ -419,8 +412,6 @@ class _Walk:
         seen_here = set()
         holes = 0
         for _ in range(self.max_pages):
-            if self.out_of_time():
-                return False
             try:
                 page_html = _fetch_search_page(keyword, location, start, self.timeout,
                                                  self.posted_within_days, self.counts)
@@ -466,11 +457,6 @@ class _Walk:
                 return False
         return start >= RESULTS_CEILING
 
-    def out_of_time(self) -> bool:
-        if self.deadline is not None and time.monotonic() >= self.deadline:
-            self.cut = True
-        return self.cut
-
     def split(self, keyword: str, country: str) -> None:
         """The narrower queries for a (keyword, country) at the ceiling."""
         narrower = []
@@ -494,8 +480,7 @@ def fetch(keywords: Optional[List[str]] = None,
           enrich_limit: int = ENRICH_LIMIT,
           posted_within_days: Optional[int] = POSTED_WITHIN_DAYS,
           split_at_ceiling: bool = True,
-          timeout: int = common.DEFAULT_TIMEOUT,
-          time_budget_minutes: Optional[float] = None):
+          timeout: int = common.DEFAULT_TIMEOUT):
     """Walks (keyword × country) pairs and returns (records, note).
 
     keywords/locations come from <prefix>_sources.yaml -> params. Locations
@@ -503,11 +488,6 @@ def fetch(keywords: Optional[List[str]] = None,
     lives in one place (see tools/markets.py). Each pair is read page after
     page until its list ends; a pair that reaches the guest search's ceiling
     is split into narrower queries (split_at_ceiling, see SPLIT_REGIONS).
-
-    time_budget_minutes stops the walk, and the description reads after it,
-    once that much time has passed; the note then says so (TIME_BUDGET_NOTE).
-    Added 2026-10-17: the top run asked for two days and, at 40 answers 429 in
-    half an hour, read 4 of 168 pairs.
     """
     import markets
     import progress
@@ -519,23 +499,17 @@ def fetch(keywords: Optional[List[str]] = None,
     if not keywords or not locations:
         return [], "nothing to query: the keyword or country list is empty"
 
-    deadline = (time.monotonic() + time_budget_minutes * 60) if time_budget_minutes else None
-    walk = _Walk(max_pages, posted_within_days, timeout, deadline)
-    pairs_done = 0
+    walk = _Walk(max_pages, posted_within_days, timeout)
     # A full walk reads every page of every pair and can take hours; it says
     # how far along it is rather than going quiet until the end.
     tick = progress.Progress(len(keywords) * len(locations), "linkedin pairs")
 
     for keyword in keywords:
         for location in locations:
-            if walk.out_of_time():
-                break
             if walk.query(keyword, location, location):
                 walk.capped += 1
                 if split_at_ceiling:
                     walk.split(keyword, location)
-            if not walk.cut:
-                pairs_done += 1
             tick.note = walk.note()
             tick()
 
@@ -559,8 +533,6 @@ def fetch(keywords: Optional[List[str]] = None,
         to_read = records[:enrich_limit]
         read_tick = progress.Progress(len(to_read), "linkedin descriptions")
         for rec in to_read:
-            if walk.out_of_time():
-                break
             # The whole page's facts rather than only its text: the request is
             # the same, and until 2026-09-13 this loop threw away the employer's
             # stated engagement, salary and TELECOMMUTE declaration that
@@ -588,9 +560,6 @@ def fetch(keywords: Optional[List[str]] = None,
         note_parts.append(f"connection dropped {counts['dropped']} times")
     if errors:
         note_parts.append("errors: " + "; ".join(errors[:3]))
-    if walk.cut:
-        note_parts.append(f"{TIME_BUDGET_NOTE} of {time_budget_minutes:g} min after "
-                          f"{pairs_done} of {len(keywords) * len(locations)} pairs")
     return records, "; ".join(note_parts)
 
 

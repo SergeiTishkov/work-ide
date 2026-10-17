@@ -54,11 +54,10 @@ vacancies first"): `--top` does the top classes in about an hour (the app's
 How far back it collects is decided at the start (docs/ARCHITECTURE.md, "How
 far back a collection reaches"): LinkedIn, the one source with a date filter,
 is asked for the days since the last collection, both included — yesterday
-and today after a collection yesterday — or for the full month when there
-was no collection or the base holds no LinkedIn vacancy. **After every
+and today after a collection yesterday — or for the full week (also the
+cap) when there was no collection or the base holds no LinkedIn vacancy. **After every
 collection, tell the person how many days of vacancies were collected**: the
-`collected` line the pipeline prints at the end, including a stop at the
-time budget.
+`collected` line the pipeline prints at the end, including a failed fetch.
 
 This is the one command mandatory on every run. A full run takes hours
 (most of it LinkedIn, links and descriptions); it reports every stage with

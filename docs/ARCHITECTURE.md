@@ -789,8 +789,7 @@ collection queued before it, so with two identities queued both top runs
 come first.
 
 `pipeline.py --rest` (`run_rest`): LinkedIn's window again when the last
-fetch left a gap (`linkedin_backfill_days`: it failed or stopped at its time
-budget), then the full tail (`finalize_and_report`) with a "rebuild" selection, so what the top run
+fetch left a gap (`linkedin_backfill_days`: it failed), then the full tail (`finalize_and_report`) with a "rebuild" selection, so what the top run
 marked fresh stays fresh. Its description stage leaves out
 remote_unconfirmed. The full cycle (`pipeline.py` with neither flag) is
 unchanged except for the AI stage.
@@ -804,31 +803,33 @@ mode (full, top, rest) asks it for `linkedin_window`:
   last LinkedIn fetch that went through) to today, both included: a
   collection yesterday afternoon means yesterday and today, for what was
   posted after it;
-- the full window, `LINKEDIN_FULL_DAYS` = 30, when there was no collection,
+- the full window, `LINKEDIN_FULL_DAYS` = 7, when there was no collection,
   or when no LinkedIn vacancy is left in the base (it was cleaned up); also
-  the cap. A month is LinkedIn's own "past month" and the age the base is
-  cleaned up at.
+  the cap. It was 30 for a day; the owner, 2026-10-18: a week takes hours
+  already (a 7-day rest run of 2026-10-17 read 126 of 168 pairs in about
+  3 h), a month is out of reach.
 
 The owner asked for it: a first top run that asked for a day or two missed
 the long-open roles that always take CVs. Before, every run asked for 7 days
 and the top run for at most 2.
 
-The top run also has a time budget for LinkedIn (`TOP_LINKEDIN_MINUTES`, 25)
-— except when it asks for the full window: a first collection collects
-everything, however long. The first top run of 2026-10-17 met 40 answers 429
-in half an hour and read 4 of 168 (keyword × country) pairs. Past the
-budget `fetch_linkedin.fetch` stops between pages, keeps what it read, and
-its note says so (`TIME_BUDGET_NOTE`).
+LinkedIn is read to the end of its window in every mode, the top run
+included, however long it takes. **Not taken: a time budget.** On 2026-10-17
+the top run had one (`TOP_LINKEDIN_MINUTES` = 25: past it
+`fetch_linkedin.fetch` stopped between pages and the rest run read the
+window again), after its first run met 40 answers 429 in half an hour and
+read 4 of 168 (keyword × country) pairs. The owner had it removed on
+2026-10-18.
 
 `note_linkedin_window` moves `linkedin_covered_to` to the fetch's start when
-the fetch neither failed nor stopped at the budget. Otherwise it keeps the
-value read before the fetch — the fallback, `sources.linkedin.last_success`,
-has just moved to now and would hide the gap — and sets `linkedin_gap`, so
-the rest run reads the window again without a budget.
+the fetch did not fail. Otherwise it keeps the value read before the fetch —
+the fallback, `sources.linkedin.last_success`, has just moved to now and
+would hide the gap — and sets `linkedin_gap`, so the rest run reads the
+window again.
 
 Every mode's result has `collected`: the window in words ("LinkedIn: posted
 in the last 2 days - the days since the last collection, both included",
-with the budget stop or a failure when there was one). The summary to the
+with a failure when there was one). The summary to the
 person names it after every collection (`/top`, `/run`, RUNBOOK step 1);
 `last_run_stats.linkedin_days` keeps the number.
 

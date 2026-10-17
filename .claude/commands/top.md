@@ -21,8 +21,8 @@ Identity: `$ARGUMENTS` (empty means: establish it in step 1).
 4. `python tools/pipeline.py --identity <p> --top --skip-contracts` — the
    pipeline's top mode:
    - fetch every enabled source; LinkedIn for the days since the last
-     collection, both included, or the full month when there was none
-     (`linkedin_window`); at most 25 minutes unless it is the full month;
+     collection, both included, or the full week when there was none
+     (`linkedin_window`), read to the end of the window;
    - the remote check by script: the pages of the top classes and of what
      this run brought, then a rescore of those;
    - the AI check of the top classes (`tools/ai_screen.py`, with the brief of
@@ -30,8 +30,8 @@ Identity: `$ARGUMENTS` (empty means: establish it in step 1).
    - links, direct application channels and company facts of the top;
    - selection and report.
 5. A short summary: **how many days of vacancies were collected** (the
-   pipeline's `collected` line, as it is: the LinkedIn window, whether it
-   stopped at the time budget), how many hot leads and worth-a-look there are,
+   pipeline's `collected` line, as it is: the LinkedIn window, whether the
+   fetch failed), how many hot leads and worth-a-look there are,
    how many the AI check turned down, what the fetch reported as broken or
    blocked.
 

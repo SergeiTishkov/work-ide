@@ -113,15 +113,14 @@ TOP_CLASSES = ai_screen.SCREENED_CLASSES
 # full window when there was none, or the base holds no LinkedIn vacancy any
 # more. The owner, 2026-10-17: a first collection that asks for a day or two
 # misses the long-open roles that always take CVs; one after a collection
-# yesterday needs yesterday too, for what was posted after it. A month is the
-# full window: LinkedIn's own "past month", and the age at which the base is
-# cleaned up. Before 2026-10-17 every run asked for 7 days.
-LINKEDIN_FULL_DAYS = 30
-# LinkedIn's share of the hour in a top run that asks for less than the full
-# window (a first collection is not cut). Measured 2026-10-17: the other 17
-# sources took a minute and a half; LinkedIn, answering 429 forty times, read
-# 4 of 168 pairs in half an hour. What the budget leaves unread, --rest reads.
-TOP_LINKEDIN_MINUTES = 25
+# yesterday needs yesterday too, for what was posted after it. A week is the
+# full window and the cap (the owner, 2026-10-18: a week takes hours
+# already, a month is out of reach; it was 30 for a day). Before 2026-10-17
+# every run asked for 7 days.
+LINKEDIN_FULL_DAYS = 7
+# LinkedIn is read to the end of its window in every mode, the top run
+# included: the owner, 2026-10-18, had the 25-minute budget of the top run
+# (2026-10-17) removed.
 # The top run's budgets: pages read for the remote check, postings the AI
 # reads. What is left waits for the rest run.
 TOP_DESCRIPTION_LIMIT = 300
@@ -145,7 +144,7 @@ def _parse_stamp(stamp) -> Optional[datetime]:
 
 def linkedin_covered_to(state: dict):
     """Until when LinkedIn's postings were fetched without a gap. A fetch that
-    failed or stopped at its time budget leaves it where it was."""
+    failed leaves it where it was."""
     return (state.get("linkedin_covered_to")
             or (state.get("sources", {}).get("linkedin") or {}).get("last_success"))
 
@@ -163,15 +162,9 @@ def linkedin_window(state: dict, vacancies: dict, now: Optional[datetime] = None
     return max(1, min(LINKEDIN_FULL_DAYS, days))
 
 
-def _linkedin_cut(state: dict) -> bool:
-    """The last LinkedIn fetch stopped at its time budget."""
-    linkedin = state.get("sources", {}).get("linkedin") or {}
-    return fetch_linkedin.TIME_BUDGET_NOTE in (linkedin.get("last_error") or "")
-
-
 def linkedin_backfill_days(state: dict, vacancies: dict, now: Optional[datetime] = None) -> int:
     """Days the rest run asks LinkedIn for: the window again when the last
-    fetch left a gap (it failed or stopped at its time budget), else 0."""
+    fetch left a gap (it failed), else 0."""
     if not state.get("linkedin_gap"):
         return 0
     return linkedin_window(state, vacancies, now)
@@ -180,12 +173,12 @@ def linkedin_backfill_days(state: dict, vacancies: dict, now: Optional[datetime]
 def note_linkedin_window(state: dict, started: datetime, covered_before) -> None:
     """After a LinkedIn fetch that started at `started` with the window from
     linkedin_window: moves linkedin_covered_to to `started` when it did not
-    fail and was not stopped at its time budget. Otherwise it stays at
+    fail. Otherwise it stays at
     `covered_before` (linkedin_covered_to read before the fetch: the fallback,
     last_success, has just moved to now and would hide the gap), and
     linkedin_gap tells the rest run to read the window again."""
     linkedin = state.get("sources", {}).get("linkedin") or {}
-    if not linkedin.get("consecutive_failures") and not _linkedin_cut(state):
+    if not linkedin.get("consecutive_failures"):
         state["linkedin_covered_to"] = started.isoformat()
         state["linkedin_gap"] = False
     else:
@@ -194,13 +187,11 @@ def note_linkedin_window(state: dict, started: datetime, covered_before) -> None
         state["linkedin_gap"] = True
 
 
-def linkedin_window_text(days: int, budget_minutes: Optional[int] = None) -> str:
+def linkedin_window_text(days: int) -> str:
     """The fetch stage's words for the window; the summary repeats them."""
     text = f"LinkedIn: posted in the last {days} day{'s' if days > 1 else ''}"
     if days >= LINKEDIN_FULL_DAYS:
         text += ", the full window"
-    if budget_minutes:
-        text += f", up to {budget_minutes} min"
     return text
 
 
@@ -212,10 +203,9 @@ def collected_text(state: dict, days: Optional[int]) -> str:
         return "LinkedIn not asked; the other sources serve their whole current feed"
     text = f"{linkedin_window_text(days)} - the days since the last collection, both included"
     if days >= LINKEDIN_FULL_DAYS:
-        text = f"{linkedin_window_text(days)} - no earlier collection to start from"
-    if _linkedin_cut(state):
-        text += "; stopped at the time budget, the rest run reads the window again"
-    elif (state.get("sources", {}).get("linkedin") or {}).get("consecutive_failures"):
+        text = (f"{linkedin_window_text(days)} - no earlier collection to start from, "
+                f"or it was {LINKEDIN_FULL_DAYS} days ago or more")
+    if (state.get("sources", {}).get("linkedin") or {}).get("consecutive_failures"):
         text += "; the fetch failed, the next run asks for the window again"
     return text + "; the other sources serve their whole current feed"
 
@@ -680,14 +670,12 @@ def run_top(check_contracts: bool = False) -> dict:
     names = [s.get("name") for s in enabled]
     contracts = check_source_contracts(names) if check_contracts else {}
     days = linkedin_window(state, vacancies)
-    budget = TOP_LINKEDIN_MINUTES if days < LINKEDIN_FULL_DAYS else None
     covered_before = linkedin_covered_to(state)
     started_at = datetime.now(timezone.utc)
-    with progress.stage(f"fetch {len(enabled)} sources ({linkedin_window_text(days, budget)})") as st:
+    with progress.stage(f"fetch {len(enabled)} sources ({linkedin_window_text(days)})") as st:
         progress.log("   " + ", ".join(names))
         counts = fetch_sources(enabled, vacancies, state, criteria, profile, contracts,
-                               overrides={"linkedin": {"posted_within_days": days,
-                                                       "time_budget_minutes": budget}})
+                               overrides={"linkedin": {"posted_within_days": days}})
         st.note = (f"{progress.number(counts['fetched'])} records, "
                    f"{progress.number(counts['new'])} new")
     if "linkedin" in names:

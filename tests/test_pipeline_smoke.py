@@ -313,10 +313,11 @@ def test_linkedin_is_asked_for_the_days_since_the_last_collection_both_included(
     assert pipeline.linkedin_window({"linkedin_covered_to": local(0, 1)}, base, now) == 1
     assert pipeline.linkedin_window({"linkedin_covered_to": local(1, 14)}, base, now) == 2
     assert pipeline.linkedin_window({"linkedin_covered_to": local(1, 23)}, base, now) == 2
-    # the last full run, five days back, as last_success: six days
-    state = {"sources": {"linkedin": {"last_success": local(5, 6)}}}
-    assert pipeline.linkedin_window(state, base, now) == 6
-    # longer ago than the full window: the full window
+    # the last full run, four days back, as last_success: five days
+    state = {"sources": {"linkedin": {"last_success": local(4, 6)}}}
+    assert pipeline.linkedin_window(state, base, now) == 5
+    # longer ago than the full window: the full window, a week
+    assert full == 7
     assert pipeline.linkedin_window({"linkedin_covered_to": local(40, 6)}, base, now) == full
 
     # a fetch that went through moves the coverage and leaves no gap
@@ -330,14 +331,7 @@ def test_linkedin_is_asked_for_the_days_since_the_last_collection_both_included(
     pipeline.note_linkedin_window(failed, now, local(3, 6))
     assert failed["linkedin_covered_to"] == local(3, 6)
     assert pipeline.linkedin_backfill_days(failed, base, now) == 4
-    # a fetch stopped at its time budget: the same, even inside a day
-    cut = {"sources": {"linkedin": {
-        "consecutive_failures": 0,
-        "last_error": "queries 3; stopped at the time budget of 25 min after 2 of 168 pairs"}}}
-    pipeline.note_linkedin_window(cut, now, local(0, 1))
-    assert cut["linkedin_covered_to"] == local(0, 1)
-    assert pipeline.linkedin_backfill_days(cut, base, now) == 1
-    assert "time budget" in pipeline.collected_text(cut, 1)
+    assert "the fetch failed" in pipeline.collected_text(failed, 4)
 
 
 def test_the_top_subset_is_the_top_classes_and_what_this_run_brought():
@@ -395,7 +389,7 @@ def test_the_top_run_end_to_end(isolated_data_dir, monkeypatch):
 
     assert asked["posted_within_days"] == pipeline.LINKEDIN_FULL_DAYS, \
         "no collection known: the full window"
-    assert asked["time_budget_minutes"] is None, "the first collection is not cut at the budget"
+    assert "time_budget_minutes" not in asked, "LinkedIn is read to the end of its window"
     assert "the full window" in result["collected"]
     assert result["new_vacancies"] == 1
     (vid,) = kb.load_vacancies()
