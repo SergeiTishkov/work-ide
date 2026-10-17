@@ -47,31 +47,64 @@ test('sections follow the class order, with their titles from the locale', async
   expect(titles).toEqual([ru['class.hot_lead'], ru['class.worth_a_look']]);
 });
 
-test('"Collect vacancies" starts the agent for this identity and locks the buttons', async ({ page }) => {
+test('"Collect vacancies" queues a collection; the bottom panel lists it with its log', async ({ page }) => {
   await open(page);
+  await expect(page.getByTestId('task-panel')).toBeHidden();
   await page.getByTestId('run-collect').click();
-  expect(await calls(page, 'startRun')).toEqual([[{ identity: 'sharp', kind: 'collect' }]]);
-  await expect(page.getByTestId('run-collect')).toBeDisabled();
+  expect(await calls(page, 'enqueueTask')).toEqual([[{ kind: 'collect', identity: 'sharp' }]]);
+  const button = page.getByTestId('run-collect');
+  await expect(button).toBeDisabled();
+  await expect(button.getByTestId('collect-indicator')).toBeVisible();
   await expect(page.getByTestId('run-stop')).toBeVisible();
+  await expect(page.getByTestId('task-panel')).toBeVisible();
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'running');
+  await expect(page.getByTestId('task-1')).toContainText(`${ru['task.kind.collect']} · sharp`);
 
-  await page.evaluate(() => window.__emitRunEvent({ type: 'output', text: 'fetching sources' }));
-  await expect(page.getByTestId('run-log')).toContainText('fetching sources');
+  await page.evaluate(() => window.__taskLine('fetching sources'));
+  await expect(page.getByTestId('task-log')).toContainText('fetching sources');
+  await expect(page.getByTestId('task-log-title')).toContainText(ru['task.state.running']);
 
-  await page.getByTestId('run-stop').click();
-  expect(await calls(page, 'stopRun')).toHaveLength(1);
-
-  await page.evaluate(() => window.__emitRunEvent({ type: 'exit', code: 0, identity: 'sharp', kind: 'collect' }));
-  await expect(page.getByTestId('run-collect')).toBeEnabled();
-  await expect(page.getByTestId('run-status')).toContainText(ru['run.finished']);
-  expect((await calls(page, 'listIdentities')).length).toBe(2);   // reloaded after the run
+  await page.evaluate(() => window.__finishCollect({ ok: true, code: 0 }));
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'done');
+  await expect(button).toBeEnabled();
+  await expect(page.getByTestId('task-log')).toContainText('fetching sources');   // the log stays
+  await expect.poll(async () => (await calls(page, 'listIdentities')).length).toBe(2);   // reloaded after the run
 });
 
-test('buttons are locked on every identity while any run is going', async ({ page }) => {
+test('"Stop" and the panel\'s cross cancel a collection', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('run-collect').click();
+  await page.getByTestId('run-stop').click();
+  expect(await calls(page, 'cancelTask')).toEqual([[1]]);
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'stopped');
+  await expect(page.getByTestId('run-stop')).toHaveCount(0);
+  await page.getByTestId('run-collect').click();
+  await page.getByTestId('task-2').hover();
+  await page.getByTestId('task-2').getByTestId('task-cancel').click();
+  await expect(page.getByTestId('task-2')).toHaveAttribute('data-state', 'stopped');
+});
+
+test('collections of several identities queue: the first runs, the others wait their turn', async ({ page }) => {
   await open(page);
   await page.getByTestId('run-collect').click();
   await page.getByTestId('identity-tab-partsharp').click();
   await expect(page.getByTestId('identity-name')).toHaveText('Part-time side work');
-  await expect(page.getByTestId('run-collect')).toBeDisabled();
+  const button = page.getByTestId('run-collect');
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(button).toHaveText(ru['run.queued']);
+  await expect(button).toBeDisabled();
+  await expect(page.getByTestId('task-2')).toHaveAttribute('data-state', 'queued');
+  await expect(page.getByTestId('task-list-title')).toContainText(ru['task.list_title'].replace('{n}', '2'));
+
+  await page.evaluate(() => window.__finishCollect({ ok: true, code: 0 }));
+  await expect(page.getByTestId('task-2')).toHaveAttribute('data-state', 'running');
+  await expect(page.getByTestId('run-stop')).toBeVisible();
+  // the running one is the one whose log shows, until a click chooses another
+  await expect(page.getByTestId('task-2')).toHaveClass(/chosen/);
+  await page.getByTestId('task-1').click();
+  await expect(page.getByTestId('task-1')).toHaveClass(/chosen/);
+  await expect(page.getByTestId('task-log-title')).toContainText(ru['task.state.done']);
 });
 
 // The owner, 2026-10-07: the review is started from an agent session, where
@@ -413,7 +446,7 @@ test('an identity never collected says so and offers to collect', async ({ page 
   await page.getByTestId('identity-tab-newbie').click();
   await expect(page.getByTestId('never-collected')).toHaveText(ru['identity.never_collected']);
   await page.getByTestId('run-collect').click();
-  expect(await calls(page, 'startRun')).toEqual([[{ identity: 'newbie', kind: 'collect' }]]);
+  expect(await calls(page, 'enqueueTask')).toEqual([[{ kind: 'collect', identity: 'newbie' }]]);
 });
 
 test('"Copy URL" beside "Open" copies the link and says so', async ({ page }) => {
@@ -444,11 +477,12 @@ test('badges: fresh and needs a manual check', async ({ page }) => {
 
 test('a missing claude is explained', async ({ page }) => {
   const fixture = standardFixture();
-  fixture.startRunReply = { ok: false, error: 'claude_not_found' };
+  fixture.collectReply = { ok: false, error: 'claude_not_found' };
   await open(page, fixture);
   await page.getByTestId('run-collect').click();
   await expect(page.getByTestId('error')).toContainText(ru['run.claude_not_found']);
   await expect(page.getByTestId('run-collect')).toBeEnabled();
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'failed');
 });
 
 test('data text is shown as text, never as markup', async ({ page }) => {
@@ -802,11 +836,151 @@ test('the chosen boards stay across markets, and a refresh brings them back', as
   await expect(byId(page, 'a1')).toHaveCount(0);
 });
 
+// --- the company filter (the owner, 2026-10-14) -------------------------------
+// All companies; under it the kinds of intermediary, each one by name under
+// its kind; every other company one row. a1 and a2r are freelance
+// marketplaces, b1 an employer; no agency and no reposter in the view.
+
+const ALL4 = ['marketplace', 'agency', 'reposter', 'other'];
+
+function companyFixture() {
+  const fixture = standardFixture();
+  fixture.companyKinds = {
+    'Company a1': { kind: 'marketplace', name: 'Proxify' },
+    'Company a2r': { kind: 'marketplace', name: 'Toptal' },
+  };
+  return fixture;
+}
+
+async function openCompanies(page) {
+  await open(page, companyFixture());
+  await page.getByTestId('company-filter').click();
+  await expect(page.getByTestId('company-filter-menu')).toBeVisible();
+}
+
+async function click(page, testid) {
+  await page.getByTestId(testid).click();
+  await settled(page);
+}
+
+test('"Company" sits between "Source" and "Category": all, the kinds, the intermediaries, the rest', async ({ page }) => {
+  await openCompanies(page);
+  const order = await page.getByTestId('filters').locator('[data-dropdown]')
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.dropdown));
+  expect(order).toEqual(['segment-filter', 'filter', 'age-filter', 'source-filter', 'company-filter', 'fit-filter']);
+  await expect(page.getByTestId('company-label')).toHaveText(ru['filter.company_legend']);
+  await expect(page.getByTestId('company-filter-value')).toHaveText(ru['filter.company_all']);
+  const rows = await page.getByTestId('company-filter-menu').locator('[role="option"]')
+    .evaluateAll((nodes) => nodes.map((n) => [n.textContent, n.dataset.state]));
+  expect(rows).toEqual([
+    [`${ru['filter.company_all']} (3)`, 'on'],
+    [`${ru['filter.company_kind.marketplace']} (2)`, 'on'],
+    ['Proxify (1)', 'on'],
+    ['Toptal (1)', 'on'],
+    [`${ru['filter.company_kind.other']} (1)`, 'on'],
+  ]);
+  expect(await calls(page, 'listCompanies')).toContainEqual(['sharp', VIEW]);
+});
+
+test('unticking one intermediary hides it alone, and the closed box says what is hidden', async ({ page }) => {
+  await openCompanies(page);
+  await click(page, 'company-option-Proxify');
+  expect(await lastListing(page)).toEqual(['sharp', view({ companies: { kinds: ALL4, hidden: ['Proxify'] } })]);
+  await expect(byId(page, 'a1')).toHaveCount(0);
+  await expect(byId(page, 'a2r')).toBeVisible();
+  await expect(byId(page, 'b1')).toBeVisible();
+  // its own numbers leave the company choice aside: Proxify stays, unticked
+  await expect(page.getByTestId('company-option-Proxify')).toHaveAttribute('data-state', 'off');
+  await expect(page.getByTestId('company-option-Proxify')).toHaveText('Proxify (1)');
+  await expect(page.getByTestId('company-kind-marketplace')).toHaveAttribute('data-state', 'partial');
+  await expect(page.getByTestId('company-option-all')).toHaveAttribute('data-state', 'partial');
+  await expect(page.getByTestId('company-filter-value'))
+    .toHaveText(ru['filter.company_except'].replace('{list}', 'Proxify'));
+  // the other drop-downs count under it
+  await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (1)');
+  await click(page, 'company-option-Proxify');
+  expect(await lastListing(page)).toEqual(['sharp', VIEW]);
+});
+
+test('a kind goes as a whole, and one of it ticked back brings that one alone', async ({ page }) => {
+  await openCompanies(page);
+  await click(page, 'company-kind-marketplace');
+  expect(await lastListing(page))
+    .toEqual(['sharp', view({ companies: { kinds: ['agency', 'reposter', 'other'], hidden: [] } })]);
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(1);   // b1
+  await expect(page.getByTestId('company-option-Proxify')).toHaveAttribute('data-state', 'off');
+  await expect(page.getByTestId('company-option-Toptal')).toHaveAttribute('data-state', 'off');
+  await expect(page.getByTestId('company-filter-value'))
+    .toHaveText(ru['filter.company_except'].replace('{list}', ru['filter.company_kind.marketplace']));
+
+  await click(page, 'company-option-Toptal');
+  expect(await lastListing(page)).toEqual(['sharp', view({ companies: { kinds: ALL4, hidden: ['Proxify'] } })]);
+  await expect(byId(page, 'a2r')).toBeVisible();
+  await expect(byId(page, 'a1')).toHaveCount(0);
+
+  // a partly ticked kind: a click ticks all of it
+  await click(page, 'company-kind-marketplace');
+  expect(await lastListing(page)).toEqual(['sharp', VIEW]);
+});
+
+test('"Other companies" leaves only the intermediaries; "All companies" turns everything off and on', async ({ page }) => {
+  await openCompanies(page);
+  await click(page, 'company-kind-other');
+  expect(await lastListing(page))
+    .toEqual(['sharp', view({ companies: { kinds: ['marketplace', 'agency', 'reposter'], hidden: [] } })]);
+  await expect(byId(page, 'b1')).toHaveCount(0);
+  await expect(page.getByTestId('company-kind-other')).toHaveAttribute('data-state', 'off');
+  await expect(page.getByTestId('company-option-all')).toHaveAttribute('data-state', 'partial');
+
+  await click(page, 'company-option-all');   // partly on: everything
+  expect(await lastListing(page)).toEqual(['sharp', VIEW]);
+  await click(page, 'company-option-all');   // on: nothing
+  expect(await lastListing(page)).toEqual(['sharp', view({ companies: { kinds: [], hidden: [] } })]);
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
+  await expect(page.getByTestId('company-filter-value')).toHaveText(ru['filter.none']);
+  for (const testid of ['company-kind-marketplace', 'company-option-Proxify', 'company-kind-other']) {
+    await expect(page.getByTestId(testid)).toHaveAttribute('data-state', 'off');
+  }
+});
+
+test('the hidden companies survive a refresh and a change of market', async ({ page }) => {
+  await openCompanies(page);
+  await click(page, 'company-option-Proxify');
+  await page.keyboard.press('Escape');
+  await choose(page, 'segment-filter', 'uk');
+  await choose(page, 'segment-filter', '');
+  await page.getByTestId('refresh').click();
+  await expect(page.getByTestId('company-filter-value'))
+    .toHaveText(ru['filter.company_except'].replace('{list}', 'Proxify'));
+  await expect(byId(page, 'a2r')).toBeVisible();
+  await expect(byId(page, 'a1')).toHaveCount(0);
+});
+
+test('a base without company kinds: every company is one "Other companies" row', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('company-filter').click();
+  const rows = await page.getByTestId('company-filter-menu').locator('[role="option"]')
+    .evaluateAll((nodes) => nodes.map((n) => n.textContent));
+  expect(rows).toEqual([`${ru['filter.company_all']} (3)`, `${ru['filter.company_kind.other']} (3)`]);
+});
+
+test('the company list stands in by level: all, the kinds, the companies', async ({ page }) => {
+  await openCompanies(page);
+  const pad = (testid) => page.getByTestId(testid)
+    .evaluate((node) => parseFloat(getComputedStyle(node).paddingLeft));
+  const top = await pad('company-option-all');
+  const kind = await pad('company-kind-marketplace');
+  const company = await pad('company-option-Proxify');
+  expect(kind).toBeGreaterThan(top);
+  expect(company).toBeGreaterThan(kind);
+  expect(await pad('company-kind-other')).toBe(kind);
+});
+
 test('"Generate CV" sits between "Copy URL" and "Generate Cover Letter" and opens what it made', async ({ page }) => {
   const fixture = standardFixture();
   fixture.holdCv = true;
   fixture.cvReply = {
-    ok: true, pages: 3, docx: '/home/me/Downloads/CV.docx', pdf: '/home/me/Downloads/CV.pdf',
+    ok: true, pages: 3, docx: '/docs/sharp/a1/CV.docx', pdf: '/docs/sharp/a1/CV.pdf',
     findings: [{ kind: 'term', text: 'Kafka', where: 'Skills', message: 'not found in either CV' }],
     warnings: [], removed_for_length: ['Contoso: Fixed flaky tests.'],
     report: { gaps: ['Kubernetes'], from_parent: ['interviewed Go developers'], notes: [] },
@@ -814,22 +988,30 @@ test('"Generate CV" sits between "Copy URL" and "Generate Cover Letter" and open
   await open(page, fixture);
   const row = byId(page, 'a1');
   const ids = await row.locator('.answers button').evaluateAll((b) => b.map((x) => x.dataset.testid));
-  expect(ids.slice(0, 5)).toEqual(['btn-open', 'btn-copy-url', 'btn-generate-cv', 'btn-generate-letter', 'btn-applied']);
+  expect(ids.slice(0, 6)).toEqual(['btn-open', 'btn-copy-url', 'btn-generate-cv', 'btn-generate-letter',
+    'btn-collect-reputation', 'btn-applied']);
 
   await row.getByTestId('btn-generate-cv').click();
   await expect(row.getByTestId('cv-form')).toBeVisible();
-  expect(await calls(page, 'generateCv')).toEqual([]);
+  expect(await calls(page, 'enqueueTask')).toEqual([]);
   await row.getByTestId('btn-generate-cv').click();
   await expect(row.getByTestId('cv-form')).toHaveCount(0);
   await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generating_cv']);
   await expect(row.getByTestId('btn-generate-cv')).toBeDisabled();
-  // one at a time: the other cards wait too
-  await expect(byId(page, 'a2r').getByTestId('btn-generate-cv')).toBeDisabled();
-  expect(await calls(page, 'generateCv')).toEqual([['sharp', 'a1', '']]);
+  expect(await calls(page, 'enqueueTask')).toEqual([[{
+    kind: 'cv', identity: 'sharp', vacancyId: 'a1', title: 'Senior .NET Developer a1', company: 'Company a1',
+    instructions: '',
+  }]]);
+  // another card is not locked: its CV queues behind this one
+  const other = byId(page, 'a2r').getByTestId('btn-generate-cv');
+  await other.dblclick();
+  await expect(other).toHaveText(ru['action.queued']);
+  await expect(other).toBeDisabled();
 
   await page.evaluate(() => window.__releaseCv());
   await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
   await expect(row.getByTestId('btn-generate-cv')).toBeEnabled();
+  await expect(other).toHaveText(ru['action.generating_cv']);
   await expect(row.getByTestId('cv-summary')).toHaveText(ru['cv.ready_pages'].replace('{pages}', '3'));
   await expect(row.getByTestId('cv-findings')).toContainText('Kafka');
   await expect(row.getByTestId('cv-gaps')).toContainText('Kubernetes');
@@ -839,50 +1021,96 @@ test('"Generate CV" sits between "Copy URL" and "Generate Cover Letter" and open
 
   await row.getByTestId('cv-open-pdf').click();
   await row.getByTestId('cv-show-folder').click();
-  expect(await calls(page, 'openCvFile')).toEqual([['/home/me/Downloads/CV.pdf']]);
-  expect(await calls(page, 'showCvFile')).toEqual([['/home/me/Downloads/CV.pdf']]);
+  expect(await calls(page, 'openCvFile')).toEqual([['/docs/sharp/a1/CV.pdf']]);
+  expect(await calls(page, 'showCvFile')).toEqual([['/docs/sharp/a1/CV.pdf']]);
   await row.getByTestId('cv-close').click();
   await expect(row.getByTestId('cv-result')).toHaveCount(0);
 });
 
-test('the button of the last CV says it is generated, still makes another, and resets on the next', async ({ page }) => {
+test('"Collect reputation" queues a lookup for the vacancy and is gone once the company has a result', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.holdReputation = true;
+  for (const rows of Object.values(fixture.rows.sharp)) {
+    for (const r of rows) if (r.id === 'a3') r.view.reputation_collected = true;
+  }
+  await open(page, fixture);
+  await expect(byId(page, 'a3').getByTestId('btn-collect-reputation')).toHaveCount(0);
+  const row = byId(page, 'a1');
+  const button = row.getByTestId('btn-collect-reputation');
+  await expect(button).toHaveText(ru['action.collect_reputation']);
+  await button.click();
+  await expect(button).toHaveText(ru['action.collecting_reputation']);
+  await expect(button).toBeDisabled();
+  expect(await calls(page, 'enqueueTask')).toEqual([[{
+    kind: 'reputation', identity: 'sharp', vacancyId: 'a1', title: 'Senior .NET Developer a1', company: 'Company a1',
+  }]]);
+  // its own lane: a second lookup queues behind it
+  const other = byId(page, 'a2r').getByTestId('btn-collect-reputation');
+  await other.click();
+  await expect(other).toHaveText(ru['action.queued']);
+  await expect(page.getByTestId('task-1')).toContainText(ru['task.kind.reputation']);
+  await page.evaluate(() => window.__finishReputation());
+  await expect(button).toHaveCount(0);
+  await expect(row).toContainText('4.1/5 (Glassdoor)');
+  await expect(other).toHaveText(ru['action.collecting_reputation']);
+});
+
+test('the vacancy\'s folder: opened, or its path copied, once it has a CV or a cover letter', async ({ page }) => {
+  await open(page);
+  const row = byId(page, 'a1');
+  await expect(row.getByTestId('btn-open-docs')).toHaveCount(0);
+  await row.getByTestId('btn-generate-cv').dblclick();
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
+  const ids = await row.locator('.answers button').evaluateAll((b) => b.map((x) => x.dataset.testid));
+  expect(ids.slice(0, 8)).toEqual(['btn-open', 'btn-copy-url', 'btn-generate-cv', 'btn-generate-letter',
+    'btn-collect-reputation', 'btn-open-docs', 'btn-copy-docs-path', 'btn-applied']);
+  await expect(row.getByTestId('btn-open-docs')).toHaveText(ru['action.open_docs']);
+  await row.getByTestId('btn-open-docs').click();
+  expect(await calls(page, 'openDocumentsDir')).toEqual([['sharp', 'a1']]);
+  await row.getByTestId('btn-copy-docs-path').click();
+  expect(await calls(page, 'copyText')).toEqual([['/docs/sharp/a1']]);
+  await expect(row.getByTestId('btn-copy-docs-path')).toHaveText(ru['action.copied']);
+  await expect(row.getByTestId('btn-copy-docs-path')).toHaveText(ru['action.copy_docs_path']);
+  await expect(byId(page, 'a2r').getByTestId('btn-open-docs')).toHaveCount(0);
+});
+
+test('a generated CV stays generated whatever is generated after it, and makes a new version when pressed', async ({ page }) => {
   const fixture = standardFixture();
   fixture.holdCv = true;
+  // made before this session: the folder says so
+  fixture.docs = { sharp: { b1: { dir: "/docs/sharp/b1", cv: 2, letter: 0, errors: {} } } };
   await open(page, fixture);
   const first = byId(page, 'a1').getByTestId('btn-generate-cv');
   const second = byId(page, 'a2r').getByTestId('btn-generate-cv');
+  await expect(byId(page, "b1").getByTestId("btn-generate-cv")).toHaveText(ru['action.cv_generated']);
+  await expect(byId(page, "b1").getByTestId("btn-open-docs")).toBeVisible();
 
-  await first.click();
-  await first.click();
+  await first.dblclick();
   await page.evaluate(() => window.__releaseCv());
   await expect(first).toHaveText(ru['action.cv_generated']);
   await expect(first).toHaveClass(/done/);
   await expect(second).toHaveText(ru['action.generate_cv']);
 
-  // pressed again: the instructions, then another generation
+  await second.dblclick();
+  await page.evaluate(() => window.__releaseCv());
+  await expect(second).toHaveText(ru['action.cv_generated']);
+  await expect(first).toHaveText(ru['action.cv_generated']);
+
+  // pressed again: the instructions, then a new version
   await first.click();
   await expect(byId(page, 'a1').getByTestId('cv-form')).toBeVisible();
   await first.click();
   await expect(first).toHaveText(ru['action.generating_cv']);
   await page.evaluate(() => window.__releaseCv());
   await expect(first).toHaveText(ru['action.cv_generated']);
-  expect(await calls(page, 'generateCv')).toEqual([['sharp', 'a1', ''], ['sharp', 'a1', '']]);
-
-  // the next CV starts: the first button is back to "Generate CV"
-  await second.click();
-  await second.click();
-  await expect(first).toHaveText(ru['action.generate_cv']);
-  await expect(first).not.toHaveClass(/done/);
-  await page.evaluate(() => window.__releaseCv());
-  await expect(second).toHaveText(ru['action.cv_generated']);
-  await expect(first).toHaveText(ru['action.generate_cv']);
+  expect((await calls(page, 'enqueueTask')).map(([r]) => r.vacancyId)).toEqual(['a1', 'a2r', 'a1']);
 });
 
-test('"Generate Cover Letter" works as "Generate CV" does, apart from it, and waits its turn', async ({ page }) => {
+test('"Generate Cover Letter" works as "Generate CV" does, apart from it, and queues behind it', async ({ page }) => {
   const fixture = standardFixture();
   fixture.holdCv = true;
   fixture.letterReply = {
-    ok: true, pages: 1, docx: '/home/me/Downloads/Cover Letter.docx', pdf: '/home/me/Downloads/Cover Letter.pdf',
+    ok: true, pages: 1, docx: '/docs/sharp/a1/Cover Letter.docx', pdf: '/docs/sharp/a1/Cover Letter.pdf',
     findings: [{ kind: 'term', text: 'Kafka', where: 'letter', message: 'not found in either CV' }],
     warnings: [], report: { gaps: ['Kubernetes'], from_parent: [], notes: ['the recipient is guessed'] },
   };
@@ -900,38 +1128,36 @@ test('"Generate Cover Letter" works as "Generate CV" does, apart from it, and wa
   await row.getByTestId('letter-instructions').fill('Mention Azure.');
   await letter.click();
   await expect(letter).toHaveText(ru['action.generating_letter']);
-  // one at a time, of either kind
-  await expect(cv).toBeDisabled();
-  await expect(cv).toHaveText(ru['action.generate_cv']);
-  expect(await calls(page, 'generateCoverLetter')).toEqual([['sharp', 'a1', 'Mention Azure.']]);
-  expect(await calls(page, 'generateCv')).toEqual([]);
+  expect((await calls(page, 'enqueueTask')).map(([r]) => [r.kind, r.vacancyId, r.instructions]))
+    .toEqual([['letter', 'a1', 'Mention Azure.']]);
+
+  // a CV meanwhile: queued, one document at a time
+  await expect(cv).toBeEnabled();
+  await cv.dblclick();
+  await expect(cv).toHaveText(ru['action.queued']);
+  await expect(page.getByTestId('task-2')).toContainText(`${ru['task.kind.cv']} · Senior .NET Developer a1 — Company a1 · sharp`);
 
   await page.evaluate(() => window.__releaseCv());
   await expect(letter).toHaveText(ru['action.letter_generated']);
+  await expect(cv).toHaveText(ru['action.generating_cv']);
   await expect(row.getByTestId('letter-summary')).toHaveText(ru['letter.ready_pages'].replace('{pages}', '1'));
   await expect(row.getByTestId('letter-findings')).toContainText('Kafka');
   await expect(row.getByTestId('letter-notes')).toContainText('the recipient is guessed');
   await row.getByTestId('letter-open-pdf').click();
-  expect(await calls(page, 'openCvFile')).toEqual([['/home/me/Downloads/Cover Letter.pdf']]);
+  expect(await calls(page, 'openCvFile')).toEqual([['/docs/sharp/a1/Cover Letter.pdf']]);
 
-  // a CV after it: the letter keeps saying it is generated; both results show
-  await cv.click();
-  await cv.click();
-  await expect(letter).toBeDisabled();
   await page.evaluate(() => window.__releaseCv());
   await expect(cv).toHaveText(ru['action.cv_generated']);
   await expect(letter).toHaveText(ru['action.letter_generated']);
   await expect(row.getByTestId('cv-result')).toBeVisible();
   await expect(row.getByTestId('letter-result')).toBeVisible();
 
-  // the next letter, for another vacancy: this card's letter button resets, its CV button does not
+  // a letter for another vacancy leaves this card's letter generated
   const other = byId(page, 'a2r').getByTestId('btn-generate-letter');
-  await other.click();
-  await other.click();
-  await expect(letter).toHaveText(ru['action.generate_letter']);
+  await other.dblclick();
   await page.evaluate(() => window.__releaseCv());
   await expect(other).toHaveText(ru['action.letter_generated']);
-  await expect(cv).toHaveText(ru['action.cv_generated']);
+  await expect(letter).toHaveText(ru['action.letter_generated']);
   await row.getByTestId('letter-close').click();
   await expect(row.getByTestId('letter-result')).toHaveCount(0);
   await expect(row.getByTestId('cv-result')).toBeVisible();
@@ -946,6 +1172,73 @@ test('a failed generation does not say the CV is generated', async ({ page }) =>
   await row.getByTestId('btn-generate-cv').click();
   await expect(row.getByTestId('cv-result')).toHaveClass(/failed/);
   await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generate_cv']);
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'failed');
+});
+
+test('a vacancy found gone says so on its button, and offers no folder', async ({ page }) => {
+  const fixture = standardFixture();
+  const gone = 'Vacancy not found, possibly outdated: the link is dead.';
+  fixture.docs = { sharp: { a1: { dir: '/docs/sharp/a1', cv: 0, letter: 0, errors: { cv: gone } } } };
+  await open(page, fixture);
+  const row = byId(page, 'a1');
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generate_cv']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveAttribute('title', gone);
+  await expect(row.getByTestId('btn-open-docs')).toHaveCount(0);
+});
+
+test('documents the app queued itself show on their cards and in the panel, marked auto', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.holdCv = true;
+  await open(page, fixture);
+  await page.evaluate(() => {
+    window.__addTask({ kind: 'cv', identity: 'sharp', vacancyId: 'a1', title: 'Senior .NET Developer a1', company: 'Company a1' });
+    window.__addTask({ kind: 'letter', identity: 'sharp', vacancyId: 'a1', title: 'Senior .NET Developer a1', company: 'Company a1' });
+  });
+  const row = byId(page, 'a1');
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generating_cv']);
+  await expect(row.getByTestId('btn-generate-letter')).toHaveText(ru['action.queued']);
+  await expect(page.getByTestId('task-1')).toContainText(ru['task.auto']);
+  await page.getByTestId('tasks-cancel-queued').click();
+  expect(await calls(page, 'cancelQueued')).toEqual([[null]]);
+  await expect(row.getByTestId('btn-generate-letter')).toHaveText(ru['action.generate_letter']);
+  await page.evaluate(() => window.__releaseCv());
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
+  // what the app queued itself shows no result on the card: the folder has it
+  await expect(row.getByTestId('cv-result')).toHaveCount(0);
+  await page.getByTestId('tasks-clear').click();
+  await expect(page.getByTestId('task-panel')).toBeHidden();
+});
+
+test('the panel\'s height and split are dragged on their sashes and kept', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('run-collect').click();
+  const panel = page.getByTestId('task-panel');
+  await expect(panel).toBeVisible();
+  const before = await panel.boundingBox();
+  const sash = await page.getByTestId('task-panel-sash').boundingBox();
+  await expect(page.getByTestId('task-panel-sash')).toHaveCSS('cursor', 'ns-resize');
+  await page.mouse.move(sash.x + 50, sash.y + sash.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sash.x + 50, sash.y - 80, { steps: 4 });
+  await page.mouse.up();
+  const after = await panel.boundingBox();
+  expect(Math.round(after.height - before.height)).toBeGreaterThan(70);
+
+  const split = await page.getByTestId('task-split-sash').boundingBox();
+  await expect(page.getByTestId('task-split-sash')).toHaveCSS('cursor', 'ew-resize');
+  const listBefore = await page.locator('.tasks-pane').boundingBox();
+  await page.mouse.move(split.x + split.width / 2, split.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(split.x + 120, split.y + 20, { steps: 4 });
+  await page.mouse.up();
+  const listAfter = await page.locator('.tasks-pane').boundingBox();
+  expect(listAfter.width - listBefore.width).toBeGreaterThan(80);
+
+  await page.reload();
+  await page.getByTestId('run-collect').click();
+  await expect(panel).toBeVisible();
+  expect(Math.abs((await panel.boundingBox()).height - after.height)).toBeLessThan(3);
+  expect(Math.abs((await page.locator('.tasks-pane').boundingBox()).width - listAfter.width)).toBeLessThan(3);
 });
 
 test('the first click on "Generate CV" opens instructions; the second sends what they hold', async ({ page }) => {
@@ -959,22 +1252,24 @@ test('the first click on "Generate CV" opens instructions; the second sends what
   await input.fill('  Stress Azure.\nWrite it in German.  ');
   await row.getByTestId('btn-generate-cv').click();
   await expect(row.getByTestId('cv-summary')).toBeVisible();
-  expect(await calls(page, 'generateCv')).toEqual([['sharp', 'a1', 'Stress Azure.\nWrite it in German.']]);
+  const sent = async () => (await calls(page, 'enqueueTask')).map(([r]) => r.instructions);
+  expect(await sent()).toEqual(['Stress Azure.\nWrite it in German.']);
   await expect(row.getByTestId('cv-form')).toHaveCount(0);
 
   // The form's own button and Ctrl+Enter send too; Cancel sends nothing.
   await row.getByTestId('btn-generate-cv').click();
   await row.getByTestId('cv-instructions').fill('Lead with payments.');
   await row.getByTestId('cv-instructions-generate').click();
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
   await row.getByTestId('btn-generate-cv').click();
   await row.getByTestId('cv-instructions').fill('Short.');
   await row.getByTestId('cv-instructions').press('Control+Enter');
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
   await row.getByTestId('btn-generate-cv').click();
   await row.getByTestId('cv-instructions').fill('Never sent.');
   await row.getByTestId('cv-instructions-cancel').click();
   await expect(row.getByTestId('cv-form')).toHaveCount(0);
-  expect((await calls(page, 'generateCv')).map((c) => c[2]))
-    .toEqual(['Stress Azure.\nWrite it in German.', 'Lead with payments.', 'Short.']);
+  expect(await sent()).toEqual(['Stress Azure.\nWrite it in German.', 'Lead with payments.', 'Short.']);
 });
 
 test('instructions half typed outlive a re-render and stay with their card', async ({ page }) => {
@@ -994,4 +1289,169 @@ test('a failed CV generation says why, on its card', async ({ page }) => {
   await expect(byId(page, 'a1').getByTestId('cv-result')).toHaveText(new RegExp(`${ru['cv.failed']}: the common CV is missing`));
   await expect(byId(page, 'a2r').getByTestId('cv-result')).toHaveCount(0);
   await expect(byId(page, 'a1').getByTestId('btn-generate-cv')).toBeEnabled();
+});
+
+test('a collection shows its steps under it while it runs, folded or opened by its arrow', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('run-collect').click();
+  await page.evaluate(() => window.__setSteps([
+    { key: 'prepare', state: 'done', duration: '1:05', note: null, progress: null },
+    { key: 'fetch', name: 'fetch 19 sources', state: 'running', began: Date.now() - 65000,
+      progress: 'linkedin pairs: 36/168 (21%)', note: null, duration: null },
+    { key: null, name: 'a stage the app has no name for', state: 'done', duration: '0:02', note: null, progress: null },
+  ]));
+  const step = (i) => page.getByTestId(`task-step-1-${i}`);
+  await expect(step(0)).toContainText(ru['step.prepare']);
+  await expect(step(0)).toContainText('1:05');
+  await expect(step(1)).toHaveAttribute('data-state', 'running');
+  await expect(step(1)).toContainText(ru['step.fetch']);
+  await expect(step(1)).toContainText('linkedin pairs: 36/168');
+  await expect(step(1)).toContainText(/1:0[5-9]/);   // its time counts on
+  await expect(step(2)).toContainText('a stage the app has no name for');
+  await page.getByTestId('task-1').getByTestId('task-fold').click();
+  await expect(step(0)).toHaveCount(0);
+  await page.getByTestId('task-1').getByTestId('task-fold').click();
+  await expect(step(0)).toBeVisible();
+  await page.evaluate(() => window.__finishCollect({ ok: true, code: 0 }));
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'done');
+  await expect(step(0)).toHaveCount(0);   // an ended collection folds its steps
+  await page.getByTestId('task-1').getByTestId('task-fold').click();
+  await expect(step(0)).toBeVisible();
+});
+
+test('the CV/CL batch is one task: its progress, its document on the card, its log, its stop', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => window.__setBatch({
+    identity: 'sharp, partsharp',
+    progress: { index: 8, total: 971, made: 6, failed: 1, gone: 0 },
+    current: { identity: 'sharp', kind: 'cv', vacancyId: 'a1', title: 'Senior .NET Developer a1', company: 'Company a1' },
+  }, ['start: sharp partsharp', '[8/971] sharp cv a1']));
+  const task = page.getByTestId('task-batch');
+  await expect(task).toHaveAttribute('data-state', 'running');
+  await expect(task).toContainText(`${ru['task.kind.batch']} · sharp, partsharp · 8/971`);
+  await expect(task).toContainText('Senior .NET Developer a1');
+  await expect(task).toContainText(ru['batch.summary'].replace('{made}', '6').replace('{gone}', '0').replace('{failed}', '1'));
+  const row = byId(page, 'a1');
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generating_cv']);
+  await expect(row.getByTestId('btn-generate-cv')).toBeDisabled();
+  await expect(page.getByTestId('task-log')).toContainText('[8/971] sharp cv a1');
+  await expect(page.getByTestId('task-log-title')).toContainText(ru['task.kind.batch']);
+
+  await page.evaluate(() => window.__setBatch({
+    identity: 'sharp, partsharp', holding: true,
+    progress: { index: 8, total: 971, made: 7, failed: 1, gone: 0 }, current: null,
+  }, ['paused: the app is generating documents']));
+  await expect(task).toContainText(ru['batch.holding']);
+  await expect.poll(async () => (await calls(page, 'documentsState')).some(([who, ids]) => who === 'sharp'
+    && ids.length === 1 && ids[0] === 'a1')).toBe(true);   // the document it made shows on the card
+  await expect(row.getByTestId('btn-generate-cv')).toBeEnabled();
+
+  await task.hover();
+  await task.getByTestId('task-cancel').click();
+  expect(await calls(page, 'cancelTask')).toEqual([['batch']]);
+  await expect(task).toContainText(ru['batch.stopping']);
+  await page.evaluate(() => window.__setBatch({
+    identity: 'sharp, partsharp', state: 'stopped', progress: { index: 9, total: 971, made: 8, failed: 1, gone: 0 },
+  }, ['stopped before 10/971']));
+  await expect(task).toHaveAttribute('data-state', 'stopped');
+  await page.getByTestId('tasks-clear').click();
+  await expect(page.getByTestId('task-panel')).toBeHidden();
+});
+
+test("a document asked for while the batch runs says it waits for the batch's current document", async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.holdCv = true;
+  await open(page, fixture);
+  await page.evaluate(() => window.__setBatch({ progress: { index: 1, total: 3, made: 0, failed: 0, gone: 0 } }));
+  await page.evaluate(() => window.__addTask({ kind: 'cv', identity: 'sharp', vacancyId: 'b1', origin: 'manual' }));
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'queued');
+  await expect(page.getByTestId('task-1')).toHaveAttribute('title', ru['task.waiting_batch']);
+  await page.evaluate(() => window.__setBatch({ holding: true, progress: { index: 1, total: 3, made: 1, failed: 0, gone: 0 } }));
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'running');
+});
+
+test('"Age" stands after "Status": today, a week, a month, older, each with its count', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.rows.sharp.full.find((r) => r.id === 'a2r').age = 'week';
+  fixture.rows.sharp.full.find((r) => r.id === 'b1').age = 'older';
+  await open(page, fixture);
+  await expect(page.getByTestId('filter-label')).toHaveText(ru['filter.legend']);
+  await expect(page.getByTestId('age-label')).toHaveText(ru['filter.age_legend']);
+  await expect(page.getByTestId('age-filter-value')).toHaveText(ru['filter.age_all']);
+  await page.getByTestId('age-filter').click();
+  await expect(page.getByTestId('age-option-today')).toHaveText(`${ru['filter.age.today']} (1)`);
+  await expect(page.getByTestId('age-option-week')).toHaveText(`${ru['filter.age.week']} (1)`);
+  await expect(page.getByTestId('age-option-older')).toHaveText(`${ru['filter.age.older']} (1)`);
+  await page.keyboard.press('Escape');
+  await check(page, 'age-filter', ['today', 'week']);
+  expect(await lastListing(page)).toEqual(['sharp', view({ ages: ['today', 'week'] })]);
+  await expect(byId(page, 'b1')).toHaveCount(0);
+  await expect(byId(page, 'a1')).toBeVisible();
+});
+
+test('the stub\'s text has one width, so the buttons after it stand in one column', async ({ page }) => {
+  await open(page);
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a2r').getByTestId('btn-rejected').click();
+  await byId(page, 'a2r').getByTestId('reason-save').click();
+  const lefts = await Promise.all(['stub-a1', 'stub-a2r'].map((id) =>
+    page.getByTestId(id).getByTestId('btn-undo').boundingBox().then((b) => Math.round(b.x))));
+  expect(new Set(lefts).size).toBe(1);
+});
+
+test('"Score" in Details: a row per part, a cell per point, earned ones bright, axes in one column', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.rows.sharp.full.find((r) => r.id === 'a1').view.score_parts = [
+    { key: 'stack', points: 4, min: 0, max: 20 },
+    { key: 'extra:calm', label: 'calm domain', points: 0, min: 0, max: 6 },
+    { key: 'title', points: -8, min: -24, max: 0 },
+  ];
+  await open(page, fixture);
+  const card = byId(page, 'a1');
+  await card.locator('details.details > summary').click();
+  await card.getByTestId('score-parts').locator('summary').click();
+  await expect(card.getByTestId('score-parts').locator('summary')).toHaveText(ru['score.summary']);
+  await expect(card.getByTestId('score-label-stack')).toHaveText(`${ru['score.part.stack']} (+4/+20)`);
+  await expect(card.getByTestId('score-label-extra:calm')).toHaveText('calm domain (0/+6)');
+  await expect(card.getByTestId('score-label-title')).toHaveText(`${ru['score.part.title']} (-8/-24)`);
+  const stack = card.getByTestId('score-bar-stack');
+  await expect(stack.locator('.score-cell.plus:not(.off)')).toHaveCount(4);
+  await expect(stack.locator('.score-cell.plus.off')).toHaveCount(16);
+  const title = card.getByTestId('score-bar-title');
+  await expect(title.locator('.score-cell.minus:not(.off)')).toHaveCount(8);
+  await expect(title.locator('.score-cell.minus.off')).toHaveCount(16);
+  const axes = await card.locator('.score-axis').evaluateAll((nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().x)));
+  expect(new Set(axes).size).toBe(1);
+  const widths = await card.locator('.score-cell').evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().width));
+  expect(new Set(widths).size).toBe(1);
+  // the bright minus cells sit next to the axis
+  const lastMinus = await title.locator('.score-cell.minus').last().getAttribute('class');
+  expect(lastMinus).not.toContain('off');
+});
+
+test('"Clean up" sits between "Refresh" and "Collect": filters, a count, then the deletion', async ({ page }) => {
+  await open(page);
+  const order = await page.locator('.actions > button').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
+  expect(order.slice(0, 3)).toEqual(['refresh', 'cleanup', 'run-collect']);
+  await page.getByTestId('cleanup').click();
+  const dialog = page.getByTestId('cleanup-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(page.getByTestId('cleanup-ages-older')).toBeChecked();
+  await expect(page.getByTestId('cleanup-delete')).toBeDisabled();
+  await page.getByTestId('cleanup-statuses-expired').check();
+  await page.getByTestId('cleanup-count').click();
+  expect((await calls(page, 'cleanup')).at(-1)).toEqual(['sharp', { ages: ['older'], statuses: ['expired'], classes: [] }, true]);
+  await expect(page.getByTestId('cleanup-outcome')).toContainText(ru['cleanup.would_delete'].replace('{n}', '3'));
+  await expect(page.getByTestId('cleanup-delete')).toHaveText(ru['cleanup.delete_n'].replace('{n}', '3'));
+  // a changed filter needs a new count first
+  await page.getByTestId('cleanup-classes-rejected').check();
+  await expect(page.getByTestId('cleanup-delete')).toBeDisabled();
+  await page.getByTestId('cleanup-count').click();
+  const before = (await calls(page, 'loadSegments')).length;
+  await page.getByTestId('cleanup-delete').click();
+  expect((await calls(page, 'cleanup')).at(-1)[2]).toBe(false);
+  await expect(page.getByTestId('cleanup-outcome')).toContainText(ru['cleanup.deleted'].replace('{n}', '3'));
+  expect((await calls(page, 'loadSegments')).length).toBeGreaterThan(before);
+  await page.getByTestId('cleanup-close').click();
+  await expect(page.getByTestId('cleanup-overlay')).toHaveCount(0);
 });

@@ -121,7 +121,8 @@ test('bad input is refused', () => {
   assert.throws(() => store.setFeedback('test', 'old00', 'maybe'));
   assert.throws(() => store.setFeedback('test', 'nope', 'applied'));
   assert.throws(() => store.listing('test', v('full', 'whatever')), /unknown status/);
-  assert.throws(() => store.counts('test', { ...v('full'), fresh: ['stale'] }), /unknown status or freshness/);
+  assert.throws(() => store.counts('test', { ...v('full'), fresh: ['stale'] }), /unknown status, freshness or age/);
+  assert.throws(() => store.ages('test', { ...v('full'), ages: ['ancient'] }), /unknown status, freshness or age/);
   store.closeAll();
 });
 
@@ -451,5 +452,83 @@ test('several markets, statuses, boards and classes at once; an empty choice lis
   assert.equal(fresh.statuses.rejected, 1);
   assert.equal(fresh.statuses.applied, 0, 'old00 is from an earlier run');
   assert.deepEqual(store.counts('test', { ...view, statuses: ['applied'] }).fresh, { fresh: 0, earlier: 1 });
+  store.closeAll();
+});
+
+// The owner, 2026-10-14: a fifth drop-down, "Company" — the intermediaries by
+// kind and by name, every other company one row. The kinds are the
+// pipeline's (meta 'company_kinds', tools/company_kinds.py).
+function withCompanies(file) {
+  const db = new DatabaseSync(file);
+  const setCompany = db.prepare(
+    "UPDATE vacancy_identity SET view = json_set(view, '$.company', ?) WHERE vacancy_id = ?");
+  setCompany.run('Proxify', 'new0');
+  setCompany.run('Proxify AB', 'new1');
+  setCompany.run('Hays Technology', 'old00');
+  db.prepare("INSERT INTO meta (key, value) VALUES ('company_kinds', ?)").run(JSON.stringify({
+    Proxify: { kind: 'marketplace', name: 'Proxify' },
+    'Proxify AB': { kind: 'marketplace', name: 'Proxify' },
+    'Hays Technology': { kind: 'agency', name: 'Hays' },
+  }));
+  db.close();
+}
+
+test('the company list: each intermediary by name, every other company one row', () => {
+  const { store, file } = setup();
+  assert.deepEqual(store.companies('test', v('full', 'all')), [{ kind: 'other', name: null, total: 23 }],
+    'a base without company kinds: every company is "other"');
+  withCompanies(file);
+  assert.deepEqual(store.companies('test', v('full', 'all')), [
+    { kind: 'other', name: null, total: 20 },
+    { kind: 'marketplace', name: 'Proxify', total: 2 },
+    { kind: 'agency', name: 'Hays', total: 1 },
+  ]);
+  const chosen = { ...v('full', 'all'), companies: { kinds: ['other'], hidden: [] } };
+  assert.deepEqual(store.companies('test', chosen), store.companies('test', v('full', 'all')),
+    'the chosen companies aside');
+  assert.deepEqual(store.companies('test', v('full', 'all', { source: 'nowhere' })), []);
+  assert.deepEqual(store.companies('other', v('full', 'all')), []);
+  store.closeAll();
+});
+
+test('the company narrows the list, the counts, the classes and the boards', () => {
+  const { store, file } = setup();
+  withCompanies(file);
+  const every = ['hot_lead', 'worth_a_look'];
+  const ids = (companies) => store.listing('test', { ...v('full', 'all'), companies }, { expanded: every })
+    .map((r) => r.id).sort();
+  assert.deepEqual(ids({ kinds: ['marketplace'], hidden: [] }), ['new0', 'new1']);
+  assert.deepEqual(ids({ kinds: ['marketplace', 'agency'], hidden: ['Proxify'] }), ['old00']);
+  assert.deepEqual(ids({ kinds: [], hidden: [] }), []);
+  assert.equal(ids(null).length, 23);
+  const noIntermediaries = { ...v('full', 'all'), companies: { kinds: ['other'], hidden: [] } };
+  assert.equal(count(store, 'test', noIntermediaries), 20);
+  const totals = store.classTotals('test', noIntermediaries);
+  assert.equal(Object.values(totals).reduce((a, b) => a + b, 0), 20);
+  assert.equal(store.sources('test', noIntermediaries).reduce((a, s) => a + s.total, 0), 20);
+  assert.throws(() => store.listing('test', { ...v('full', 'all'), companies: { kinds: ['employer'] } }),
+    /unknown company kind/);
+  store.closeAll();
+});
+
+test('age: the posted date sorts each vacancy into one bucket; the filter narrows list and counts', () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  const day = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const setPosted = (id, posted) => db.prepare("UPDATE vacancy_identity SET view = json_set(view, '$.posted_on', ?) "
+    + "WHERE identity_id = 'test' AND vacancy_id = ?").run(posted, id);
+  setPosted('new0', day(0));
+  setPosted('new1', day(5));
+  setPosted('new2', day(20));
+  db.close();
+  const all = v('full', 'all');
+  const ages = store.ages('test', { ...all, ages: ['today'] });
+  assert.equal(ages.today, 1);
+  assert.equal(ages.week, 1);
+  assert.equal(ages.month, 1);
+  assert.equal(Object.values(ages).reduce((a, b) => a + b, 0), count(store, 'test', all), 'ages ignore their own filter');
+  assert.deepEqual(store.listing('test', { ...all, ages: ['today', 'week'] }).map((r) => r.id), ['new0', 'new1']);
+  assert.equal(count(store, 'test', { ...all, ages: ['month'] }), 1);
+  assert.equal(count(store, 'test', { ...all, ages: [] }), 0);
   store.closeAll();
 });

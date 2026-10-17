@@ -395,6 +395,51 @@ tailored from the common CV alone, and the result says so and that a parent CV
 can be added. Each identity sets its own `cv.parent`; two identities of one
 person may point at the same file.
 
+### Where the documents go
+
+One folder for every identity, kept outside git in
+`local-identities/settings.yaml` and set with
+`python tools/documents.py set "<folder>"` (onboarding asks): an existing
+folder gets a "Work IDE CVs and CLs" folder inside it, a new path is created
+and used as it is. Unset, it is `~/Downloads/Work IDE CVs and CLs`. Inside:
+`<prefix>/<vacancy id>/` with the current CV and cover letter (`.docx`,
+`.pdf`), a log per document, and `Old versions/` (`V1`, `V2`, … — `V1 failed`
+for a version the person rejected as a whole). Details: `tools/documents.py`.
+
+### Generating without a click: `cv.auto`
+
+After each collection the app can queue a CV and a cover letter for the
+vacancies matching the identity's filters (tools/cv_auto.py):
+
+```yaml
+cv:
+  auto:
+    documents: [cv, letter]          # what to generate; both when omitted
+    filters:                         # a vacancy matching ANY filter is picked
+      - markets: [worldwide]         # market slugs, as in the app's Region
+      - classes: [hot_lead, worth_a_look, long_shot]
+      - markets: [eu]                # inside one filter everything must match
+        sources: [weworkremotely.com]
+        classes: [hot_lead]
+```
+
+A key left out of a filter matches anything. Candidates are the vacancies of
+the latest selection with no answer yet; a document already in the vacancy's
+folder is not made again, nor one whose vacancy was found gone (a dead link,
+or no description — an error in its log instead of files).
+
+After a collection the app makes them in one batch (`tools/cv_batch.py`,
+a process of its own, shown in the app's task panel); it can be run by hand:
+`python tools/cv_batch.py <prefix>`, `--stop`, `--status`.
+
+A filter already applied picks only the **fresh** vacancies of the run. A
+**new** filter — auto-generation just switched on, a filter added, or
+`documents` changed — also picks the earlier vacancies of the latest
+selection, once, at the end of the next collection. What was applied is kept
+in `data/identities/<prefix>/cv_auto.json`; deleting it makes every filter
+new again. `python tools/cv_auto.py --identity <prefix>` lists what the next
+collection would generate.
+
 ## Practical commands
 
 ```bash

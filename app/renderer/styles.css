@@ -15,6 +15,10 @@
   --rejected: #8a6d1f;
   --bugged: #c23b3b;
   --fresh: #7a3fd1;
+  --score-plus: #1fae4b;
+  --score-plus-off: #cdebd6;
+  --score-minus: #e0302f;
+  --score-minus-off: #e9c9cd;
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   color: var(--text);
@@ -35,6 +39,10 @@
     --rejected: #d1b25a;
     --bugged: #e36b6b;
     --fresh: #b38cf0;
+    --score-plus: #3fd16c;
+    --score-plus-off: #23402c;
+    --score-minus: #ff4d4a;
+    --score-minus-off: #4a2328;
   }
 }
 :root[data-theme="dark"] {
@@ -51,6 +59,10 @@
   --rejected: #d1b25a;
   --bugged: #e36b6b;
   --fresh: #b38cf0;
+  --score-plus: #3fd16c;
+  --score-plus-off: #23402c;
+  --score-minus: #ff4d4a;
+  --score-minus-off: #4a2328;
 }
 
 * { box-sizing: border-box; }
@@ -141,7 +153,7 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
    the page's colour above the border, the field's below, so the line looks
    cut where the name crosses it. */
 .filters { margin: 8px 0 14px; display: flex; flex-wrap: wrap; gap: 14px 12px; align-items: center; }
-.field { position: relative; display: inline-flex; width: 250px; }
+.field { position: relative; display: inline-flex; width: 205px; }
 .field label {
   position: absolute; left: 9px; top: 0; transform: translateY(-50%);
   padding: 0 4px; font-size: 11.5px; line-height: 1; color: var(--muted);
@@ -182,6 +194,10 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .dropdown-menu [role="option"].master { font-weight: 600; }
 /* the rows under a group's master row stand in from it */
 .dropdown-menu .master ~ [role="option"] { padding-left: 30px; }
+/* three levels (the "Company" drop-down): the groups stand in from the top
+   row, and their rows further still */
+.dropdown-menu.nested .dropdown-group + .dropdown-group [role="option"].master { padding-left: 30px; }
+.dropdown-menu.nested .dropdown-group + .dropdown-group .master ~ [role="option"] { padding-left: 50px; }
 .option-text { flex: 1; min-width: 0; }
 /* The check box: on (a tick), partly on (a dash: some of the group's rows),
    off (empty). Drawn, so it looks the same in every theme. */
@@ -214,6 +230,12 @@ button.more { color: var(--accent); }
 .scroll-more { flex-basis: 100%; height: 1px; }
 .row { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 12px; margin-bottom: 8px; }
 .row.stub { color: var(--muted); padding: 6px 12px; display: flex; align-items: center; }
+/* Wide enough for the longest status in either language ("Marked: Waiting
+   for final resolution"), so the buttons after it line up. */
+.stub-label {
+  display: inline-block; width: 38ch; vertical-align: bottom;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 /* The ring drains from full to empty over the stub's life (app.js,
    STUB_LIFETIME_MS), clockwise from the top, 10px right of "undo"; the
    tooltip shows the seconds left. */
@@ -244,6 +266,23 @@ button.more { color: var(--accent); }
 .details { margin: 4px 0 0 38px; }
 .details summary { cursor: pointer; color: var(--accent); }
 .details ul { margin: 4px 0; padding-left: 18px; }
+/* "Score": a row per part of the score, a cell per point (the owner,
+   2026-10-17). Every cell is one size, so a long bar is a big part. The axis
+   stands in one column for every row: what a part can lose goes left of it,
+   what it can earn goes right; earned points are bright, the rest faded. */
+.score-parts summary { color: var(--accent); }
+.score-grid { display: grid; grid-template-columns: max-content max-content; gap: 3px 10px; margin: 4px 0 6px 18px; align-items: center; }
+.score-label { white-space: nowrap; }
+.score-label .score-points { color: var(--muted); font-variant-numeric: tabular-nums; }
+.score-bar { display: flex; align-items: center; }
+.score-side { display: flex; gap: 1px; }
+.score-side.minus { justify-content: flex-end; }
+.score-axis { width: 2px; height: 14px; background: var(--muted); margin: 0 2px; }
+.score-cell { width: 6px; height: 12px; border-radius: 1px; }
+.score-cell.plus { background: var(--score-plus); }
+.score-cell.plus.off { background: var(--score-plus-off); }
+.score-cell.minus { background: var(--score-minus); }
+.score-cell.minus.off { background: var(--score-minus-off); }
 .answers, .marked { display: flex; gap: 6px; align-items: center; margin: 8px 0 0 38px; }
 button.open { margin-right: 6px; color: var(--accent); border-color: var(--accent); }
 button.copy, button.cv { padding: 2px 8px; font-size: 0.85em; color: var(--muted); white-space: nowrap; }
@@ -322,6 +361,82 @@ button.cv.done { color: var(--applied); border-color: var(--applied); }
 .entry-body { margin: 2px 0 6px 26px; }
 .entry-comment { white-space: pre-wrap; }
 
-.runlog { border-top: 1px solid var(--border); background: var(--surface); max-height: 32vh; display: flex; flex-direction: column; }
-.runlog-head { padding: 6px 16px; font-weight: 600; }
-.runlog pre { margin: 0; padding: 6px 16px 12px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+/* The bottom panel: the tasks on the left, the log on the right, as VS
+   Code's panel split. A sash is a thin strip over the border: the resize
+   cursor on it, and after a moment's hover (or while dragged) the accent
+   colour along it. */
+.taskpanel {
+  --tasks-width: 38%;
+  position: relative; flex: none; display: flex; min-height: 100px;
+  border-top: 1px solid var(--border); background: var(--surface);
+}
+.pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tasks-pane { width: var(--tasks-width); flex: none; }
+.log-pane { flex: 1; border-left: 1px solid var(--border); }
+.pane-title {
+  display: flex; align-items: center; gap: 8px; padding: 7px 12px 5px;
+  font-size: 11.5px; line-height: 1; color: var(--muted); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pane-title .pane-actions { margin-left: auto; display: flex; gap: 8px; }
+.pane-title button.link { font-size: 11.5px; color: var(--muted); text-decoration: none; }
+.pane-title button.link:hover { color: var(--accent); text-decoration: underline; }
+.pane-body { flex: 1; overflow: auto; min-height: 0; }
+.task-log { margin: 0; padding: 2px 12px 10px; font-size: 12px; white-space: pre-wrap; }
+.task {
+  display: flex; align-items: center; gap: 8px; padding: 3px 12px; cursor: pointer;
+  font-size: 12.5px; white-space: nowrap;
+}
+.task:hover { background: var(--bg); }
+.task.chosen { background: var(--accent-soft); }
+.task-icon { width: 14px; flex: none; display: inline-flex; justify-content: center; color: var(--muted); }
+.task.done .task-icon { color: var(--applied); }
+.task.failed .task-icon { color: var(--danger); }
+.task.queued .task-label, .task.stopped .task-label { color: var(--muted); }
+.task-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.task-auto {
+  margin-left: 6px; padding: 0 5px; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 10.5px; color: var(--muted);
+}
+.task-cancel { flex: none; visibility: hidden; text-decoration: none; color: var(--muted); }
+.task:hover .task-cancel { visibility: visible; }
+.task-fold {
+  flex: none; width: 12px; margin-left: -6px; text-decoration: none; color: var(--muted); font-size: 10px;
+}
+/* a collection's steps, under it, as an IDE's tree */
+.task-step {
+  display: flex; align-items: center; gap: 8px; padding: 2px 12px 2px 38px; cursor: pointer;
+  font-size: 12px; white-space: nowrap; color: var(--muted);
+}
+.task-step:hover { background: var(--bg); }
+.task-step.running { color: var(--text); }
+.task-step.done .task-icon { color: var(--applied); }
+.task-step.failed .task-icon { color: var(--danger); }
+.step-detail { margin-left: 8px; color: var(--muted); font-size: 11.5px; }
+.step-time { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11.5px; }
+.spinner.small {
+  width: 10px; height: 10px; border-width: 2px;
+  border-color: var(--accent-soft); border-top-color: var(--accent);
+}
+.sash { position: absolute; z-index: 5; transition: background-color .1s ease-out; }
+.sash-y { left: 0; right: 0; top: -3px; height: 5px; cursor: ns-resize; }
+.sash-x { top: 0; bottom: 0; left: calc(var(--tasks-width) - 2px); width: 5px; cursor: ew-resize; }
+.sash:hover { background: var(--accent); transition-delay: .3s; }
+.sash.active { background: var(--accent); transition-delay: 0s; }
+body.resizing-y, body.resizing-y * { cursor: ns-resize !important; user-select: none; }
+body.resizing-x, body.resizing-x * { cursor: ew-resize !important; user-select: none; }
+button.queued { opacity: .75; }
+.taskpanel[hidden] { display: none; }
+
+/* "Clean up": a popup over the page (app.js, renderCleanup). */
+.overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; align-items: flex-start; justify-content: center; padding: 60px 16px; z-index: 50; }
+.popup { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; max-width: 760px; width: 100%; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); }
+.popup h2 { margin: 0 0 6px; font-size: 17px; }
+.cleanup-groups { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0; }
+.cleanup-group { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px 8px; min-width: 200px; flex: 1; }
+.cleanup-group legend { padding: 0 4px; color: var(--muted); font-size: 12px; }
+.cleanup-option { display: block; padding: 2px 0; cursor: pointer; }
+.cleanup-any { font-size: 11.5px; margin-top: 4px; }
+.cleanup-outcome { margin: 8px 0; }
+.cleanup-error { margin: 8px 0; color: var(--danger); }
+.popup-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }

@@ -33,10 +33,13 @@ person. Then, without the model:
      only priority-1 bullets left it may stay at cv.max_pages (3 as well
      unless the profile raises it), and only past that do priority-1 bullets
      of the oldest jobs go. The owner, 2026-10-12: a CV is 2-3 pages.
-  4. The files go into the out folder (Downloads by default) under the common
-     CV's own name: "<name>.docx" and "<name>.pdf". Files of that name
-     already there are deleted first; the new ones are copied in only after
-     everything succeeded, so a failed run leaves the old pair in place.
+  4. The files go into the vacancy's folder of documents (tools/documents.py:
+     <folder>/<identity>/<vacancy id>/) under the common CV's own name. The
+     current pair moves into "Old versions" as V<n> (or "V<n> failed", when
+     the model reads the person's message as a rejection of it), and "CV
+     log.md" gets the new version and its message. The model gets that log
+     and the current version's text with every new version, so earlier
+     corrections stay made. Nothing moves until everything succeeded.
 
 Every run is kept in data/identities/<prefix>/cvs/<vacancy id>/<time>/: the
 model's input, its answer, the fact check, the final content and both files.
@@ -56,7 +59,6 @@ import html
 import json
 import math
 import re
-import shutil
 import sqlite3
 import subprocess
 import sys
@@ -69,6 +71,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 import cv_convert  # noqa: E402
 import cv_docx  # noqa: E402
+import documents  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 PROMPT_PATH = ROOT / "config" / "cv_tailor_prompt.md"
@@ -105,11 +108,23 @@ def _strings(description: str = "") -> dict:
     return schema
 
 
+# The model's verdict on the version before this one (tools/documents.py):
+# rejected as a whole, or the base this one was edited from.
+PREVIOUS_VERSION_SCHEMA = {
+    "type": "object", "additionalProperties": False,
+    "required": ["failed", "reason"],
+    "properties": {
+        "failed": {"type": "boolean",
+                   "description": "the person's message rejects the previous version as a whole"},
+        "reason": {"type": "string"},
+    },
+}
+
 CONTENT_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "required": ["name", "headline", "tagline", "contacts", "summary", "skills",
-                 "experience", "sections", "report"],
+                 "experience", "sections", "previous_version", "report"],
     "properties": {
         "name": _string("exactly as in the common CV"),
         "headline": _string("the title line under the name"),
@@ -165,6 +180,7 @@ CONTENT_SCHEMA = {
                 "properties": {"heading": _string(), "lines": _strings()},
             },
         },
+        "previous_version": PREVIOUS_VERSION_SCHEMA,
         "report": {
             "type": "object", "additionalProperties": False,
             "required": ["jd_keywords", "covered", "gaps", "from_parent", "notes"],
@@ -179,6 +195,31 @@ CONTENT_SCHEMA = {
 
 class TailorError(RuntimeError):
     pass
+
+
+# A vacancy with a dead link, or with less description than this, is taken
+# for gone (an old one, most likely): nothing is generated, and the
+# document's log says so (the owner, 2026-10-13).
+MIN_DESCRIPTION = 100
+GONE = "Vacancy not found, possibly outdated"
+
+
+def gone_reason(vacancy: dict) -> Optional[str]:
+    if (vacancy.get("link_check") or {}).get("status") == "dead":
+        return "the link is dead"
+    if len((vacancy.get("description_text") or "").strip()) < MIN_DESCRIPTION:
+        return "it has no description"
+    return None
+
+
+def refuse_gone(vacancy: dict, document) -> None:
+    """Raises TailorError, after writing it into the document's log, when
+    the vacancy is gone."""
+    reason = gone_reason(vacancy)
+    if reason:
+        text = f"{GONE}: {reason}."
+        document.record_error(text)
+        raise TailorError(text)
 
 
 # --- inputs -----------------------------------------------------------------
@@ -227,8 +268,24 @@ def load_vacancy(db_path: Path, vacancy_id: str) -> dict:
     return json.loads(row[0])
 
 
+def history_parts(log_text: str, previous_text: Optional[str], version: int, what: str) -> List[str]:
+    """The earlier versions for the message: the log of every version and
+    the person's messages, and the current version's text — the base to edit,
+    unless the new message rejects it as a whole."""
+    if not previous_text and not log_text.strip():
+        return [f"This is the first version of the {what} (V1): there is no earlier one.", ""]
+    parts = [f"This is version V{version} of the {what}. The log of the earlier versions, "
+             "oldest first, with the person's message for each:", "",
+             "<log>", log_text.strip() or "(no log)", "</log>", ""]
+    if previous_text:
+        parts += [f"The current version (V{version - 1}) as the file is now, the person's own edits "
+                  "included:", "", "<previous_version>", previous_text.strip(), "</previous_version>", ""]
+    return parts
+
+
 def build_message(common_text: str, parent_text: Optional[str], vacancy: dict,
-                  instructions: Optional[str] = None) -> str:
+                  instructions: Optional[str] = None, *, log_text: str = "",
+                  previous_text: Optional[str] = None, version: int = 1) -> str:
     description = (vacancy.get("description_text") or "").strip()
     if len(description) > DESCRIPTION_LIMIT:
         description = description[:DESCRIPTION_LIMIT] + "\n[cut]"
@@ -244,6 +301,7 @@ def build_message(common_text: str, parent_text: Optional[str], vacancy: dict,
                   "and what to include first when the vacancy asks for nothing special.", ""]
     else:
         parts += ["There is no parent CV this time: work from the common CV alone.", ""]
+    parts += history_parts(log_text, previous_text, version, "CV")
     instructions = (instructions or "").strip()
     if instructions:
         parts += ["<person_instructions>", instructions, "</person_instructions>", ""]
@@ -575,30 +633,42 @@ def _stamp() -> str:
     return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d_%H%M%S")
 
 
-def publish(files: List[Path], out_dir: Path, stem: str, *, extensions=(".docx", ".pdf")) -> List[Path]:
-    """Deletes <stem>.docx and <stem>.pdf in out_dir, then copies the new
-    files in under that stem. Both old files go even when only a .docx is new:
-    a .pdf left from another vacancy beside it would be sent by mistake."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    for extension in extensions:
-        old = out_dir / f"{stem}{extension}"
-        try:
-            old.unlink(missing_ok=True)
-        except PermissionError:
-            raise TailorError(f"{old} is open in another program; close it and generate again")
-    published = []
-    for file in files:
-        target = out_dir / f"{stem}{file.suffix}"
-        shutil.copyfile(file, target)
-        published.append(target)
-    return published
+def say(text: str) -> None:
+    """A progress line on stderr: the app shows it in the task's log; stdout
+    stays for the result."""
+    print(text, file=sys.stderr, flush=True)
+
+
+def earlier_versions(document) -> dict:
+    """The log and the current version's text of a documents.Document."""
+    previous = document.previous_docx()
+    return {"log_text": document.log_text(),
+            "previous_text": cv_docx.read_cv_text(previous) if previous else None,
+            "version": document.next_version()}
+
+
+def publish_version(document, files: List[Path], content: dict, instructions: Optional[str]) -> dict:
+    verdict = content.get("previous_version") or {}
+    try:
+        return document.publish(files, message=instructions,
+                                previous_failed=bool(verdict.get("failed")),
+                                failed_reason=(verdict.get("reason") or "").strip() or None)
+    except documents.DocumentsError as exc:
+        raise TailorError(str(exc))
 
 
 def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path, out_dir: Path,
            content: Optional[dict] = None, model_call=call_model, converter=None,
            instructions: Optional[str] = None) -> dict:
-    """The whole run; returns the result the app shows. `converter` is a
+    """The whole run; returns the result the app shows. `out_dir` is the
+    vacancy's folder of documents (documents.vacancy_dir): the new version
+    goes there, the current one into "Old versions". `converter` is a
     cv_convert.WordSession-like object, or None to pick one here."""
+    document = documents.Document(out_dir, "cv", settings["output_stem"])
+    earlier = earlier_versions(document)
+    say(f"CV V{earlier['version']}: {vacancy.get('title', vacancy_id)} — {vacancy.get('company', '')}")
+    if instructions and instructions.strip():
+        say(f"message: {instructions.strip()}")
     common_text = cv_docx.read_cv_text(settings["common"])
     parent_text = None
     warnings = []
@@ -615,9 +685,11 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
     workdir = archive_root / vacancy_id / _stamp()
     workdir.mkdir(parents=True, exist_ok=True)
     if content is None:
-        message = build_message(common_text, parent_text, vacancy, instructions)
+        message = build_message(common_text, parent_text, vacancy, instructions, **earlier)
         (workdir / "model_input.md").write_text(message, encoding="utf-8")
+        say(f"asking the model ({settings['model']}), a minute or three")
         content = model_call(message, model=settings["model"], workdir=workdir)
+        say("the model answered: checking the facts, rendering")
     (workdir / "content_from_model.json").write_text(json.dumps(content, ensure_ascii=False, indent=2),
                                                      encoding="utf-8")
     content = clean_text(content)
@@ -650,6 +722,7 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
     if converter is not None:
         fitted = finish(converter)
     elif cv_convert.word_available():
+        say("Word: the PDF and the page count")
         with cv_convert.WordSession() as session:
             fitted = finish(session)
     elif cv_convert.soffice_path():
@@ -667,10 +740,17 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
                         f"{settings['target_pages']}")
 
     files = [docx_path] + ([pdf_path] if pdf_path.exists() else [])
-    published = publish(files, out_dir, stem)
+    version = publish_version(document, files, content, instructions)
+    published = version["files"]
+    verdict = content.get("previous_version") or {}
+    if version.get("previous_failed"):
+        say(f"V{version['version'] - 1} marked failed: {verdict.get('reason') or ''}")
+    say(f"V{version['version']}: {pages or '?'} pages, in {out_dir}")
     result = {
         "ok": True,
         "vacancy": vacancy_id,
+        "version": version["version"],
+        "dir": str(out_dir),
         "docx": str(next((p for p in published if p.suffix == ".docx"), "")),
         "pdf": str(next((p for p in published if p.suffix == ".pdf"), "")),
         "pages": pages,
@@ -686,15 +766,12 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
     return result
 
 
-def default_downloads() -> Path:
-    return Path.home() / "Downloads"
-
-
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Tailor the CV to one vacancy: .docx and .pdf")
     parser.add_argument("--identity", default=None, help="Search identity prefix")
     parser.add_argument("--vacancy", required=True, help="The vacancy id (vacancies.id)")
-    parser.add_argument("--out-dir", default=None, help="Where the files go (default: ~/Downloads)")
+    parser.add_argument("--documents-dir", default=None,
+                        help="The folder of generated documents (default: tools/documents.py where)")
     parser.add_argument("--content", default=None,
                         help="Render this content JSON instead of asking the model")
     parser.add_argument("--model", default=None, help="Override cv.model (a claude --model value)")
@@ -710,16 +787,20 @@ def main(argv=None) -> int:
         if args.model:
             settings["model"] = args.model
         content = json.loads(Path(args.content).read_text(encoding="utf-8")) if args.content else None
+        vacancy = load_vacancy(common.DB_PATH, args.vacancy)
+        out_dir = documents.vacancy_dir(prefix, args.vacancy,
+                                        Path(args.documents_dir) if args.documents_dir else None)
+        refuse_gone(vacancy, documents.Document(out_dir, "cv", settings["output_stem"]))
         result = tailor(
             settings=settings,
-            vacancy=load_vacancy(common.DB_PATH, args.vacancy),
+            vacancy=vacancy,
             vacancy_id=args.vacancy,
             archive_root=common.DATA_DIR / "cvs",
-            out_dir=Path(args.out_dir) if args.out_dir else default_downloads(),
+            out_dir=out_dir,
             content=content,
             instructions=args.instructions,
         )
-    except (TailorError, cv_convert.ConversionError, OSError, ValueError) as exc:
+    except (TailorError, documents.DocumentsError, cv_convert.ConversionError, OSError, ValueError) as exc:
         if args.json:
             print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
         else:

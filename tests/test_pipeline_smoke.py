@@ -259,11 +259,10 @@ def test_company_enrichment_runs_for_the_shortlist(isolated_data_dir, monkeypatc
     )
 
 
-def test_pipeline_records_the_reputation_gap_in_state(tmp_path, monkeypatch):
-    """The link «shortlist -> reputation check» has to live in code rather than in
-    an instruction. Until 2026-08-06 enrichment ran only when vacancies were
-    COLLECTED, whereas the shortlist also changes on every edit to the filters —
-    and companies arriving in it that way were never checked at all."""
+def test_the_reputation_worklist_drops_a_company_once_it_has_a_result(tmp_path, monkeypatch):
+    """The worklist for looking by hand (tools/reputation.py): the shortlist's
+    companies with no result. Since 2026-10-17 the pipeline no longer records
+    it; a lookup is the app's button (tools/reputation_lookup.py)."""
     import reputation
 
     vacancies = {
@@ -283,3 +282,128 @@ def test_pipeline_records_the_reputation_gap_in_state(tmp_path, monkeypatch):
         "once the result is recorded the company has to leave the worklist — "
         "otherwise every run searches again for reviews that do not exist"
     )
+
+
+def test_a_source_closed_for_the_identity_is_not_fetched(monkeypatch):
+    monkeypatch.setattr(pipeline, "FETCHERS", {"arbeitnow": object(), "contractoruk": object(),
+                                               "reed": object()})
+    sources_cfg = [{"name": "arbeitnow"}, {"name": "contractoruk"},
+                   {"name": "reed", "enabled": False}, {"name": "manual", "kind": "manual_ingest"},
+                   {"name": "no_fetcher"}]
+    criteria = {"closed_sources": {"contractoruk": "applying is blocked",
+                                   "devitjobs.uk": "a website, not a source"}}
+    assert [s["name"] for s in pipeline.fetched_sources(sources_cfg, criteria)] == ["arbeitnow"]
+    assert [s["name"] for s in pipeline.fetched_sources(sources_cfg, {})] == ["arbeitnow", "contractoruk"]
+
+
+def test_linkedin_is_asked_for_the_days_since_the_last_collection_both_included():
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 10, 17, 12, tzinfo=timezone.utc)
+    local = lambda days_ago, hour: (  # noqa: E731 — a local time `days_ago` days back
+        datetime.combine(now.astimezone().date() - timedelta(days=days_ago),
+                         datetime.min.time()).replace(hour=hour).astimezone().isoformat())
+    base = {"v1": {"source": "linkedin"}}
+    full = pipeline.LINKEDIN_FULL_DAYS
+
+    # never collected, or the base holds no LinkedIn vacancy: the full window
+    assert pipeline.linkedin_window({}, base, now) == full
+    assert pipeline.linkedin_window({"linkedin_covered_to": local(1, 14)}, {"v1": {"source": "reed"}}, now) == full
+    # collected today: today; yesterday afternoon: yesterday and today
+    assert pipeline.linkedin_window({"linkedin_covered_to": local(0, 1)}, base, now) == 1
+    assert pipeline.linkedin_window({"linkedin_covered_to": local(1, 14)}, base, now) == 2
+    assert pipeline.linkedin_window({"linkedin_covered_to": local(1, 23)}, base, now) == 2
+    # the last full run, five days back, as last_success: six days
+    state = {"sources": {"linkedin": {"last_success": local(5, 6)}}}
+    assert pipeline.linkedin_window(state, base, now) == 6
+    # longer ago than the full window: the full window
+    assert pipeline.linkedin_window({"linkedin_covered_to": local(40, 6)}, base, now) == full
+
+    # a fetch that went through moves the coverage and leaves no gap
+    before = pipeline.linkedin_covered_to(state)
+    state["sources"]["linkedin"]["last_success"] = now.isoformat()
+    pipeline.note_linkedin_window(state, now, before)
+    assert state["linkedin_covered_to"] == now.isoformat()
+    assert pipeline.linkedin_backfill_days(state, base, now) == 0
+    # a failed fetch keeps the old coverage (not last_success) and leaves a gap
+    failed = {"sources": {"linkedin": {"consecutive_failures": 1, "last_success": now.isoformat()}}}
+    pipeline.note_linkedin_window(failed, now, local(3, 6))
+    assert failed["linkedin_covered_to"] == local(3, 6)
+    assert pipeline.linkedin_backfill_days(failed, base, now) == 4
+    # a fetch stopped at its time budget: the same, even inside a day
+    cut = {"sources": {"linkedin": {
+        "consecutive_failures": 0,
+        "last_error": "queries 3; stopped at the time budget of 25 min after 2 of 168 pairs"}}}
+    pipeline.note_linkedin_window(cut, now, local(0, 1))
+    assert cut["linkedin_covered_to"] == local(0, 1)
+    assert pipeline.linkedin_backfill_days(cut, base, now) == 1
+    assert "time budget" in pipeline.collected_text(cut, 1)
+
+
+def test_the_top_subset_is_the_top_classes_and_what_this_run_brought():
+    vacancies = {
+        "hot": {"computed": {"classification": "hot_lead"}},
+        "unconfirmed_old": {"computed": {"classification": "remote_unconfirmed"}},
+        "unconfirmed_new": {"computed": {"classification": "remote_unconfirmed"}},
+        "rejected": {"computed": {"classification": "rejected"}},
+    }
+    assert set(pipeline.top_subset(vacancies)) == {"hot"}
+    assert set(pipeline.top_subset(vacancies, {"unconfirmed_new"})) == {"hot", "unconfirmed_new"}
+    assert pipeline.top_subset(vacancies)["hot"] is vacancies["hot"], "the records are shared"
+
+
+def test_the_top_run_end_to_end(isolated_data_dir, monkeypatch):
+    import apply_channels
+    import company_intel
+    import enrich_descriptions
+
+    asked = {}
+
+    def linkedin(**params):
+        asked.update(params)
+        return [], None
+
+    record = {
+        "source": "arbeitnow", "external_id": "job-1",
+        "title": "Senior .NET Developer", "company": "Old Reliable Insurance Co",
+        "url": "https://example.com/jobs/1", "location_raw": "Remote - Anywhere", "remote": True,
+        "tags": ["dotnet"], "description_html": "<p>C# and .NET, fully remote, contractor via Deel.</p>",
+        "posted_at_epoch": 1700000000,
+    }
+    monkeypatch.setattr(pipeline, "FETCHERS", {"arbeitnow": fake_ok_source([record]), "linkedin": linkedin})
+    monkeypatch.setattr(pipeline, "load_sources_config",
+                        lambda: [{"name": "arbeitnow"}, {"name": "linkedin", "params": {"posted_within_days": 7}}])
+    described = {}
+
+    def fake_enrich(vacancies, **kwargs):
+        described["ids"] = set(vacancies)
+        described["limit"] = kwargs.get("limit")
+        return {"considered": 0}
+
+    checked = {}
+
+    def fake_links(vacancies, **kwargs):
+        checked["ids"] = set(vacancies)
+        return {"checked": 0}
+
+    monkeypatch.setattr(enrich_descriptions, "enrich", fake_enrich)
+    monkeypatch.setattr(pipeline.link_check, "check_links", fake_links)
+    monkeypatch.setattr(apply_channels, "collect", lambda *_a, **_k: {"considered": 0})
+    monkeypatch.setattr(company_intel, "enrich_companies", lambda *_a, **_k: {"checked": 0})
+
+    result = pipeline.run_top()
+
+    assert asked["posted_within_days"] == pipeline.LINKEDIN_FULL_DAYS, \
+        "no collection known: the full window"
+    assert asked["time_budget_minutes"] is None, "the first collection is not cut at the budget"
+    assert "the full window" in result["collected"]
+    assert result["new_vacancies"] == 1
+    (vid,) = kb.load_vacancies()
+    assert described["ids"] == {vid} and described["limit"] == pipeline.TOP_DESCRIPTION_LIMIT
+    state = common.load_json(common.STATE_PATH, default={})
+    assert state["last_run_stats"]["mode"] == "top"
+    assert state["last_top_run_at"]
+    assert state["linkedin_covered_to"], "nothing was covered before: the top run's window counts"
+    assert state["last_run_stats"]["linkedin_days"] == pipeline.LINKEDIN_FULL_DAYS
+    assert "error" in state["last_ai_screen"], "no model in tests: the AI check is skipped, the run goes on"
+    assert (common.REPORTS_DIR / f"{common.FILE_PREFIX}latest.md").exists()

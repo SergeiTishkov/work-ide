@@ -44,6 +44,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
       WORK_IDE_ROOT: repo.root,
       WORK_IDE_IDENTITIES_JSON: repo.identities,
       WORK_IDE_FAKE_RUNNER: '1',
+      WORK_IDE_DOCUMENTS_DIR: path.join(repo.root, 'documents'),
       WORK_IDE_HIDDEN_WINDOW: '1',
       // Its own profile: the real app may be open on the owner's desktop.
       WORK_IDE_USER_DATA: path.join(repo.root, 'electron-profile'),
@@ -69,8 +70,9 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     expect({ ...row }).toEqual({ feedback_status: 'bugged', bugged_reason: 'onsite in fact' });
 
     await window.getByTestId('run-collect').click();
-    await expect(window.getByTestId('run-log')).toContainText('fake run: /run sharp');
-    await expect(window.getByTestId('run-status')).toContainText(ru['run.finished']);
+    await expect(window.getByTestId('task-log')).toContainText('fake run: /top sharp');
+    await expect(window.getByTestId('task-1')).toHaveAttribute('data-state', 'done', { timeout: 15000 });
+    await expect(window.getByTestId('task-log-title')).toContainText(ru['task.state.done']);
     await expect(window.getByTestId('run-collect')).toBeEnabled();
     expect(fs.readdirSync(path.join(repo.root, 'data', 'identities', 'sharp', 'runs'))).toHaveLength(1);
 

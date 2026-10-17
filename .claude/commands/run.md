@@ -47,32 +47,10 @@ the skeleton, plus the parts most often skipped.
    and above — this is a mandatory step, not a recommendation.** Read the full
    `description_text` from the base, not only the score breakdown:
    `python tools/kb.py --identity <p> dump --min-class long_shot`.
-6. **Close out the reputation of the shortlist companies — also mandatory.**
 
-   ```
-   python tools/reputation.py worklist --identity <p>
-   ```
-
-   For each company on the list: an ordinary web search (Glassdoor, Indeed and
-   Trustpilot are closed to scripts, 403, so the agent searches as a person
-   would), then ONE of two:
-
-   ```
-   python tools/kb.py set-company-reputation --company "<name>"        --rating N --wlb N --source Glassdoor --reviews N
-   python tools/reputation.py mark-insufficient --company "<name>"
-   ```
-
-   The second is a full result rather than an excuse: a small company may simply
-   have no reviews, and it matters to a person to see "we looked and found
-   nothing" rather than "not checked". Those are different things: the first is
-   a property of the company, the second a gap in the process.
-
-   The list has to end up empty. To check:
-   `python tools/reputation.py coverage --identity <p>` → "NOT CHECKED: 0".
-
-7. The report is `reports/<p>_latest.md`. The "Company reputation checks"
-   section must have nothing unchecked left in it — if it does, step 6 is not
-   finished.
+Employer reputation is not part of this cycle (the owner, 2026-10-17: not
+worth the time of every collection). The person looks it up for one vacancy
+with its "Collect reputation" button in the app (`tools/reputation_lookup.py`).
 
 ## Why step 5 cannot be skipped
 
@@ -113,6 +91,7 @@ Nobody is there to answer, so:
 
 ## At the end
 
-Tell the person plainly: how many candidates are confirmed, what you discarded
-by hand and why, and what changed in the filters. Do not present an unchecked
+Tell the person plainly: how many days of vacancies were collected (the
+pipeline's `collected` line), how many candidates are confirmed, what you
+discarded by hand and why, and what changed in the filters. Do not present an unchecked
 list as a shortlist.

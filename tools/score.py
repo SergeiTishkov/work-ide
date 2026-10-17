@@ -400,6 +400,12 @@ def _check_structured_location(vacancy: dict, criteria: dict, profile: dict = No
 # classification has to recognise it exactly: it is the one objection that
 # does not mean the vacancy is unsuitable, only that we do not know.
 REMOTE_UNCONFIRMED = "location: the employer never states this is remote"
+# The same silence after the text was read, where the identity says that
+# settles it (remote_location_fit.unstated_remote_after_reading: reject). An
+# ordinary dealbreaker: the vacancy is rejected.
+REMOTE_UNSTATED_IN_TEXT = "location: the text was read and never says the work is remote"
+# Shorter than this is a card or a teaser, not a read text.
+TEXT_READ_MIN_CHARS = 600
 
 # "Nobody has read what stack this is." The stack counterpart of the two
 # "unconfirmed" objections, found 2026-10-01: of 1510 vacancies new in one
@@ -1337,7 +1343,18 @@ def _score_remote_location(text: str, vacancy: dict, criteria: dict, profile: di
             # have vanished on an inference rather than on anybody's words.
             # What the employer DOES say — "hybrid", "on-site" — still
             # disqualifies through hard_dealbreakers, as before.
-            dealbreakers.append(REMOTE_UNCONFIRMED)
+            #
+            # `unstated_remote_after_reading: reject` (a personal setting):
+            # once the posting's text has been read, silence about remote is
+            # the answer. The owner, 2026-10-17: 99 of 107 "wrong picks" in
+            # remote_unconfirmed had their text read, and it named an office
+            # city and never remote work (Belfast, Leeds, "Monday plus one
+            # additional office day per week").
+            read = len((vacancy.get("description_text") or "").strip()) >= TEXT_READ_MIN_CHARS
+            if read and rl.get("unstated_remote_after_reading") == "reject":
+                dealbreakers.append(REMOTE_UNSTATED_IN_TEXT)
+            else:
+                dealbreakers.append(REMOTE_UNCONFIRMED)
 
     places_ambiguous, place_detail = _score_ambiguous_places(text, criteria)
     if place_detail:
@@ -2623,6 +2640,7 @@ def _score_title_role_penalty(title: str, criteria: dict):
     title_norm = common.normalize_for_matching(title)
 
     hits = []
+    rejects = []
     points = 0
     for rule in cfg.get("rules", []):
         pattern = rule.get("pattern")
@@ -2631,10 +2649,19 @@ def _score_title_role_penalty(title: str, criteria: dict):
         # Exceptions: "Fullstack (React)" must not count as pure frontend.
         if any(re.search(x, title_norm, re.IGNORECASE) for x in rule.get("unless", [])):
             continue
+        # `reject: true` makes the rule a dealbreaker (the owner, 2026-10-17,
+        # on front-end and junior titles: "I'm not a front end engineer",
+        # "I'm not Junior, they won't hire me").
+        if rule.get("reject"):
+            rejects.append(rule.get("label") or pattern)
+            continue
         hits.append(rule.get("label") or pattern)
         points += rule.get("points", 0)
 
-    return points, ({"points": points, "hits": hits} if hits else {})
+    bd = {"points": points, "hits": hits} if hits else {}
+    if rejects:
+        bd["rejects"] = rejects
+    return points, bd
 
 
 def _score_personal_tech_bonus(text: str, title: str, profile: dict, criteria: dict = None):
@@ -2680,6 +2707,109 @@ def _score_personal_tech_bonus(text: str, title: str, profile: dict, criteria: d
         hits[name] = {"points": points, "matched": matched[:4]}
 
     return total, ({"points": total, "groups": hits} if hits else {})
+
+
+def _sum_signed(values):
+    """(the sum of the negative ones, the sum of the positive ones)"""
+    values = [v for v in values if isinstance(v, (int, float))]
+    return sum(v for v in values if v < 0), sum(v for v in values if v > 0)
+
+
+def score_parts(points: dict, breakdown: dict, criteria: dict, profile: dict) -> list:
+    """The score, part by part, with the range each part could have taken.
+
+    For the "Score" bars on the app's card (the owner, 2026-10-17): every part
+    with what it earned and the least and most it can earn under this
+    identity's criteria. A part whose range is 0..0 is left out, unless it
+    earned something anyway. Ranges are read from the same caps, floors and
+    point values the scorers above use; where several hits add up without a
+    cap (title rules, personal bonuses), the range is the sum of every rule's
+    points of that sign.
+
+    `points` is what score_vacancy added up, by part; the named extra and
+    domain signals come from the breakdown. Each part: {"key", "label" (only
+    for parts the criteria name), "points", "min", "max"}, ordered from the
+    most positive to the most negative.
+    """
+    bd = breakdown or {}
+    rl = criteria.get("remote_location_fit") or {}
+    parts = []
+
+    def add(key, points, lo, hi, label=None):
+        points = points or 0
+        lo, hi = min(lo, points, 0), max(hi, points, 0)
+        if lo == hi == 0:
+            return
+        part = {"key": key, "points": points, "min": lo, "max": hi}
+        if label:
+            part["label"] = label
+        parts.append(part)
+
+    rl_best = max([4] + [int((rl.get(k) or {}).get("points") or 0) for k in (
+        "worldwide_remote", "eor_or_contractor_international", "acceptable_region_signal")])
+    add("remote_location", points.get("remote_location"), 0, rl_best)
+    reach = [int(v or 0) for v in ((rl.get("residency_eligibility") or {}).get("points") or {}).values()]
+    add("reachability", points.get("reachability"), min([0, *reach]), max([0, *reach]))
+    add("stack", points.get("stack"), 0, (criteria.get("stack_fit") or {}).get("cap") or 0)
+    add("legacy", points.get("legacy"), 0, (criteria.get("legacy_enterprise_signal") or {}).get("cap") or 0)
+    intensity = criteria.get("low_intensity_signal") or {}
+    add("intensity", points.get("intensity"), intensity.get("floor") or 0, intensity.get("cap") or 0)
+    for spec in criteria.get("extra_signals") or []:
+        name = (spec or {}).get("name")
+        if not name:
+            continue
+        hi = spec.get("cap")
+        if hi is None:
+            hi = len(spec.get("keywords") or []) * (spec.get("points_per_keyword") or 0)
+        lo = spec.get("floor")
+        if lo is None:
+            lo = len(spec.get("negative_keywords") or []) * (spec.get("negative_points_per_keyword") or 0)
+        add(f"extra:{name}", ((bd.get("extra_signals") or {}).get(name) or {}).get("points"),
+            lo, hi, spec.get("label") or name)
+    for spec in criteria.get("domain_fit_signals") or []:
+        name = (spec or {}).get("name")
+        if not name:
+            continue
+        add(f"domain:{name}", ((bd.get("domain_fit_signals") or {}).get(name) or {}).get("points"),
+            0, int(spec.get("points") or 0), spec.get("label") or name)
+    comp = criteria.get("compensation_signal") or {}
+    tiers = [t.get("points") or 0 for t in comp.get("hourly_equivalent_tiers") or []]
+    explicit = comp.get("has_explicit_range_points") or 0
+    if tiers:
+        comp_lo, comp_hi = explicit + min(tiers), explicit + max(tiers)
+    else:
+        comp_lo = explicit + (comp.get("below_target_penalty") or 0)
+        comp_hi = explicit + (comp.get("above_target_bonus") or 0)
+    estimate = comp.get("external_estimate_points") or 0
+    add("compensation", points.get("compensation"),
+        min(comp_lo, estimate + (comp.get("below_target_penalty") or 0), comp.get("no_range_points") or 0),
+        max(comp_hi, estimate + (comp.get("above_target_bonus") or 0), comp.get("no_range_points") or 0))
+    add("contractor", points.get("contractor"), 0, (criteria.get("contractor_friendliness") or {}).get("cap") or 0)
+    rep = criteria.get("company_reputation_signal") or {}
+    overall, wlb = rep.get("overall_rating") or {}, rep.get("work_life_balance") or {}
+    add("reputation", points.get("reputation"),
+        (overall.get("poor_points") or 0) + (wlb.get("poor_points") or 0) + (rep.get("red_flag_penalty_cap") or 0),
+        (overall.get("excellent_points") or 0) + (wlb.get("excellent_points") or 0))
+    age = rep.get("company_age") or {}
+    add("company_age", points.get("company_age"),
+        age.get("very_young_points") or 0, age.get("mature_points") or 0)
+    markets = (profile or {}).get("personal_market_bonus")
+    markets = markets if isinstance(markets, dict) else {}
+    add("market", points.get("market"), *_sum_signed(
+        (c.get("points", 0) if isinstance(c, dict) else c) for c in markets.values()))
+    techs = (profile or {}).get("personal_tech_bonus")
+    techs = techs if isinstance(techs, dict) else {}
+    add("tech", points.get("tech"), *_sum_signed(
+        c.get("points", 0) for c in techs.values() if isinstance(c, dict)))
+    add("title", points.get("title"), *_sum_signed(
+        r.get("points", 0) for r in (criteria.get("title_role_penalty") or {}).get("rules") or []
+        if not r.get("reject")))
+    exporter = rl.get("net_exporter_penalty")
+    add("exporter", points.get("exporter"),
+        (exporter or {}).get("points", -10) if exporter else 0, 0)
+    # most positive first: what it earned, then what it could have
+    parts.sort(key=lambda p: (-p["points"], -p["max"], p["min"]))
+    return parts
 
 
 def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optional[dict] = None) -> dict:
@@ -2838,6 +2968,19 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     if closed_source:
         dealbreakers.append(f"source: {closed_source}")
 
+    # What the cheap model read in the posting with the person's brief in
+    # mind (tools/ai_screen.py, 2026-10-17). It only removes: a "reject" is a
+    # dealbreaker, a "keep" changes nothing. An answer given for another text
+    # (the description arrived later) is not used.
+    import ai_screen
+
+    for label in title_penalty_bd.get("rejects") or ():
+        dealbreakers.append(f"title: {label}")
+
+    screen = ai_screen.current(vacancy)
+    if screen and screen.get("verdict") == "reject":
+        dealbreakers.append(f"ai: {(screen.get('reason') or 'the screening model turned it down').strip()}")
+
     # Reachability as points: see residency_eligibility.points in the
     # criteria. Decided here rather than after the classification, because the
     # bonus has to be in the score the classes are cut from.
@@ -2963,6 +3106,9 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "personal_tech_bonus": tech_bd,
         "title_role_penalty": title_penalty_bd,
         "reachability_bonus": {"points": reach_points, "eligibility": eligibility},
+        "ai_screen": ({k: screen.get(k) for k in ("verdict", "reason", "quote", "work_arrangement",
+                                                   "location_ok", "role_fit", "is_job_posting")}
+                      if screen else {}),
         "raw_total_before_clamp": raw_total,
     }
 
@@ -2976,9 +3122,19 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
                 for d in dealbreakers)
         and bool(role_relevance_bd.get("developer_override_hits")))
 
+    parts = score_parts({
+        "remote_location": rl_points, "reachability": reach_points, "stack": stack_points,
+        "legacy": legacy_points, "intensity": intensity_points, "compensation": comp_points,
+        "contractor": contractor_points, "reputation": reputation_points, "company_age": age_points,
+        "market": market_points, "tech": tech_points, "title": title_penalty,
+        "exporter": exporter_penalty,
+    }, breakdown, criteria, profile)
+
     return {
         "score": total,
         "score_breakdown": breakdown,
+        # the parts with their ranges, for the card's "Score" bars
+        "score_parts": parts,
         "classification": classification,
         "dealbreakers": dealbreakers,
         "needs_manual_review": needs_review,

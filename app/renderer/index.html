@@ -18,11 +18,19 @@
   <div class="error" data-testid="error" hidden></div>
   <!-- A spinner from the first paint: app.js replaces it once it knows more. -->
   <main class="panel" data-testid="panel"><div class="loading"><span class="spinner"></span></div></main>
-  <section class="runlog" data-testid="run-panel" hidden>
-    <div class="runlog-head">
-      <span class="runlog-title" data-testid="run-status"></span>
+  <!-- The tasks and the log of one, as an IDE's bottom panel (app.js,
+       renderTaskPanel). The sashes resize it. -->
+  <section class="taskpanel" data-testid="task-panel" hidden>
+    <div class="sash sash-y" data-axis="y" data-testid="task-panel-sash"></div>
+    <div class="pane tasks-pane">
+      <div class="pane-title" data-testid="task-list-title"></div>
+      <div class="pane-body task-list" data-testid="task-list"></div>
     </div>
-    <pre data-testid="run-log"></pre>
+    <div class="sash sash-x" data-axis="x" data-testid="task-split-sash"></div>
+    <div class="pane log-pane">
+      <div class="pane-title" data-testid="task-log-title"></div>
+      <pre class="pane-body task-log" data-testid="task-log"></pre>
+    </div>
   </section>
   <script src="locales/ru.js"></script>
   <script src="locales/en.js"></script>

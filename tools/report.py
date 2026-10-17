@@ -96,18 +96,10 @@ def _fmt_reputation(rep_bd: dict, classification: str = "") -> str:
                 f"{t('usually the case for small, little-known companies')})_")
 
     if not rep_bd.get("has_data"):
-        import reputation
-
-        if classification in reputation.REQUIRED_CLASSES:
-            return (
-                "❗ " + t("not checked yet") + " _("
-                + t("this is a gap in the process, not a property of the company")
-                + ": `python tools/reputation.py worklist`)_"
-            )
-        # The tail of the shortlist is deliberately left unchecked — see
-        # reputation.py.
-        return (t("not checked") + " _("
-                + t("tail of the shortlist: companies at worth_a_look and above are checked")
+        # Looked up on request since 2026-10-17 (the owner: not worth the
+        # time of every collection), by the vacancy's button in the app.
+        return (t("not collected") + " _("
+                + t("the vacancy's “Collect reputation” button in the app")
                 + ")_")
     parts = []
     if rep_bd.get("overall_rating") is not None:
@@ -507,6 +499,11 @@ def vacancy_view(v: dict) -> dict:
         "technologies": expected_technologies(v),
         "reputation": _fmt_reputation(bd.get("company_reputation_signal", {}),
                                       c.get("classification", "")),
+        # The app shows "Collect reputation" while this is false: found and
+        # "too few sources" are both results (tools/reputation_lookup.py).
+        "reputation_collected": bool(
+            (bd.get("company_reputation_signal") or {}).get("has_data")
+            or (bd.get("company_reputation_signal") or {}).get("verdict") == "insufficient_sources"),
         "hiring_country": _hiring_country_text(v, bd),
         "company_age": company_age,
         "needs_manual_review": bool(c.get("needs_manual_review")),
@@ -517,6 +514,12 @@ def vacancy_view(v: dict) -> dict:
         "first_seen_on": calendar_date(v.get("first_seen")),
         # The board it came from: the app's "Source" filter reads it here.
         "source": v.get("source"),
+        # Each part of the score with its range: the card's "Score" bars.
+        # Empty for a vacancy last scored before 2026-10-17.
+        "score_parts": c.get("score_parts") or [],
+        # What the screening model said (tools/ai_screen.py): {verdict,
+        # reason, quote, ...}, or null when it has not read this text.
+        "ai_screen": bd.get("ai_screen") or None,
     }
 
 
@@ -679,59 +682,6 @@ def _source_usefulness(vacancies: dict) -> str:
         rate = (100.0 * s["shortlist"] / s["total"]) if s["total"] else 0.0
         lines.append(f"| {name} | {s['total']} | {s['shortlist']} | {rate:.1f} |")
     return chr(10).join(lines)
-
-
-def _reputation_coverage_block(vacancies: dict, companies: dict) -> str:
-    """How many companies at the head of the shortlist were checked, and who is
-    left.
-
-    The section exists because work not done has to be visible. Measured
-    2026-08-06: hot_lead and worth_a_look held 55 companies, reputation was
-    known for zero of them, and the report said nothing about it — writing "not
-    checked" against each, which reads as a property of the company rather than
-    as a gap.
-    """
-    import reputation
-
-    stats = reputation.coverage(vacancies, companies)
-    if not stats["companies"]:
-        return f'_{t("The shortlist has no hot_lead / worth_a_look companies yet.")}_'
-
-    lines = [
-        f"{t('Companies at the head of the shortlist (hot_lead + worth_a_look)')}: "
-        f"**{stats['companies']}**",
-        "",
-        f"- {t('reputation found')}: **{stats['found']}**",
-        f"- {t('checked, no credible reviews exist')}: **{stats['insufficient']}** "
-        f"_({t('usually the case for small, little-known companies')})_",
-        f"- **{t('not checked')}: {stats['unchecked']}**",
-    ]
-    if stats["unchecked"]:
-        todo = reputation.worklist(vacancies, companies, limit=12)
-        lines += [
-            "",
-            "> ⚠ " + t("Unchecked companies are a gap in the process, not a property "
-            "of the companies. Until the check is done the report cannot tell "
-            "'no reviews exist' from 'we did not look', and for a decision "
-                       "those are different things."),
-            "",
-            t('Still to check') + ':',
-            "",
-        ] + [f"- {item['classification']}: {item['company']}" for item in todo]
-        if stats["unchecked"] > len(todo):
-            lines.append(f"- _…{t('and one more')} {stats['unchecked'] - len(todo)}_")
-        lines += [
-            "",
-            "```bash",
-            "python tools/reputation.py worklist          # the full list",
-            "python tools/kb.py set-company-reputation \\",
-            "    --company \"<name>\" --rating 4.2 --wlb 4.4 --source Glassdoor",
-            "python tools/reputation.py mark-insufficient --company \"<name>\"",
-            "```",
-        ]
-    else:
-        lines += ['', t('No gaps: every company at the head of the shortlist has a result.')]
-    return "\n".join(lines)
 
 
 def segment_filename(slug: str, prefix: Optional[str] = None) -> str:
@@ -964,14 +914,6 @@ def build_report_markdown(vacancies: dict, companies: dict, state: dict,
         "",
         _section("needs_manual_review", review_items),
         *_salary_benchmark_block(segment),
-        f"## ⭐ {t('Company reputation checks')}",
-        "",
-        # The shortlist THIS file shows, not the whole base: a person
-        # reading the UK list is not helped by a to-do list of Singapore
-        # companies, and before the split this block quietly named them.
-        _reputation_coverage_block(
-            {v.get('id') or i: v for i, v in enumerate(items)}, companies),
-        "",
         f"## 📊 {t('Class statistics')}",
         "",
         "\n".join(f"- {cls}: {n}" for cls, n in sorted(class_counts.items(), key=lambda kv: -kv[1])) or f"_{t('no data')}_",

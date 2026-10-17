@@ -63,6 +63,22 @@ marked it on older selections. Each drop-down's own numbers are counted with
 its own choice left aside, so a row that is unchecked still shows how many
 it would add.
 
+A fifth drop-down, "Company" (2026-10-14), groups by who stands between the
+person and the employer: freelance marketplaces (Proxify, Toptal: a vetting
+pool first, one application per marketplace), recruitment agencies, reposters
+of other companies' vacancies (Jobgether: the employer unnamed), and every
+other company as one row. A board's company field carries the intermediary's
+own name, so the "Source" drop-down cannot separate them: Proxify's vacancies
+came through workingnomads.com. Which company is which is Python's call
+(`tools/company_kinds.py` over `config/company_kinds.yaml`: named entries plus
+keywords such as "recruit" and "staffing", measured at 400+ small agencies in
+the base). The app reads the database only, so every selection writes the
+outcome to meta `company_kinds`, {company: {kind, name}} for the
+intermediaries; the queries join it in `view_pool`. The view keeps the kinds
+shown and the names hidden, not the names shown: with a shown-list, unticking
+one name would freeze the list, and every company a later run brings would be
+hidden.
+
 node:sqlite is synchronous, and Electron's main thread also carries the
 window's input, so the app reads and writes the base on a thread of its own
 (`app/main/store-worker.js`, driven by `store-thread.js`). Before 2026-10-12
@@ -555,9 +571,10 @@ The steps:
    are cut and the CV rendered again; `cv.max_pages` (3 by default, 4 until
    2026-10-12) is allowed only when nothing but priority 1 is left.
 4. The pair is built in `data/identities/<prefix>/cvs/<vacancy>/<time>/` with
-   the model's input and output, then copied to Downloads under the common
-   CV's file name, the previous pair deleted first. A failed run leaves the
-   previous pair where it was.
+   the model's input and output, then published to the vacancy's folder under
+   the common CV's file name (see "The documents folder" below); the previous
+   pair moves to `Old versions/`. A failed run leaves the current pair where
+   it was.
 
 **Taken from career-ops** (github.com/santifer/career-ops, its CV mode and
 history): the model returns content only, never markup; a requirements →
@@ -579,11 +596,12 @@ apart; a fresh document in the same measurements is predictable. LibreOffice
 first: Word is what the person edits in and what employers open with, so its
 pagination is the one that counts; LibreOffice is the fallback.
 
-**The button after a generation** (2026-10-12). The button that made the last
-CV reads "CV is generated" until the next CV starts anywhere in the list, and
-then goes back to "Generate CV". Pressed in that state it works as before —
-the instructions, then another CV — for a generation that went wrong. A
-failed generation leaves the button at "Generate CV".
+**The button after a generation** (2026-10-12, changed 2026-10-13). The
+button reads "CV is generated" while the vacancy's folder holds a CV, whoever
+made it (a click or the automatic generation), and keeps that state after
+other CVs. Pressed in that state it works as before — the instructions, then
+another version. A failed generation leaves the button as it was; when the
+vacancy was found gone, the error is the button's tooltip.
 
 ### A cover letter per vacancy (2026-10-12)
 
@@ -610,13 +628,293 @@ generated after a letter does not reset the letter's button.
    the PDF and counts the pages. More than one page is a warning; nothing is
    cut.
 4. Archived in `data/identities/<prefix>/cover_letters/<vacancy>/<time>/`,
-   then copied to Downloads as the common CV's name with "CV" turned into
-   "Cover Letter" (`CV Ivan Petrov.pdf` → `Cover Letter Ivan Petrov.pdf`),
-   the previous letter replaced.
+   then published to the vacancy's folder as the common CV's name with "CV"
+   turned into "Cover Letter" (`CV Ivan Petrov.pdf` → `Cover Letter Ivan
+   Petrov.pdf`), the previous letter moved to `Old versions/`.
 
-One generation at a time, of either kind (`app/main/cv.js`): both tools drive
-Word through COM, and two at once could share one Word instance, whose
-`Quit()` at the end of one run would close the other's document.
+One generation at a time, of either kind (`app/main/tasks.js`, the documents
+lane): both tools drive Word through COM, and two at once could share one
+Word instance, whose `Quit()` at the end of one run would close the other's
+document.
+
+### The documents folder: versions and a log (2026-10-13)
+
+Until 2026-10-13 a generation replaced one pair in Downloads: the previous
+vacancy's CV was gone, and a second version for the same vacancy replaced the
+first. The owner asked for a folder per vacancy and a history.
+
+`tools/documents.py` keeps one folder for every identity, chosen at
+onboarding (`documents.py set`, stored in `local-identities/settings.yaml`;
+an existing folder gets "Work IDE CVs and CLs" inside it, a new path is
+used as it is; unset, `~/Downloads/Work IDE CVs and CLs`), then
+`<prefix>/<vacancy id>/`. Up to six files there: the CV and the cover letter
+as `.docx` and `.pdf`, and a log for each (`CV log.md`, `Cover Letter
+log.md`). A new version moves the current pair to `Old versions/` as
+`<name> V<n>`, or `<name> V<n> failed` when the person's message rejects the
+version as a whole (start over, or about ten changes and more); the model
+decides that (`previous_version.failed` in its answer) and the log records
+it.
+
+The log is the document's history: each version, its time, and the person's
+message. The whole log and the current `.docx` (the person's own Word edits
+included) go to the model with the next request, so a version keeps every
+correction asked for before it.
+
+**A vacancy that is gone.** Old vacancies have dead links or no description
+(fewer than 100 characters fetched). The tools then make no files and append
+`## Error · <time>` with "Vacancy not found, possibly outdated: …" to the
+log; the automatic generation skips that document from then on, and a later
+successful version clears the error.
+
+In the app: **Open CV/CL Directory** and **Copy CV/CL Directory Path** on a
+vacancy that has a folder; "CV is generated" / "Cover letter is generated"
+follow what the folder holds (`app/main/documents.js` reads the logs).
+
+### The task panel and the queue (2026-10-13)
+
+A collection and a generation used to block their buttons, with one log
+under the list. Now everything is a task in a queue (`app/main/tasks.js`),
+shown in a panel at the bottom of the window, as in an IDE: the tasks on the
+left, the log of the chosen one (the running one by default) on the right.
+The panel's height (20% of the window by default, at least 220px) and the
+split are dragged by their sashes and remembered.
+
+Two lanes, each running one task at a time, side by side:
+
+- **collect** — **Collect vacancies** on several identities queues them; a
+  collection started outside the app (the agent, a terminal) makes the lane
+  wait and retry;
+- **documents** — CVs and cover letters, any number queued; one at a time
+  because of Word (above).
+
+The same task queued or running twice is refused (`already_queued`). A
+queued task can be cancelled, a running one stopped. The queue is in memory:
+closing the app stops the running tasks and drops the rest; **Refresh** does
+not reload the window while a task is active.
+
+**A collection's steps** (`app/main/steps.js`). A collection runs about four
+hours (sharp, 2026-10-12: 4:24 in the pipeline alone), and one row said
+nothing about where it was. The owner asked for the collection split into
+tasks. Its row now has the steps under it, read from its own log: the agent's
+preparation (identity, template, source contracts), each pipeline stage as
+`tools/progress.py` logs it (`>> name` … `ok name - 5:35 (note)`, the
+indented lines in between as its progress), then the agent's checklist and
+the reputation lookups. That run, by stage: fetch 2:39:05 (LinkedIn nearly
+all of it, 168 query pairs and 429 pauses; the other 18 sources about a
+minute), check links 22:00, missing descriptions 53:31, three rescores of
+about 6:00, direct channels 10:13, the rest seconds. Steps show while the
+collection runs and fold when it ends; the arrow opens them again.
+
+### Generation without a click (2026-10-13)
+
+The profile's `cv.auto` (`docs/IDENTITIES.md`) names filters — markets,
+sources, classes; AND inside a filter, OR between filters. When a collection
+ends with exit code 0, the app starts **one batch** for the identity:
+`tools/cv_batch.py <prefix>`, a detached process. It asks `tools/cv_auto.py`
+what to make, records the filters as applied, and makes the documents one by
+one. Until 2026-10-13 (the same day) the app queued one task per document;
+the first catch-up was 971 documents, so the owner asked for one batch task
+instead.
+
+**Why a process of its own.** About 2.4 minutes per vacancy (CV 1.6, cover
+letter 0.8): 489 vacancies are some 20 hours. The app's queue lives in
+memory; the batch outlives the window, and a stopped batch started again
+skips what is made (`python tools/cv_batch.py sharp --all` goes on with the
+catch-up).
+
+**How the app shows it** (`app/main/batch.js`). The batch writes
+`data/cv_batch.json` (pid, state, index/total, made/gone/failed, the
+document in work, where its lines begin in `data/cv_batch.log`); the app
+polls both and lists the batch as the task "CV/CL batch", with that log. Its
+document in work shows as generating on its card, and the card shows the
+result when the batch moves on. The ✕ writes `data/cv_batch.STOP`: the batch
+stops after the current document.
+
+**One batch at a time.** Started while one runs, `cv_batch.py` adds the
+identity to `data/cv_batch.pending` and exits; the running batch takes it
+after its own list.
+
+**The app goes first.** A CV asked for in the app would wait hours behind a
+batch. While the app has documents queued or running, it keeps
+`data/cv_batch.HOLD` (its pid): the batch pauses between documents
+("holding" in its status), and the app's document waits only for the batch's
+current one. The file is removed when the app's documents are done; a hold
+whose process is gone is ignored.
+
+**Fresh, and the catch-up.** The owner first asked for a one-off generation
+over every matching vacancy and fresh ones after that, then changed it: when
+auto-generation is switched on later, or a filter is added, the next
+collection should also cover the earlier vacancies matching the new filter.
+So a filter is identified by its content (plus `documents`), the applied
+ones are kept in `data/identities/<prefix>/cv_auto.json`, and only a filter
+not yet there picks the earlier vacancies of the latest selection. Changing
+`documents` makes every filter new.
+
+**Not taken:** a separate "generate for the backlog" button — the owner's
+second answer made the catch-up part of the collection, and a button would
+be a second path to the same thing.
+
+### The top vacancies first: `--top`, then `--rest` (2026-10-17)
+
+The owner, after a day of applying: the best remote vacancies close within
+hours, and a full run took 4:24 on 2026-10-12 (fetch 2:39 of it, LinkedIn
+2:35; links 22:00; descriptions 53:31; three whole-base rescores of about
+6:00). They asked for the top vacancies in about an hour, daily, in this
+order: collect, check remoteness by script, check the remote ones with AI,
+polish, CVs; everything else afterwards; remote_unconfirmed gets nothing
+after its remote check; and the steps visible in the task panel.
+
+`pipeline.py --top` (`run_top`):
+1. fetch every enabled source; LinkedIn for the window of
+   `linkedin_window` (below);
+2. rescore the top classes (`TOP_CLASSES`: hot_lead, worth_a_look,
+   long_shot, engagement_unconfirmed) and what this run brought — not the
+   whole base;
+3. the remote check by script: the pages of those vacancies that have no
+   text (`enrich_descriptions`, at most 300 plus 200 "description wanted"),
+   then a rescore;
+4. the AI brief (written when the CV or the identity documents changed) and
+   the AI check of the top (at most 1000 a run, so the CV batch after
+   it gets read vacancies), then a rescore;
+5. near-duplicates, links of the top classes only, companies, direct
+   application channels, Wikidata facts of the top companies, a rescore;
+6. save, a "run" selection, the reports.
+
+The app's "Collect" runs `/top <p>` (`.claude/commands/top.md`: identity,
+template check, source contracts, `pipeline.py --top`, a summary; no
+checklist and no reputation lookups). When it ends well, the CV/CL batch
+starts as before, and the task "rest" is queued in the collect lane
+(`app/main/rest.js`): `pipeline.py --rest` with no agent, after every
+collection queued before it, so with two identities queued both top runs
+come first.
+
+`pipeline.py --rest` (`run_rest`): LinkedIn's window again when the last
+fetch left a gap (`linkedin_backfill_days`: it failed or stopped at its time
+budget), then the full tail (`finalize_and_report`) with a "rebuild" selection, so what the top run
+marked fresh stays fresh. Its description stage leaves out
+remote_unconfirmed. The full cycle (`pipeline.py` with neither flag) is
+unchanged except for the AI stage.
+
+#### How far back a collection reaches (2026-10-17)
+
+LinkedIn is the one source that can be asked for a date window (`f_TPR`);
+the others serve their whole current feed in seconds to a minute. Every
+mode (full, top, rest) asks it for `linkedin_window`:
+- the days from the local date of `linkedin_covered_to` (the start of the
+  last LinkedIn fetch that went through) to today, both included: a
+  collection yesterday afternoon means yesterday and today, for what was
+  posted after it;
+- the full window, `LINKEDIN_FULL_DAYS` = 30, when there was no collection,
+  or when no LinkedIn vacancy is left in the base (it was cleaned up); also
+  the cap. A month is LinkedIn's own "past month" and the age the base is
+  cleaned up at.
+
+The owner asked for it: a first top run that asked for a day or two missed
+the long-open roles that always take CVs. Before, every run asked for 7 days
+and the top run for at most 2.
+
+The top run also has a time budget for LinkedIn (`TOP_LINKEDIN_MINUTES`, 25)
+— except when it asks for the full window: a first collection collects
+everything, however long. The first top run of 2026-10-17 met 40 answers 429
+in half an hour and read 4 of 168 (keyword × country) pairs. Past the
+budget `fetch_linkedin.fetch` stops between pages, keeps what it read, and
+its note says so (`TIME_BUDGET_NOTE`).
+
+`note_linkedin_window` moves `linkedin_covered_to` to the fetch's start when
+the fetch neither failed nor stopped at the budget. Otherwise it keeps the
+value read before the fetch — the fallback, `sources.linkedin.last_success`,
+has just moved to now and would hide the gap — and sets `linkedin_gap`, so
+the rest run reads the window again without a budget.
+
+Every mode's result has `collected`: the window in words ("LinkedIn: posted
+in the last 2 days - the days since the last collection, both included",
+with the budget stop or a failure when there was one). The summary to the
+person names it after every collection (`/top`, `/run`, RUNBOOK step 1);
+`last_run_stats.linkedin_days` keeps the number.
+
+### The AI check of the top (2026-10-17)
+
+The owner's feedback of 2026-10-17 (137 wrong picks): keyword gates miss
+what a reader sees at once — a Hacker News comment that is not a posting,
+"remote first (1 day per month in Manchester)", "at least 50% of the time in
+their local office", a Go or Shopify role with .NET in the company blurb, a
+US-only role with "Remote Work" in an award name. They asked for a cheap
+model reading each top posting with a digest of the person written by a
+strong model, kept in the local identity and rewritten when the CV changes.
+
+- `tools/ai_brief.py`: Opus writes `<identity folder>/<p>_ai_brief.md` from
+  the CV text, the identity description (template and local), the personal
+  profile and criteria, and the owner's reasons for turning postings down.
+  The first line holds the hash of the documents and the prompt
+  (`config/ai_brief_prompt.md`); the reasons are not in the hash, so new
+  feedback alone does not rewrite it.
+- `tools/ai_screen.py`: Haiku, with `config/ai_screen_prompt.md` plus the
+  brief as its system prompt, answers a fixed schema per posting (is it a
+  posting, arrangement, location, role fit, verdict, reason, quote). Answers
+  are stored per identity in `ai_screens` with the hash of the text read and
+  of the brief; a new text or brief asks again.
+- It only removes: `score.py` turns a "reject" into the dealbreaker
+  `ai: <reason>`; a "keep" changes nothing. The reason and the quote show in
+  the app's Details.
+- Through the `claude` CLI (`-p`, no tools, an empty working folder, so no
+  project instructions in its context), with `MAX_THINKING_TOKENS=0`:
+  measured on one posting, $0.018 and 2566 output tokens with thinking,
+  $0.0059 and 237 without. On the 43 feedback items the scripts still kept,
+  Haiku rejected all 43 with thinking; 15 asked again without it gave the same
+  15 verdicts.
+- The first top run (sharp, 2026-10-17): 400 read, 388 rejected, $3.14.
+  Reading the 185 rejects with a fitting stack: nearly all name a US, Canada,
+  UK or single-country limit, IR35, or office days. Two were wrong — "CET
+  ±3 hours" taken to exclude UTC+4, and a posting hiring "elsewhere" through
+  Remote.com taken as Ireland-only. `config/ai_screen_prompt.md` now says to
+  work time zones out in UTC offsets and that hiring elsewhere through an
+  employer of record is not "no"; asked again, both were kept and three
+  rejects from the control sample stayed rejected. The prompt is part of
+  `brief_hash`, so a prompt change reads the top again.
+
+Two script rules came from the same feedback, as personal settings:
+`remote_location_fit.unstated_remote_after_reading: reject` (a text of 600+
+characters that never says remote is rejected; 99 of 107 wrong picks in
+remote_unconfirmed had their text read), and `reject: true` on
+`title_role_penalty` rules (sharp: front-end, UI and junior titles).
+
+### Reputation on request, not in every collection (2026-10-17)
+
+The owner: reputation lookups did not pay for their time. Until then /run
+step 6 made them mandatory for every company in hot_lead and worth_a_look,
+the report had a "Company reputation checks" section listing the gaps, and
+doctor.py warned about them. All three are gone; the pipeline no longer
+records `reputation_coverage` and `reputation_worklist` in the state.
+
+Instead the vacancy has a "Collect reputation" button in the app while its
+company has no result (`reputation_collected` in the vacancy's view: found,
+or "too few sources"). The button queues the task "reputation" in a lane of
+its own, so it does not wait for a collection: `tools/reputation_lookup.py
+--identity <p> --vacancy <id>` asks a model with web search only (`claude -p
+--tools WebSearch,WebFetch`, Sonnet, an empty working folder) for the ratings
+on Glassdoor, Indeed, Trustpilot and the like, records "found" or
+"insufficient_sources" as the hand commands do, rescores this identity's
+vacancies of the company and renders their rows again. A company with a
+result is not looked up again — the tool only rescores and renders, which an
+identity rendered before the other identity's lookup needs.
+
+A pipeline that loaded the companies hours before would overwrite such a
+result when it saves the companies table whole; `db.save_companies` keeps a
+stored reputation newer (by `checked_at`) than the one being saved.
+
+The scoring is unchanged: a reputation, when there is one, still adds or
+removes points and a red flag still asks for a person's review.
+
+### Clean up: deleting, not hiding (2026-10-17)
+
+The app's "Clean up" (`tools/cleanup.py`, `app/main/cleanup.js`) deletes
+vacancies by age, feedback status and class, with every row that names them,
+and compacts the file. A vacancy goes only when it matches in every identity
+holding it; the funnel and feedback not yet reviewed are kept. The owner
+weighed a shadow ban and chose deletion: a vacancy deleted and still live
+comes back as a new one on the next collection, and the disk space returns.
+The first run (2026-10-17, older than a month) deleted 22 209 vacancies; the
+file went from 818 MB to 535 MB.
 
 
 ### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)

@@ -12,7 +12,9 @@ const { spawn: nodeSpawn, execFile } = require('node:child_process');
 // session of their own, where they can follow and steer it (the owner,
 // 2026-10-07).
 const KINDS = {
-  collect: (identity) => `/run ${identity}`,
+  // the fast cycle (.claude/commands/top.md); the rest of the base is the
+  // task "rest" after it (rest.js)
+  collect: (identity) => `/top ${identity}`,
 };
 
 // What a run from the app may do without asking: run the project's Python
@@ -238,4 +240,4 @@ class Runner {
   }
 }
 
-module.exports = { Runner, PipelineLogFollower, buildCommand, describeEvent, ALLOWED_TOOLS };
+module.exports = { Runner, PipelineLogFollower, buildCommand, describeEvent, killTree, ALLOWED_TOOLS };

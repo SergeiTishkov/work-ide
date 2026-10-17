@@ -7,10 +7,11 @@ const { SCHEMA_DIR } = require('../helpers/fixture-db');
 test('the shared query file parses into the queries the app needs', () => {
   const queries = loadQueries(SCHEMA_DIR);
   for (const name of ['latest_selection', 'selection', 'segments', 'display_name', 'view_listing',
-    'view_counts', 'view_class_totals', 'view_sources', 'set_feedback', 'pending_feedback_counts']) {
+    'view_counts', 'view_class_totals', 'view_sources', 'view_companies', 'set_feedback',
+    'pending_feedback_counts']) {
     assert.ok(queries[name] && queries[name].length > 10, name);
   }
-  for (const name of ['view_listing', 'view_counts', 'view_class_totals', 'view_sources']) {
+  for (const name of ['view_listing', 'view_counts', 'view_class_totals', 'view_sources', 'view_companies']) {
     assert.ok(!queries[name].includes('-- include:'), name);
     assert.ok(queries[name].includes('pool AS ('), name);
   }

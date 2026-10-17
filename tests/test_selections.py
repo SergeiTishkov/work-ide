@@ -609,3 +609,130 @@ def test_an_unknown_status_or_freshness_is_refused(isolated_data_dir):
         selections.listing(conn, sel, selections.view(["full"], ("archived",)))
     with db.session() as conn, pytest.raises(ValueError):
         selections.listing(conn, sel, selections.view(["full"], fresh=("stale",)))
+
+
+
+def test_the_age_comes_from_the_posted_date_else_the_first_sighting(isolated_data_dir):
+    from datetime import date, timedelta
+    day = lambda n: (date.today() - timedelta(days=n)).isoformat()
+    sel = _store({
+        "t": _vacancy("t", posted_at=day(0)),
+        "w": _vacancy("w", posted_at=day(6)),
+        "m": _vacancy("m", posted_at=day(25)),
+        "o": _vacancy("o", posted_at=day(45), first_seen=day(1)),
+        "f": _vacancy("f", first_seen=day(40)),
+    })
+    every = selections.view(["full"], selections.STATUSES, selections.FRESHNESS)
+    with db.session() as conn:
+        assert selections.ages(conn, sel, {**every, "ages": ["today"]}) ==             {"today": 1, "week": 1, "month": 1, "older": 2}
+        def ids(ages):
+            return set(_ids(selections.listing(conn, sel, {**every, "ages": ages})))
+        assert ids(["today", "week"]) == {"t", "w"}
+        assert ids(["older"]) == {"o", "f"}
+        assert ids([]) == set()
+        assert _count(conn, sel, {**every, "ages": ["month"]}) == 1
+        with pytest.raises(ValueError):
+            selections.listing(conn, sel, {**every, "ages": ["ancient"]})
+
+# --- the company: freelance marketplaces, agencies, reposters, the rest --------
+# The owner, 2026-10-14: a fifth drop-down, the intermediaries by kind and by
+# name, every other company one row (tools/company_kinds.py).
+
+def _by_company():
+    companies = {"p0": "Proxify", "p1": "Proxify AB", "t0": "Toptal", "h0": "Hays Technology",
+                 "j0": "Jobgether", "s0": "Stripe", "s1": "Ramp", "s2": "Notion"}
+    return {vid: _vacancy(vid, score=90 - i, company=company,
+                          source="devitjobs" if vid == "s2" else "linkedin",
+                          classification="worth_a_look" if vid == "h0" else "hot_lead")
+            for i, (vid, company) in enumerate(companies.items())}
+
+
+def _companies(kinds=selections.COMPANY_KINDS, hidden=()):
+    return {"kinds": list(kinds), "hidden": list(hidden)}
+
+
+def test_a_selection_carries_the_kind_of_each_intermediary(isolated_data_dir):
+    _store(_by_company())
+    with db.session() as conn:
+        (value,) = conn.execute("SELECT value FROM meta WHERE key = 'company_kinds'").fetchone()
+    assert json.loads(value) == {
+        "Proxify": {"kind": "marketplace", "name": "Proxify"},
+        "Proxify AB": {"kind": "marketplace", "name": "Proxify"},
+        "Toptal": {"kind": "marketplace", "name": "Toptal"},
+        "Hays Technology": {"kind": "agency", "name": "Hays"},
+        "Jobgether": {"kind": "reposter", "name": "Jobgether"},
+    }
+
+
+def test_the_company_narrows_the_listing_by_kind_and_by_name(isolated_data_dir):
+    sel = _store(_by_company())
+    with db.session() as conn:
+        def ids(companies):
+            chosen = selections.view(["full"], selections.STATUSES, companies=companies)
+            return set(_ids(selections.listing(conn, sel, chosen, expanded=_all_classes())))
+        everything = set(_by_company())
+        assert ids(None) == ids(_companies()) == everything
+        assert ids(_companies(["marketplace"])) == {"p0", "p1", "t0"}
+        assert ids(_companies(["other"])) == {"s0", "s1", "s2"}
+        assert ids(_companies(hidden=["Proxify"])) == everything - {"p0", "p1"}, "both spellings"
+        assert ids(_companies(["agency", "reposter"], hidden=["Hays"])) == {"j0"}
+        assert ids(_companies([])) == set()
+        # a name is hidden whatever its kind says; "other" has no names
+        assert ids(_companies(["other"], hidden=["Stripe"])) == {"s0", "s1", "s2"}
+
+
+def test_counts_totals_and_sources_follow_the_company(isolated_data_dir):
+    sel = _store(_by_company())
+    no_marketplaces = _companies(["agency", "reposter", "other"])
+    with db.session() as conn:
+        chosen = selections.view(["full"], selections.STATUSES, companies=no_marketplaces)
+        rows = selections.listing(conn, sel, chosen, expanded=_all_classes())
+        assert _count(conn, sel, chosen) == len(rows) == 5
+        assert selections.class_totals(conn, sel, chosen) == {"hot_lead": 4, "worth_a_look": 1}
+        assert selections.sources(conn, sel, chosen) == {"linkedin": 4, "devitjobs": 1}
+
+
+def test_the_company_list_counts_under_the_other_drop_downs_not_itself(isolated_data_dir):
+    sel = _store(_by_company())
+    _set_feedback("s0", "rejected", selection_id=sel)
+    with db.session() as conn:
+        def listed(**kw):
+            return selections.companies(conn, sel, selections.view(["full"], **kw))
+        assert listed(statuses=selections.STATUSES) == [
+            ("other", None, 3), ("marketplace", "Proxify", 2), ("agency", "Hays", 1),
+            ("marketplace", "Toptal", 1), ("reposter", "Jobgether", 1)]
+        assert ("other", None, 2) in listed(), "the denied one aside"
+        assert listed(statuses=selections.STATUSES, sources=["devitjobs"]) == [("other", None, 1)]
+        assert listed(statuses=selections.STATUSES, fits=["worth_a_look"]) == [("agency", "Hays", 1)]
+        assert listed(statuses=selections.STATUSES, companies=_companies(["other"])) \
+            == listed(statuses=selections.STATUSES), "the chosen companies aside"
+
+
+def test_a_base_without_company_kinds_has_only_other_companies(isolated_data_dir):
+    """A base last written before 2026-10-14: every company is "other" until
+    the next run or rebuild, and the filter still works."""
+    sel = _store(_by_company())
+    with db.session() as conn:
+        conn.execute("DELETE FROM meta WHERE key = 'company_kinds'")
+    with db.session() as conn:
+        assert selections.companies(conn, sel, selections.view(["full"], selections.STATUSES)) \
+            == [("other", None, 8)]
+        chosen = selections.view(["full"], selections.STATUSES, companies=_companies(["marketplace"]))
+        assert selections.listing(conn, sel, chosen) == []
+
+
+def test_refreshing_the_views_writes_the_company_kinds_again(isolated_data_dir):
+    vacancies = _by_company()
+    _store(vacancies)
+    with db.session() as conn:
+        conn.execute("DELETE FROM meta WHERE key = 'company_kinds'")
+    selections.refresh_views(vacancies)
+    with db.session() as conn:
+        (value,) = conn.execute("SELECT value FROM meta WHERE key = 'company_kinds'").fetchone()
+    assert json.loads(value)["Proxify AB"] == {"kind": "marketplace", "name": "Proxify"}
+
+
+def test_an_unknown_company_kind_is_refused(isolated_data_dir):
+    sel = _store({"a": _vacancy("a")})
+    with db.session() as conn, pytest.raises(ValueError):
+        selections.listing(conn, sel, selections.view(["full"], companies={"kinds": ["employer"]}))

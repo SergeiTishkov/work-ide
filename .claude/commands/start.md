@@ -75,6 +75,12 @@ from reality and folders cannot.
        documents/               ← CV files under their OWN names
    ```
 
+   Ask where the generated CVs and cover letters should go
+   (`python tools/documents.py set "<folder>"`; skip it when
+   `python tools/documents.py where` shows one is set) and offer, as optional,
+   automatic generation after each collection (`cv.auto` filters).
+   `docs/ONBOARDING.md`, step 5.
+
    The personal files hold **only the differences** from the template;
    everything else arrives by itself. To check the result and the provenance of
    any value:

@@ -23,6 +23,7 @@
 --   applied_at and the funnel columns               - the app; `feedback.py reject`,
 --                                                     the agent's own "not for me"
 --   vacancy_identity.feedback_reviewed_at           - tools/feedback.py
+--   ai_screens                                      - the pipeline (tools/ai_screen.py)
 --
 -- VERSIONS. 1-7: one file per identity (see git history). 8: one base for
 -- every identity — tools/merge_shared_base.py built it from the old files.
@@ -178,3 +179,19 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
 );
 
 CREATE INDEX IF NOT EXISTS pipeline_runs_status ON pipeline_runs(status);
+
+-- What the cheap model said about a vacancy for one identity (tools/ai_screen.py,
+-- 2026-10-17): its answer as JSON, with the hash of the text it read and of the
+-- brief it read it with. score.py uses an answer only while the text is the
+-- same. No foreign key: tools/cleanup.py deletes the rows with the vacancy.
+-- Added without a version step: a table of its own, which old code ignores.
+CREATE TABLE IF NOT EXISTS ai_screens (
+  identity_id TEXT NOT NULL,
+  vacancy_id  TEXT NOT NULL,
+  text_hash   TEXT NOT NULL,
+  brief_hash  TEXT NOT NULL,
+  result      TEXT NOT NULL,
+  model       TEXT,
+  screened_at TEXT NOT NULL,
+  PRIMARY KEY (identity_id, vacancy_id)
+);

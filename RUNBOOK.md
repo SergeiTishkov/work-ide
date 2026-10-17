@@ -46,8 +46,22 @@ clone: it is created when a template is cloned, see
 python tools/pipeline.py --identity <p>
 ```
 
-This is the one command mandatory on every run. A full run takes about an
-hour (most of it checking links and rescoring); it reports every stage with
+Two shorter modes split the same work (docs/ARCHITECTURE.md, "The top
+vacancies first"): `--top` does the top classes in about an hour (the app's
+"Collect" runs it through `/top`), `--rest` does the whole base afterwards
+(the app queues it). Without a flag the command is the full cycle.
+
+How far back it collects is decided at the start (docs/ARCHITECTURE.md, "How
+far back a collection reaches"): LinkedIn, the one source with a date filter,
+is asked for the days since the last collection, both included — yesterday
+and today after a collection yesterday — or for the full month when there
+was no collection or the base holds no LinkedIn vacancy. **After every
+collection, tell the person how many days of vacancies were collected**: the
+`collected` line the pipeline prints at the end, including a stop at the
+time budget.
+
+This is the one command mandatory on every run. A full run takes hours
+(most of it LinkedIn, links and descriptions); it reports every stage with
 its duration, every source with its counts, and progress on the long loops, on
 stderr and in `data/identities/<p>/runs/pipeline_<time>.log` (the desktop app shows that
 file live). It:
@@ -136,31 +150,13 @@ tools (WebSearch/WebFetch):
    That puts the finds through the same normalize + score + report path as the
    automatic sources, and regenerates the report.
 
-3. **Check employer reputation** for the companies in `hot_lead` and
-   `worth_a_look` (and `long_shot` where possible). This is a separate,
-   important step: what a person is actually looking for — calm, culture, pace —
-   is never written in a job posting, whereas former employees write about it
-   honestly. Look it up with ordinary web search (Glassdoor, Indeed and
-   Trustpilot cannot be scraped automatically — they answer 403 behind bot
-   protection) and record it:
-   ```bash
-   python tools/kb.py set-company-reputation --identity <p> --company "Acme Corp" --rating 4.2 --wlb 4.4 --source "Glassdoor" --retrieval web_search --reviews 257 --red-flags "layoffs,unpaid overtime" --notes "..."
-   ```
-   Reputation is stored per company and applies at once to all of its vacancies;
-   the score is recomputed immediately. Pay particular attention to work-life
-   balance (it weighs more than the overall rating) and to red flags: any red
-   flag sets `needs_manual_review`, so that a person definitely reads the reason
-   before applying.
-
-   The list of companies still to check is compiled by the system itself:
-   ```bash
-   python tools/reputation.py worklist --identity <p>
-   ```
-   If nothing credible was found about a company, record that too — it is a full
-   result, not the absence of one:
-   ```bash
-   python tools/reputation.py mark-insufficient --identity <p> --company "Acme Corp"
-   ```
+3. Employer reputation is **not** a step of the cycle any more (the owner,
+   2026-10-17: not worth the time of every collection). The app's
+   "Collect reputation" button on a vacancy looks it up for that company
+   (`tools/reputation_lookup.py`); the button shows while the company has no
+   result. By hand, the commands are still there:
+   `python tools/kb.py set-company-reputation ...` and
+   `python tools/reputation.py mark-insufficient ...`.
 
 4. If, for a particular promising vacancy that quotes no salary, an approximate
    range was found on an external source (Glassdoor and the like), record it (it

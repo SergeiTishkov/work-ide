@@ -79,6 +79,7 @@ def refresh_views(vacancies: dict) -> int:
     rows = [_view_row(v) for vid, v in vacancies.items() if vid in shown]
     with db.session() as conn:
         conn.executemany(UPDATE_VIEWS, rows)
+        write_company_kinds(conn)
     return len(rows)
 
 
@@ -148,6 +149,7 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
             ((selection_id, *item) for item in items),
         )
         write_source_sites(conn)
+        write_company_kinds(conn)
     return selection_id
 
 
@@ -158,6 +160,24 @@ def write_source_sites(conn) -> None:
         "INSERT INTO meta (key, value) VALUES ('source_sites', ?) "
         "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         (json.dumps(common.source_sites(), ensure_ascii=False, sort_keys=True),),
+    )
+
+
+def write_company_kinds(conn) -> None:
+    """{company: {"kind", "name"}} for every intermediary among the companies
+    any identity's rows show, for the app's "Company" drop-down
+    (config/company_kinds.yaml; a company missing from it is "other"). Over
+    every identity, since the base and this key are shared: 0.5 s on 8.5k rows
+    (2026-10-14)."""
+    import company_kinds
+
+    names = [row[0] for row in conn.execute(
+        "SELECT DISTINCT json_extract(view, '$.company') FROM vacancy_identity "
+        "WHERE view IS NOT NULL")]
+    conn.execute(
+        "INSERT INTO meta (key, value) VALUES ('company_kinds', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (json.dumps(company_kinds.mapping(names), ensure_ascii=False, sort_keys=True),),
     )
 
 
@@ -208,21 +228,39 @@ DENIED = ("rejected", "bugged", "expired")
 STATUSES = NEW + FUNNEL + DENIED
 # Fresh: no selection before the latest run held it; earlier: one did.
 FRESHNESS = ("fresh", "earlier")
+# The "Company" drop-down's groups: company_kinds.KINDS, then every other company.
+COMPANY_KINDS = ("marketplace", "agency", "reposter", "other")
+# The "Age" drop-down's bands (AGE in schemas/queries.sql): posted today, up to
+# a week, up to a month, longer ago.
+AGES = ("today", "week", "month", "older")
 
 
-def view(segments, statuses=NEW, fresh=FRESHNESS, sources=None, fits=None) -> dict:
-    """What to list. `sources` and `fits` are None for every board and class
-    (a list, even an empty one, names them)."""
+def view(segments, statuses=NEW, fresh=FRESHNESS, sources=None, fits=None, companies=None,
+         ages=None) -> dict:
+    """What to list. `sources`, `fits` and `ages` are None for every board,
+    class and age (a list, even an empty one, names them). `companies` is None
+    for every company, or {"kinds": [the kinds shown], "hidden": [names hidden
+    among them]} — see THE VIEW in schemas/queries.sql."""
     return {"segments": list(segments), "statuses": list(statuses), "fresh": list(fresh),
             "sources": None if sources is None else list(sources),
-            "fits": None if fits is None else list(fits)}
+            "fits": None if fits is None else list(fits),
+            "ages": None if ages is None else list(ages),
+            "companies": None if companies is None else {
+                "kinds": list(companies.get("kinds") or []),
+                "hidden": list(companies.get("hidden") or [])}}
 
 
 def _params(selection_id: int, chosen: dict) -> dict:
     unknown = [s for s in chosen["statuses"] if s not in STATUSES]
     unknown += [f for f in chosen["fresh"] if f not in FRESHNESS]
+    unknown += [a for a in chosen.get("ages") or () if a not in AGES]
     if unknown:
-        raise ValueError(f"unknown status or freshness: {unknown}")
+        raise ValueError(f"unknown status, freshness or age: {unknown}")
+    companies = chosen.get("companies")
+    if companies is not None:
+        unknown = [k for k in companies["kinds"] if k not in COMPANY_KINDS]
+        if unknown:
+            raise ValueError(f"unknown company kind: {unknown}")
 
     def listed(values):
         return None if values is None else json.dumps(list(values))
@@ -234,6 +272,8 @@ def _params(selection_id: int, chosen: dict) -> dict:
         "fresh": json.dumps([1 if f == "fresh" else 0 for f in chosen["fresh"]]),
         "sources": listed(chosen.get("sources")),
         "fits": listed(chosen.get("fits")),
+        "companies": None if companies is None else json.dumps(companies),
+        "ages": listed(chosen.get("ages")),
     }
 
 
@@ -277,6 +317,22 @@ def sources(conn, selection_id: int, chosen: dict) -> dict:
     boards aside: the "Source" drop-down."""
     rows = conn.execute(load_queries()["view_sources"], _params(selection_id, chosen))
     return {source: total for source, total in rows.fetchall()}
+
+
+def companies(conn, selection_id: int, chosen: dict) -> list:
+    """[(kind, name, how many)], largest first, the chosen companies aside:
+    the "Company" drop-down. Every other company is one row, name None."""
+    rows = conn.execute(load_queries()["view_companies"], _params(selection_id, chosen))
+    return [tuple(row) for row in rows.fetchall()]
+
+
+def ages(conn, selection_id: int, chosen: dict) -> dict:
+    """{age band: how many the view holds}, the chosen ages aside: the "Age"
+    drop-down."""
+    result = {age: 0 for age in AGES}
+    for age, total in conn.execute(load_queries()["view_ages"], _params(selection_id, chosen)):
+        result[age] = total
+    return result
 
 
 def latest_selection_id(conn) -> Optional[int]:

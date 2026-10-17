@@ -54,7 +54,7 @@ PER_IDENTITY_KEYS = ("computed", "duplicate_of")
 
 # Copied onto a record for one scoring pass (kb.attach_company_reputation);
 # the company table is where they live.
-TRANSIENT_KEYS = ("_company_reputation", "_company_intel")
+TRANSIENT_KEYS = ("_company_reputation", "_company_intel", "_ai_screen")
 
 
 class SchemaVersionError(RuntimeError):
@@ -220,7 +220,17 @@ def load_vacancies() -> dict:
             "SELECT v.id, v.data, vi.computed, vi.duplicate_of FROM vacancies v "
             "LEFT JOIN vacancy_identity vi ON vi.vacancy_id = v.id AND vi.identity_id = ?",
             (prefix,))
-        return {vid: join_record(data, computed, dup) for vid, data, computed, dup in rows}
+        records = {vid: join_record(data, computed, dup) for vid, data, computed, dup in rows}
+        # The cheap model's answers (tools/ai_screen.py), for score.py to read.
+        for vid, th, bh, result in conn.execute(
+                "SELECT vacancy_id, text_hash, brief_hash, result FROM ai_screens WHERE identity_id = ?",
+                (prefix,)):
+            if vid in records:
+                try:
+                    records[vid]["_ai_screen"] = {**json.loads(result), "text_hash": th, "brief_hash": bh}
+                except json.JSONDecodeError:
+                    pass
+        return records
 
 
 def save_vacancies(vacancies: dict) -> None:
@@ -259,8 +269,20 @@ def load_companies() -> dict:
 
 def save_companies(companies: dict) -> None:
     """Companies are rebuilt whole on every run (kb.build_companies_from_vacancies),
-    so the table is replaced whole too."""
+    so the table is replaced whole too.
+
+    A reputation in the table that is newer than the one being saved is kept:
+    the app's "Collect reputation" (tools/reputation_lookup.py) may record one
+    while a pipeline that loaded the companies hours ago is still running."""
     with session() as conn:
+        for key, data in conn.execute("SELECT key, data FROM companies"):
+            stored = (json.loads(data) or {}).get("reputation")
+            entry = companies.get(key)
+            if not stored or entry is None:
+                continue
+            mine = entry.get("reputation") or {}
+            if (stored.get("checked_at") or "") > (mine.get("checked_at") or ""):
+                entry["reputation"] = stored
         conn.execute("DELETE FROM companies")
         conn.executemany("INSERT INTO companies (key, data) VALUES (?, ?)",
                          ((key, dumps(c)) for key, c in companies.items()))

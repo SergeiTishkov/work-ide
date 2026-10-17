@@ -9,7 +9,7 @@ const { settled } = require('../helpers/dropdown');
 const ru = require('../../renderer/locales/ru.js');
 
 const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.html')).href;
-const BOXES = ['segment-filter', 'filter', 'source-filter', 'fit-filter'];
+const BOXES = ['segment-filter', 'filter', 'age-filter', 'source-filter', 'company-filter', 'fit-filter'];
 
 async function open(page) {
   await page.addInitScript(installMockApi, standardFixture());
@@ -20,7 +20,7 @@ async function open(page) {
 const calls = (page, name) =>
   page.evaluate((n) => window.__calls.filter((c) => c.name === n).map((c) => c.args), name);
 
-test('the four boxes are one width, in one row', async ({ page }) => {
+test('the six boxes are one width, in one row', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 600 });
   await open(page);
   const boxes = await Promise.all(BOXES.map((id) => page.getByTestId(id).boundingBox()));
@@ -55,7 +55,7 @@ test('the keyboard: arrows move, Enter checks and leaves the list open, Escape c
   await expect(page.getByTestId('filter-option-earlier')).toHaveClass(/cursor/);
   await settled(page);
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', {
-    segments: null, statuses: ['new'], fresh: ['fresh', 'earlier'], sources: null, fits: null,
+    segments: null, statuses: ['new'], fresh: ['fresh', 'earlier'], sources: null, fits: null, companies: null, ages: null,
   }]);
   await expect(page.getByTestId('filter-value')).toHaveText(ru['filter.new']);
   await page.keyboard.press('Escape');
@@ -84,7 +84,7 @@ test('quick clicks ask for one list, and a spinner stands in for it until it com
   await expect(page.getByTestId('filter-menu')).toBeVisible();   // the open list stays
   const asked = (await calls(page, 'loadListing')).slice(before);
   expect(asked).toEqual([['sharp', {
-    segments: null, statuses: ['new', 'applied'], fresh: ['fresh', 'earlier'], sources: null, fits: null,
+    segments: null, statuses: ['new', 'applied'], fresh: ['fresh', 'earlier'], sources: null, fits: null, companies: null, ages: null,
   }]]);
   await page.evaluate(() => window.__releaseListing());
   await settled(page);

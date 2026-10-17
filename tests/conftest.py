@@ -65,6 +65,22 @@ def isolated_data_dir(tmp_path, monkeypatch):
     return data_root
 
 
+@pytest.fixture(autouse=True)
+def _no_model_calls(monkeypatch):
+    """No test reaches the claude CLI: a model call costs money and its answer
+    is not repeatable. A test that wants one passes `call=` itself."""
+    import ai_brief
+    import ai_screen
+    import reputation_lookup
+
+    def refuse(*_args, **_kwargs):
+        raise RuntimeError("tests do not call models")
+
+    monkeypatch.setattr(ai_brief, "call_model", refuse)
+    monkeypatch.setattr(ai_screen, "call_model", refuse)
+    monkeypatch.setattr(reputation_lookup, "call_model", refuse)
+
+
 @pytest.fixture(autouse=True, scope="session")
 def _no_test_writes_into_real_folders():
     """A safety net against tests writing into the REAL data and report folders.

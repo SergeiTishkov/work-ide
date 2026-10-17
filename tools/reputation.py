@@ -43,6 +43,14 @@ size from Wikidata — while ratings are searched for by the agent. The automati
 the worklist itself, records the outcome of every attempt itself, and complains
 by itself while the list is not empty. None of that rests on an agent
 remembering; rules of that kind have broken here before.
+
+SINCE 2026-10-17: ON REQUEST
+----------------------------
+The owner found the lookups not worth the time of every collection: the
+mandatory /run step, the report's "Company reputation checks" section and
+doctor's warning are gone. A vacancy's "Collect reputation" button in the app
+runs tools/reputation_lookup.py for its company. The three states stay; the
+worklist and coverage below are for looking by hand.
 """
 from __future__ import annotations
 

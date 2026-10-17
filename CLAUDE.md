@@ -437,6 +437,15 @@ history.
 repository; the report is in the person's own language. The rule and its one
 exception are §5, "The repository is in English".
 
+**Commits** (the owner, 2026-10-18). Preferably one commit per finished,
+self-contained piece of work, made when it is done. When several pieces end
+up in one commit anyway — the work waited for the owner's feedback, or a
+session ended before a commit — its message lists **every** business change
+it carries: what changed for the person and the app (features, behaviour,
+scoring rules, filters, labels, prompts, commands, schema versions), not only
+the latest one. The history is read to find when and why a behaviour
+changed; a change missing from the message is lost to that search.
+
 ## 13. Where to put a change
 
 The project grows in response to users' requests. Every change has to be placed

@@ -1,0 +1,133 @@
+# =============================================================================
+#  COMPANY KINDS — who stands between the person and the employer
+# =============================================================================
+#  A board's "company" field is not always the employer. Three kinds of
+#  intermediary come through it under their own name (measured 2026-10-14 on
+#  the shared base, 17,840 distinct company names):
+#
+#  marketplace  A freelance talent network: you apply to join its pool, it
+#               vets you (tests, interviews), and only then matches you to a
+#               client. One application per marketplace, not per vacancy —
+#               Proxify listed 66 vacancies under two names ("Proxify",
+#               "Proxify AB"), Alignerr 804.
+#  agency       A recruitment or staffing agency filling a client's role:
+#               "We are Kforce and we have a client in Austin, Texas seeking
+#               an AJO Developer". The application goes to the client's
+#               vacancy, through the agency.
+#  reposter     A platform republishing other companies' vacancies under its
+#               own name: "This position is listed on behalf of a partner
+#               company, who manages all applications and next steps"
+#               (Jobgether, 535 vacancies). The employer is not named.
+#
+#  Every other company is "other". The app's "Company" drop-down groups by
+#  kind (the owner, 2026-10-14), and lists each intermediary by the `name`
+#  given here, so "Proxify" and "Proxify AB" are one row.
+#
+#  MATCHING (tools/company_kinds.py). A company name is normalised first:
+#  lower case, punctuation to spaces, legal suffixes dropped from the end
+#  ("Ltd", "Limited", "AB", "Pte", "Inc", "GmbH", ...). Then:
+#    - an entry matches when the normalised name equals one of its `match`
+#      phrases, or starts with one followed by a space ("hays" matches
+#      "Hays Specialist Recruitment Limited"); an `exact` phrase matches
+#      only the whole name ("turing" is Turing, not "Turing Pharmaceuticals");
+#    - otherwise a `keywords` phrase anywhere in the normalised name makes it
+#      that kind, and the company is listed under its own name.
+#  A `match` phrase must not start an unrelated company's name: "outlier"
+#  would take "Outlier Ventures", "arc" would take "Arc IT Recruitment" —
+#  hence `exact`, or two words. docs/TECH_MATCHING.md has the general rule
+#  about short phrases.
+#
+#  EFFECT. The pipeline writes the classification into the base with every
+#  selection (tools/selections.write_company_kinds); an edit here reaches the
+#  app with the next run or rebuild. Nothing is filtered out by this file —
+#  it only groups the drop-down.
+# =============================================================================
+
+schema_version: 1
+last_reviewed: "2026-10-14"
+
+kinds:
+  marketplace:
+    - {name: Proxify, match: [proxify]}
+    - {name: Toptal, match: [toptal]}
+    - {name: Turing, exact: [turing], match: [turing com]}
+    - {name: micro1, match: [micro1]}
+    - {name: Mercor, match: [mercor]}
+    - {name: Alignerr, match: [alignerr]}
+    - {name: Outlier, exact: [outlier], match: [outlier ai]}
+    - {name: AfterQuery, match: [afterquery, afterquery experts]}
+    - {name: DataAnnotation, match: [dataannotation, data annotation tech]}
+    - {name: Lemon.io, match: [lemon io]}
+    - {name: Arc.dev, match: [arc dev]}
+    - {name: A.Team, match: [a team]}
+    - {name: Braintrust, match: [braintrust]}
+    - {name: Andela, match: [andela]}
+    - {name: Crossover, exact: [crossover], match: [crossover for work]}
+    - {name: Gun.io, match: [gun io]}
+    - {name: X-Team, match: [x team]}
+    - {name: Upwork, match: [upwork, lifted an upwork company]}
+    - {name: Codementor, match: [codementor]}
+    - {name: Revelo, match: [revelo]}
+    - {name: Remotebase, match: [remotebase]}
+    - {name: YouTeam, match: [youteam]}
+    - {name: Gigster, match: [gigster]}
+    - {name: Index.dev, match: [index dev]}
+    - {name: Terminal.io, match: [terminal io]}
+
+  agency:
+    - {name: Hays, match: [hays]}
+    - {name: Kforce, match: [kforce]}
+    - {name: Experis, match: [experis]}
+    - {name: Adecco, match: [adecco]}
+    - {name: Randstad, match: [randstad]}
+    - {name: Michael Page, match: [michael page, page personnel]}
+    - {name: Robert Half, match: [robert half]}
+    - {name: Robert Walters, match: [robert walters]}
+    - {name: Manpower, match: [manpower, manpowergroup]}
+    - {name: Kelly Services, match: [kelly services]}
+    - {name: TEKsystems, match: [teksystems]}
+    - {name: Insight Global, match: [insight global]}
+    - {name: Apex Systems, match: [apex systems]}
+    - {name: Actalent, match: [actalent]}
+    - {name: Harvey Nash, match: [harvey nash]}
+    - {name: Computer Futures, match: [computer futures]}
+    - {name: Tenth Revolution Group, match: [tenth revolution group, nigel frank, jefferson frank, mason frank]}
+    - {name: Client Server, match: [client server]}
+    - {name: Eliassen Group, match: [eliassen group]}
+    - {name: Jobot, match: [jobot]}
+    - {name: Noir, exact: [noir], match: [noir consulting]}
+    - {name: CBSbutler, match: [cbsbutler, cbsbutler holdings]}
+    - {name: VIQU, match: [viqu, viqu it]}
+    - {name: Intec Select, match: [intec select]}
+    - {name: Pinnacle Technical Resources, match: [pinnacle technical resources]}
+    - {name: Genesis10, match: [genesis10]}
+    - {name: Anson McCade, match: [anson mccade]}
+    - {name: Michael Bailey Associates, match: [michael bailey associates]}
+    - {name: Sanderson, exact: [sanderson], match: [sanderson government and defence, sanderson recruitment]}
+    - {name: Huxley, exact: [huxley], match: [huxley associates]}
+    - {name: La Fosse, match: [la fosse]}
+    - {name: Oliver Bernard, match: [oliver bernard]}
+
+  reposter:
+    - {name: Jobgether, match: [jobgether]}
+    - {name: Hackajob, match: [hackajob]}
+    - {name: Jobster, match: [jobster]}
+    - {name: Haystack, match: [haystack, haystack people]}
+    - {name: Instaffo, match: [instaffo]}
+    - {name: Clera, match: [clera]}
+    - {name: Rocken, match: [rocken]}
+    - {name: Lensa, match: [lensa]}
+    - {name: Jooble, match: [jooble]}
+    - {name: JobLeads, match: [jobleads, jobleads careers]}
+    - {name: Jobs for Humanity, match: [jobs for humanity]}
+    - {name: mamgo, match: [mamgo]}
+    - {name: Jobbird, match: [jobbird, jobbird com]}
+
+# Hundreds of small agencies name themselves by what they do: "Spectrum IT
+# Recruitment", "Quik Hire Staffing", "Vivid Resourcing" — 400+ such names in
+# the base on 2026-10-14. "Undisclosed agency (ContractorUK)" is how
+# fetch_contractoruk.py labels a listing whose agency the board hides.
+# "talent" is not here: it also names employers ("TALENT Software Services")
+# and the measured share of agencies among them was below half.
+keywords:
+  agency: [recruit, staffing, resourcing, undisclosed agency, search and selection, headhunt]

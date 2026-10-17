@@ -130,7 +130,6 @@ CATALOGUES = {
         "the hours (part-time, freelance)": "занятость (part-time, фриланс)",
         "Needs a manual check by the agent or the owner":
             "Требуют ручной проверки агентом/владельцем",
-        "Company reputation checks": "Проверка репутации компаний",
         "Class statistics": "Статистика по классам",
         "Source health": "Здоровье источников",
         "Source usefulness": "Польза источников",
@@ -187,29 +186,15 @@ CATALOGUES = {
         "searched": "искали",
         "usually the case for small, little-known companies":
             "обычно так у небольших и малоизвестных компаний",
-        "not checked yet": "ещё не проверялась",
-        "this is a gap in the process, not a property of the company":
-            "это пробел в процессе, а не свойство компании",
-        "not checked": "не проверялась",
-        "tail of the shortlist: companies at worth_a_look and above are checked":
-            "хвост выдачи: проверяются компании уровня worth_a_look и выше",
+        "not collected": "не собрана",
+        "the vacancy's “Collect reputation” button in the app":
+            "кнопка «Собрать репутацию» на вакансии в приложении",
         "not determined": "не определена",
         "without a country": "без привязки к стране",
         "the board said": "площадка указала",
         "company home country": "штаб-квартира компании",
 
-        # --- reputation coverage block -----------------------------------
-        "Companies at the head of the shortlist (hot_lead + worth_a_look)":
-            "Компаний в голове выдачи (hot_lead + worth_a_look)",
-        "reputation found": "репутация найдена",
-        "checked, no credible reviews exist": "проверено, достоверных отзывов нет",
-        "not checked": "не проверено",
-        "No gaps: every company at the head of the shortlist has a result.":
-            "Пробелов нет: у каждой компании головы выдачи есть результат проверки.",
-        "Still to check": "Осталось проверить",
         "and one more": "и ещё",
-        "The shortlist has no hot_lead / worth_a_look companies yet.":
-            "В выдаче пока нет компаний уровня hot_lead / worth_a_look.",
         'report of': 'отчёт от',
         'Search identity': 'Идентичность поиска',
         'Run': 'Запуск',
@@ -228,8 +213,6 @@ CATALOGUES = {
             'Это вакансии, где автоматика не уверена в оценке — чаще всего ',
         'or it is unclear whether the company will hire someone from your country. Worth re-checking with a web search and, if needed, updating the record through `tools/kb.py`.':
             'либо непонятно, готова ли компания нанять человека из вашей страны. Стоит перепроверить веб-поиском и, если нужно, обновить запись через `tools/kb.py`.',
-        "Unchecked companies are a gap in the process, not a property of the companies. Until the check is done the report cannot tell 'no reviews exist' from 'we did not look', and for a decision those are different things.":
-            'Непроверенные компании — это пробел в процессе, а не свойство компаний. Пока проверка не сделана, отчёт не может отличить «отзывов нет» от «мы не смотрели», а для решения это разные вещи.',
         'Volume and usefulness are different things. A source bringing thousands of records and zero candidates costs only run time.':
             'Объём и польза — разные вещи. Источник, приносящий тысячи записей и ноль кандидатов, стоит только времени прогона.',
         'Source': 'Источник',

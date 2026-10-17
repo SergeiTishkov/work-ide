@@ -151,28 +151,22 @@ def test_reputation_has_three_states_not_two():
     assert "2026-08-06" in checked_empty
     assert "Glassdoor, Indeed" in checked_empty
 
-    gap = report._fmt_reputation({"has_data": False}, "hot_lead")
-    assert "❗" in gap, "a gap at the head of the shortlist has to be noticeable"
+    # Since 2026-10-17 a lookup is on request: the unchecked state names the
+    # button, at the head of the shortlist and in its tail alike.
+    for cls in ("hot_lead", "long_shot"):
+        unchecked = report._fmt_reputation({"has_data": False}, cls)
+        assert "not collected" in unchecked and "Collect reputation" in unchecked
+        assert "❗" not in unchecked, "a reputation nobody asked for is not a gap"
 
-    tail = report._fmt_reputation({"has_data": False}, "long_shot")
-    assert "❗" not in tail, "the tail is deliberately left unchecked — that is not a gap"
+
+def test_the_view_says_whether_the_reputation_was_collected():
+    """The app shows "Collect reputation" while it is false."""
+    def view(signal):
+        return report.vacancy_view({"id": "x", "computed": {
+            "classification": "hot_lead", "score_breakdown": {"company_reputation_signal": signal}}})
+
+    assert view({"has_data": False})["reputation_collected"] is False
+    assert view({"has_data": True, "overall_rating": 4.0})["reputation_collected"] is True
+    assert view({"has_data": False, "verdict": "insufficient_sources"})["reputation_collected"] is True
 
 
-def test_reputation_coverage_block_names_what_is_left():
-    """Work not done has to be visible in the report rather than in somebody's
-    memory: a measurement on 2026-08-06 found 55 companies at the head of the
-    shortlist and zero checks, and the report said nothing about it."""
-    vacancies = {
-        "a": {"company": "Known Co", "computed": {"classification": "hot_lead"}},
-        "b": {"company": "Obscure Co", "computed": {"classification": "worth_a_look"}},
-    }
-    companies = {
-        "known-co": {"name": "Known Co",
-                      "reputation": {"overall_rating": 4.0,
-                                     "checked_at": "2026-08-06T10:00:00+00:00"}},
-        "obscure-co": {"name": "Obscure Co"},
-    }
-    block = report._reputation_coverage_block(vacancies, companies)
-    assert "not checked: 1" in block
-    assert "Obscure Co" in block
-    assert "Known Co" not in block.split("Still to check")[-1]

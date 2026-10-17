@@ -29,11 +29,23 @@
 --              (denied);
 --   :fresh     1 (fresh), 0 (seen in an earlier run), or both;
 --   :sources   boards, NULL for every board (new boards included);
---   :fits      classes, NULL for every class.
+--   :fits      classes, NULL for every class;
+--   :companies NULL for every company, or {"kinds": [...], "hidden": [...]}:
+--              the kinds shown ('marketplace', 'agency', 'reposter',
+--              'other') and the intermediaries hidden among them, by name.
+--              Hidden names, not shown ones, so an intermediary a later run
+--              brings is listed (the owner, 2026-10-14);
+--   :ages      NULL for any age, or the ages chosen (see AGE).
 -- A row is shown when its status is one of :statuses AND its freshness one
--- of :fresh, and the board and class match. view_pool is what all four
--- queries read; `-- include: view_pool` stands for its text (the loaders in
--- tools/selections.py and app/main/queries.js put it in).
+-- of :fresh, and the board, class, company and age match. view_pool is what all
+-- five queries read; `-- include: view_pool` stands for its text (the
+-- loaders in tools/selections.py and app/main/queries.js put it in).
+--
+-- COMPANY KINDS. Which company is an intermediary is Python's call
+-- (tools/company_kinds.py, config/company_kinds.yaml); the pipeline stores
+-- the outcome in meta 'company_kinds' as {company: {kind, name}}, and a
+-- company missing from it is 'other'. A base written before 2026-10-14 has
+-- no such key: every company is 'other' until the next run or rebuild.
 --
 -- WHERE THE ROWS COME FROM. Vacancies without an answer, and the ones turned
 -- down in this collection (see DECIDED EARLIER), come from the latest
@@ -52,10 +64,17 @@
 -- add up across markets (the owner, 2026-09-30: UK 40 + ANZ 15 > "everything"
 -- 54), and the list says "N more" under a capped class instead.
 --
+-- AGE (the owner, 2026-10-17): how long ago the employer posted it, by the
+-- date the source gave (view.posted_on), else the day it reached the base
+-- (view.first_seen_on). 'today' under one day, 'week' up to 7 days, 'month'
+-- up to 30, 'older' beyond. Each is a band of its own: "up to a week" is
+-- 'today' and 'week' checked together.
+--
 -- EACH DROP-DOWN'S OWN NUMBERS. A drop-down counts its rows under the other
 -- drop-downs, not under itself: view_sources ignores :sources,
--- view_class_totals ignores :fits, and view_counts counts the statuses under
--- :fresh and the freshness under :statuses.
+-- view_class_totals ignores :fits, view_companies ignores :companies,
+-- view_ages ignores :ages, and view_counts counts the statuses under :fresh and the freshness under
+-- :statuses.
 
 -- name: latest_selection
 SELECT MAX(id) AS id FROM selections WHERE identity_id = :identity;
@@ -79,12 +98,17 @@ SELECT display_name AS value FROM identities WHERE id = :identity;
 SELECT value FROM meta WHERE key = 'source_sites';
 
 -- name: view_pool
--- Not a query of its own: the common start of the four below.
+-- Not a query of its own: the common start of the five below.
 runs AS (
   SELECT id, kind FROM selections WHERE identity_id = :identity
 ),
 baseline AS (
   SELECT MAX(id) AS id FROM runs WHERE kind = 'run' AND id <= :selection_id
+),
+-- the intermediaries (COMPANY KINDS above)
+company_kinds AS (
+  SELECT key AS company, json_extract(value, '$.kind') AS kind, json_extract(value, '$.name') AS name
+  FROM json_each(COALESCE((SELECT value FROM meta WHERE key = 'company_kinds'), '{}'))
 ),
 -- a vacancy in two chosen markets is one row
 in_markets AS (
@@ -114,7 +138,7 @@ candidates AS (
     AND v.feedback_status IN ('applied', 'contacted', 'interview', 'awaiting_final',
                               'awaiting_offer', 'declined', 'offered', 'started')
 ),
-pool AS (
+joined AS (
   SELECT c.*, v.view, v.views, v.feedback_status, v.rejected_reason, v.bugged_reason,
          v.feedback_at, v.applied_at, v.contact_comment, v.contact_at,
          v.interview_comments, v.interview_at, v.final_comment, v.final_at,
@@ -127,10 +151,25 @@ pool AS (
                         WHERE o.vacancy_id = c.vacancy_id
                           AND o.selection_id < (SELECT id FROM baseline)) THEN 0
            ELSE 1
-         END AS fresh
+         END AS fresh,
+         COALESCE(k.kind, 'other') AS company_kind, k.name AS company_name,
+         -- days since it was posted (AGE); no date at all reads as today
+         COALESCE(julianday(date('now')) - julianday(COALESCE(
+           json_extract(v.view, '$.posted_on'), json_extract(v.view, '$.first_seen_on'))), 0) AS age_days
   FROM candidates c
   CROSS JOIN vacancy_identity v ON v.vacancy_id = c.vacancy_id AND v.identity_id = :identity
   CROSS JOIN vacancies d ON d.id = c.vacancy_id
+  LEFT JOIN company_kinds k ON k.company = json_extract(v.view, '$.company')
+),
+pool AS (
+  SELECT *,
+         CASE
+           WHEN age_days < 1 THEN 'today'
+           WHEN age_days <= 7 THEN 'week'
+           WHEN age_days <= 30 THEN 'month'
+           ELSE 'older'
+         END AS age
+  FROM joined
 )
 
 -- name: view_listing
@@ -145,6 +184,10 @@ matched AS (
     AND fresh IN (SELECT value FROM json_each(:fresh))
     AND (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
     AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
+    AND (:companies IS NULL
+           OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
+               AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
+    AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
 ),
 ranked AS (
   SELECT *, ROW_NUMBER() OVER (
@@ -178,6 +221,10 @@ base AS (
   SELECT feedback_status, fresh FROM pool
   WHERE (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
     AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
+    AND (:companies IS NULL
+           OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
+               AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
+    AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
 )
 SELECT 'status' AS axis, feedback_status AS key, COUNT(*) AS total
 FROM base
@@ -199,6 +246,10 @@ FROM pool
 WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
   AND fresh IN (SELECT value FROM json_each(:fresh))
   AND (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
+  AND (:companies IS NULL
+         OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
+             AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
+  AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
 GROUP BY class;
 
 -- name: view_sources
@@ -210,8 +261,42 @@ FROM pool
 WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
   AND fresh IN (SELECT value FROM json_each(:fresh))
   AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
+  AND (:companies IS NULL
+         OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
+             AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
+  AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
 GROUP BY source
 ORDER BY total DESC, source;
+
+-- name: view_companies
+-- The "Company" drop-down: (kind, name, how many) for each intermediary the
+-- view holds, and (kind 'other', NULL, how many) for every other company.
+WITH
+-- include: view_pool
+SELECT company_kind AS kind, company_name AS name, COUNT(*) AS total
+FROM pool
+WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
+  AND fresh IN (SELECT value FROM json_each(:fresh))
+  AND (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
+  AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
+  AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
+GROUP BY company_kind, company_name
+ORDER BY total DESC, kind, name;
+
+-- name: view_ages
+-- The "Age" drop-down: (age, how many) under every other drop-down.
+WITH
+-- include: view_pool
+SELECT age, COUNT(*) AS total
+FROM pool
+WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
+  AND fresh IN (SELECT value FROM json_each(:fresh))
+  AND (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
+  AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
+  AND (:companies IS NULL
+         OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
+             AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
+GROUP BY age;
 
 -- name: pipeline_running
 -- The latest run still marked running, of any identity: the base is shared,

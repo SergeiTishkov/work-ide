@@ -141,9 +141,14 @@ It opens a window over the knowledge base:
   form a dated column: a commented step opens like an accordion, the pencil
   edits any comment in place, and undo goes back one step. The applications
   are listed from every run and market;
-- **Collect vacancies** runs `/run` for the identity in Claude Code, headless,
-  with a live log. The agent edits and tests but never commits — the changes
-  wait for you;
+- **Collect vacancies** runs `/run` for the identity in Claude Code, headless.
+  It is a task in the panel at the bottom of the window — the tasks on the
+  left, the live log of the chosen one on the right, both panes resized by
+  dragging — with its steps under it (preparation, each pipeline stage with
+  its time and progress, the agent's review). Collections of several
+  identities queue up; CVs and cover letters run in their own lane beside
+  them. The agent edits and tests but never commits — the changes wait for
+  you;
 - **Review feedback (N)** counts the answers not yet reviewed and starts
   nothing: run `/feedback <prefix>` in a Claude Code session of your own, where
   you follow and steer the review. It gathers the pending answers
@@ -153,7 +158,10 @@ It opens a window over the knowledge base:
   identity's tab. **Refresh** re-reads everything and reloads the interface
   itself (markup, styles, code), keeping the tab and the drop-downs' choice.
 - **Generate CV** on a vacancy writes a CV tailored to it — `.docx` and `.pdf`
-  in Downloads, under the name of your own CV (the old pair is replaced) —
+  under the name of your own CV, in the vacancy's folder (`<folder>/<prefix>/
+  <vacancy id>/`, the folder chosen at onboarding; older versions go to
+  `Old versions/`, and a log keeps every request, so the next version builds
+  on them) —
   and lists below the card what to check before sending: claims the fact
   check could not find in your CVs, the vacancy's requirements with no
   evidence, what came from the parent CV (an optional file with every
@@ -164,12 +172,19 @@ It opens a window over the knowledge base:
   language); the second click generates with what the field holds, empty
   included. The CV is in English unless the instructions ask for another
   language. See "A CV per vacancy" in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md);
-  after a generation the button reads "CV is generated" until the next CV
-  starts, and pressing it makes another one;
+  once the folder holds a CV the button reads "CV is generated", and pressing
+  it makes another version;
 - **Generate Cover Letter**, right of it, works the same way: a one-page
-  cover letter from the same CVs, `.docx` and `.pdf` in Downloads as
-  "Cover Letter <your name>", with what to check before sending. One
-  generation at a time, CV or letter;
+  cover letter from the same CVs, `.docx` and `.pdf` in the same folder as
+  "Cover Letter <your name>", with what to check before sending. Any number
+  can be queued; they run one at a time. **Open CV/CL Directory** and **Copy
+  CV/CL Directory Path** appear once the vacancy has documents;
+- with `cv.auto` in the profile, a collection ends by starting one CV/CL
+  batch for the vacancies matching its filters (a new filter covers the
+  earlier vacancies too, once): a process of its own, so it goes on when the
+  app is closed, shown in the panel as one task with its progress and log.
+  A CV asked for in the app goes first: the batch pauses between documents —
+  see [docs/IDENTITIES.md](docs/IDENTITIES.md);
 - the interface speaks Russian or English: a flag in the top right opens a
   drop-down of flags, and the choice is remembered. Left of it the same kind
   of button picks the theme: as in the system, light or dark. The lines the pipeline

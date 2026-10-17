@@ -125,38 +125,6 @@ def check_sources_reachable() -> None:
             _report(f"source '{src['name']}' reachable", False, str(exc), critical=False)
 
 
-def check_reputation_coverage() -> None:
-    """How many companies at the head of the shortlist have no reputation result.
-
-    Not critical for running: this is about the completeness of accumulated
-    knowledge rather than the health of the environment. But the number is
-    worth seeing — on 2026-08-06 the head of the shortlist held 55 companies
-    and zero checks, and the only way to notice was to read the whole report.
-    """
-    import kb
-    import reputation
-
-    try:
-        vacancies = kb.load_vacancies()
-        companies = kb.load_companies()
-    except Exception as exc:  # noqa: BLE001 — the database may not exist yet
-        print(f"  [ SKIP ] company reputation: database unreadable "
-              f"({type(exc).__name__})")
-        return
-
-    stats = reputation.coverage(vacancies, companies)
-    if not stats["companies"]:
-        print("  [ SKIP ] company reputation: nobody in the shortlist to check yet")
-        return
-    mark = "OK  " if not stats["unchecked"] else "WARN"
-    print(f"  [ {mark} ] reputation of shortlist companies: "
-          f"found {stats['found']}, too few sources {stats['insufficient']}, "
-          f"NOT CHECKED {stats['unchecked']} of {stats['companies']}")
-    if stats["unchecked"]:
-        print("           close it: python tools/reputation.py worklist "
-              f"--identity {common.ACTIVE_IDENTITY}")
-
-
 def main() -> None:
     import identity as identity_mod
 
@@ -178,7 +146,6 @@ def main() -> None:
     check_packages()
     check_configs()
     check_data_writable()
-    check_reputation_coverage()
     print()
     print("--- Source reachability (not critical for operation) ---")
     check_sources_reachable()

@@ -19,9 +19,28 @@
     { key: 'denied', label: 'filter.group.denied', statuses: ['rejected', 'bugged', 'expired'] },
   ];
   const STATUSES = STATUS_GROUPS.flatMap((group) => group.statuses);
-  // What the four drop-downs choose (schemas/queries.sql, THE VIEW). null
-  // markets, boards or classes: all of them, also the ones a later run adds.
-  const DEFAULT_VIEW = { segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, fits: null };
+  // What the five drop-downs choose (schemas/queries.sql, THE VIEW). null
+  // markets, boards, classes or companies: all of them, also the ones a later
+  // run adds. companies: { kinds: [shown], hidden: [names hidden among them] }.
+  const DEFAULT_VIEW = {
+    segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, fits: null, companies: null, ages: null,
+  };
+  // The "Age" drop-down (the owner, 2026-10-17): how long ago it was posted,
+  // in bands of their own (schemas/queries.sql, AGE).
+  const AGES = ['today', 'week', 'month', 'older'];
+  const AGE_KEYS = {
+    today: 'filter.age.today', week: 'filter.age.week', month: 'filter.age.month', older: 'filter.age.older',
+  };
+  // The "Company" drop-down's groups, in its order (tools/company_kinds.py):
+  // the intermediaries, each listed by name, then every other company as one row.
+  const INTERMEDIARIES = ['marketplace', 'agency', 'reposter'];
+  const COMPANY_KINDS = [...INTERMEDIARIES, 'other'];
+  const COMPANY_KIND_KEYS = {
+    marketplace: 'filter.company_kind.marketplace',
+    agency: 'filter.company_kind.agency',
+    reposter: 'filter.company_kind.reposter',
+    other: 'filter.company_kind.other',
+  };
   const CLASS_KEYS = {
     hot_lead: 'class.hot_lead',
     worth_a_look: 'class.worth_a_look',
@@ -92,9 +111,9 @@
     bugged: 'timeline.bugged',
     expired: 'timeline.expired',
   };
-  const RUN_KIND_KEYS = { collect: 'run.kind.collect' };
   const REASON_KEYS = { rejected: 'reason.rejected', bugged: 'reason.bugged' };
-  const LOG_LIMIT = 500;
+  const LOG_LIMIT = 3000;
+  const PANEL_KEY = 'work-ide-task-panel';
   // How often the pipeline indicator asks the databases. Tests shorten it.
   const POLL_MS = window.__WORK_IDE_POLL_MS || 5000;
   const SESSION_KEY = 'work-ide-view';
@@ -116,6 +135,16 @@
     dropdownScroll: 0,
     // [{ source, site, total }]: the boards the view holds, the boards aside
     sources: [],
+    // [{ kind, name, total }]: the companies the view holds, the companies
+    // aside; every other company is one row, name null
+    companies: [],
+    // { age band: how many }: the "Age" drop-down's numbers, the ages aside
+    ages: {},
+    // the "Clean up" popup while open: { ages, statuses, classes, result, busy, error }
+    cleanup: null,
+    // intermediary name -> kind, kept across loads: a hidden one the view has
+    // emptied stays on the list, unticked, to be ticked back
+    companyKinds: {},
     listing: [],
     // the "Show" drop-down's numbers: { statuses: { status: n }, fresh: { fresh, earlier } }
     counts: { statuses: {}, fresh: {} },
@@ -128,12 +157,13 @@
     gone: new Set(),
     reasonFor: null,   // { id, status } while a reason form is open
     stepFor: null,     // { id, step, draft } while a funnel step's comment is written
-    // "Generate CV" and "Generate Cover Letter": the one being generated (one
-    // at a time, of either kind), and the last result per card until closed
-    cvBusy: null,      // { identity, id, kind }: a CV ('cv') or a cover letter ('letter') being made
+    // "Generate CV" and "Generate Cover Letter": the result of a generation
+    // asked for from a card, shown on it until closed
     cvResults: new Map(),   // "<identity>/<id>/<kind>" -> the result shown on the card
     cvFor: null,       // { identity, id, kind, draft } while the instructions are written
-    cvLast: { cv: null, letter: null },   // { identity, id } of the last one of each kind
+    // "<identity>/<id>" -> { dir, cv, letter, errors }: the documents in the
+    // vacancy's folder (main/documents.js)
+    docs: {},
     editing: null,     // { key, id, kind, index, draft } while a timeline comment is edited
     openEntries: new Set(),   // timeline entries shown opened, by key
     shown: {},             // class -> rows without feedback asked for ("Show more")
@@ -143,10 +173,15 @@
     // the number of the list load a drop-down started, 0 when none is going:
     // a spinner stands in for the vacancies meanwhile
     listLoading: 0,
-    run: { running: false },
-    // a function, so the status follows a change of language
-    runStatus: null,
-    log: [],
+    // the task queue (main/tasks.js), as its last event gave it
+    tasks: [],
+    // the task whose log the panel shows: chosen by a click, else the running one
+    chosenTask: null,
+    // a collection's steps: folded while it runs, opened after it ended
+    foldedTasks: new Set(),
+    openTasks: new Set(),
+    shownTask: null,
+    taskLog: [],
     // prefix -> { running, stage, startedAt }: a pipeline run of that
     // identity, however it was started (tools/runstate.py)
     pipelines: {},
@@ -325,6 +360,8 @@
       state.listing = [];
       state.counts = { statuses: {}, fresh: {} };
       state.sources = [];
+      state.companies = [];
+      state.ages = {};
       state.classTotals = {};
       render();
       return;
@@ -332,22 +369,48 @@
     const view = viewToLoad(info);
     // the rows asked for travel only when set
     const page = Object.keys(state.shown).length ? [{ shown: { ...state.shown } }] : [];
-    const [listing, counts, totals, pending, sources] = await Promise.all([
+    const [listing, counts, totals, pending, sources, companies, ages] = await Promise.all([
       api.loadListing(state.active, view, ...page),
       api.listingCounts(state.active, view),
       api.classTotals(state.active, view),
       api.pendingFeedbackCount(state.active),
       api.listSources(state.active, view),
+      api.listCompanies(state.active, view),
+      api.listAges ? api.listAges(state.active, view) : {},
     ]);
     if (asked !== listRequest) return;
+    state.ages = ages || {};
     state.listing = listing;
     state.counts = counts;
     state.classTotals = totals;
     state.sources = sources;
+    state.companies = companies;
+    for (const c of companies) if (c.name) state.companyKinds[c.name] = c.kind;
     // a chosen board the view has emptied keeps its website on the list
     state.sourceSites = state.sourceSites || {};
     for (const s of sources) if (s.site) state.sourceSites[s.source] = s.site;
     info.pending = pending;
+    render();
+    await loadDocs(state.active, listing.map((item) => item.id));
+  }
+
+  // The documents of the listed vacancies, for their buttons. Without an
+  // answer (the folder could not be found) the buttons say "Generate": the
+  // list itself is not held up by it.
+  async function loadDocs(identity, ids) {
+    if (!identity || !ids.length || !api.documentsState) return;
+    let found;
+    try {
+      found = await api.documentsState(identity, ids);
+    } catch (error) {
+      console.warn('documents state:', error.message);
+      return;
+    }
+    for (const id of ids) {
+      const key = `${identity}/${id}`;
+      if (found[id]) state.docs[key] = found[id];
+      else delete state.docs[key];
+    }
     render();
   }
 
@@ -560,51 +623,116 @@
     });
   }
 
-  function startRun(kind) {
-    return guarded(async () => {
-      const reply = await api.startRun({ identity: state.active, kind });
-      if (!reply || reply.ok === false) {
-        const key = reply && reply.error === 'busy' ? 'run.busy'
-          : reply && reply.error === 'claude_not_found' ? 'run.claude_not_found' : null;
-        throw new Error(key ? t(key) : (reply && reply.error) || '?');
-      }
-      state.run = { running: true, identity: state.active, kind };
-      state.log = [];
-      const identity = state.active;
-      state.runStatus = () => t('run.running', { kind: t(RUN_KIND_KEYS[kind]), identity });
-      render();
-    });
+  // --- the task queue ----------------------------------------------------------
+  // "Collect vacancies", "Generate CV" and "Generate Cover Letter" queue a
+  // task (main/tasks.js); the bottom panel lists the tasks and the log of one.
+
+  const ACTIVE_TASK = new Set(['queued', 'running']);
+
+  function findTask(identity, kind, vacancyId = null) {
+    const own = state.tasks.find((task) => ACTIVE_TASK.has(task.state) && task.identity === identity
+      && task.kind === kind && (task.vacancyId || null) === vacancyId);
+    if (own) return own;
+    // the document the CV/CL batch is making now
+    const current = batchCurrent();
+    return current && current.identity === identity && current.kind === kind && current.vacancyId === vacancyId
+      ? { ...current, state: 'running', origin: 'external' } : null;
   }
 
-  function stopRun() {
-    return guarded(async () => {
-      await api.stopRun();
-    });
+  function batchCurrent() {
+    const batch = state.tasks.find((task) => task.kind === 'batch' && task.state === 'running');
+    return batch ? batch.current : null;
   }
 
-  function onRunEvent(event) {
-    if (event.type === 'start') {
-      state.run = { running: true, identity: event.identity, kind: event.kind };
-      state.runStatus = () => t('run.running', { kind: t(RUN_KIND_KEYS[event.kind]), identity: event.identity });
-    } else if (event.type === 'output') {
-      state.log.push(event.text);
-      if (state.log.length > LOG_LIMIT) state.log.splice(0, state.log.length - LOG_LIMIT);
-    } else if (event.type === 'exit') {
-      state.run = { running: false };
-      if (event.error === 'claude_not_found') state.runStatus = () => t('run.claude_not_found');
-      else if (event.code === 0) state.runStatus = () => t('run.finished');
-      else if (event.code === null) state.runStatus = () => t('run.stopped');
-      else state.runStatus = () => t('run.failed', { code: event.code });
-      render();
-      // A run may have created the database, recorded a selection or changed
-      // the feedback: everything on screen is reloaded.
-      guarded(async () => {
-        resetView();
-        state.byIdentity = {};
-        await loadIdentities();
-      });
+  async function enqueue(request) {
+    const reply = await api.enqueueTask(request);
+    if (reply && reply.task) mergeTask(reply.task);
+    render();
+    return reply;
+  }
+
+  function mergeTask(task) {
+    const index = state.tasks.findIndex((t) => t.id === task.id);
+    if (index < 0) state.tasks.push(task);
+    else state.tasks[index] = task;
+  }
+
+  function startCollect() {
+    const identity = state.active;
+    return guarded(() => enqueue({ kind: 'collect', identity }));
+  }
+
+  function stopCollect() {
+    const task = findTask(state.active, 'collect');
+    if (task) guarded(() => api.cancelTask(task.id));
+  }
+
+  function onTaskEvent(event) {
+    if (event.type === 'log') {
+      if (event.id === state.shownTask) appendTaskLog(event.text);
       return;
     }
+    if (event.type === 'finished') {
+      taskFinished(event.task);
+      return;
+    }
+    if (event.type === 'tasks') {
+      // the batch moved on: the document it made shows on its card
+      const before = batchCurrent();
+      state.tasks = event.tasks;
+      const after = batchCurrent();
+      if (before && (!after || after.vacancyId !== before.vacancyId || after.kind !== before.kind)) {
+        loadDocs(before.identity, [before.vacancyId]);
+      }
+      render();
+    }
+  }
+
+  function taskFinished(task) {
+    mergeTask(task);
+    if (task.kind === 'batch') {
+      render();
+      return;
+    }
+    if (task.kind === 'collect' || task.kind === 'rest') {
+      const problem = task.result && task.result.error === 'claude_not_found' ? t('run.claude_not_found') : null;
+      // A run may have created the database, recorded a selection or changed
+      // the feedback: what it touched is reloaded. The reload clears the
+      // error box, so a problem is shown after it.
+      let reload = Promise.resolve();
+      if (task.identity === state.active) {
+        reload = guarded(async () => {
+          resetView();
+          state.byIdentity = {};
+          await loadIdentities();
+        });
+      } else {
+        delete state.byIdentity[task.identity];
+      }
+      reload.then(() => { if (problem) showError(problem); });
+      render();
+      return;
+    }
+    if (task.kind === 'reputation') {
+      // the lookup rendered the company's rows again: the list shows them
+      // (and the button goes)
+      const problem = task.state === 'failed' ? `${t('reputation.failed')}: ${task.error || '?'}` : null;
+      if (task.identity === state.active) {
+        guarded(() => loadList()).then(() => { if (problem) showError(problem); });
+      } else if (problem) {
+        showError(problem);
+      }
+      render();
+      return;
+    }
+    // a CV or a cover letter: the buttons follow the folder; a generation
+    // asked for from a card shows its result there
+    const key = `${task.identity}/${task.vacancyId}/${task.kind}`;
+    if (task.origin === 'manual' && task.state !== 'stopped') {
+      const result = task.result || {};
+      state.cvResults.set(key, result.ok ? result : { ok: false, error: task.error || result.error || '?' });
+    }
+    guarded(() => loadDocs(task.identity, [task.vacancyId]));
     render();
   }
 
@@ -615,7 +743,7 @@
     renderPickers();
     renderIdentityTabs();
     renderPanel();
-    renderRunPanel();
+    renderTaskPanel();
     watchScroll();
   }
 
@@ -738,6 +866,7 @@
     }
     const identity = state.identities.find((i) => i.prefix === state.active);
     const parts = [renderToolbar(identity, info)];
+    if (state.cleanup) parts.push(renderCleanup());
     if (!info.selection) {
       parts.push(el('p', { class: 'empty', testid: 'never-collected' }, t('identity.never_collected')));
     } else if (!info.segments.length) {
@@ -754,15 +883,25 @@
     else state.openDropdown = null;
   }
 
-  function collectButton(running) {
+  function collectButton() {
     const pipeline = state.pipelines[state.active] || { running: false };
-    if (!pipeline.running) {
-      // A run of another identity holds the shared base; this one would be
-      // refused (tools/runstate.py).
+    const task = findTask(state.active, 'collect');
+    const running = pipeline.running || (task && task.state === 'running');
+    if (task && task.state === 'queued') {
+      // Waiting its turn: behind another collection, or a run started
+      // elsewhere that holds the shared base (tools/runstate.py).
       return el('button', {
-        class: 'primary', testid: 'run-collect', disabled: running || Boolean(pipeline.busyWith),
+        class: 'primary queued', testid: 'run-collect', disabled: true,
+        title: task.waitingFor ? t('run.waiting_for', { identity: task.waitingFor }) : t('run.queued_hint'),
+      }, t('run.queued'));
+    }
+    if (!running) {
+      // Another identity's run holds the shared base: this one queues
+      // behind it (main/tasks.js).
+      return el('button', {
+        class: 'primary', testid: 'run-collect',
         title: pipeline.busyWith ? t('run.busy_other', { identity: pipeline.busyWith }) : null,
-        onclick: () => startRun('collect'),
+        onclick: startCollect,
       }, t('run.collect'));
     }
     // A run of this identity is going — from here or from anywhere else.
@@ -776,7 +915,8 @@
   }
 
   function renderToolbar(identity, info) {
-    const running = state.run.running;
+    const task = findTask(state.active, 'collect');
+    const running = Boolean(task && task.state === 'running');
     const pending = info.pending ? info.pending.bugged + info.pending.rejected : 0;
     const selection = info.selection;
     return el('div', { class: 'toolbar' },
@@ -790,9 +930,112 @@
           }) + (selection.kind === 'rebuild' ? ` · ${t('selection.rebuild')}` : ''))),
       el('div', { class: 'actions' },
         el('button', { testid: 'refresh', title: t('app.refresh_hint'), onclick: refresh }, t('app.refresh')),
-        collectButton(running),
+        el('button', { testid: 'cleanup', title: t('cleanup.hint'), onclick: openCleanup }, t('cleanup.button')),
+        collectButton(),
         feedbackHint(pending),
-        running && el('button', { class: 'danger', testid: 'run-stop', onclick: stopRun }, t('run.stop'))));
+        running && el('button', { class: 'danger', testid: 'run-stop', onclick: stopCollect }, t('run.stop'))));
+  }
+
+  // --- "Clean up": vacancies deleted for good (tools/cleanup.py) ----------------
+  // The owner, 2026-10-17: old vacancies and old answers go, no shadow ban. A
+  // popup over the page: the filters, a count of what would go, then the
+  // deletion. Applications and feedback not yet reviewed stay whatever is
+  // ticked; that is the Python side's rule, the popup only says so.
+  const CLEANUP_AGES = ['today', 'week', 'month', 'older'];
+  const CLEANUP_STATUS_KEYS = {
+    new: 'cleanup.status.new', expired: 'cleanup.status.expired',
+    rejected: 'cleanup.status.rejected', bugged: 'cleanup.status.bugged',
+  };
+  const CLEANUP_CLASS_KEYS = {
+    hot_lead: 'cleanup.class.hot_lead', worth_a_look: 'cleanup.class.worth_a_look',
+    long_shot: 'cleanup.class.long_shot', remote_unconfirmed: 'cleanup.class.remote_unconfirmed',
+    engagement_unconfirmed: 'cleanup.class.engagement_unconfirmed',
+    low_priority: 'cleanup.class.low_priority', rejected: 'cleanup.class.rejected',
+  };
+  const CLEANUP_LEGENDS = { ages: 'cleanup.ages', statuses: 'cleanup.statuses', classes: 'cleanup.classes' };
+
+  function openCleanup() {
+    state.cleanup = { ages: ['older'], statuses: [], classes: [], result: null, busy: false, error: null };
+    render();
+  }
+
+  function closeCleanup() {
+    state.cleanup = null;
+    render();
+  }
+
+  function cleanupFilters() {
+    const c = state.cleanup;
+    return { ages: c.ages, statuses: c.statuses, classes: c.classes };
+  }
+
+  async function runCleanup(dryRun) {
+    const c = state.cleanup;
+    c.busy = true;
+    c.error = null;
+    render();
+    try {
+      const result = await api.cleanup(state.active, cleanupFilters(), dryRun);
+      if (state.cleanup !== c) return;
+      c.result = result;
+    } catch (error) {
+      if (state.cleanup !== c) return;
+      c.error = error.message || String(error);
+    }
+    c.busy = false;
+    if (!dryRun && c.result && !c.error) {
+      for (const identity of state.identities) delete state.byIdentity[identity.prefix];
+      await guarded(() => loadIdentity(state.active));
+    }
+    render();
+  }
+
+  function renderCleanup() {
+    const c = state.cleanup;
+    if (!c) return null;
+    const group = (key, values, label) => el('fieldset', { class: 'cleanup-group', testid: `cleanup-${key}` },
+      el('legend', {}, t(CLEANUP_LEGENDS[key])),
+      values.map((value) => el('label', { class: 'cleanup-option' },
+        el('input', {
+          type: 'checkbox', testid: `cleanup-${key}-${value}`, checked: c[key].includes(value),
+          disabled: c.busy,
+          onchange: (event) => {
+            c[key] = event.target.checked ? [...c[key], value] : c[key].filter((v) => v !== value);
+            c.result = null;
+            render();
+          },
+        }), ` ${label(value)}`)),
+      el('div', { class: 'muted cleanup-any' }, t('cleanup.none_is_any')));
+    const chosen = c.ages.length + c.statuses.length + c.classes.length;
+    const r = c.result;
+    let outcome = null;
+    if (c.error) outcome = el('p', { class: 'cleanup-error', testid: 'cleanup-error' }, c.error);
+    else if (r) {
+      outcome = el('p', { class: 'cleanup-outcome', testid: 'cleanup-outcome' },
+        t(r.dry_run ? 'cleanup.would_delete' : 'cleanup.deleted', { n: r.dry_run ? r.matched : r.deleted }),
+        ' ', t('cleanup.kept', { funnel: r.kept_funnel, unreviewed: r.kept_unreviewed, other: r.kept_other_identity }));
+    }
+    const counted = r && r.dry_run;
+    return el('div', { class: 'overlay', testid: 'cleanup-overlay',
+      onclick: (event) => { if (event.target === event.currentTarget && !c.busy) closeCleanup(); } },
+    el('div', { class: 'popup cleanup', role: 'dialog', 'aria-modal': 'true', testid: 'cleanup-dialog' },
+      el('h2', {}, t('cleanup.title')),
+      el('p', { class: 'muted' }, t('cleanup.explain')),
+      el('div', { class: 'cleanup-groups' },
+        group('ages', CLEANUP_AGES, (a) => t(AGE_KEYS[a])),
+        group('statuses', Object.keys(CLEANUP_STATUS_KEYS), (v) => t(CLEANUP_STATUS_KEYS[v])),
+        group('classes', Object.keys(CLEANUP_CLASS_KEYS), (v) => t(CLEANUP_CLASS_KEYS[v]))),
+      outcome,
+      el('div', { class: 'popup-actions' },
+        c.busy && el('span', { class: 'spinner', testid: 'cleanup-busy' }),
+        el('button', { testid: 'cleanup-count', disabled: c.busy || !chosen, onclick: () => runCleanup(true) },
+          t('cleanup.count')),
+        el('button', {
+          class: 'danger', testid: 'cleanup-delete',
+          disabled: c.busy || !chosen || !counted || !r.matched,
+          onclick: () => runCleanup(false),
+        }, counted ? t('cleanup.delete_n', { n: r.matched }) : t('cleanup.delete')),
+        el('button', { testid: 'cleanup-close', disabled: c.busy, onclick: closeCleanup }, t('cleanup.close')))));
   }
 
   // "Review feedback (N)" starts nothing: the review runs in an agent session
@@ -828,7 +1071,11 @@
   //   whole (the master shows on whatever the rows: the view takes all),
   //   options: [{ value, text, testid, checked }] }]
   // onToggle(group, values): the group's checked values after the click.
-  function checklist({ testid, label, labelTestid, summary, groups, onToggle }) {
+  // Three levels (the "Company" drop-down): `top`, { text, testid, mark,
+  // toggle }, is a row above every group, and a master given its own `mark`
+  // and `toggle` stands for its group whatever its rows say (a group may have
+  // none); `nested` stands the groups in from the top row.
+  function checklist({ testid, label, labelTestid, summary, groups, onToggle, top, nested }) {
     const id = `${testid}-select`;
     const button = el('button', {
       id, class: 'dropdown-button', testid, type: 'button',
@@ -845,6 +1092,8 @@
       rows.push({ node, toggle });
       return node;
     };
+    const topNode = top && el('li', { class: 'dropdown-group', role: 'presentation' },
+      el('ul', { role: 'group' }, row(top.testid, null, top.text, top.mark, true, top.toggle)));
     const groupNodes = groups.map((group) => {
       const values = group.options.map((option) => option.value);
       const checked = group.options.filter((option) => option.checked).map((option) => option.value);
@@ -853,8 +1102,10 @@
       else if (!checked.length) mark = 'off';
       const nodes = [];
       if (group.master) {
-        nodes.push(row(group.master.testid, null, group.master.text, mark, true,
-          () => onToggle(group, mark === 'on' ? [] : values)));
+        const { master } = group;
+        if (master.mark) mark = master.mark;
+        nodes.push(row(master.testid, null, master.text, mark, true,
+          master.toggle || (() => onToggle(group, mark === 'on' ? [] : values))));
       }
       for (const option of group.options) {
         nodes.push(row(option.testid, option.value, option.text, option.checked ? 'on' : 'off', false,
@@ -865,10 +1116,10 @@
         el('ul', { role: 'group', 'aria-label': group.label || null }, nodes));
     });
     const menu = el('ul', {
-      class: 'dropdown-menu', role: 'listbox', 'aria-multiselectable': 'true', testid: `${testid}-menu`,
-      hidden: true, onclick: (event) => event.stopPropagation(),
+      class: nested ? 'dropdown-menu nested' : 'dropdown-menu', role: 'listbox', 'aria-multiselectable': 'true',
+      testid: `${testid}-menu`, hidden: true, onclick: (event) => event.stopPropagation(),
       onscroll: () => { if (state.openDropdown === testid) state.dropdownScroll = menu.scrollTop; },
-    }, groupNodes);
+    }, topNode, groupNodes);
     const box = el('span', { class: 'field dropdown', 'data-dropdown': testid },
       button, el('label', { for: id, testid: labelTestid }, label), menu);
 
@@ -1040,8 +1291,31 @@
     return el('div', { class: 'filters', testid: 'filters' },
       renderSegmentFilter(info, view),
       renderShowFilter(view),
+      renderAgeFilter(view),
       renderSourceFilter(view),
+      renderCompanyFilter(view),
       renderFitFilter(view));
+  }
+
+  // How long ago the employer posted it: today, up to a week, up to a month,
+  // longer (the owner, 2026-10-17). Each band with how many it holds under
+  // the other drop-downs; null in the view is every age.
+  function renderAgeFilter(view) {
+    const chosen = view.ages;
+    const options = AGES.map((age) => ({
+      value: age, label: t(AGE_KEYS[age]), text: counted(t(AGE_KEYS[age]), state.ages[age]),
+      testid: `age-option-${age}`, checked: !chosen || chosen.includes(age),
+    }));
+    const all = AGES.reduce((sum, age) => sum + (state.ages[age] || 0), 0);
+    return checklist({
+      testid: 'age-filter', label: t('filter.age_legend'), labelTestid: 'age-label',
+      summary: !chosen ? t('filter.age_all') : summaryOf(t('filter.age_all'), options),
+      groups: [{
+        key: 'ages', options, whole: !chosen,
+        master: { text: counted(t('filter.age_all'), all), testid: 'age-option-all' },
+      }],
+      onToggle: (group, values) => changeView({ ages: values.length === AGES.length ? null : values }),
+    });
   }
 
   // The classes ("Hot leads", "Worth a look", ...) under the other three
@@ -1094,6 +1368,100 @@
         master: { text: counted(t('filter.source_all'), all), testid: 'source-option-all' },
       }],
       onToggle: (group, values) => changeView({ sources: values.length === options.length ? null : values }),
+    });
+  }
+
+  // The companies under the other four drop-downs (the owner, 2026-10-14):
+  // all of them on top; under it each kind of intermediary — freelance
+  // marketplaces, agencies, reposters — with each one by name beneath it,
+  // and every other company as one row. The view keeps the kinds shown and
+  // the names hidden, so an intermediary or a company a later run brings is
+  // listed unless its kind is off.
+  function renderCompanyFilter(view) {
+    const chosen = view.companies || { kinds: COMPANY_KINDS, hidden: [] };
+    const kindOn = (kind) => chosen.kinds.includes(kind);
+    const nameOn = (name, kind) => kindOn(kind) && !chosen.hidden.includes(name);
+    const rows = state.companies.slice();
+    // a hidden one the view has emptied stays, to be ticked back
+    for (const name of chosen.hidden) {
+      const kind = state.companyKinds[name];
+      if (kind && !rows.some((c) => c.name === name)) rows.push({ kind, name, total: 0 });
+    }
+    const totalOf = (list) => list.reduce((n, c) => n + c.total, 0);
+    const kindName = (kind) => t(COMPANY_KIND_KEYS[kind]);
+    const without = (list, drop) => list.filter((x) => !drop.includes(x));
+    const change = (kinds, hidden) => {
+      const shown = COMPANY_KINDS.filter((k) => kinds.includes(k));
+      const everything = shown.length === COMPANY_KINDS.length && !hidden.length;
+      changeView({ companies: everything ? null : { kinds: shown, hidden } });
+    };
+
+    const groups = [];
+    const marks = [];
+    for (const kind of INTERMEDIARIES) {
+      const members = rows.filter((c) => c.kind === kind);
+      if (!members.length && kindOn(kind)) continue;   // none in the view: no row
+      const names = members.map((c) => c.name);
+      const on = names.filter((name) => nameOn(name, kind));
+      let mark = 'partial';
+      if (!kindOn(kind) || (names.length && !on.length)) mark = 'off';
+      else if (on.length === names.length) mark = 'on';
+      marks.push(mark);
+      groups.push({
+        key: kind,
+        master: {
+          text: counted(kindName(kind), totalOf(members)), testid: `company-kind-${kind}`, mark,
+          // on: the kind goes; off or partly on: the kind and every name of it
+          toggle: () => (mark === 'on'
+            ? change(without(chosen.kinds, [kind]), without(chosen.hidden, names))
+            : change([...chosen.kinds, kind], without(chosen.hidden, names))),
+        },
+        options: members.map((c) => ({
+          value: c.name, label: c.name, text: counted(c.name, c.total),
+          testid: `company-option-${c.name}`, checked: nameOn(c.name, kind),
+        })),
+      });
+    }
+    const other = rows.find((c) => c.kind === 'other');
+    marks.push(kindOn('other') ? 'on' : 'off');
+    groups.push({
+      key: 'other', options: [],
+      master: {
+        text: counted(kindName('other'), other ? other.total : 0), testid: 'company-kind-other',
+        mark: kindOn('other') ? 'on' : 'off',
+        toggle: () => change(kindOn('other') ? without(chosen.kinds, ['other']) : [...chosen.kinds, 'other'],
+          chosen.hidden),
+      },
+    });
+
+    // a name ticked under a kind that was off: the kind comes back with it alone
+    const onToggle = (group, values) => {
+      const names = group.options.map((o) => o.value);
+      const hidden = [...without(chosen.hidden, names), ...without(names, values)];
+      const kinds = values.length ? [...without(chosen.kinds, [group.key]), group.key] : chosen.kinds;
+      change(kinds, hidden);
+    };
+
+    let topMark = 'partial';
+    if (marks.every((m) => m === 'on')) topMark = 'on';
+    else if (marks.every((m) => m === 'off')) topMark = 'off';
+    let summary = t('filter.company_all');
+    if (topMark === 'off') summary = t('filter.none');
+    else if (view.companies) {
+      const off = COMPANY_KINDS.filter((k) => !kindOn(k)).map(kindName);
+      const hidden = chosen.hidden.filter((name) => kindOn(state.companyKinds[name]));
+      summary = t('filter.company_except', { list: [...off, ...hidden].join(', ') });
+    }
+    return checklist({
+      testid: 'company-filter', label: t('filter.company_legend'), labelTestid: 'company-label', summary,
+      nested: true,
+      top: {
+        text: counted(t('filter.company_all'), totalOf(state.companies)), testid: 'company-option-all',
+        mark: topMark,
+        toggle: () => (topMark === 'on' ? change([], []) : change(COMPANY_KINDS, [])),
+      },
+      groups,
+      onToggle,
     });
   }
 
@@ -1189,8 +1557,12 @@
     // A negative delay starts the drain where it stands, so a render half way
     // through does not refill the ring.
     const elapsed = STUB_LIFETIME_MS - Math.max(0, stub.expires - Date.now());
+    // The label has one width whatever the status, so "undo" and "hide" stand
+    // in one column down a run of stubs (the owner, 2026-10-16).
     return el('div', { class: 'row stub', testid: `stub-${id}` },
-      el('span', {}, t('stub.marked', { status: t(STATUS_KEYS[stub.status]) }), ' · ',
+      el('span', {},
+        el('span', { class: 'stub-label', testid: 'stub-label' }, t('stub.marked', { status: t(STATUS_KEYS[stub.status]) })),
+        ' · ',
         el('button', { class: 'link', testid: 'btn-undo', onclick: () => undo(id) }, t('action.undo')),
         ' · ',
         // Goes now rather than when the ring runs out (the owner, 2026-10-05).
@@ -1276,8 +1648,59 @@
     }
     if (view.reputation) lines.push(md('li', `${t('row.reputation')}: ${view.reputation}`));
     if (view.company_age) lines.push(md('li', `${t('row.company_age')}: ${view.company_age}`));
-    if (!lines.length) return null;
-    return el('details', { class: 'details' }, el('summary', {}, t('row.details')), el('ul', {}, lines));
+    // the screening model's answer (tools/ai_screen.py), with its quote
+    if (view.ai_screen && view.ai_screen.verdict) {
+      const said = view.ai_screen;
+      lines.push(el('li', { testid: 'details-ai' },
+        `${t('row.ai')}: ${said.verdict === 'reject' ? t('row.ai_reject') : t('row.ai_keep')}`
+        + (said.reason ? ` — ${said.reason}` : '') + (said.quote ? ` «${said.quote}»` : '')));
+    }
+    const score = renderScoreParts(view.score_parts);
+    if (!lines.length && !score) return null;
+    return el('details', { class: 'details' }, el('summary', {}, t('row.details')),
+      lines.length ? el('ul', {}, lines) : null, score);
+  }
+
+  // "Score": what each part of the score earned out of what it could, most
+  // positive first (tools/score.py, score_parts). A cell per point; the
+  // minus side of every row is as wide as the widest one, so the axes line up.
+  const SCORE_PART_KEYS = {
+    remote_location: 'score.part.remote_location', reachability: 'score.part.reachability',
+    stack: 'score.part.stack', legacy: 'score.part.legacy', intensity: 'score.part.intensity',
+    compensation: 'score.part.compensation', contractor: 'score.part.contractor',
+    reputation: 'score.part.reputation', company_age: 'score.part.company_age',
+    market: 'score.part.market', tech: 'score.part.tech', title: 'score.part.title',
+    exporter: 'score.part.exporter',
+  };
+
+  function renderScoreParts(parts) {
+    if (!parts || !parts.length) return null;
+    const signed = (n) => (n > 0 ? `+${n}` : String(n));
+    const cells = (count, lit, kind, fromAxis) => {
+      const list = [];
+      for (let i = 0; i < count; i += 1) {
+        const on = fromAxis ? i < lit : i >= count - lit;
+        list.push(el('span', { class: `score-cell ${kind}${on ? '' : ' off'}` }));
+      }
+      return list;
+    };
+    const widest = Math.max(...parts.map((p) => -p.min));
+    const rows = [];
+    for (const part of parts) {
+      const name = part.label || (SCORE_PART_KEYS[part.key] ? t(SCORE_PART_KEYS[part.key]) : part.key);
+      const bound = part.points < 0 || (part.points === 0 && part.max === 0) ? part.min : part.max;
+      const range = part.min < 0 && part.max > 0 ? `${signed(part.min)}…${signed(part.max)}` : signed(bound);
+      rows.push(el('span', { class: 'score-label', testid: `score-label-${part.key}` }, `${name} `,
+        el('span', { class: 'score-points' }, `(${signed(part.points)}/${range})`)));
+      const minus = el('span', { class: 'score-side minus', style: `min-width: ${widest * 7}px` },
+        cells(-part.min, Math.max(0, -part.points), 'minus', false));
+      const plus = el('span', { class: 'score-side plus' },
+        cells(part.max, Math.max(0, part.points), 'plus', true));
+      rows.push(el('span', { class: 'score-bar', testid: `score-bar-${part.key}` },
+        widest ? minus : null, el('span', { class: 'score-axis' }), plus));
+    }
+    return el('details', { class: 'score-parts', testid: 'score-parts' },
+      el('summary', {}, t('score.summary')), el('div', { class: 'score-grid' }, rows));
   }
 
   // Opens the vacancy the way the operating system opens any link: in the
@@ -1301,33 +1724,73 @@
       }, t('action.copy_url')),
       docButton(item, 'cv'),
       docButton(item, 'letter'),
+      ...reputationButton(item),
+      ...folderButtons(item),
     ];
   }
 
-  // "Generate CV" (the owner, 2026-10-06): a CV tailored to this vacancy,
-  // .docx and .pdf in Downloads under the common CV's name
+  // "Collect reputation" (the owner, 2026-10-17): the employer's reputation
+  // is no longer looked up by every collection; this button looks it up for
+  // the vacancy's company (main/reputation.js) and is gone once the company
+  // has a result — found, or too few sources.
+  function reputationButton(item) {
+    const view = viewOf(item);
+    if (view.reputation_collected) return [];
+    const task = findTask(state.active, 'reputation', item.id);
+    const label = !task ? t('action.collect_reputation')
+      : task.state === 'running' ? t('action.collecting_reputation') : t('action.queued');
+    const identity = state.active;
+    return [el('button', {
+      class: 'copy reputation', testid: 'btn-collect-reputation', disabled: Boolean(task),
+      onclick: () => guarded(() => enqueue({
+        kind: 'reputation', identity, vacancyId: item.id, title: view.title || '', company: view.company || '',
+      })),
+    }, label)];
+  }
+
+  // "Open CV/CL Directory" and "Copy CV/CL Directory Path" (the owner,
+  // 2026-10-13): once the vacancy has a CV or a cover letter, its folder —
+  // opened in the file manager, or its path copied, as "Open" and "Copy URL"
+  // do with the link.
+  function folderButtons(item) {
+    const docs = state.docs[`${state.active}/${item.id}`];
+    if (!docs || !(docs.cv || docs.letter)) return [];
+    const identity = state.active;
+    return [
+      el('button', {
+        class: 'copy folder', testid: 'btn-open-docs',
+        onclick: () => guarded(() => api.openDocumentsDir(identity, item.id)),
+      }, t('action.open_docs')),
+      el('button', {
+        class: 'copy', testid: 'btn-copy-docs-path',
+        onclick: (event) => copyText(docs.dir, event.currentTarget, 'action.copy_docs_path'),
+      }, t('action.copy_docs_path')),
+    ];
+  }
+
+  // "Generate CV" (the owner, 2026-10-06): a CV tailored to this vacancy
   // (tools/cv_tailor.py). "Generate Cover Letter" beside it (2026-10-12): a
-  // cover letter from the same CVs, as "Cover Letter <name>.docx/.pdf"
-  // (tools/cover_letter.py). Each takes a minute or three; one generation at
-  // a time, of either kind (app/main/cv.js says why).
+  // cover letter from the same CVs (tools/cover_letter.py). Both go into the
+  // vacancy's own folder of documents, versioned (tools/documents.py). Each
+  // takes a minute or three; a click queues a task (main/tasks.js), and the
+  // tasks run one at a time, of either kind (app/main/cv.js says why).
   //
   // Both buttons behave alike. Like the reason of a rejection (the owner,
   // 2026-10-12): the first click opens a field for instructions to this one
-  // document, the second click on the same button generates with whatever
-  // the field holds, empty included. The button that made the last document
-  // of its kind reads "CV is generated" / "Cover letter is generated" until
-  // the next one of that kind starts, and still makes another one when
-  // pressed — for a generation that went wrong.
+  // document, the second click on the same button queues it with whatever
+  // the field holds, empty included. While queued or generating the button
+  // says so. Once the vacancy has the document it reads "CV is generated" /
+  // "Cover letter is generated" — for good, since every vacancy has its own
+  // folder (2026-10-13) — and still makes a new version when pressed.
   const DOC_KINDS = {
     cv: {
-      testid: 'cv', button: 'btn-generate-cv', css: 'cv', call: (...args) => api.generateCv(...args),
+      testid: 'cv', button: 'btn-generate-cv', css: 'cv',
       generate: 'action.generate_cv', generating: 'action.generating_cv', done: 'action.cv_generated',
       failed: 'cv.failed', ready: 'cv.ready', readyPages: 'cv.ready_pages',
       instructionsTitle: 'cv.instructions_title', instructionsHint: 'cv.instructions_hint',
     },
     letter: {
       testid: 'letter', button: 'btn-generate-letter', css: 'cv letter',
-      call: (...args) => api.generateCoverLetter(...args),
       generate: 'action.generate_letter', generating: 'action.generating_letter', done: 'action.letter_generated',
       failed: 'letter.failed', ready: 'letter.ready', readyPages: 'letter.ready_pages',
       instructionsTitle: 'letter.instructions_title', instructionsHint: 'letter.instructions_hint',
@@ -1336,17 +1799,22 @@
 
   const sameCard = (mark, item) => Boolean(mark && mark.identity === state.active && mark.id === item.id);
 
+  // Generate, queued, generating, or generated — the last from the
+  // vacancy's folder, so it stays whatever is generated elsewhere.
   function docButton(item, kind) {
     const k = DOC_KINDS[kind];
-    const busy = state.cvBusy;
-    const mine = sameCard(busy, item) && busy.kind === kind;
-    const done = !busy && sameCard(state.cvLast[kind], item);
+    const task = findTask(state.active, kind, item.id);
+    const docs = state.docs[`${state.active}/${item.id}`] || {};
+    const done = !task && docs[kind] > 0;
+    const gone = !task && !done && (docs.errors || {})[kind];
     const classes = [k.css, docFormOpen(item, kind) && 'pressed', done && 'done'].filter(Boolean).join(' ');
+    const label = !task ? (done ? t(k.done) : t(k.generate))
+      : task.state === 'running' ? t(k.generating) : t('action.queued');
     return el('button', {
-      class: classes, testid: k.button, disabled: Boolean(busy),
-      title: busy && !mine ? t('cv.busy_other') : null,
+      class: classes, testid: k.button, disabled: Boolean(task),
+      title: gone || (task && task.state === 'queued' ? t('cv.queued_hint') : null),
       onclick: () => askDoc(item, kind),
-    }, mine ? t(k.generating) : done ? t(k.done) : t(k.generate));
+    }, label);
   }
 
   function docFormOpen(item, kind) {
@@ -1354,7 +1822,7 @@
   }
 
   function askDoc(item, kind) {
-    if (state.cvBusy) return;
+    if (findTask(state.active, kind, item.id)) return;
     if (docFormOpen(item, kind)) return generateDoc(item, kind, state.cvFor.draft || '');
     state.cvFor = { identity: state.active, id: item.id, kind, draft: '' };
     render();
@@ -1392,27 +1860,15 @@
   }
 
   function generateDoc(item, kind, instructions) {
-    if (state.cvBusy) return;
     const identity = state.active;
-    const key = `${identity}/${item.id}/${kind}`;
+    if (findTask(identity, kind, item.id)) return;
+    const view = viewOf(item);
     state.cvFor = null;
-    state.cvBusy = { identity, id: item.id, kind };
-    state.cvLast[kind] = null;
-    state.cvResults.delete(key);
-    render();
-    guarded(async () => {
-      try {
-        const result = await DOC_KINDS[kind].call(identity, item.id, (instructions || '').trim());
-        state.cvResults.set(key, result && result.ok ? result
-          : { ok: false, error: (result && result.error) || 'unknown error' });
-        if (result && result.ok) state.cvLast[kind] = { identity, id: item.id };
-      } catch (error) {
-        state.cvResults.set(key, { ok: false, error: error.message });
-      } finally {
-        state.cvBusy = null;
-        render();
-      }
-    });
+    state.cvResults.delete(`${identity}/${item.id}/${kind}`);
+    guarded(() => enqueue({
+      kind, identity, vacancyId: item.id, title: view.title || '', company: view.company || '',
+      instructions: (instructions || '').trim(),
+    }));
   }
 
   // What the generation produced: the files, the page count, and what to
@@ -1429,7 +1885,7 @@
       class: 'link', testid: id('close'), onclick: () => { state.cvResults.delete(key); render(); },
     }, t('cv.close'));
     if (!result.ok) {
-      const text = result.error === 'busy' ? t('cv.busy_other') : `${t(k.failed)}: ${result.error}`;
+      const text = `${t(k.failed)}: ${result.error === 'stopped' ? t('task.stopped') : result.error}`;
       return el('div', { class: 'cv-result failed', testid: id('result') },
         el('div', { class: 'cv-head' }, el('span', {}, text), close));
     }
@@ -1462,11 +1918,14 @@
   }
 
   function copyLink(view, button) {
-    if (!view.url) return;
+    if (view.url) copyText(view.url, button, 'action.copy_url');
+  }
+
+  function copyText(text, button, labelKey) {
     guarded(async () => {
-      await api.copyText(view.url);
+      await api.copyText(text);
       button.textContent = t('action.copied');
-      setTimeout(() => { button.textContent = t('action.copy_url'); }, 1500);
+      setTimeout(() => { button.textContent = t(labelKey); }, 1500);
     });
   }
 
@@ -1613,16 +2072,261 @@
     return el('div', { class: 'entry', testid: `entry-${step.kind}${suffix}` }, head, body);
   }
 
-  function renderRunPanel() {
-    const panel = document.querySelector('[data-testid="run-panel"]');
-    const visible = state.run.running || state.log.length > 0 || state.runStatus;
-    panel.hidden = !visible;
-    if (!visible) return;
-    document.querySelector('[data-testid="run-status"]').textContent =
-      `${t('run.log_title')} · ${state.runStatus ? state.runStatus() : ''}`;
-    const log = document.querySelector('[data-testid="run-log"]');
-    log.textContent = state.log.join('\n');
-    log.scrollTop = log.scrollHeight;
+  // The bottom panel (the owner, 2026-10-13), as an IDE's: the tasks on the
+  // left, top to bottom; the log of the chosen one on the right — the
+  // running one until a click chooses another. It shows while there are
+  // tasks. Its height and the split are dragged by their sashes and kept.
+
+  const TASK_STATE_ICONS = { queued: '○', running: null, done: '✓', failed: '✕', stopped: '■' };
+  const TASK_KIND_KEYS = {
+    collect: 'task.kind.collect', rest: 'task.kind.rest', cv: 'task.kind.cv', letter: 'task.kind.letter',
+    reputation: 'task.kind.reputation', batch: 'task.kind.batch',
+  };
+  // a collection's steps (main/steps.js); a stage the app has no name for
+  // shows as the pipeline wrote it
+  const RUN_STEP_KEYS = {
+    prepare: 'step.prepare', checklist: 'step.checklist', summary: 'step.summary',
+    backfill: 'step.backfill', rescore_top: 'step.rescore_top', remote_check: 'step.remote_check',
+    ai_brief: 'step.ai_brief', ai_check: 'step.ai_check',
+    load: 'step.load', fetch: 'step.fetch', rescore: 'step.rescore', duplicates: 'step.duplicates',
+    links: 'step.links', companies: 'step.companies', descriptions: 'step.descriptions',
+    benchmark: 'step.benchmark', channels: 'step.channels', wikidata: 'step.wikidata', save: 'step.save',
+    selection: 'step.selection', reports: 'step.reports', contracts: 'step.contracts',
+  };
+  const TASK_STATE_KEYS = {
+    queued: 'task.state.queued', running: 'task.state.running', done: 'task.state.done',
+    failed: 'task.state.failed', stopped: 'task.state.stopped',
+  };
+
+  function taskLabel(task) {
+    const what = t(TASK_KIND_KEYS[task.kind]);
+    if (task.kind === 'collect' || task.kind === 'rest') return `${what} · ${task.identity}`;
+    if (task.kind === 'batch') {
+      const p = task.progress || {};
+      return `${what} · ${task.identity} · ${p.index || 0}/${p.total || 0}`;
+    }
+    const vacancy = [task.title, task.company].filter(Boolean).join(' — ') || task.vacancyId;
+    return `${what} · ${vacancy} · ${task.identity}`;
+  }
+
+  function taskStateText(task) {
+    if (task.kind === 'batch') return batchStateText(task);
+    if (task.state === 'queued' && task.waitingFor === 'batch') return t('task.waiting_batch');
+    if (task.state === 'queued' && task.waitingFor) return t('run.waiting_for', { identity: task.waitingFor });
+    if (task.state === 'failed' && task.error) return `${t('task.state.failed')}: ${task.error}`;
+    return t(TASK_STATE_KEYS[task.state]);
+  }
+
+  function batchStateText(task) {
+    const p = task.progress || {};
+    const summary = t('batch.summary', { made: p.made || 0, gone: p.gone || 0, failed: p.failed || 0 });
+    if (task.state === 'running') {
+      if (task.stopping) return `${t('batch.stopping')} · ${summary}`;
+      if (task.holding) return `${t('batch.holding')} · ${summary}`;
+      const c = task.current;
+      const now = c ? `${t(TASK_KIND_KEYS[c.kind])} · ${[c.title, c.company].filter(Boolean).join(' — ') || c.vacancyId}` : '';
+      return [t('task.state.running'), now, summary].filter(Boolean).join(' · ');
+    }
+    const state = task.state === 'failed' && task.error ? `${t('task.state.failed')}: ${task.error}` : t(TASK_STATE_KEYS[task.state]);
+    return `${state} · ${summary}`;
+  }
+
+  function stepName(step) {
+    return RUN_STEP_KEYS[step.key] ? t(RUN_STEP_KEYS[step.key]) : step.name || step.key || '?';
+  }
+
+  function stepClock(ms) {
+    const seconds = Math.max(0, Math.round(ms / 1000));
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = String(seconds % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+  }
+
+  // A collection's steps under it: shown while it runs, and when opened.
+  function stepRows(task) {
+    if (!task.steps || !task.steps.length) return [];
+    if (!(task.state === 'running' ? !state.foldedTasks.has(task.id) : state.openTasks.has(task.id))) return [];
+    return task.steps.map((step, index) => el('div', {
+      class: `task-step ${step.state}`, testid: `task-step-${task.id}-${index}`, 'data-state': step.state,
+      title: [stepName(step), step.progress || step.note].filter(Boolean).join(' · '),
+      onclick: () => chooseTask(task.id),
+    },
+    el('span', { class: 'task-icon' }, step.state === 'running'
+      ? el('span', { class: 'spinner small' }) : TASK_STATE_ICONS[step.state]),
+    el('span', { class: 'task-label' }, stepName(step),
+      (step.progress || step.note) && el('span', { class: 'step-detail' }, step.progress || step.note)),
+    el('span', { class: 'step-time', ...(step.began != null ? { 'data-began': String(step.began) } : {}) },
+      step.began != null ? stepClock(Date.now() - step.began) : step.duration || '')));
+  }
+
+  function toggleSteps(task) {
+    const set = task.state === 'running' ? state.foldedTasks : state.openTasks;
+    if (set.has(task.id)) set.delete(task.id);
+    else set.add(task.id);
+    renderTaskPanel();
+  }
+
+  // the running steps' time, counted here between the log's lines
+  setInterval(() => {
+    for (const cell of document.querySelectorAll('[data-testid="task-list"] [data-began]')) {
+      cell.textContent = stepClock(Date.now() - Number(cell.dataset.began));
+    }
+  }, 1000);
+
+  function shownTaskId() {
+    const chosen = state.tasks.find((task) => task.id === state.chosenTask);
+    if (chosen) return chosen.id;
+    const running = state.tasks.filter((task) => task.state === 'running');
+    if (running.length) return running[running.length - 1].id;
+    return state.tasks.length ? state.tasks[state.tasks.length - 1].id : null;
+  }
+
+  function chooseTask(id) {
+    state.chosenTask = id;
+    renderTaskPanel();
+  }
+
+  function appendTaskLog(text) {
+    state.taskLog.push(text);
+    if (state.taskLog.length > LOG_LIMIT) state.taskLog.splice(0, state.taskLog.length - LOG_LIMIT);
+    const log = document.querySelector('[data-testid="task-log"]');
+    if (!log) return;
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
+    log.append(`${log.textContent ? '\n' : ''}${text}`);
+    if (atBottom) log.scrollTop = log.scrollHeight;
+  }
+
+  let taskLogRequest = 0;
+
+  function showTaskLog(id) {
+    if (state.shownTask === id) return;
+    state.shownTask = id;
+    state.taskLog = [];
+    const log = document.querySelector('[data-testid="task-log"]');
+    if (log) log.textContent = '';
+    if (id == null) return;
+    const asked = ++taskLogRequest;
+    guarded(async () => {
+      const lines = await api.taskLog(id);
+      if (asked !== taskLogRequest) return;
+      // lines that came as events meanwhile are in the answer too
+      state.taskLog = lines.slice(-LOG_LIMIT);
+      if (log) {
+        log.textContent = state.taskLog.join('\n');
+        log.scrollTop = log.scrollHeight;
+      }
+    });
+  }
+
+  function renderTaskPanel() {
+    const panel = document.querySelector('[data-testid="task-panel"]');
+    panel.hidden = !state.tasks.length;
+    if (panel.hidden) return;
+    const id = shownTaskId();
+    const list = document.querySelector('[data-testid="task-list"]');
+    const scroll = list.scrollTop;
+    list.replaceChildren(...state.tasks.flatMap((task) => [el('div', {
+      class: `task ${task.state}${task.id === id ? ' chosen' : ''}`,
+      testid: `task-${task.id}`, 'data-state': task.state, title: taskStateText(task),
+      onclick: () => chooseTask(task.id),
+    },
+    task.steps && task.steps.length ? el('button', {
+      class: 'link task-fold', testid: 'task-fold',
+      onclick: (event) => { event.stopPropagation(); toggleSteps(task); },
+    }, stepRows(task).length ? '▾' : '▸') : null,
+    el('span', { class: 'task-icon' }, task.state === 'running'
+      ? el('span', { class: 'spinner small' }) : TASK_STATE_ICONS[task.state]),
+    el('span', { class: 'task-label' }, taskLabel(task),
+      task.origin === 'auto' && el('span', { class: 'task-auto' }, t('task.auto')),
+      task.kind === 'batch' && el('span', { class: 'step-detail' }, batchStateText(task))),
+    ACTIVE_TASK.has(task.state) && !task.stopping && el('button', {
+      class: 'link task-cancel', testid: 'task-cancel',
+      title: task.kind === 'batch' ? t('batch.stop') : t('task.cancel'),
+      onclick: (event) => { event.stopPropagation(); guarded(() => api.cancelTask(task.id)); },
+    }, '✕')), ...stepRows(task)]));
+    list.scrollTop = scroll;
+    const queued = state.tasks.filter((task) => task.state === 'queued').length;
+    const finished = state.tasks.filter((task) => !ACTIVE_TASK.has(task.state)).length;
+    document.querySelector('[data-testid="task-list-title"]').replaceChildren(
+      el('span', {}, t('task.list_title', { n: state.tasks.length - finished })),
+      el('span', { class: 'pane-actions' },
+        queued > 0 && el('button', {
+          class: 'link', testid: 'tasks-cancel-queued', onclick: () => guarded(() => api.cancelQueued(null)),
+        }, t('task.cancel_queued', { n: queued })),
+        finished > 0 && el('button', {
+          class: 'link', testid: 'tasks-clear', onclick: () => guarded(() => api.clearTasks()),
+        }, t('task.clear'))));
+    const shown = state.tasks.find((task) => task.id === id);
+    document.querySelector('[data-testid="task-log-title"]').textContent = shown
+      ? `${t('task.log_title')} · ${taskLabel(shown)} · ${taskStateText(shown)}` : t('task.log_title');
+    showTaskLog(id);
+  }
+
+  // --- the panel's sashes: its height, and the split between its panes -------
+
+  function readPanelLayout() {
+    try {
+      return JSON.parse(localStorage.getItem(PANEL_KEY) || 'null') || {};
+    } catch {
+      return {};
+    }
+  }
+
+  function savePanelLayout(layout) {
+    try {
+      localStorage.setItem(PANEL_KEY, JSON.stringify({ ...readPanelLayout(), ...layout }));
+    } catch {
+      // storage unavailable: the next start has the defaults
+    }
+  }
+
+  function applyPanelLayout() {
+    const layout = readPanelLayout();
+    const panel = document.querySelector('[data-testid="task-panel"]');
+    // 20% of the window, 220 px at least (the owner, 2026-10-13)
+    const height = layout.height || Math.max(220, Math.round(window.innerHeight * 0.2));
+    panel.style.height = `${clamp(height, 100, window.innerHeight - 160)}px`;
+    panel.style.setProperty('--tasks-width', `${clamp(layout.split || 38, 15, 85)}%`);
+  }
+
+  function clamp(value, low, high) {
+    return Math.min(Math.max(value, low), Math.max(low, high));
+  }
+
+  function dragSash(sash, onMove, onEnd) {
+    sash.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      sash.classList.add('active');
+      document.body.classList.add(sash.dataset.axis === 'x' ? 'resizing-x' : 'resizing-y');
+      const move = (e) => onMove(e);
+      const up = () => {
+        sash.classList.remove('active');
+        document.body.classList.remove('resizing-x', 'resizing-y');
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', up);
+        onEnd();
+      };
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', up);
+    });
+  }
+
+  function setupTaskPanel() {
+    const panel = document.querySelector('[data-testid="task-panel"]');
+    applyPanelLayout();
+    dragSash(document.querySelector('[data-testid="task-panel-sash"]'), (event) => {
+      const height = clamp(window.innerHeight - event.clientY, 100, window.innerHeight - 160);
+      panel.style.height = `${height}px`;
+    }, () => savePanelLayout({ height: panel.getBoundingClientRect().height }));
+    dragSash(document.querySelector('[data-testid="task-split-sash"]'), (event) => {
+      const box = panel.getBoundingClientRect();
+      const split = clamp(((event.clientX - box.left) / box.width) * 100, 15, 85);
+      panel.style.setProperty('--tasks-width', `${split}%`);
+    }, () => {
+      const value = parseFloat(panel.style.getPropertyValue('--tasks-width'));
+      if (!Number.isNaN(value)) savePanelLayout({ split: value });
+    });
   }
 
   // --- the pipeline indicator ------------------------------------------------
@@ -1652,15 +2356,12 @@
 
   // --- start -----------------------------------------------------------------
 
-  api.onRunEvent(onRunEvent);
+  api.onTaskEvent(onTaskEvent);
   restoreView();
+  setupTaskPanel();
   window.addEventListener('beforeunload', saveView);
   guarded(async () => {
-    const run = await api.getRunState();
-    if (run && run.running) {
-      state.run = run;
-      state.runStatus = () => t('run.running', { kind: t(RUN_KIND_KEYS[run.kind]), identity: run.identity });
-    }
+    state.tasks = (await api.listTasks()) || [];
     render();
     try {
       await loadIdentities();

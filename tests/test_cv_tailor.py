@@ -261,22 +261,6 @@ def test_no_docx_of_the_common_cv_is_an_error(tmp_path):
         cv_tailor.cv_settings({"owner": {}}, tmp_path)
 
 
-def test_publish_replaces_both_old_files_even_without_a_new_pdf(tmp_path):
-    out = tmp_path / "Downloads"
-    out.mkdir()
-    (out / "CV Alex.docx").write_text("old")
-    (out / "CV Alex.pdf").write_text("old, another vacancy")
-    (out / "unrelated.pdf").write_text("keep")
-    new = tmp_path / "build" / "x.docx"
-    new.parent.mkdir()
-    new.write_text("new")
-    published = cv_tailor.publish([new], out, "CV Alex")
-    assert published == [out / "CV Alex.docx"]
-    assert (out / "CV Alex.docx").read_text() == "new"
-    assert not (out / "CV Alex.pdf").exists()
-    assert (out / "unrelated.pdf").exists()
-
-
 class FakeWord:
     def __init__(self, pages=2):
         self.pages = pages
@@ -304,7 +288,7 @@ def test_a_whole_run_with_a_fake_model_and_a_fake_word(tmp_path, common_docx):
 
     out = tmp_path / "Downloads"
     out.mkdir()
-    (out / "CV Alex Example.pdf").write_text("an older one")
+    (out / "CV Alex Example.pdf").write_text("an older one")   # made before the log: V1
     word = FakeWord()
     result = cv_tailor.tailor(
         settings=_settings(tmp_path, common_docx, parent), vacancy={"title": "Go dev", "company": "Acme",
@@ -318,9 +302,56 @@ def test_a_whole_run_with_a_fake_model_and_a_fake_word(tmp_path, common_docx):
     assert "<parent_cv>" in seen["message"] and "We use Go." in seen["message"]
     archive = Path(result["archive"])
     assert archive.parent == tmp_path / "cvs" / "v1"
+    assert result["version"] == 2 and result["dir"] == str(out)
+    assert (out / "Old versions" / "CV Alex Example V1.pdf").read_text() == "an older one"
     for name in ("model_input.md", "content_from_model.json", "content.json", "result.json",
                  "CV Alex Example.docx", "CV Alex Example.pdf"):
         assert (archive / name).exists(), name
+
+
+def test_the_second_version_gets_the_log_and_the_first_as_its_base(tmp_path, common_docx):
+    seen = []
+
+    def model(message, **_):
+        seen.append(message)
+        return tailored()
+
+    folder = tmp_path / "docs" / "sharp" / "v1"
+    run = dict(settings=_settings(tmp_path, common_docx), vacancy={"title": "Dev"}, vacancy_id="v1",
+               archive_root=tmp_path / "cvs", out_dir=folder, model_call=model, converter=FakeWord())
+    first = cv_tailor.tailor(**run)
+    second = cv_tailor.tailor(**run, instructions="Shorter summary.")
+    assert (first["version"], second["version"]) == (1, 2)
+    assert "first version of the CV (V1)" in seen[0] and "<log>" not in seen[0]
+    assert "version V2 of the CV" in seen[1]
+    assert "## V1 · " in seen[1] and "Without a message." in seen[1]
+    assert "<previous_version>" in seen[1] and "Northwind" in seen[1]
+    assert (folder / "Old versions" / "CV Alex Example V1.pdf").exists()
+    assert (folder / "Old versions" / "CV Alex Example V1.docx").exists()
+    log = (folder / "CV log.md").read_text(encoding="utf-8")
+    assert "## V2 · " in log and "> Shorter summary." in log
+
+
+def test_a_version_the_model_reads_as_rejected_is_kept_as_failed(tmp_path, common_docx):
+    folder = tmp_path / "docs" / "sharp" / "v1"
+    verdicts = iter([{"failed": False, "reason": ""}, {"failed": True, "reason": "asked to start over"}])
+    run = dict(settings=_settings(tmp_path, common_docx), vacancy={"title": "Dev"}, vacancy_id="v1",
+               archive_root=tmp_path / "cvs", out_dir=folder, converter=FakeWord(),
+               model_call=lambda message, **_: tailored(previous_version=next(verdicts)))
+    cv_tailor.tailor(**run)
+    cv_tailor.tailor(**run, instructions="This is bad, start over.")
+    assert (folder / "Old versions" / "CV Alex Example V1 failed.pdf").exists()
+    entries = __import__("documents").read_log(folder / "CV log.md")
+    assert [(e["version"], e["failed"]) for e in entries] == [(1, True), (2, False)]
+    assert entries[0]["failed_reason"] == "asked to start over"
+    assert entries[1]["message"] == "This is bad, start over."
+
+
+def test_the_prompt_explains_the_log_and_a_failed_version():
+    prompt = " ".join(cv_tailor.PROMPT_PATH.read_text(encoding="utf-8").split())
+    assert "Every request in the log still stands" in prompt
+    assert "The previous version is the mould" in prompt
+    assert "about ten or more" in prompt
 
 
 def test_a_run_without_a_parent_cv_says_so(tmp_path, common_docx):
@@ -471,3 +502,15 @@ def test_a_header_line_too_long_for_its_column_is_a_warning():
     long = "Senior Full-Stack Software Engineer - C# / AI-Assisted Development & Code Review"
     assert len(cv_tailor.layout_warnings({"headline": long, "tagline": "C# / .NET"})) == 1
     assert cv_tailor.layout_warnings({"headline": "Senior Software Engineer", "tagline": "C#"}) == []
+
+
+def test_a_vacancy_with_a_dead_link_or_no_description_is_refused_into_the_log(tmp_path):
+    described = {"title": "Dev", "description_text": "C# and SQL Server. " * 10}
+    assert cv_tailor.gone_reason(described) is None
+    assert cv_tailor.gone_reason({**described, "link_check": {"status": "dead"}}) == "the link is dead"
+    assert cv_tailor.gone_reason({"title": "Dev", "description_text": "Apply now."}) == "it has no description"
+    doc = __import__("documents").Document(tmp_path / "sharp" / "v1", "cv", "CV Alex")
+    with pytest.raises(cv_tailor.TailorError, match="Vacancy not found, possibly outdated"):
+        cv_tailor.refuse_gone({**described, "link_check": {"status": "dead"}}, doc)
+    assert doc.log_path.exists() and not doc.current(".pdf").exists()
+    cv_tailor.refuse_gone(described, doc)   # nothing to say

@@ -23,10 +23,10 @@ without the model:
      CV) and signs with the name as a person writes it; Word (or
      LibreOffice) converts it to .pdf and counts the pages. More than one page
      is a warning, nothing is cut.
-  3. The files go into the out folder (Downloads by default) as
-     "<the common CV's name with CV turned into Cover Letter>.docx/.pdf"
-     ("CV Ivan Petrov.pdf" -> "Cover Letter Ivan Petrov.pdf"), replacing the
-     previous pair only after everything succeeded.
+  3. The files go into the vacancy's folder of documents beside its CV
+     (tools/documents.py) as "<the common CV's name with CV turned into Cover
+     Letter>.docx/.pdf" ("CV Ivan Petrov.pdf" -> "Cover Letter Ivan
+     Petrov.pdf"), versioned as the CV is, with "Cover Letter log.md".
 
 Every run is kept in data/identities/<prefix>/cover_letters/<vacancy id>/<time>/.
 """
@@ -45,6 +45,7 @@ import common  # noqa: E402
 import cv_convert  # noqa: E402
 import cv_docx  # noqa: E402
 import cv_tailor  # noqa: E402
+import documents  # noqa: E402
 from cv_tailor import TailorError, _string, _strings  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -55,7 +56,7 @@ LETTER_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "required": ["name", "headline", "tagline", "contacts", "date", "recipient", "greeting", "paragraphs",
-                 "closing", "technologies", "report"],
+                 "closing", "technologies", "previous_version", "report"],
     "properties": {
         "name": _string("exactly as in the common CV"),
         "headline": _string("the title line under the name"),
@@ -67,6 +68,7 @@ LETTER_SCHEMA = {
         "paragraphs": _strings("3-4 paragraphs, 250-350 words in all"),
         "closing": _string(),
         "technologies": _strings("every technology the letter names"),
+        "previous_version": cv_tailor.PREVIOUS_VERSION_SCHEMA,
         "report": {
             "type": "object", "additionalProperties": False,
             "required": ["covered", "gaps", "from_parent", "notes"],
@@ -87,7 +89,8 @@ def letter_stem(cv_stem: str) -> str:
 
 
 def build_message(common_text: str, parent_text: Optional[str], vacancy: dict,
-                  instructions: Optional[str] = None, today: Optional[date] = None) -> str:
+                  instructions: Optional[str] = None, today: Optional[date] = None, *,
+                  log_text: str = "", previous_text: Optional[str] = None, version: int = 1) -> str:
     description = (vacancy.get("description_text") or "").strip()
     if len(description) > cv_tailor.DESCRIPTION_LIMIT:
         description = description[:cv_tailor.DESCRIPTION_LIMIT] + "\n[cut]"
@@ -98,6 +101,7 @@ def build_message(common_text: str, parent_text: Optional[str], vacancy: dict,
         parts += ["<parent_cv>", parent_text.strip(), "</parent_cv>", ""]
     else:
         parts += ["There is no parent CV this time: work from the common CV alone.", ""]
+    parts += cv_tailor.history_parts(log_text, previous_text, version, "cover letter")
     instructions = (instructions or "").strip()
     if instructions:
         parts += ["<person_instructions>", instructions, "</person_instructions>", ""]
@@ -162,8 +166,15 @@ def check_facts(content: dict, common_text: str, parent_text: Optional[str]) -> 
 def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path, out_dir: Path,
                  content: Optional[dict] = None, model_call=None, converter=None,
                  instructions: Optional[str] = None, today: Optional[date] = None) -> dict:
-    """The whole run; returns the result the app shows. `converter` is a
+    """The whole run; returns the result the app shows. `out_dir` is the
+    vacancy's folder of documents, as for cv_tailor.tailor. `converter` is a
     cv_convert.WordSession-like object, or None to pick one here."""
+    say = cv_tailor.say
+    document = documents.Document(out_dir, "letter", letter_stem(settings["output_stem"]))
+    earlier = cv_tailor.earlier_versions(document)
+    say(f"Cover letter V{earlier['version']}: {vacancy.get('title', vacancy_id)} — {vacancy.get('company', '')}")
+    if instructions and instructions.strip():
+        say(f"message: {instructions.strip()}")
     common_text = cv_docx.read_cv_text(settings["common"])
     parent_text = None
     warnings = []
@@ -176,8 +187,9 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
     workdir = archive_root / vacancy_id / cv_tailor._stamp()
     workdir.mkdir(parents=True, exist_ok=True)
     if content is None:
-        message = build_message(common_text, parent_text, vacancy, instructions, today)
+        message = build_message(common_text, parent_text, vacancy, instructions, today, **earlier)
         (workdir / "model_input.md").write_text(message, encoding="utf-8")
+        say(f"asking the model ({settings['model']}), a minute or two")
         if model_call is None:
             content = cv_tailor.call_model(message, model=settings["model"], workdir=workdir,
                                            prompt_path=PROMPT_PATH, schema=LETTER_SCHEMA)
@@ -202,6 +214,7 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
     if converter is not None:
         pages = converter.convert(docx_path, pdf_path)["pages"]
     elif cv_convert.word_available():
+        say("Word: the PDF and the page count")
         with cv_convert.WordSession() as session:
             pages = session.convert(docx_path, pdf_path)["pages"]
     elif cv_convert.soffice_path():
@@ -213,10 +226,16 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
         warnings.append(f"{pages} pages: a cover letter is one page; shorten it before sending")
 
     files = [docx_path] + ([pdf_path] if pdf_path.exists() else [])
-    published = cv_tailor.publish(files, out_dir, stem)
+    version = cv_tailor.publish_version(document, files, content, instructions)
+    published = version["files"]
+    if version.get("previous_failed"):
+        say(f"V{version['version'] - 1} marked failed: {(content.get('previous_version') or {}).get('reason') or ''}")
+    say(f"V{version['version']}: {pages or '?'} page(s), in {out_dir}")
     result = {
         "ok": True,
         "vacancy": vacancy_id,
+        "version": version["version"],
+        "dir": str(out_dir),
         "docx": str(next((p for p in published if p.suffix == ".docx"), "")),
         "pdf": str(next((p for p in published if p.suffix == ".pdf"), "")),
         "pages": pages,
@@ -235,7 +254,8 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="A cover letter for one vacancy: .docx and .pdf")
     parser.add_argument("--identity", default=None, help="Search identity prefix")
     parser.add_argument("--vacancy", required=True, help="The vacancy id (vacancies.id)")
-    parser.add_argument("--out-dir", default=None, help="Where the files go (default: ~/Downloads)")
+    parser.add_argument("--documents-dir", default=None,
+                        help="The folder of generated documents (default: tools/documents.py where)")
     parser.add_argument("--content", default=None,
                         help="Render this content JSON instead of asking the model")
     parser.add_argument("--model", default=None, help="Override cv.model (a claude --model value)")
@@ -251,16 +271,21 @@ def main(argv=None) -> int:
         if args.model:
             settings["model"] = args.model
         content = json.loads(Path(args.content).read_text(encoding="utf-8")) if args.content else None
+        vacancy = cv_tailor.load_vacancy(common.DB_PATH, args.vacancy)
+        out_dir = documents.vacancy_dir(prefix, args.vacancy,
+                                        Path(args.documents_dir) if args.documents_dir else None)
+        cv_tailor.refuse_gone(vacancy, documents.Document(out_dir, "letter",
+                                                          letter_stem(settings["output_stem"])))
         result = write_letter(
             settings=settings,
-            vacancy=cv_tailor.load_vacancy(common.DB_PATH, args.vacancy),
+            vacancy=vacancy,
             vacancy_id=args.vacancy,
             archive_root=common.DATA_DIR / "cover_letters",
-            out_dir=Path(args.out_dir) if args.out_dir else cv_tailor.default_downloads(),
+            out_dir=out_dir,
             content=content,
             instructions=args.instructions,
         )
-    except (TailorError, cv_convert.ConversionError, OSError, ValueError) as exc:
+    except (TailorError, documents.DocumentsError, cv_convert.ConversionError, OSError, ValueError) as exc:
         if args.json:
             print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
         else:

@@ -13,33 +13,42 @@ async function call(channel, ...args) {
 contextBridge.exposeInMainWorld('api', {
   listIdentities: () => call('identities'),
   loadSegments: (identity) => call('segments', identity),
-  // view: { segments, statuses, fresh, sources, fits } (store.viewParams);
+  // view: { segments, statuses, fresh, sources, fits, companies, ages } (store.viewParams);
   // page: { shown: { class: rows }, expanded: [class] }
   loadListing: (identity, view, page) => call('listing', identity, view, page || {}),
   classTotals: (identity, view) => call('class-totals', identity, view),
   listingCounts: (identity, view) => call('counts', identity, view),
   listSources: (identity, view) => call('sources', identity, view),
+  listCompanies: (identity, view) => call('companies', identity, view),
+  listAges: (identity, view) => call('ages', identity, view),
+  // filters: { ages, statuses, classes } (main/cleanup.js); a dry run counts
+  cleanup: (identity, filters, dryRun) => call('cleanup', identity, filters, Boolean(dryRun)),
   setFeedback: (identity, id, status, reason) => call('set-feedback', identity, id, status, reason ?? null),
   advance: (identity, id, step, comment) => call('advance', identity, id, step, comment ?? ''),
   stepBack: (identity, id) => call('step-back', identity, id),
   editComment: (identity, id, kind, index, text) => call('edit-comment', identity, id, kind, index ?? null, text ?? ''),
   pendingFeedbackCount: (identity) => call('pending-feedback', identity),
   pipelineStatus: (identity) => call('pipeline-status', identity),
-  getRunState: () => call('run-state'),
-  startRun: (request) => call('start-run', request),
-  stopRun: () => call('stop-run'),
   refresh: () => call('refresh'),
   openExternal: (url) => call('open-external', url),
   copyText: (text) => call('copy-text', text),
-  generateCv: (identity, vacancyId, instructions) => call('generate-cv', identity, vacancyId, instructions),
-  generateCoverLetter: (identity, vacancyId, instructions) =>
-    call('generate-cover-letter', identity, vacancyId, instructions),
-  cvState: () => call('cv-state'),
+  // The task queue (main/tasks.js). request: { kind: 'collect' | 'cv' |
+  // 'letter', identity, vacancyId?, title?, company?, instructions? }
+  enqueueTask: (request) => call('enqueue-task', request),
+  listTasks: () => call('tasks'),
+  taskLog: (id) => call('task-log', id),
+  cancelTask: (id) => call('cancel-task', id),
+  cancelQueued: (identity) => call('cancel-queued', identity ?? null),
+  clearTasks: () => call('clear-tasks'),
+  // { type: 'tasks', tasks } | { type: 'log', id, text } | { type: 'finished', task }
+  onTaskEvent: (listener) => {
+    const wrapped = (_event, payload) => listener(payload);
+    ipcRenderer.on('task-event', wrapped);
+    return () => ipcRenderer.removeListener('task-event', wrapped);
+  },
+  // The folder of generated documents: { id: { dir, cv, letter, errors } }
+  documentsState: (identity, ids) => call('documents-state', identity, ids),
+  openDocumentsDir: (identity, vacancyId) => call('open-documents-dir', identity, vacancyId),
   openCvFile: (file) => call('open-cv-file', file),
   showCvFile: (file) => call('show-cv-file', file),
-  onRunEvent: (listener) => {
-    const wrapped = (_event, payload) => listener(payload);
-    ipcRenderer.on('run-event', wrapped);
-    return () => ipcRenderer.removeListener('run-event', wrapped);
-  },
 });

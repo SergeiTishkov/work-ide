@@ -161,6 +161,27 @@ cv:
 
 The rest of the `cv:` section is in `docs/IDENTITIES.md`, "The CV per vacancy".
 
+**Where the generated CVs and cover letters go.** Ask once, for all
+identities: "Which folder should the CVs and cover letters go to?" Then:
+
+```bash
+python tools/documents.py set "<the answer>"
+```
+
+An existing folder gets a "Work IDE CVs and CLs" folder inside it; a path
+that does not exist is created and used as it is. "I don't care" is an
+answer: then it is `~/Downloads/Work IDE CVs and CLs`, and nothing needs
+setting. Skip the question when `python tools/documents.py where` says the
+folder is already set (a second identity).
+
+**Automatic generation (optional).** Offer once: after each collection, the
+app can generate a CV and a cover letter for the vacancies matching filters
+of the person's choosing — a market, a source, a class, or several filters
+at once. When they want it, write `cv.auto` into the local profile
+(`docs/IDENTITIES.md`, "Generating without a click"). Say that each document
+is a call to the model and takes minutes, so broad filters on a large
+backlog mean a long queue after the next collection. "No" is a full answer.
+
 If the person has an email address to use in the User-Agent, put it in their
 `<prefix>_profile.yaml` under `contact.user_agent_contact`. The address stays
 outside the shared repository.

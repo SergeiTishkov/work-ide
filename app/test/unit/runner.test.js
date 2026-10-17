@@ -8,11 +8,11 @@ const { PassThrough } = require('node:stream');
 const { Runner, buildCommand, describeEvent, ALLOWED_TOOLS } = require('../../main/runner');
 const { tempDir } = require('../helpers/fixture-db');
 
-test('collect runs /run for the identity, headless, with the allowed tools', () => {
+test('collect runs the fast cycle /top for the identity, headless, with the allowed tools', () => {
   const cmd = buildCommand('collect', 'sharp', { root: '/repo' });
   assert.equal(cmd.command, 'claude');
   assert.equal(cmd.cwd, '/repo');
-  assert.deepEqual(cmd.args, ['-p', '/run sharp', '--output-format', 'stream-json', '--verbose',
+  assert.deepEqual(cmd.args, ['-p', '/top sharp', '--output-format', 'stream-json', '--verbose',
     '--allowedTools', ALLOWED_TOOLS.join(',')]);
 });
 
@@ -52,7 +52,7 @@ test('one run at a time; output is described and logged; exit is reported', asyn
   runner.onEvent((e) => events.push(e));
 
   assert.deepEqual(runner.start('collect', 'sharp'), { ok: true });
-  assert.equal(spawned[0].args[1], '/run sharp');
+  assert.equal(spawned[0].args[1], '/top sharp');
   assert.equal(spawned[0].options.cwd, '/repo');
   assert.deepEqual(runner.state(), { running: true, identity: 'sharp', kind: 'collect' });
   assert.equal(runner.start('collect', 'partsharp').error, 'busy');

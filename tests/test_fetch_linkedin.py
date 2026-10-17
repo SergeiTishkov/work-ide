@@ -307,6 +307,32 @@ def test_max_pages_caps_a_long_list(monkeypatch):
     assert len(calls) == 3 and len(records) == 30
 
 
+def test_the_walk_stops_at_its_time_budget_and_says_so(monkeypatch):
+    """Each page costs a minute here: a 3-minute budget reads 3 pages of the
+    first pair, none of the second, and the note says the window was cut."""
+    fake, calls = _pages(500)
+    clock = [0.0]
+
+    def paged(*args, **kwargs):
+        clock[0] += 60
+        return fake(*args, **kwargs)
+    _quiet(monkeypatch, paged)
+    monkeypatch.setattr(fetch_linkedin.time, "monotonic", lambda: clock[0])
+    records, note = fetch_linkedin.fetch(keywords=["C#"], locations=["UK", "Germany"],
+                                         max_pages=10, enrich_limit=0, time_budget_minutes=3)
+    assert len(calls) == 3 and len(records) == 30
+    assert fetch_linkedin.TIME_BUDGET_NOTE in note
+    assert "after 0 of 2 pairs" in note
+
+
+def test_a_walk_inside_its_budget_says_nothing_of_it(monkeypatch):
+    fake, _ = _pages(5)
+    _quiet(monkeypatch, fake)
+    _, note = fetch_linkedin.fetch(keywords=["C#"], locations=["UK"], enrich_limit=0,
+                                   time_budget_minutes=25)
+    assert fetch_linkedin.TIME_BUDGET_NOTE not in note
+
+
 def test_a_page_another_keyword_already_found_does_not_end_the_pair(monkeypatch):
     """The second keyword's first page may be all vacancies the first keyword
     found. That page still moved on — its second page must be read."""

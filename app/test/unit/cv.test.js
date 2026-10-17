@@ -6,14 +6,14 @@ const { EventEmitter } = require('node:events');
 const { PassThrough } = require('node:stream');
 const { CvGenerator, buildCvCommand, parseResult, INSTRUCTIONS_LIMIT } = require('../../main/cv');
 
-const OPTIONS = { root: '/repo', python: '/repo/.venv/Scripts/python.exe', outDir: '/home/me/Downloads' };
+const OPTIONS = { root: '/repo', python: '/repo/.venv/Scripts/python.exe', documentsDir: '/home/me/Work IDE CVs and CLs' };
 
 test('the command runs tools/cv_tailor.py for one identity and vacancy, with a JSON result', () => {
   const cmd = buildCvCommand('sharp', '35bf096fae2ac0e4b101', OPTIONS);
   assert.equal(cmd.command, OPTIONS.python);
   assert.equal(cmd.cwd, '/repo');
   assert.deepEqual(cmd.args, [path.join('tools', 'cv_tailor.py'), '--identity', 'sharp',
-    '--vacancy', '35bf096fae2ac0e4b101', '--out-dir', '/home/me/Downloads', '--json']);
+    '--vacancy', '35bf096fae2ac0e4b101', '--documents-dir', '/home/me/Work IDE CVs and CLs', '--json']);
 });
 
 test('instructions go last, trimmed; empty ones add nothing', () => {
@@ -91,6 +91,32 @@ test('a failed generation reports its error and frees the generator', async () =
   child.stdout.write('{"ok": false, "error": "vacancy a1 is not in the database"}\n');
   child.emit('close', 1);
   assert.deepEqual(await running, { ok: false, error: 'vacancy a1 is not in the database' });
+  assert.deepEqual(cv.state(), { running: false });
+});
+
+test('the progress lines go out as they come; a stopped generation says it was stopped', async () => {
+  const child = fakeChild();
+  const killed = [];
+  const lines = [];
+  const cv = new CvGenerator({
+    ...OPTIONS,
+    documentsDir: async () => '/docs',
+    spawn: (command, args) => {
+      lines.push(`args ${args.join(' ')}`);
+      return child;
+    },
+    kill: (c) => { killed.push(c); c.emit('close', null); },
+  });
+  const handle = cv.start('sharp', 'a1', '', 'cv', (line) => lines.push(line));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(lines[0], /--documents-dir \/docs/);
+  child.stderr.write('CV V1: Dev — Acme\nasking the mo');
+  child.stderr.write('del\n');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(lines.slice(1), ['CV V1: Dev — Acme', 'asking the model']);
+  handle.stop();
+  assert.deepEqual(await handle.done, { ok: false, error: 'stopped' });
+  assert.equal(killed.length, 1);
   assert.deepEqual(cv.state(), { running: false });
 });
 

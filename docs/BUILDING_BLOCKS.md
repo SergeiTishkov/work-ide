@@ -65,9 +65,11 @@ A board token can be checked with one request:
 | `templates.py` | List templates, clone one, check for and apply updates | Onboarding, and when the template moves on |
 | `settings.py` | Where a value came from; which keys more than one layer sets | When "why is this number what it is" comes up |
 | `kb.py` | The knowledge base: statuses, notes, pay and reputation estimates | Working with finds by hand |
-| `reputation.py` | Which shortlist companies are still unchecked; recording "we looked and found nothing" | The reputation step of RUNBOOK |
+| `reputation.py` | Which shortlist companies are still unchecked; recording "we looked and found nothing" | By hand |
+| `reputation_lookup.py` | One vacancy's employer reputation, looked up by a model with web search and recorded | The app's "Collect reputation" button |
 | `ingest_manual.py` | Enter finds obtained by web search | After the manual stage of RUNBOOK |
 | `company_intel.py` | Company age and size from Wikidata | Automatically inside the pipeline, for shortlist companies |
+| `company_kinds.py` | Which companies are freelance marketplaces, agencies or reposters (`config/company_kinds.yaml`), for the app's "Company" drop-down; `--scan` lists them, `--write` stores them in the base | Automatically with every selection; by hand after editing the YAML |
 | `link_check.py` | Checking that links are alive | Automatically inside the pipeline |
 | `report.py` | Rebuild the report without collecting again | After editing the criteria |
 | `textclean.py` | Strip email addresses and links out of text | Inside scoring; also useful by hand when debugging a match |
@@ -95,7 +97,9 @@ primary source was not opened". That is second-hand data, and the report says so
 honestly. Before actually applying, it is worth opening the primary source with
 your own eyes.
 
-The system compiles the list of what remains to check itself:
+The app's "Collect reputation" button does the reputation part for one
+vacancy (`tools/reputation_lookup.py --identity <p> --vacancy <id>`). What is
+left unchecked, by hand:
 
 ```bash
 python tools/reputation.py worklist --identity <p>

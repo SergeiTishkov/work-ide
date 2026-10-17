@@ -36,6 +36,11 @@ const NEW = ['new'];
 const DENIED = ['rejected', 'bugged', 'expired'];
 const VIEW_STATUSES = [...NEW, ...FUNNEL, ...DENIED];
 const FRESHNESS = ['fresh', 'earlier'];
+// The "Company" drop-down's groups (tools/company_kinds.py): the intermediaries
+// by kind, then every other company.
+const COMPANY_KINDS = ['marketplace', 'agency', 'reposter', 'other'];
+// The "Age" drop-down's bands (AGE in schemas/queries.sql).
+const AGES = ['today', 'week', 'month', 'older'];
 // The first answers, set directly; the funnel beyond "applied" is reached
 // only step by step (advance).
 const STATUSES = ['new', 'applied', 'rejected', 'bugged', 'expired'];
@@ -165,13 +170,19 @@ class Store {
 
   // The view's query parameters. `segments` null means every market: the one
   // holding everything, or all of them when the selection names none.
-  // `sources` and `fits` null mean every board and class.
+  // `sources` and `fits` null mean every board and class; `companies`
+  // null every company, or { kinds: [shown], hidden: [names hidden among them] }.
   viewParams(db, identity, selection, view = {}) {
     const statuses = view.statuses || [];
     const fresh = view.fresh || [];
     const unknown = [...statuses.filter((s) => !VIEW_STATUSES.includes(s)),
-      ...fresh.filter((f) => !FRESHNESS.includes(f))];
-    if (unknown.length) throw new Error(`unknown status or freshness: ${unknown.join(', ')}`);
+      ...fresh.filter((f) => !FRESHNESS.includes(f)),
+      ...(view.ages || []).filter((a) => !AGES.includes(a))];
+    if (unknown.length) throw new Error(`unknown status, freshness or age: ${unknown.join(', ')}`);
+    const companies = view.companies == null ? null
+      : { kinds: view.companies.kinds || [], hidden: view.companies.hidden || [] };
+    const kinds = companies ? companies.kinds.filter((k) => !COMPANY_KINDS.includes(k)) : [];
+    if (kinds.length) throw new Error(`unknown company kind: ${kinds.join(', ')}`);
     let segments = view.segments;
     if (segments == null) {
       const markets = db.prepare(this.queries.segments).all({ selection_id: selection.id });
@@ -187,6 +198,8 @@ class Store {
       fresh: JSON.stringify(fresh.map((f) => (f === 'fresh' ? 1 : 0))),
       sources: listed(view.sources),
       fits: listed(view.fits),
+      companies: companies && JSON.stringify(companies),
+      ages: listed(view.ages),
     };
   }
 
@@ -252,6 +265,29 @@ class Store {
       if (row.axis === 'status') result.statuses[row.key] = row.total;
       else result.fresh[row.key === '1' ? 'fresh' : 'earlier'] = row.total;
     }
+    return result;
+  }
+
+  // [{ kind, name, total }], largest first, the chosen companies aside: the
+  // "Company" drop-down. Every company not an intermediary is one row of kind
+  // 'other', name null.
+  companies(identity, view) {
+    const db = this.connection(identity);
+    const selection = db && this.latestSelection(db, identity);
+    if (!selection) return [];
+    const { companies, ...params } = this.viewParams(db, identity, selection, view);   // the companies aside
+    return db.prepare(this.queries.view_companies).all(params)
+      .map((r) => ({ kind: r.kind, name: r.name, total: r.total }));
+  }
+
+  // { age band: how many }, the chosen ages aside: the "Age" drop-down.
+  ages(identity, view) {
+    const result = Object.fromEntries(AGES.map((a) => [a, 0]));
+    const db = this.connection(identity);
+    const selection = db && this.latestSelection(db, identity);
+    if (!selection) return result;
+    const { ages, ...params } = this.viewParams(db, identity, selection, view);   // the ages aside
+    for (const row of db.prepare(this.queries.view_ages).all(params)) result[row.age] = row.total;
     return result;
   }
 
@@ -358,5 +394,5 @@ class Store {
 }
 
 module.exports = {
-  Store, SchemaMismatchError, STATUSES, FUNNEL, NEW, DENIED, VIEW_STATUSES, FRESHNESS, nowIso,
+  Store, SchemaMismatchError, STATUSES, FUNNEL, NEW, DENIED, VIEW_STATUSES, FRESHNESS, COMPANY_KINDS, AGES, nowIso,
 };

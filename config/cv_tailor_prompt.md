@@ -94,6 +94,26 @@ put first and which words to use — never what is true.
    common CV has none and the vacancy does not ask for one.
 8. Name and contacts: copied exactly from the common CV.
 
+## Earlier versions
+
+The message may hold `<log>`: every earlier version of this CV, oldest
+first, with the person's message for each ("Without a message." when there
+was none), and `<previous_version>`: the current version's text as the file is
+now — the person may have edited it by hand.
+
+- Every request in the log still stands unless a later message changes it.
+  The new version keeps all of them, plus what the new message asks.
+- The previous version is the mould: keep what it has and how it has it,
+  change what the new message asks for. Do not rewrite what nobody asked to
+  change.
+- `previous_version.failed` is true when the new message rejects the
+  previous version as a whole: it asks to start over or generate anew, calls
+  the whole of it bad, or asks for so many changes (about ten or more) that
+  it is a do-over. Then do not use it as the mould: write the CV anew
+  from the CVs and the vacancy, still keeping the log's requests. Otherwise
+  false — a few corrections are an edit. `reason`: a few words why, or ""
+  when false. Without a previous version: false and "".
+
 ## Length
 
 The CV prints on A4 in the common CV's layout. Aim for the common CV's
