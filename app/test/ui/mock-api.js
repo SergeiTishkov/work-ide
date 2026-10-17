@@ -208,10 +208,17 @@ function installMockApi(fixture) {
 
   const NOW = '2026-10-01T10:00:00+00:00';
 
+  // -> the record as written, as the store answers
   function update(identity, id, change) {
+    let written = null;
     for (const rows of Object.values(data.rows[identity] || {})) {
-      for (const row of rows) if (row.id === id) row.feedback = change(row.feedback);
+      for (const row of rows) {
+        if (row.id !== id) continue;
+        row.feedback = change(row.feedback);
+        written = copy(row.feedback);
+      }
     }
+    return written;
   }
 
   window.api = {
@@ -299,34 +306,29 @@ function installMockApi(fixture) {
     },
     async setFeedback(identity, id, status, reason) {
       record('setFeedback', [identity, id, status, reason]);
-      for (const rows of Object.values(data.rows[identity] || {})) {
-        for (const row of rows) {
-          if (row.id !== id) continue;
-          row.feedback = {
-            status,
-            at: NOW,
-            appliedAt: status === 'applied' ? NOW : null,
-            rejectedReason: status === 'rejected' ? reason : null,
-            buggedReason: status === 'bugged' ? reason : null,
-            interviewComments: [],
-            interviewAt: [],
-          };
-        }
-      }
+      return update(identity, id, () => ({
+        status,
+        at: NOW,
+        appliedAt: status === 'applied' ? NOW : null,
+        rejectedReason: status === 'rejected' ? reason : null,
+        buggedReason: status === 'bugged' ? reason : null,
+        interviewComments: [],
+        interviewAt: [],
+      }));
     },
     // The funnel through the page's own rules (renderer/funnel.js), like the
     // main process does.
     async advance(identity, id, step, comment) {
       record('advance', [identity, id, step, comment]);
-      update(identity, id, (fb) => window.WorkIdeFunnel.advance(fb, step, comment, NOW));
+      return update(identity, id, (fb) => window.WorkIdeFunnel.advance(fb, step, comment, NOW));
     },
     async stepBack(identity, id) {
       record('stepBack', [identity, id]);
-      update(identity, id, (fb) => window.WorkIdeFunnel.stepBack(fb, NOW));
+      return update(identity, id, (fb) => window.WorkIdeFunnel.stepBack(fb, NOW));
     },
     async editComment(identity, id, kind, index, text) {
       record('editComment', [identity, id, kind, index, text]);
-      update(identity, id, (fb) => window.WorkIdeFunnel.editComment(fb, kind, index, text, NOW));
+      return update(identity, id, (fb) => window.WorkIdeFunnel.editComment(fb, kind, index, text, NOW));
     },
     async pendingFeedbackCount(identity) {
       record('pendingFeedbackCount', [identity]);

@@ -303,6 +303,10 @@ class Store {
     }
   }
 
+  // Every write below answers with the vacancy's record as the base now holds
+  // it, read back after the write: the renderer redraws that one card from it
+  // instead of reloading the list (the owner, 2026-10-18).
+
   // The first answer on a vacancy. 'new' takes it back; a reason is kept only
   // for the status it explains.
   setFeedback(identity, vacancyId, status, reason = null) {
@@ -321,6 +325,7 @@ class Store {
       selection_id: status === 'new' || !selection ? null : selection.id,
     });
     if (result.changes !== 1) throw new Error(`no vacancy ${vacancyId} in ${identity}`);
+    return this.record(identity, vacancyId).record;
   }
 
   // --- the application funnel (renderer/funnel.js decides, this writes) ---
@@ -365,18 +370,21 @@ class Store {
   advance(identity, vacancyId, step, comment) {
     const { db, record } = this.record(identity, vacancyId);
     this.write(db, identity, vacancyId, funnel.advance(record, step, comment, this.clock()));
+    return this.record(identity, vacancyId).record;
   }
 
   // "Undo" on a vacancy with an answer: one step back.
   stepBack(identity, vacancyId) {
     const { db, record } = this.record(identity, vacancyId);
     this.write(db, identity, vacancyId, funnel.stepBack(record, this.clock()));
+    return this.record(identity, vacancyId).record;
   }
 
   // Rewrites one comment of the timeline under a vacancy.
   editComment(identity, vacancyId, kind, index, text) {
     const { db, record } = this.record(identity, vacancyId);
     this.write(db, identity, vacancyId, funnel.editComment(record, kind, index, text, this.clock()));
+    return this.record(identity, vacancyId).record;
   }
 
   pendingFeedback(identity) {

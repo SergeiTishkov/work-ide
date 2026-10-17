@@ -519,20 +519,83 @@
   // The place is counted among everything the section shows, stubs included:
   // counted among rows only, each new stub landed above the ones before it
   // (the owner, 2026-10-04: the last vacancy marked jumped to the top).
-  async function answered(item, status) {
+  // One card, not the list (the owner, 2026-10-18: a click waited 1.5 s for
+  // the whole list to load again). The store answers a write with the
+  // vacancy's record as the base now holds it; the card is redrawn from that
+  // at once, and the list with the drop-downs' numbers catches up behind it.
+  // The store thread answers in the order asked, so a catch-up never brings
+  // back a list older than a later click's record.
+  function showRecord(item, record) {
+    const row = state.listing.find((r) => r.id === item.id);
+    if (row) {
+      row.feedback = record;
+      return;
+    }
+    const { stubIndex, ...back } = item;
+    state.listing.splice(placeOf(item), 0, { ...back, feedback: record });
+  }
+
+  // Where a card brought back by "Undo" goes: where its stub stood among the
+  // rows of its class.
+  function placeOf(item) {
+    const wanted = item.stubIndex == null ? Infinity : item.stubIndex;
+    let seen = 0;
+    let last = -1;
+    for (let i = 0; i < state.listing.length; i++) {
+      if (state.listing[i].class !== item.class) continue;
+      if (seen === wanted) return i;
+      seen += 1;
+      last = i;
+    }
+    return last < 0 ? state.listing.length : last + 1;
+  }
+
+  // Does the view still hold a vacancy with this answer? Only the status
+  // changes with an answer; the other filters held it a moment ago.
+  function inView(record) {
+    return currentView().statuses.includes(record.status);
+  }
+
+  function catchUp() {
+    guarded(() => loadList());
+  }
+
+  // "Shown 10 of 660" as the list that catches up will have it, so it does
+  // not jump half a second later (the owner, 2026-10-18).
+  function countIn(cls, change) {
+    state.classTotals[cls] = Math.max(0, (state.classTotals[cls] || 0) + change);
+  }
+
+  // A card brought back into a capped class pushes out its last unanswered
+  // card, as the store's limit per class does.
+  function trimClass(cls, keep) {
+    const waiting = state.listing.filter((r) => r.class === cls && r.id !== keep && r.feedback.status === 'new');
+    const last = waiting.at(-1);
+    if (last) state.listing = state.listing.filter((r) => r !== last);
+  }
+
+  function answered(item, status, record) {
     const shown = arranged().byClass.get(item.class) || [];
     const index = shown.findIndex((entry) => entry.kind === 'row' && entry.row.id === item.id);
-    await loadList();
+    showRecord(item, record);
     // A vacancy turned down goes out of sight whatever the filter (the owner,
     // 2026-10-04: "Vacancy expired" must fold like "Not for me"). One that
     // goes on along the funnel stays while the filter holds it.
-    const left = !state.listing.some((row) => row.id === item.id);
+    const left = !inView(record);
+    // Left, it counts no more; its row stays under the stub until the list
+    // catches up and the next card moves up into its place.
+    if (left) countIn(item.class, -1);
     if (status !== 'new' && (left || TURNED_DOWN.includes(status))) {
-      const stub = { class: item.class, index, status, expires: Date.now() + STUB_LIFETIME_MS };
+      const stub = {
+        class: item.class, index, status, row: item, left, expires: Date.now() + STUB_LIFETIME_MS,
+      };
       state.stubs.set(item.id, stub);
       setTimeout(() => expireStub(item.id, stub), STUB_LIFETIME_MS);
-      render();
+    } else if (left) {
+      state.listing = state.listing.filter((r) => r.id !== item.id);
     }
+    render();
+    catchUp();
   }
 
   // A stub lives 30 seconds, then goes (the owner, 2026-10-04: a column of
@@ -568,8 +631,8 @@
   function mark(item, status, reason) {
     return guarded(async () => {
       state.reasonFor = null;
-      await api.setFeedback(state.active, item.id, status, reason);
-      await answered(item, status);
+      const record = await api.setFeedback(state.active, item.id, status, reason);
+      answered(item, status, record);
     });
   }
 
@@ -577,20 +640,33 @@
   function advance(item, step, comment) {
     return guarded(async () => {
       state.stepFor = null;
-      await api.advance(state.active, item.id, step, comment || '');
-      await answered(item, step);
+      const record = await api.advance(state.active, item.id, step, comment || '');
+      answered(item, step, record);
     });
   }
 
   // "Undo": one step back — the funnel's last step, or the answer altogether.
   function undo(id) {
     return guarded(async () => {
+      const stub = state.stubs.get(id);
+      const item = state.listing.find((r) => r.id === id) || (stub && { ...stub.row, stubIndex: stub.index });
       state.stubs.delete(id);
       state.gone.delete(id);
       state.stepFor = null;
       state.editing = null;
-      await api.stepBack(state.active, id);
-      await loadList();
+      const record = await api.stepBack(state.active, id);
+      if (item) {
+        const listed = state.listing.some((r) => r.id === id);
+        const capped = hiddenIn(item.class) > 0;
+        showRecord(item, record);
+        const back = inView(record);
+        if (!back) state.listing = state.listing.filter((r) => r.id !== id);
+        if (stub && stub.left && back) countIn(item.class, 1);
+        if (!stub && listed && !back) countIn(item.class, -1);
+        if (!listed && back && capped) trimClass(item.class, id);
+      }
+      render();
+      catchUp();
     });
   }
 
@@ -613,13 +689,16 @@
   function saveEdit() {
     const editing = state.editing;
     return guarded(async () => {
-      await api.editComment(state.active, editing.id, editing.kind,
+      const record = await api.editComment(state.active, editing.id, editing.kind,
         editing.index == null ? null : editing.index, editing.draft);
       state.editing = null;
       // A comment written is a comment to read: its entry stays open.
       if (editing.draft.trim()) state.openEntries.add(editing.key);
       else state.openEntries.delete(editing.key);
-      await loadList();
+      const row = state.listing.find((r) => r.id === editing.id);
+      if (row) showRecord(row, record);
+      render();
+      catchUp();
     });
   }
 
@@ -1519,8 +1598,15 @@
     return Math.max(0, (state.classTotals[cls] || 0) - loadedIn(cls).length);
   }
 
+  // A row that left the view stays under its stub until the list catches up
+  // (answered): the list then shows as many as before, the total allowing.
+  function leftUnder(cls) {
+    return state.listing.some((r) => r.class === cls && (state.stubs.get(r.id) || {}).left);
+  }
+
   function sectionCount(cls) {
-    const shown = loadedIn(cls).length;
+    const loaded = loadedIn(cls).length;
+    const shown = leftUnder(cls) ? Math.min(loaded, state.classTotals[cls] || 0) : loaded;
     const total = Math.max(state.classTotals[cls] || 0, shown);
     const hidden = hiddenIn(cls);
     if (!hidden) return t('list.shown_all', { n: total });

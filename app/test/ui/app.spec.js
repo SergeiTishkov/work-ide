@@ -206,6 +206,25 @@ test('"Applied" is recorded at once, with no reason form', async ({ page }) => {
   await expect(page.getByTestId('stub-a1')).toBeVisible();
 });
 
+test('an answer and its undo change the card at once, before the list loads again', async ({ page }) => {
+  await open(page);
+  // the reload after the click is held: what changes, changes without it
+  await page.evaluate(() => window.__holdListing());
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await expect(page.getByTestId('stub-a1')).toBeVisible();
+  await expect(byId(page, 'a2r')).toBeVisible();
+  await page.evaluate(() => window.__releaseListing());
+  await expect(page.getByTestId('stub-a1')).toBeVisible();
+
+  await page.evaluate(() => window.__holdListing());
+  await page.getByTestId('stub-a1').getByTestId('btn-undo').click();
+  await expect(page.getByTestId('stub-a1')).toHaveCount(0);
+  await expect(byId(page, 'a1').getByTestId('btn-applied')).toBeVisible();
+  await page.evaluate(() => window.__releaseListing());
+  await expect(byId(page, 'a1')).toBeVisible();
+  expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'a1']);
+});
+
 test('"Show" counts the statuses under the freshness chosen, the freshness under the statuses', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('filter-option-new')).toContainText('(3)');   // a1, a2r, b1
@@ -573,6 +592,42 @@ function manyHotLeads(n) {
 
 const fill = (text, values) => Object.entries(values)
   .reduce((s, [k, v]) => s.split(`{${k}}`).join(String(v)), text);
+
+test('an answer and its undo change the class count at once, and the list that catches up agrees', async ({ page }) => {
+  await open(page, manyHotLeads(30));
+  const count = page.getByTestId('section-count-hot_lead');
+  const shownOf = (total) => fill(ru['list.shown_of'],
+    { shown: 15, total, n: 10, button: ru['list.show_more'].replace('{n}', '10') });
+  await expect(count).toHaveText(shownOf(30));
+
+  await page.evaluate(() => window.__holdListing());
+  await byId(page, 'h00').getByTestId('btn-applied').click();
+  await expect(page.getByTestId('stub-h00')).toBeVisible();
+  await expect(count).toHaveText(shownOf(29));
+  await page.evaluate(() => window.__releaseListing());
+  await expect(byId(page, 'h15')).toBeVisible();   // the next one moved up
+  await expect(count).toHaveText(shownOf(29));
+
+  await page.evaluate(() => window.__holdListing());
+  await page.getByTestId('stub-h00').getByTestId('btn-undo').click();
+  await expect(byId(page, 'h00')).toBeVisible();
+  await expect(byId(page, 'h15')).toHaveCount(0);
+  await expect(count).toHaveText(shownOf(30));
+  await page.evaluate(() => window.__releaseListing());
+  await expect(count).toHaveText(shownOf(30));
+  await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(15);
+});
+
+test('in a class shown whole, an answer takes one off its count at once', async ({ page }) => {
+  await open(page);
+  const count = page.getByTestId('section-count-hot_lead');
+  await expect(count).toHaveText(ru['list.shown_all'].replace('{n}', '2'));   // a1, a2r
+  await page.evaluate(() => window.__holdListing());
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await expect(count).toHaveText(ru['list.shown_all'].replace('{n}', '1'));
+  await page.evaluate(() => window.__releaseListing());
+  await expect(count).toHaveText(ru['list.shown_all'].replace('{n}', '1'));
+});
 
 test('"Not applied or denied" from every run lists every unanswered vacancy, fresh or not', async ({ page }) => {
   await open(page);

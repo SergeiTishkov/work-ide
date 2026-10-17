@@ -917,6 +917,27 @@ comes back as a new one on the next collection, and the disk space returns.
 The first run (2026-10-17, older than a month) deleted 22 209 vacancies; the
 file went from 818 MB to 535 MB.
 
+### An answer redraws one card, not the list (2026-10-18)
+
+Until 2026-10-18 every answer (Apply, Not for me, Undo, a funnel step, a
+comment) wrote, then waited for the whole list to load again — six view
+queries, one after another in the store thread — before anything changed on
+screen. The owner measured 1.5 s a click. Two causes, two fixes:
+- the queries: `company_kinds` was parsed again for every row of the pool
+  (`schemas/queries.sql` says how; 250-560 ms a query, 30-75 ms after);
+- the wait itself: the store answers each write with the vacancy's record
+  read back after it (the backend's confirmation), the renderer redraws that
+  card, its stub and its class's "Shown 10 of 660" from it at once, and the
+  list catches up behind (`answered`, `undo` in `app/renderer/app.js`). The
+  count is set to what the list that catches up will say: an answer that
+  takes a card out of the view takes one off the total, its row staying under
+  the stub until the next card moves up; an Undo puts it back and, in a
+  capped class, pushes the last unanswered card out.
+
+A pipeline writing the base (the end of a collection rescores and saves it)
+still makes a write wait for its lock (busy_timeout 60 s): the confirmation
+is the write itself.
+
 
 ### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)
 

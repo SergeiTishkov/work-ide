@@ -91,6 +91,25 @@ test('feedback writes only the feedback columns, and the next one moves up', () 
   db.close();
 });
 
+test('every write answers with the record as the base now holds it', () => {
+  const { store } = setup();
+  const rejected = store.setFeedback('test', 'new0', 'rejected', '  too much travel ');
+  assert.equal(rejected.status, 'rejected');
+  assert.equal(rejected.rejectedReason, 'too much travel');
+  const applied = store.setFeedback('test', 'new1', 'applied');
+  assert.equal(applied.status, 'applied');
+  const contacted = store.advance('test', 'new1', 'contacted', 'a call on Monday');
+  assert.equal(contacted.status, 'contacted');
+  assert.equal(contacted.contactComment, 'a call on Monday');
+  assert.equal(store.editComment('test', 'new1', 'contact', null, 'a call on Tuesday').contactComment,
+    'a call on Tuesday');
+  const back = store.stepBack('test', 'new1');
+  assert.equal(back.status, 'applied');
+  const [row] = store.listing('test', v('full', 'applied'));
+  assert.deepEqual(back, row.feedback, 'the same record the list reads');
+  store.closeAll();
+});
+
 test('undo returns a vacancy to new and erases its reason', () => {
   const { store } = setup();
   store.setFeedback('test', 'new0', 'rejected', 'too much travel');
