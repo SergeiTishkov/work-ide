@@ -121,7 +121,10 @@ async function startAuto(identity) {
 
 // The rest of the base after a collection (rest.js): the pipeline alone.
 function startRest(task, onLine) {
-  if (fake) return { done: Promise.resolve({ ok: true, code: 0 }), stop() {} };
+  if (fake) {
+    onLine(`fake rest: ${task.identity}`);
+    return { done: Promise.resolve({ ok: true, code: 0 }), stop() {} };
+  }
   store.closeAll();
   data.call('closeAll').catch(() => {});
   const handle = spawnRest({ root, python: pythonExecutable(root), identity: task.identity, onLine, kill: killTree });
