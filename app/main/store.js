@@ -65,6 +65,13 @@ function parseNames(text) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+// The text field's words as the queries take them (WORDS in
+// schemas/queries.sql): a JSON list, null when nothing was typed.
+function wordsOf(text) {
+  const words = [...new Set(String(text || '').split(/\s+/).filter(Boolean))];
+  return words.length ? JSON.stringify(words) : null;
+}
+
 // A row's feedback columns -> the record renderer/funnel.js works with.
 function recordOf(row) {
   return {
@@ -172,6 +179,7 @@ class Store {
   // holding everything, or all of them when the selection names none.
   // `sources` and `fits` null mean every board and class; `companies`
   // null every company, or { kinds: [shown], hidden: [names hidden among them] }.
+  // `text` the words a row must hold, empty for any.
   viewParams(db, identity, selection, view = {}) {
     const statuses = view.statuses || [];
     const fresh = view.fresh || [];
@@ -200,6 +208,7 @@ class Store {
       fits: listed(view.fits),
       companies: companies && JSON.stringify(companies),
       ages: listed(view.ages),
+      words: wordsOf(view.text),
     };
   }
 

@@ -199,7 +199,18 @@ function installMockApi(fixture) {
       && (aside === 'sources' || view.sources == null || view.sources.includes(row.view.source))
       && (aside === 'fits' || view.fits == null || view.fits.includes(row.class))
       && (aside === 'companies' || companyShown(row, view.companies))
-      && (aside === 'ages' || view.ages == null || view.ages.includes(ageOf(row))));
+      && (aside === 'ages' || view.ages == null || view.ages.includes(ageOf(row)))
+      && holdsWords(row, view.text));
+  }
+
+  // WORDS in schemas/queries.sql: every word typed is part of the title,
+  // company, intermediary's name, board, link, country or technologies.
+  function holdsWords(row, text) {
+    const v = row.view;
+    const haystack = [v.title, v.company, kindOf(row).name, v.source, v.url, v.hiring_country,
+      JSON.stringify(v.technologies || [])].filter(Boolean).join(' ').toLowerCase();
+    return String(text || '').split(/\s+/).filter(Boolean)
+      .every((word) => haystack.includes(word.toLowerCase()));
   }
 
   // The age band the query works out of the posted date (schemas/queries.sql,

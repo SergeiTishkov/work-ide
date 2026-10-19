@@ -35,9 +35,10 @@
 --              'other') and the intermediaries hidden among them, by name.
 --              Hidden names, not shown ones, so an intermediary a later run
 --              brings is listed (the owner, 2026-10-14);
---   :ages      NULL for any age, or the ages chosen (see AGE).
+--   :ages      NULL for any age, or the ages chosen (see AGE);
+--   :words     NULL for no text filter, or the words typed (see WORDS).
 -- A row is shown when its status is one of :statuses AND its freshness one
--- of :fresh, and the board, class, company and age match. view_pool is what all
+-- of :fresh, and the board, class, company, age and words match. view_pool is what all
 -- five queries read; `-- include: view_pool` stands for its text (the
 -- loaders in tools/selections.py and app/main/queries.js put it in).
 --
@@ -69,6 +70,13 @@
 -- (view.first_seen_on). 'today' under one day, 'week' up to 7 days, 'month'
 -- up to 30, 'older' beyond. Each is a band of its own: "up to a week" is
 -- 'today' and 'week' checked together.
+--
+-- WORDS (the owner, 2026-10-19): the text field over the drop-downs. A row
+-- matches when every word typed is part of its title, company (and the
+-- intermediary's name), board, link, hiring country or technologies, in any
+-- case. view_pool applies it, so every drop-down counts under it. SQLite's
+-- lower() folds ASCII letters only: "Zürich" is found by "zürich", but a word
+-- starting with a capital outside ASCII ("Évora") only as typed.
 --
 -- EACH DROP-DOWN'S OWN NUMBERS. A drop-down counts its rows under the other
 -- drop-downs, not under itself: view_sources ignores :sources,
@@ -161,7 +169,14 @@ joined AS (
          COALESCE(k.kind, 'other') AS company_kind, k.name AS company_name,
          -- days since it was posted (AGE); no date at all reads as today
          COALESCE(julianday(date('now')) - julianday(COALESCE(
-           json_extract(v.view, '$.posted_on'), json_extract(v.view, '$.first_seen_on'))), 0) AS age_days
+           json_extract(v.view, '$.posted_on'), json_extract(v.view, '$.first_seen_on'))), 0) AS age_days,
+         -- what the words are looked for in (WORDS)
+         lower(COALESCE(json_extract(v.view, '$.title'), '') || ' '
+               || COALESCE(json_extract(v.view, '$.company'), '') || ' ' || COALESCE(k.name, '') || ' '
+               || COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source'), '') || ' '
+               || COALESCE(json_extract(v.view, '$.url'), '') || ' '
+               || COALESCE(json_extract(v.view, '$.hiring_country'), '') || ' '
+               || COALESCE(json_extract(v.view, '$.technologies'), '')) AS haystack
   FROM candidates c
   CROSS JOIN vacancy_identity v ON v.vacancy_id = c.vacancy_id AND v.identity_id = :identity
   CROSS JOIN vacancies d ON d.id = c.vacancy_id
@@ -176,6 +191,8 @@ pool AS (
            ELSE 'older'
          END AS age
   FROM joined
+  WHERE :words IS NULL
+     OR NOT EXISTS (SELECT 1 FROM json_each(:words) w WHERE instr(haystack, lower(w.value)) = 0)
 )
 
 -- name: view_listing

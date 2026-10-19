@@ -551,3 +551,22 @@ test('age: the posted date sorts each vacancy into one bucket; the filter narrow
   assert.equal(count(store, 'test', { ...all, ages: [] }), 0);
   store.closeAll();
 });
+
+test('words: each one typed must be in the title, company, board or link, in any case; every count follows', () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  db.prepare("UPDATE vacancy_identity SET view = json_set(view, '$.title', 'Backend Engineer (Go)', "
+    + "'$.company', 'Zürich Labs') WHERE identity_id = 'test' AND vacancy_id = 'new1'").run();
+  db.close();
+  const all = v('full', 'all');
+  const ids = (text) => store.listing('test', { ...all, text }).map((r) => r.id);
+  assert.deepEqual(ids('backend'), ['new1']);
+  assert.deepEqual(ids('ENGINEER zürich'), ['new1'], 'any case, every word');
+  assert.deepEqual(ids('engineer acme'), [], 'a word missing anywhere hides it');
+  assert.deepEqual(ids('example.test/new2'), ['new2'], 'the link counts');
+  assert.ok(ids('  ').length > 1, 'blank is no filter');
+  assert.equal(count(store, 'test', { ...all, text: 'backend' }), 1);
+  assert.equal(Object.values(store.classTotals('test', { ...all, text: 'backend' })).reduce((a, b) => a + b, 0), 1);
+  assert.equal(store.sources('test', { ...all, text: 'backend' }).reduce((a, s) => a + s.total, 0), 1);
+  store.closeAll();
+});

@@ -634,6 +634,24 @@ def test_the_age_comes_from_the_posted_date_else_the_first_sighting(isolated_dat
         with pytest.raises(ValueError):
             selections.listing(conn, sel, {**every, "ages": ["ancient"]})
 
+def test_the_words_typed_narrow_the_list_and_every_count(isolated_data_dir):
+    sel = _store({
+        "a": _vacancy("a", title="Backend Engineer (Go)", company="Zürich Labs"),
+        "b": _vacancy("b"),
+    })
+    every = selections.view(["full"], selections.STATUSES, selections.FRESHNESS)
+    with db.session() as conn:
+        def ids(text):
+            return set(_ids(selections.listing(conn, sel, {**every, "text": text})))
+        assert ids("backend") == {"a"}
+        assert ids("ENGINEER zürich") == {"a"}
+        assert ids("engineer acme") == set()
+        assert ids("example.test/b") == {"b"}
+        assert ids("  ") == {"a", "b"}
+        assert _count(conn, sel, {**every, "text": "backend"}) == 1
+        assert selections.class_totals(conn, sel, {**every, "text": "backend"}) == {"hot_lead": 1}
+
+
 # --- the company: freelance marketplaces, agencies, reposters, the rest --------
 # The owner, 2026-10-14: a fifth drop-down, the intermediaries by kind and by
 # name, every other company one row (tools/company_kinds.py).

@@ -13,7 +13,7 @@ async function call(channel, ...args) {
 contextBridge.exposeInMainWorld('api', {
   listIdentities: () => call('identities'),
   loadSegments: (identity) => call('segments', identity),
-  // view: { segments, statuses, fresh, sources, fits, companies, ages } (store.viewParams);
+  // view: { segments, statuses, fresh, sources, fits, companies, ages, text } (store.viewParams);
   // page: { shown: { class: rows }, expanded: [class] }
   loadListing: (identity, view, page) => call('listing', identity, view, page || {}),
   classTotals: (identity, view) => call('class-totals', identity, view),

@@ -165,6 +165,15 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
   border-radius: 6px; padding: 10px 10px 8px;
 }
 .dropdown-button:hover:not(:disabled) { border-color: var(--muted); }
+/* the text field (renderTextFilter): the same box, typed into */
+.field.text-filter { width: 260px; }
+.text-filter-input {
+  width: 100%; font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; padding: 10px 10px 8px;
+}
+.text-filter-input:hover { border-color: var(--muted); }
+.text-filter-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.text-filter-input:focus + label { color: var(--accent); }
 .dropdown-button:focus-visible, .dropdown.open .dropdown-button {
   outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent);
 }

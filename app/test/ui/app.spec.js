@@ -862,6 +862,46 @@ test('choosing a source lists only its vacancies, and the filter counts follow i
   await expect(page.getByTestId('filter-option-new')).toContainText('(1)');   // b1
 });
 
+test('the text field after the drop-downs narrows the list by words, together with them', async ({ page }) => {
+  await open(page);
+  const order = await page.getByTestId('filters').locator('[data-dropdown], [data-testid="text-filter"]')
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.dropdown || n.dataset.testid));
+  expect(order.at(-1)).toBe('text-filter');
+  await expect(page.getByTestId('filters')).toContainText(ru['filter.text_legend']);
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(3);   // a1, a2r, b1
+
+  // typed key by key: each key redraws the panel, the field keeps the focus and the caret
+  const field = page.getByTestId('text-filter');
+  await field.pressSequentially('COMPANY b', { delay: 40 });
+  await expect(field).toHaveValue('COMPANY b');
+  await expect(field).toBeFocused();
+  await settled(page);
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(1);
+  await expect(byId(page, 'b1')).toBeVisible();
+  const typed = ['sharp', view({ text: 'COMPANY b' })];
+  expect(await lastListing(page)).toEqual(typed);
+  expect((await calls(page, 'listingCounts')).at(-1)).toEqual(typed);
+  await expect(page.getByTestId('filter-option-new')).toContainText('(1)');
+
+  await field.fill('');
+  await settled(page);
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(3);
+  expect(await lastListing(page)).toEqual(['sharp', view()]);
+
+  // a drop-down and the words: both apply
+  await choose(page, 'source-filter', 'linkedin');
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(2);   // a1, a2r
+  await field.fill('a2r');
+  await settled(page);
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(1);
+  await expect(byId(page, 'a2r')).toBeVisible();
+  expect(await lastListing(page)).toEqual(['sharp', view({ sources: ['linkedin'], text: 'a2r' })]);
+  await field.fill('devitjobs');
+  await settled(page);
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
+  await expect(field).toHaveValue('devitjobs');
+});
+
 test('the status filter and the source apply together', async ({ page }) => {
   await open(page);
   await choose(page, 'source-filter', 'linkedin');

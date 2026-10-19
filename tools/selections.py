@@ -236,12 +236,13 @@ AGES = ("today", "week", "month", "older")
 
 
 def view(segments, statuses=NEW, fresh=FRESHNESS, sources=None, fits=None, companies=None,
-         ages=None) -> dict:
+         ages=None, text="") -> dict:
     """What to list. `sources`, `fits` and `ages` are None for every board,
     class and age (a list, even an empty one, names them). `companies` is None
     for every company, or {"kinds": [the kinds shown], "hidden": [names hidden
-    among them]} — see THE VIEW in schemas/queries.sql."""
-    return {"segments": list(segments), "statuses": list(statuses), "fresh": list(fresh),
+    among them]} — see THE VIEW in schemas/queries.sql. `text` is the words
+    a row must hold (WORDS there), empty for any."""
+    return {"text": text, "segments": list(segments), "statuses": list(statuses), "fresh": list(fresh),
             "sources": None if sources is None else list(sources),
             "fits": None if fits is None else list(fits),
             "ages": None if ages is None else list(ages),
@@ -274,7 +275,15 @@ def _params(selection_id: int, chosen: dict) -> dict:
         "fits": listed(chosen.get("fits")),
         "companies": None if companies is None else json.dumps(companies),
         "ages": listed(chosen.get("ages")),
+        "words": words(chosen.get("text")),
     }
+
+
+def words(text) -> Optional[str]:
+    """The text field's words as the query takes them (WORDS in
+    schemas/queries.sql): a JSON list, None when nothing was typed."""
+    found = list(dict.fromkeys((text or "").split()))
+    return json.dumps(found) if found else None
 
 
 def listing(conn, selection_id: int, chosen: dict, shown=None, expanded=()) -> list:

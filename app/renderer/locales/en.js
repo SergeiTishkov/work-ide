@@ -133,6 +133,8 @@
   'filter.company_kind.other': 'Other companies',
   'filter.age_legend': 'Age',
   'filter.age_all': 'Any age',
+  'filter.text_legend': 'Text',
+  'filter.text_hint': 'Company, board, title…',
   'filter.age.today': 'Today',
   'filter.age.week': 'Up to a week',
   'filter.age.month': 'Up to a month',

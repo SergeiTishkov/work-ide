@@ -19,11 +19,13 @@
     { key: 'denied', label: 'filter.group.denied', statuses: ['rejected', 'bugged', 'expired'] },
   ];
   const STATUSES = STATUS_GROUPS.flatMap((group) => group.statuses);
-  // What the five drop-downs choose (schemas/queries.sql, THE VIEW). null
+  // What the drop-downs choose (schemas/queries.sql, THE VIEW). null
   // markets, boards, classes or companies: all of them, also the ones a later
   // run adds. companies: { kinds: [shown], hidden: [names hidden among them] }.
+  // text: the words typed in the text field (WORDS there), '' for none.
   const DEFAULT_VIEW = {
     segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, fits: null, companies: null, ages: null,
+    text: '',
   };
   // The "Age" drop-down (the owner, 2026-10-17): how long ago it was posted,
   // in bands of their own (schemas/queries.sql, AGE).
@@ -955,7 +957,9 @@
     }
     const focused = document.activeElement && document.activeElement.closest
       && document.activeElement.closest('.dropdown');
+    const typing = textFilterCaret();
     panel.replaceChildren(...parts);
+    if (typing) typing.restore(panel);
     // a check list stays open across the redraw its own click caused
     const open = state.openDropdown && panel.querySelector(`[data-dropdown="${state.openDropdown}"]`);
     if (open) open.reopen(Boolean(focused));
@@ -1373,7 +1377,39 @@
       renderAgeFilter(view),
       renderSourceFilter(view),
       renderCompanyFilter(view),
-      renderFitFilter(view));
+      renderFitFilter(view),
+      renderTextFilter(view));
+  }
+
+  // Words to look for in the title, company, board, link, country and
+  // technologies, on top of the drop-downs (the owner, 2026-10-19; WORDS in
+  // schemas/queries.sql). Every word must be there; the list follows the
+  // typing as it follows a click in a drop-down.
+  function renderTextFilter(view) {
+    const input = el('input', {
+      id: 'text-filter-input', class: 'text-filter-input', type: 'search', testid: 'text-filter',
+      placeholder: t('filter.text_hint'), spellcheck: 'false', autocomplete: 'off',
+      oninput: (event) => changeView({ text: event.target.value }),
+    });
+    input.value = view.text || '';
+    return el('span', { class: 'field text-filter' },
+      input, el('label', { for: 'text-filter-input' }, t('filter.text_legend')));
+  }
+
+  // The panel is drawn anew on every change, the text field with it: the
+  // field being typed in gets the focus and the caret back.
+  function textFilterCaret() {
+    const input = document.activeElement;
+    if (!input || input.dataset.testid !== 'text-filter') return null;
+    const { selectionStart, selectionEnd } = input;
+    return {
+      restore(panel) {
+        const next = panel.querySelector('[data-testid="text-filter"]');
+        if (!next) return;
+        next.focus();
+        next.setSelectionRange(selectionStart, selectionEnd);
+      },
+    };
   }
 
   // How long ago the employer posted it: today, up to a week, up to a month,

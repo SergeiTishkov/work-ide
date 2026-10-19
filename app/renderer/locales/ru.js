@@ -136,6 +136,8 @@
   'filter.company_kind.other': 'Остальные компании',
   'filter.age_legend': 'Возраст',
   'filter.age_all': 'Любой возраст',
+  'filter.text_legend': 'Текст',
+  'filter.text_hint': 'Компания, источник, тайтл…',
   'filter.age.today': 'Сегодня',
   'filter.age.week': 'До недели',
   'filter.age.month': 'До месяца',

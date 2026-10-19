@@ -79,6 +79,17 @@ shown and the names hidden, not the names shown: with a shown-list, unticking
 one name would freeze the list, and every company a later run brings would be
 hidden.
 
+A text field after the drop-downs (2026-10-19) takes words: a row stays when
+every word is part of its title, company, intermediary's name, board, link,
+hiring country or technologies (WORDS in `schemas/queries.sql`). It is applied
+in `view_pool`, not beside the drop-downs, so every drop-down's numbers count
+under it; the list and the "N more" counts stay right because the database
+filters, not the page. Measured on the real base (5000 rows of `sharp`): each
+view query 27–84 ms with words, as without. The case is folded by SQLite's
+`lower()`, ASCII letters only. The panel is drawn anew on every change, so the
+renderer gives the field its focus and caret back after each key
+(`textFilterCaret`).
+
 node:sqlite is synchronous, and Electron's main thread also carries the
 window's input, so the app reads and writes the base on a thread of its own
 (`app/main/store-worker.js`, driven by `store-thread.js`). Before 2026-10-12
