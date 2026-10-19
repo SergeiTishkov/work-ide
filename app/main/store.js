@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { DatabaseSync } = require('node:sqlite');
 const { loadQueries } = require('./queries');
+const { addFold } = require('./fold');
 const funnel = require('../renderer/funnel.js');
 
 const SCHEMA_VERSION = '10';
@@ -139,6 +140,7 @@ class Store {
     if (!db) {
       db = new DatabaseSync(file);
       db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
+      addFold(db);
       const row = db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get();
       if (!row || row.value !== SCHEMA_VERSION) {
         db.close();

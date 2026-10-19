@@ -24,6 +24,7 @@ test('the company kinds are a table built once, looked up by an index, in every 
   const path = require('node:path');
   const { DatabaseSync } = require('node:sqlite');
   const db = new DatabaseSync(':memory:');
+  require('../../main/fold').addFold(db);
   db.exec(fs.readFileSync(path.join(SCHEMA_DIR, 'db.sql'), 'utf8'));
   const queries = loadQueries(SCHEMA_DIR);
   for (const name of ['view_listing', 'view_counts', 'view_class_totals', 'view_sources', 'view_companies',

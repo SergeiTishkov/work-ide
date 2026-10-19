@@ -638,6 +638,7 @@ def test_the_words_typed_narrow_the_list_and_every_count(isolated_data_dir):
     sel = _store({
         "a": _vacancy("a", title="Backend Engineer (Go)", company="Zürich Labs"),
         "b": _vacancy("b"),
+        "c": _vacancy("c", title="Разработчик Ёлка"),
     })
     every = selections.view(["full"], selections.STATUSES, selections.FRESHNESS)
     with db.session() as conn:
@@ -645,9 +646,13 @@ def test_the_words_typed_narrow_the_list_and_every_count(isolated_data_dir):
             return set(_ids(selections.listing(conn, sel, {**every, "text": text})))
         assert ids("backend") == {"a"}
         assert ids("ENGINEER zürich") == {"a"}
+        assert ids("zurich") == {"a"}
+        assert ids("ZÜRICH") == {"a"}
         assert ids("engineer acme") == set()
         assert ids("example.test/b") == {"b"}
-        assert ids("  ") == {"a", "b"}
+        assert ids("разработчик") == {"c"}
+        assert ids("ЕЛКА") == {"c"}
+        assert ids("  ") == {"a", "b", "c"}
         assert _count(conn, sel, {**every, "text": "backend"}) == 1
         assert selections.class_totals(conn, sel, {**every, "text": "backend"}) == {"hot_lead": 1}
 

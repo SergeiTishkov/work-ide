@@ -204,13 +204,15 @@ function installMockApi(fixture) {
   }
 
   // WORDS in schemas/queries.sql: every word typed is part of the title,
-  // company, intermediary's name, board, link, country or technologies.
+  // company, intermediary's name, board, link, country or technologies, both
+  // folded as app/main/fold.js folds them.
+  const fold = (text) => String(text).toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '');
   function holdsWords(row, text) {
     const v = row.view;
-    const haystack = [v.title, v.company, kindOf(row).name, v.source, v.url, v.hiring_country,
-      JSON.stringify(v.technologies || [])].filter(Boolean).join(' ').toLowerCase();
+    const haystack = fold([v.title, v.company, kindOf(row).name, v.source, v.url, v.hiring_country,
+      JSON.stringify(v.technologies || [])].filter(Boolean).join(' '));
     return String(text || '').split(/\s+/).filter(Boolean)
-      .every((word) => haystack.includes(word.toLowerCase()));
+      .every((word) => haystack.includes(fold(word)));
   }
 
   // The age band the query works out of the posted date (schemas/queries.sql,

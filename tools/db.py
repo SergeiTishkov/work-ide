@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
+import unicodedata
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -153,8 +154,20 @@ def connect(path: Optional[Path] = None) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.create_function("fold", 1, fold, deterministic=True)
     ensure_schema(conn)
     return conn
+
+
+def fold(text):
+    """The SQL function fold(text) the text filter compares with (WORDS in
+    schemas/queries.sql; app/main/fold.js is the app's copy): lower case in
+    every alphabet, accents dropped. Lower case first: "İ" lowers to "i" plus
+    a dot mark, which the second step drops."""
+    if text is None:
+        return None
+    return "".join(c for c in unicodedata.normalize("NFKD", str(text).lower())
+                   if not unicodedata.category(c).startswith("M"))
 
 
 @contextmanager

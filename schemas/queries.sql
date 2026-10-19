@@ -73,10 +73,11 @@
 --
 -- WORDS (the owner, 2026-10-19): the text field over the drop-downs. A row
 -- matches when every word typed is part of its title, company (and the
--- intermediary's name), board, link, hiring country or technologies, in any
--- case. view_pool applies it, so every drop-down counts under it. SQLite's
--- lower() folds ASCII letters only: "Zürich" is found by "zürich", but a word
--- starting with a capital outside ASCII ("Évora") only as typed.
+-- intermediary's name), board, link, hiring country or technologies. Both
+-- sides go through fold(), a function the connection registers
+-- (app/main/fold.js, tools/db.py): lower case in every alphabet and accents
+-- dropped, so "zurich" finds "Zürich" (the owner, 2026-10-20: ignore case and
+-- culture). view_pool applies it, so every drop-down counts under it.
 --
 -- EACH DROP-DOWN'S OWN NUMBERS. A drop-down counts its rows under the other
 -- drop-downs, not under itself: view_sources ignores :sources,
@@ -171,7 +172,7 @@ joined AS (
          COALESCE(julianday(date('now')) - julianday(COALESCE(
            json_extract(v.view, '$.posted_on'), json_extract(v.view, '$.first_seen_on'))), 0) AS age_days,
          -- what the words are looked for in (WORDS)
-         lower(COALESCE(json_extract(v.view, '$.title'), '') || ' '
+         fold(COALESCE(json_extract(v.view, '$.title'), '') || ' '
                || COALESCE(json_extract(v.view, '$.company'), '') || ' ' || COALESCE(k.name, '') || ' '
                || COALESCE(json_extract(v.view, '$.source'), json_extract(d.data, '$.source'), '') || ' '
                || COALESCE(json_extract(v.view, '$.url'), '') || ' '
@@ -192,7 +193,7 @@ pool AS (
          END AS age
   FROM joined
   WHERE :words IS NULL
-     OR NOT EXISTS (SELECT 1 FROM json_each(:words) w WHERE instr(haystack, lower(w.value)) = 0)
+     OR NOT EXISTS (SELECT 1 FROM json_each(:words) w WHERE instr(haystack, fold(w.value)) = 0)
 )
 
 -- name: view_listing

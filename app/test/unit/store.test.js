@@ -552,16 +552,22 @@ test('age: the posted date sorts each vacancy into one bucket; the filter narrow
   store.closeAll();
 });
 
-test('words: each one typed must be in the title, company, board or link, in any case; every count follows', () => {
+test('words: each one typed must be in the title, company, board or link, any case or accent; every count follows', () => {
   const { store, file } = setup();
   const db = new DatabaseSync(file);
   db.prepare("UPDATE vacancy_identity SET view = json_set(view, '$.title', 'Backend Engineer (Go)', "
     + "'$.company', 'Zürich Labs') WHERE identity_id = 'test' AND vacancy_id = 'new1'").run();
+  db.prepare("UPDATE vacancy_identity SET view = json_set(view, '$.title', 'Разработчик Ёлка') "
+    + "WHERE identity_id = 'test' AND vacancy_id = 'new2'").run();
   db.close();
   const all = v('full', 'all');
   const ids = (text) => store.listing('test', { ...all, text }).map((r) => r.id);
   assert.deepEqual(ids('backend'), ['new1']);
   assert.deepEqual(ids('ENGINEER zürich'), ['new1'], 'any case, every word');
+  assert.deepEqual(ids('zurich'), ['new1'], 'no accent finds the accented');
+  assert.deepEqual(ids('ZÜRICH'), ['new1']);
+  assert.deepEqual(ids('разработчик'), ['new2'], 'any alphabet');
+  assert.deepEqual(ids('ЕЛКА'), ['new2'], 'Ё is Е with a mark');
   assert.deepEqual(ids('engineer acme'), [], 'a word missing anywhere hides it');
   assert.deepEqual(ids('example.test/new2'), ['new2'], 'the link counts');
   assert.ok(ids('  ').length > 1, 'blank is no filter');

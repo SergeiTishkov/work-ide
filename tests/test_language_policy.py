@@ -69,6 +69,12 @@ ALLOWED = {
     "tests/test_normalize.py":
         "a vacancy title in mixed scripts, proving normalisation does not "
         "mangle non-ASCII",
+    "tests/test_selections.py":
+        "Cyrillic vacancy titles as test data, proving the text filter ignores "
+        "case and accents outside ASCII",
+    "app/test/unit/store.test.js":
+        "Cyrillic vacancy titles as test data, proving the text filter ignores "
+        "case and accents outside ASCII",
     "tests/test_score.py":
         "a Hebrew vacancy text, proving the unreadable-script gate fires",
 }
