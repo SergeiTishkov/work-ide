@@ -149,6 +149,34 @@ test('a running CV/CL batch shows its progress and the document it makes', () =>
   }
 });
 
+test('a finished CV/CL batch that was cleared stays cleared after a restart', () => {
+  const f = fixture();
+  try {
+    // the batch's status file outlives the batch, and says it finished
+    const status = { state: 'finished', index: 10, total: 10, made: 9, failed: 1, gone: 0 };
+    f.client.readBatch = () => status;
+    const id = f.add({ kind: 'cv_batch', slot: 'documents', state: 'done', ended_at: new Date().toISOString() });
+    f.client.poll();
+    const [batch] = f.client.list();
+    assert.equal(batch.kind, 'batch');
+    assert.equal(batch.progress, null);   // an ended batch does not read the old status
+    f.set(id, { hidden: 1 });             // "Clear finished": taskq.py hide
+    f.client.poll();
+    assert.deepEqual(f.client.list(), []);
+    // the app starts again: a new client on the same queue, the status file still there
+    const again = new QueueClient({ dataRoot: f.dataRoot, schemaDir: SCHEMA_DIR, runTaskq: async () => '{}',
+      readBatch: () => status });
+    try {
+      again.poll();
+      assert.deepEqual(again.list(), []);
+    } finally {
+      again.close();
+    }
+  } finally {
+    f.done();
+  }
+});
+
 test('adding, stopping and clearing go through tools/taskq.py, as the app', async () => {
   const f = fixture();
   try {

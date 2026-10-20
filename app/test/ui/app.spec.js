@@ -1490,8 +1490,17 @@ test('the panel\'s height and split are dragged on their sashes and kept', async
   await (await command(page, 'run-collect')).click();
   const panel = page.getByTestId('task-panel');
   await expect(panel).toBeVisible();
+  // the panel's edge and its split are 2px lines, as VS Code's; each sash lies over its line
+  await expect(panel).toHaveCSS('border-top-width', '2px');
+  await expect(page.locator('.log-pane')).toHaveCSS('border-left-width', '2px');
   const before = await panel.boundingBox();
   const sash = await page.getByTestId('task-panel-sash').boundingBox();
+  expect(sash.y).toBeLessThanOrEqual(before.y);
+  expect(sash.y + sash.height).toBeGreaterThanOrEqual(before.y + 2);
+  const log = await page.locator('.log-pane').boundingBox();
+  const splitAt = await page.getByTestId('task-split-sash').boundingBox();
+  expect(splitAt.x).toBeLessThanOrEqual(log.x);
+  expect(splitAt.x + splitAt.width).toBeGreaterThanOrEqual(log.x + 2);
   await expect(page.getByTestId('task-panel-sash')).toHaveCSS('cursor', 'ns-resize');
   await page.mouse.move(sash.x + 50, sash.y + sash.height / 2);
   await page.mouse.down();

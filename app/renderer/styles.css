@@ -6,6 +6,8 @@
   --bg: #f6f7f9;
   --surface: #ffffff;
   --border: #dde1e7;
+  /* the bottom panel's edge and split: a line that can be seen and grabbed */
+  --panel-border: #c3c9d2;
   --text: #1d2330;
   --muted: #6b7382;
   --accent: #2f6fdb;
@@ -30,6 +32,7 @@
     --bg: #15181e;
     --surface: #1d2129;
     --border: #2e343f;
+  --panel-border: #3e4553;
     --text: #e3e7ee;
     --muted: #98a0ae;
     --accent: #6b9cf0;
@@ -50,6 +53,7 @@
   --bg: #15181e;
   --surface: #1d2129;
   --border: #2e343f;
+  --panel-border: #3e4553;
   --text: #e3e7ee;
   --muted: #98a0ae;
   --accent: #6b9cf0;
@@ -394,17 +398,18 @@ button.cv.done { color: var(--applied); border-color: var(--applied); }
 .entry-comment { white-space: pre-wrap; }
 
 /* The bottom panel: the tasks on the left, the log on the right, as VS
-   Code's panel split. A sash is a thin strip over the border: the resize
-   cursor on it, and after a moment's hover (or while dragged) the accent
-   colour along it. */
+   Code's panel split. Its top edge and the split are 2px lines (1px were
+   hard to see and to grab, the owner, 2026-10-21). A sash is a strip
+   centred over a line: the resize cursor on it, and after a moment's hover
+   (or while dragged) the accent colour along it. */
 .taskpanel {
   --tasks-width: 38%;
   position: relative; flex: none; display: flex; min-height: 100px;
-  border-top: 1px solid var(--border); background: var(--surface);
+  border-top: 2px solid var(--panel-border); background: var(--surface);
 }
 .pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .tasks-pane { width: var(--tasks-width); flex: none; }
-.log-pane { flex: 1; border-left: 1px solid var(--border); }
+.log-pane { flex: 1; border-left: 2px solid var(--panel-border); }
 .pane-title {
   display: flex; align-items: center; gap: 8px; padding: 7px 12px 5px;
   font-size: 11.5px; line-height: 1; color: var(--muted); white-space: nowrap; overflow: hidden;
@@ -451,8 +456,8 @@ button.cv.done { color: var(--applied); border-color: var(--applied); }
   border-color: var(--accent-soft); border-top-color: var(--accent);
 }
 .sash { position: absolute; z-index: 5; transition: background-color .1s ease-out; }
-.sash-y { left: 0; right: 0; top: -3px; height: 5px; cursor: ns-resize; }
-.sash-x { top: 0; bottom: 0; left: calc(var(--tasks-width) - 2px); width: 5px; cursor: ew-resize; }
+.sash-y { left: 0; right: 0; top: -4px; height: 6px; cursor: ns-resize; }
+.sash-x { top: 0; bottom: 0; left: calc(var(--tasks-width) - 2px); width: 6px; cursor: ew-resize; }
 .sash:hover { background: var(--accent); transition-delay: .3s; }
 .sash.active { background: var(--accent); transition-delay: 0s; }
 body.resizing-y, body.resizing-y * { cursor: ns-resize !important; user-select: none; }
