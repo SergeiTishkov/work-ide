@@ -6,7 +6,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test, expect } = require('@playwright/test');
 const { installMockApi, standardFixture } = require('./mock-api');
-const ru = require('../../renderer/locales/ru.js');
+const en = require('../../renderer/locales/en.js');
 
 const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.html')).href;
 
@@ -24,7 +24,7 @@ const DARK = 'rgb(21, 24, 30)';
 test('the theme follows the system until one is chosen', async ({ page }) => {
   await open(page, 'dark');
   const button = page.getByTestId('theme-button');
-  await expect(button).toHaveAttribute('title', ru['theme.choose']);
+  await expect(button).toHaveAttribute('title', en['theme.choose']);
   await expect(button.locator('[data-theme-icon="system"]')).toHaveCount(1);
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined();
   expect(await background(page)).toBe(DARK);
@@ -36,7 +36,7 @@ test('light and dark hold whatever the system says, and survive a reload', async
   await open(page, 'dark');
   await page.getByTestId('theme-button').click();
   await expect(page.getByTestId('theme-option-system')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByTestId('theme-option-light')).toHaveText(ru['theme.light']);
+  await expect(page.getByTestId('theme-option-light')).toHaveText(en['theme.light']);
   await page.getByTestId('theme-option-light').click();
   await expect(page.getByTestId('theme-menu')).toHaveCount(0);
   expect(await background(page)).toBe(LIGHT);
@@ -70,16 +70,16 @@ test('theme sits left of the language; neither button has an arrow; one menu at 
 test('market names follow the interface language where the configuration translates them', async ({ page }) => {
   await open(page);
   const uk = page.getByTestId('segment-option-uk');
+  await expect(uk).toHaveText('United Kingdom');
+  await page.getByTestId('language-button').click();
+  await page.getByTestId('language-option-ru').click();
   await expect(uk).toHaveText('Velikobritaniya');
   await expect(page.getByTestId('segment-option-worldwide')).toHaveText('Worldwide');   // not translated
-  await page.getByTestId('language-button').click();
-  await page.getByTestId('language-option-en').click();
-  await expect(uk).toHaveText('United Kingdom');
 });
 
 test('the markets are a drop-down before the filters', async ({ page }) => {
   await open(page);
-  await expect(page.getByTestId('segment-label')).toHaveText(ru['filter.segment_legend']);
+  await expect(page.getByTestId('segment-label')).toHaveText(en['filter.segment_legend']);
   const options = await page.getByTestId('segment-filter-menu').locator('[role="option"]').evaluateAll(
     (nodes) => nodes.map((n) => n.dataset.value));
   expect(options.length).toBeGreaterThan(1);

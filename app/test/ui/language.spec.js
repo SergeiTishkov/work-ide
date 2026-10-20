@@ -23,18 +23,18 @@ async function flagOf(locator) {
   }));
 }
 
-test('Russian by default; the button shows its flag and the menu is closed', async ({ page }) => {
+test('English by default; the button shows its flag and the menu is closed', async ({ page }) => {
   await open(page);
-  await expect(page.getByTestId('menu-button')).toContainText(ru['menu.button']);
-  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+  await expect(page.getByTestId('menu-button')).toContainText(en['menu.button']);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   const button = page.getByTestId('language-button');
-  await expect(button).toHaveAttribute('title', ru['language.choose']);
+  await expect(button).toHaveAttribute('title', en['language.choose']);
   await expect(button).toHaveAttribute('aria-expanded', 'false');
-  expect(await flagOf(button)).toEqual({ src: 'flags/ru.svg', loaded: true });
+  expect(await flagOf(button)).toEqual({ src: 'flags/en.svg', loaded: true });
   await expect(page.getByTestId('language-menu')).toHaveCount(0);
 });
 
-test('the drop-down lists every language with its flag and its own name', async ({ page }) => {
+test('the drop-down lists every language with its flag and its own name, English first', async ({ page }) => {
   await open(page);
   await page.getByTestId('language-button').click();
   await expect(page.getByTestId('language-button')).toHaveAttribute('aria-expanded', 'true');
@@ -42,39 +42,40 @@ test('the drop-down lists every language with its flag and its own name', async 
   const english = page.getByTestId('language-option-en');
   await expect(russian).toHaveText(ru['language.name']);
   await expect(english).toHaveText(en['language.name']);
-  await expect(russian).toHaveAttribute('aria-selected', 'true');
+  await expect(english).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-testid^="language-option-"]')).toHaveText([en['language.name'], ru['language.name']]);
   expect(await flagOf(russian)).toEqual({ src: 'flags/ru.svg', loaded: true });
   expect(await flagOf(english)).toEqual({ src: 'flags/en.svg', loaded: true });
 });
 
-test('choosing English re-draws the whole interface in English', async ({ page }) => {
+test('choosing Russian re-draws the whole interface in Russian', async ({ page }) => {
   await open(page);
-  await page.getByTestId('language-button').click();
-  await page.getByTestId('language-option-en').click();
-
-  await expect(page.getByTestId('language-menu')).toHaveCount(0);
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  expect(await flagOf(page.getByTestId('language-button'))).toEqual({ src: 'flags/en.svg', loaded: true });
-  await expect(page.getByTestId('menu-button')).toContainText(en['menu.button']);
-  await expect(page.getByTestId('refresh')).toHaveText(en['app.refresh']);
-  await expect(page.getByTestId('filter-label')).toHaveText(en['filter.legend']);
-  await expect(page.locator('[data-testid^="vacancy-"]').first().getByTestId('btn-applied'))
-    .toHaveText(en['action.applied']);
-  // Dates are written the English way.
-  await expect(page.getByTestId('posted-on').first()).toContainText(/\d{2} [A-Z][a-z]{2} \d{4}/);
-});
-
-test('the choice survives a reload, and Russian comes back the same way', async ({ page }) => {
-  await open(page);
-  await page.getByTestId('language-button').click();
-  await page.getByTestId('language-option-en').click();
-  await page.reload();
-  await expect(page.getByTestId('menu-button')).toContainText(en['menu.button']);
-
   await page.getByTestId('language-button').click();
   await page.getByTestId('language-option-ru').click();
+
+  await expect(page.getByTestId('language-menu')).toHaveCount(0);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+  expect(await flagOf(page.getByTestId('language-button'))).toEqual({ src: 'flags/ru.svg', loaded: true });
   await expect(page.getByTestId('menu-button')).toContainText(ru['menu.button']);
+  await expect(page.getByTestId('refresh')).toHaveText(ru['app.refresh']);
+  await expect(page.getByTestId('filter-label')).toHaveText(ru['filter.legend']);
+  await expect(page.locator('[data-testid^="vacancy-"]').first().getByTestId('btn-applied'))
+    .toHaveText(ru['action.applied']);
+  // Dates are written the Russian way.
   await expect(page.getByTestId('posted-on').first()).toContainText(/\d{2}\.\d{2}\.\d{4}/);
+});
+
+test('the choice survives a reload, and English comes back the same way', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('language-button').click();
+  await page.getByTestId('language-option-ru').click();
+  await page.reload();
+  await expect(page.getByTestId('menu-button')).toContainText(ru['menu.button']);
+
+  await page.getByTestId('language-button').click();
+  await page.getByTestId('language-option-en').click();
+  await expect(page.getByTestId('menu-button')).toContainText(en['menu.button']);
+  await expect(page.getByTestId('posted-on').first()).toContainText(/\d{2} [A-Z][a-z]{2} \d{4}/);
 });
 
 test('a click elsewhere or Escape closes the drop-down without a change', async ({ page }) => {
@@ -85,7 +86,7 @@ test('a click elsewhere or Escape closes the drop-down without a change', async 
   await page.getByTestId('language-button').click();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('language-menu')).toHaveCount(0);
-  await expect(page.getByTestId('menu-button')).toContainText(ru['menu.button']);
+  await expect(page.getByTestId('menu-button')).toContainText(en['menu.button']);
 });
 
 test("a vacancy's own lines follow the language, a row without them keeps its one", async ({ page }) => {
@@ -99,12 +100,12 @@ test("a vacancy's own lines follow the language, a row without them keeps its on
   await page.addInitScript(installMockApi, fixture);
   await page.goto(PAGE);
   const card = page.getByTestId(`vacancy-${withViews.id}`);
-  await expect(card.locator('.highlights')).toHaveText('nizkaya nagruzka');
-  await expect(card).toContainText('ne ukazana');
-
-  await page.getByTestId('language-button').click();
-  await page.getByTestId('language-option-en').click();
   await expect(card.locator('.highlights')).toHaveText('low intensity');
   await expect(card).toContainText('not stated');
+
+  await page.getByTestId('language-button').click();
+  await page.getByTestId('language-option-ru').click();
+  await expect(card.locator('.highlights')).toHaveText('nizkaya nagruzka');
+  await expect(card).toContainText('ne ukazana');
   await expect(page.getByTestId(`vacancy-${without.id}`).locator('.highlights')).toHaveText('only one language');
 });

@@ -89,24 +89,24 @@ function loadI18n(saved) {
 
 test('t() substitutes parameters and leaves unknown ones visible', () => {
   const { root } = loadI18n();
-  assert.equal(root.t('x.y', { n: 3 }), 'Obzor (3) {missing}');
+  assert.equal(root.t('x.y', { n: 3 }), 'Review (3) {missing}');
   assert.equal(root.t('nope.nope'), 'nope.nope');
 });
 
-test('Russian until another language is chosen; the choice is remembered', () => {
+test('English until another language is chosen, and first in the list; the choice is remembered', () => {
   const { root, storage } = loadI18n();
-  assert.equal(root.I18n.language(), 'ru');
-  assert.deepEqual(root.I18n.languages, ['ru', 'en']);
-  assert.equal(root.I18n.setLanguage('en'), true);
-  assert.equal(root.t('x.y', { n: 1 }), 'Review (1) {missing}');
-  assert.equal(storage.get('work-ide-language'), 'en');
-  assert.equal(loadI18n('en').root.I18n.language(), 'en', 'the next start speaks English');
+  assert.equal(root.I18n.language(), 'en');
+  assert.deepEqual(root.I18n.languages, ['en', 'ru']);
+  assert.equal(root.I18n.setLanguage('ru'), true);
+  assert.equal(root.t('x.y', { n: 1 }), 'Obzor (1) {missing}');
+  assert.equal(storage.get('work-ide-language'), 'ru');
+  assert.equal(loadI18n('ru').root.I18n.language(), 'ru', 'the next start speaks Russian');
 });
 
-test('an unknown language is refused, a stored one falls back to Russian', () => {
+test('an unknown language is refused, a stored one falls back to English', () => {
   const { root } = loadI18n('xx');
-  assert.equal(root.I18n.language(), 'ru');
+  assert.equal(root.I18n.language(), 'en');
   assert.equal(root.I18n.setLanguage('xx'), false);
-  assert.equal(root.I18n.language(), 'ru');
-  assert.equal(root.t('x.y', { n: 2 }, 'en'), 'Review (2) {missing}', 'one text in another language');
+  assert.equal(root.I18n.language(), 'en');
+  assert.equal(root.t('x.y', { n: 2 }, 'ru'), 'Obzor (2) {missing}', 'one text in another language');
 });

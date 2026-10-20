@@ -6,7 +6,7 @@ const { pathToFileURL } = require('node:url');
 const { test, expect } = require('@playwright/test');
 const { installMockApi, standardFixture } = require('./mock-api');
 const { settled } = require('../helpers/dropdown');
-const ru = require('../../renderer/locales/ru.js');
+const en = require('../../renderer/locales/en.js');
 
 const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.html')).href;
 const BOXES = ['segment-filter', 'filter', 'age-filter', 'source-filter', 'company-filter', 'fit-filter'];
@@ -58,7 +58,7 @@ test('the keyboard: arrows move, Enter checks and leaves the list open, Escape c
     segments: null, statuses: ['new'], fresh: ['fresh', 'earlier'], sources: null, fits: null, companies: null, ages: null,
     text: '',
   }]);
-  await expect(page.getByTestId('filter-value')).toHaveText(ru['filter.new']);
+  await expect(page.getByTestId('filter-value')).toHaveText(en['filter.new']);
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('filter-menu')).toBeHidden();
 

@@ -9,7 +9,7 @@ const {
   choose, check, settled, STATUSES, VIEW, BOTH, view,
 } = require('../helpers/dropdown');
 const { installMockApi, standardFixture, row } = require('./mock-api');
-const ru = require('../../renderer/locales/ru.js');
+const en = require('../../renderer/locales/en.js');
 
 const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.html')).href;
 
@@ -32,8 +32,8 @@ async function command(page, testid) {
 }
 const lastListing = async (page) => { await settled(page); return (await calls(page, 'loadListing')).at(-1); };
 // "Show" closed: every status and both freshness rows checked; the start
-const SHOW_ALL = [ru['filter.new'], ru['filter.group.applications'], ru['filter.group.denied']].join(' · ');
-const SHOW_DEFAULT = `${ru['filter.fresh']} · ${ru['filter.new']}`;
+const SHOW_ALL = [en['filter.new'], en['filter.group.applications'], en['filter.group.denied']].join(' · ');
+const SHOW_DEFAULT = `${en['filter.fresh']} · ${en['filter.new']}`;
 
 test('opens on the first identity, every market, fresh vacancies not applied or denied', async ({ page }) => {
   await open(page);
@@ -44,13 +44,13 @@ test('opens on the first identity, every market, fresh vacancies not applied or 
   await expect(page.getByTestId('list').locator('article')).toHaveCount(3);   // a1, a2r, b1
   await expect(byId(page, 'a3')).toHaveCount(0);   // not fresh
   await expect(byId(page, 'x1')).toHaveCount(0);   // has feedback
-  await expect(page).toHaveTitle(ru['app.title']);
+  await expect(page).toHaveTitle(en['app.title']);
 });
 
 test('sections follow the class order, with their titles from the locale', async ({ page }) => {
   await open(page);
   const titles = await page.locator('.class-section h2 .section-title').allTextContents();
-  expect(titles).toEqual([ru['class.hot_lead'], ru['class.worth_a_look']]);
+  expect(titles).toEqual([en['class.hot_lead'], en['class.worth_a_look']]);
 });
 
 test('"Collect vacancies" queues a collection; the bottom panel lists it with its log', async ({ page }) => {
@@ -65,11 +65,11 @@ test('"Collect vacancies" queues a collection; the bottom panel lists it with it
   await expect(page.getByTestId('run-stop')).toBeVisible();
   await expect(page.getByTestId('task-panel')).toBeVisible();
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'running');
-  await expect(page.getByTestId('task-1')).toContainText(`${ru['task.kind.collect']} · sharp`);
+  await expect(page.getByTestId('task-1')).toContainText(`${en['task.kind.collect']} · sharp`);
 
   await page.evaluate(() => window.__taskLine('fetching sources'));
   await expect(page.getByTestId('task-log')).toContainText('fetching sources');
-  await expect(page.getByTestId('task-log-title')).toContainText(ru['task.state.running']);
+  await expect(page.getByTestId('task-log-title')).toContainText(en['task.state.running']);
 
   await page.evaluate(() => window.__finishCollect({ ok: true, code: 0 }));
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'done');
@@ -101,12 +101,12 @@ test('collections of several identities queue: the first runs, the others wait t
   const button = await command(page, 'run-collect');
   await expect(button).toBeEnabled();
   await button.click();
-  await expect(page.getByTestId('run-status')).toHaveText(ru['run.queued']);
+  await expect(page.getByTestId('run-status')).toHaveText(en['run.queued']);
   await command(page, 'run-collect');
-  await expect(button).toHaveText(ru['run.queued']);
+  await expect(button).toHaveText(en['run.queued']);
   await expect(button).toBeDisabled();
   await expect(page.getByTestId('task-2')).toHaveAttribute('data-state', 'queued');
-  await expect(page.getByTestId('task-list-title')).toContainText(ru['task.list_title'].replace('{n}', '2'));
+  await expect(page.getByTestId('task-list-title')).toContainText(en['task.list_title'].replace('{n}', '2'));
 
   await page.evaluate(() => window.__finishCollect({ ok: true, code: 0 }));
   await expect(page.getByTestId('task-2')).toHaveAttribute('data-state', 'running');
@@ -116,7 +116,7 @@ test('collections of several identities queue: the first runs, the others wait t
   await expect(page.getByTestId('task-2')).toHaveClass(/chosen/);
   await page.getByTestId('task-1').click();
   await expect(page.getByTestId('task-1')).toHaveClass(/chosen/);
-  await expect(page.getByTestId('task-log-title')).toContainText(ru['task.state.done']);
+  await expect(page.getByTestId('task-log-title')).toContainText(en['task.state.done']);
 });
 
 // The owner, 2026-10-07: the review is started from an agent session, where
@@ -124,10 +124,10 @@ test('collections of several identities queue: the first runs, the others wait t
 test('"Review feedback" shows the pending count and starts nothing', async ({ page }) => {
   await open(page);
   const label = await command(page, 'run-feedback');
-  await expect(label).toHaveText(ru['run.feedback'].replace('{n}', '1'));
-  await expect(page.getByTestId('menu').locator('[aria-disabled="true"]')).toContainText(ru['run.feedback'].replace('{n}', '1'));
+  await expect(label).toHaveText(en['run.feedback'].replace('{n}', '1'));
+  await expect(page.getByTestId('menu').locator('[aria-disabled="true"]')).toContainText(en['run.feedback'].replace('{n}', '1'));
   // the item says how the review starts, with the menu open
-  await expect(page.getByTestId('run-feedback-tip')).toHaveText(ru['run.feedback_hint'].replace('{identity}', 'sharp'));
+  await expect(page.getByTestId('run-feedback-tip')).toHaveText(en['run.feedback_hint'].replace('{identity}', 'sharp'));
   await label.click();
   await expect(page.getByTestId('menu')).toBeVisible();   // nothing to choose: the menu stays
   expect(await calls(page, 'startRun')).toEqual([]);
@@ -137,9 +137,9 @@ test('"Review feedback" shows the pending count and starts nothing', async ({ pa
 test('"Review feedback" names the identity of the open tab', async ({ page }) => {
   await open(page);
   await page.getByTestId('identity-tab-partsharp').click();
-  await expect(await command(page, 'run-feedback')).toHaveText(ru['run.feedback'].replace('{n}', '0'));
+  await expect(await command(page, 'run-feedback')).toHaveText(en['run.feedback'].replace('{n}', '0'));
   await expect(page.getByTestId('run-feedback-tip'))
-    .toHaveText(ru['run.feedback_hint'].replace('{identity}', 'partsharp'));
+    .toHaveText(en['run.feedback_hint'].replace('{identity}', 'partsharp'));
 });
 
 test('"Wrong pick" asks for a reason, saves it, and leaves an undoable stub', async ({ page }) => {
@@ -147,7 +147,7 @@ test('"Wrong pick" asks for a reason, saves it, and leaves an undoable stub', as
   const row = byId(page, 'a1');
   await row.getByTestId('btn-bugged').click();
   expect(await calls(page, 'setFeedback')).toEqual([]);   // nothing saved before "Save"
-  await expect(row.getByTestId('reason-input')).toHaveAttribute('placeholder', ru['reason.bugged']);
+  await expect(row.getByTestId('reason-input')).toHaveAttribute('placeholder', en['reason.bugged']);
   await row.getByTestId('reason-input').fill('A Java role, .NET only in the company blurb');
   await row.getByTestId('reason-save').click();
 
@@ -155,8 +155,8 @@ test('"Wrong pick" asks for a reason, saves it, and leaves an undoable stub', as
     ['sharp', 'a1', 'bugged', 'A Java role, .NET only in the company blurb']]);
   await expect(byId(page, 'a1')).toHaveCount(0);
   const stub = page.getByTestId('stub-a1');
-  await expect(stub).toContainText(ru['stub.marked'].replace('{status}', ru['status.bugged']));
-  await expect(await command(page, 'run-feedback')).toHaveText(ru['run.feedback'].replace('{n}', '2'));
+  await expect(stub).toContainText(en['stub.marked'].replace('{status}', en['status.bugged']));
+  await expect(await command(page, 'run-feedback')).toHaveText(en['run.feedback'].replace('{n}', '2'));
 
   await stub.getByTestId('btn-undo').click();
   expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'a1']);
@@ -235,7 +235,7 @@ test('"Show" counts the statuses under the freshness chosen, the freshness under
   await choose(page, 'filter', 'bugged');
   expect(await lastListing(page)).toEqual(['sharp', view({ statuses: ['bugged'], fresh: BOTH })]);
   await expect(byId(page, 'x1')).toBeVisible();
-  await expect(byId(page, 'x1').getByTestId('status-badge')).toHaveText(ru['status.bugged']);
+  await expect(byId(page, 'x1').getByTestId('status-badge')).toHaveText(en['status.bugged']);
 
   await byId(page, 'x1').getByTestId('btn-undo').click();
   expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'x1']);
@@ -246,7 +246,7 @@ test('each identity keeps its own view', async ({ page }) => {
   await choose(page, 'filter', 'all');
   await choose(page, 'segment-filter', 'uk');
   expect(await lastListing(page)).toEqual(['sharp', view({ segments: ['uk'], statuses: STATUSES, fresh: BOTH })]);
-  await expect(page.getByTestId('segment-filter-value')).toHaveText('Velikobritaniya');
+  await expect(page.getByTestId('segment-filter-value')).toHaveText('United Kingdom');
 
   await page.getByTestId('identity-tab-partsharp').click();
   await expect(page.getByTestId('filter-value')).toHaveText(SHOW_DEFAULT);
@@ -254,10 +254,10 @@ test('each identity keeps its own view', async ({ page }) => {
   await choose(page, 'filter', 'applied');
 
   await page.getByTestId('identity-tab-sharp').click();
-  await expect(page.getByTestId('segment-filter-value')).toHaveText('Velikobritaniya');
+  await expect(page.getByTestId('segment-filter-value')).toHaveText('United Kingdom');
   await expect(page.getByTestId('filter-value')).toHaveText(SHOW_ALL);
   await page.getByTestId('identity-tab-partsharp').click();
-  await expect(page.getByTestId('filter-value')).toHaveText(ru['filter.applied']);
+  await expect(page.getByTestId('filter-value')).toHaveText(en['filter.applied']);
 });
 
 // The owner, 2026-10-07: check boxes in the four drop-downs.
@@ -279,7 +279,7 @@ test('a check list takes several rows; its master row is on, partly on or off', 
   await master.click();   // on: off
   await expect(master).toHaveAttribute('data-state', 'off');
   expect(await lastListing(page)).toEqual(['sharp', view({ segments: [] })]);
-  await expect(page.getByTestId('segment-filter-value')).toHaveText(ru['filter.none']);
+  await expect(page.getByTestId('segment-filter-value')).toHaveText(en['filter.none']);
   await expect(page.getByTestId('list-empty')).toBeVisible();
   await master.click();   // off: on
   await expect(master).toHaveAttribute('data-state', 'on');
@@ -302,7 +302,7 @@ test('"Show": freshness, not applied or denied, applications, denied; "All" chec
   await page.getByTestId('filter').click();
   const menu = page.getByTestId('filter-menu');
   await expect(menu.locator('.dropdown-group-label'))
-    .toHaveText([ru['filter.group.freshness'], ru['filter.group.applications'], ru['filter.group.denied']]);
+    .toHaveText([en['filter.group.freshness'], en['filter.group.applications'], en['filter.group.denied']]);
   const groups = await menu.locator('[role="group"]').evaluateAll((nodes) => nodes.map((group) => [
     ...group.querySelectorAll('[role="option"]')].map((o) => o.dataset.value || o.dataset.testid)));
   expect(groups).toEqual([
@@ -313,26 +313,26 @@ test('"Show": freshness, not applied or denied, applications, denied; "All" chec
     ['filter-master-denied', 'rejected', 'bugged', 'expired'],
   ]);
   await expect(page.getByTestId('filter-master-fresh')).toHaveAttribute('data-state', 'partial');
-  await expect(page.getByTestId('filter-master-denied')).toHaveText(`${ru['filter.all']} (1)`);
+  await expect(page.getByTestId('filter-master-denied')).toHaveText(`${en['filter.all']} (1)`);
 
   await page.getByTestId('filter-master-denied').click();
   await expect(page.getByTestId('filter-option-bugged')).toHaveAttribute('data-state', 'on');
   expect(await lastListing(page)).toEqual(['sharp', view({ statuses: ['new', 'rejected', 'bugged', 'expired'] })]);
   await expect(byId(page, 'x1')).toBeVisible();
   await expect(page.getByTestId('filter-value'))
-    .toHaveText(`${ru['filter.fresh']} · ${ru['filter.new']} · ${ru['filter.group.denied']}`);
+    .toHaveText(`${en['filter.fresh']} · ${en['filter.new']} · ${en['filter.group.denied']}`);
 
   await page.getByTestId('filter-option-new').click();
   await expect(page.getByTestId('filter-option-new')).toHaveAttribute('data-state', 'off');
   await page.getByTestId('filter-option-expired').click();
   await expect(page.getByTestId('filter-master-denied')).toHaveAttribute('data-state', 'partial');
   await expect(page.getByTestId('filter-value'))
-    .toHaveText([ru['filter.fresh'], ru['filter.rejected'], ru['filter.bugged']].join(' · '));
+    .toHaveText([en['filter.fresh'], en['filter.rejected'], en['filter.bugged']].join(' · '));
   await page.getByTestId('filter-master-fresh').click();   // partly on: on
   await expect(page.getByTestId('filter-master-fresh')).toHaveAttribute('data-state', 'on');
   expect(await lastListing(page)).toEqual(['sharp', view({ statuses: ['rejected', 'bugged'], fresh: BOTH })]);
   await page.getByTestId('filter-master-fresh').click();   // on: off
-  await expect(page.getByTestId('filter-value')).toHaveText(ru['filter.none']);
+  await expect(page.getByTestId('filter-value')).toHaveText(en['filter.none']);
   await expect(page.getByTestId('list-empty')).toBeVisible();
 });
 
@@ -385,9 +385,9 @@ test('a stub drains for 30 seconds, counts down on hover, then goes', async ({ p
   await expect(tip).toBeHidden();
   await stub.getByTestId('stub-timer').hover();
   await expect(tip).toBeVisible();
-  await expect(tip).toHaveText(ru['stub.removed_in'].replace('{n}', '30'));
+  await expect(tip).toHaveText(en['stub.removed_in'].replace('{n}', '30'));
   await page.clock.runFor(10000);
-  await expect(tip).toHaveText(ru['stub.removed_in'].replace('{n}', '20'));
+  await expect(tip).toHaveText(en['stub.removed_in'].replace('{n}', '20'));
   await page.clock.runFor(20000);
   await expect(stub).toHaveCount(0);
 });
@@ -457,13 +457,13 @@ test('changing the filter clears stubs', async ({ page }) => {
   await expect(page.getByTestId('stub-a1')).toBeVisible();
   await choose(page, 'filter', 'all');
   await expect(page.getByTestId('stub-a1')).toHaveCount(0);
-  await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(ru['status.applied']);
+  await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(en['status.applied']);
 });
 
 test('an identity never collected says so and offers to collect', async ({ page }) => {
   await open(page);
   await page.getByTestId('identity-tab-newbie').click();
-  await expect(page.getByTestId('never-collected')).toHaveText(ru['identity.never_collected']);
+  await expect(page.getByTestId('never-collected')).toHaveText(en['identity.never_collected']);
   await (await command(page, 'run-collect')).click();
   expect(await calls(page, 'enqueueTask')).toEqual([[{ kind: 'collect', identity: 'newbie' }]]);
 });
@@ -477,8 +477,8 @@ test('"Copy URL" beside "Open" copies the link and says so', async ({ page }) =>
   await row.getByTestId('btn-copy-url').click();
   expect(await calls(page, 'copyText')).toEqual([['https://example.test/a1']]);
   expect(await calls(page, 'openExternal')).toEqual([]);
-  await expect(row.getByTestId('btn-copy-url')).toHaveText(ru['action.copied']);
-  await expect(row.getByTestId('btn-copy-url')).toHaveText(ru['action.copy_url']);
+  await expect(row.getByTestId('btn-copy-url')).toHaveText(en['action.copied']);
+  await expect(row.getByTestId('btn-copy-url')).toHaveText(en['action.copy_url']);
 });
 
 test('a vacancy title opens in the browser, not in the app', async ({ page }) => {
@@ -489,8 +489,8 @@ test('a vacancy title opens in the browser, not in the app', async ({ page }) =>
 
 test('badges: fresh and needs a manual check', async ({ page }) => {
   await open(page);
-  await expect(byId(page, 'a2r').getByTestId('badge-review')).toHaveText(ru['badge.manual_review']);
-  await expect(byId(page, 'a1').getByTestId('badge-fresh')).toHaveText(ru['badge.fresh']);
+  await expect(byId(page, 'a2r').getByTestId('badge-review')).toHaveText(en['badge.manual_review']);
+  await expect(byId(page, 'a1').getByTestId('badge-fresh')).toHaveText(en['badge.fresh']);
   await expect(byId(page, 'a1').getByTestId('badge-review')).toHaveCount(0);
 });
 
@@ -499,7 +499,7 @@ test('a missing claude is explained', async ({ page }) => {
   fixture.collectReply = { ok: false, error: 'claude_not_found' };
   await open(page, fixture);
   await (await command(page, 'run-collect')).click();
-  await expect(page.getByTestId('error')).toContainText(ru['run.claude_not_found']);
+  await expect(page.getByTestId('error')).toContainText(en['run.claude_not_found']);
   await expect(await command(page, 'run-collect')).toBeEnabled();
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'failed');
 });
@@ -515,17 +515,17 @@ test('data text is shown as text, never as markup', async ({ page }) => {
 test('every row shows when it was posted and when we first downloaded it', async ({ page }) => {
   await open(page);
   const row = byId(page, 'a1');
-  await expect(row.getByTestId('posted-on')).toHaveText(ru['row.posted_on'].replace('{date}', '20.09.2026'));
+  await expect(row.getByTestId('posted-on')).toHaveText(en['row.posted_on'].replace('{date}', '20 Sep 2026'));
   await expect(row.getByTestId('first-seen-on'))
-    .toHaveText(ru['row.first_seen_on'].replace('{date}', '28.09.2026'));
+    .toHaveText(en['row.first_seen_on'].replace('{date}', '28 Sep 2026'));
   await expect(byId(page, 'a2r').getByTestId('posted-on'))
-    .toHaveText(ru['row.posted_on'].replace('{date}', ru['row.date_unknown']));
+    .toHaveText(en['row.posted_on'].replace('{date}', en['row.date_unknown']));
 });
 
 test('"Open the vacancy link" hands the URL to the system browser, marked or not', async ({ page }) => {
   await open(page);
   const button = byId(page, 'a1').getByTestId('btn-open');
-  await expect(button).toHaveText(ru['action.open']);
+  await expect(button).toHaveText(en['action.open']);
   await button.click();
   expect(await calls(page, 'openExternal')).toEqual([['https://example.test/a1']]);
   expect(await calls(page, 'setFeedback')).toEqual([]);   // opening is not an answer
@@ -540,10 +540,10 @@ test('a pipeline run going anywhere shows beside the menu, in it, and on the tab
   await page.evaluate(() => window.__setPipeline('sharp',
     { running: true, stage: 'check links', startedAt: '2026-09-30T00:23:41+00:00' }));
   const status = page.getByTestId('run-status');
-  await expect(status).toContainText(ru['run.collecting_stage'].replace('{stage}', 'check links'));
+  await expect(status).toContainText(en['run.collecting_stage'].replace('{stage}', 'check links'));
   await expect(status.getByTestId('collect-indicator')).toBeVisible();
   const button = await command(page, 'run-collect');
-  await expect(button).toContainText(ru['run.collecting_stage'].replace('{stage}', 'check links'));
+  await expect(button).toContainText(en['run.collecting_stage'].replace('{stage}', 'check links'));
   await expect(button).toBeDisabled();
   await expect(page.getByTestId('run-stop')).toHaveCount(0);   // started elsewhere: shown, not stopped here
   await expect(page.getByTestId('identity-tab-sharp').getByTestId('tab-collecting')).toBeVisible();
@@ -551,7 +551,7 @@ test('a pipeline run going anywhere shows beside the menu, in it, and on the tab
 
   const loadsBefore = (await calls(page, 'loadSegments')).length;
   await page.evaluate(() => window.__setPipeline('sharp', { running: false }));
-  await expect(button).toHaveText(ru['run.collect']);
+  await expect(button).toHaveText(en['run.collect']);
   await expect(button).toBeEnabled();
   await expect(status).toHaveCount(0);
   await expect(page.getByTestId('tab-collecting')).toHaveCount(0);
@@ -572,11 +572,11 @@ test('"Refresh" reloads the interface and keeps the tab and the view', async ({ 
   await page.getByTestId('identity-tab-sharp').click();
   await choose(page, 'segment-filter', 'uk');
   await choose(page, 'filter', 'all');
-  await expect(page.getByTestId('refresh')).toHaveText(ru['app.refresh']);
+  await expect(page.getByTestId('refresh')).toHaveText(en['app.refresh']);
   await page.evaluate(() => { window.__beforeRefresh = true; });
 
   await page.getByTestId('refresh').click();
-  await expect(page.getByTestId('segment-filter-value')).toHaveText('Velikobritaniya');
+  await expect(page.getByTestId('segment-filter-value')).toHaveText('United Kingdom');
   expect(await page.evaluate(() => window.__beforeRefresh)).toBeUndefined();   // a new page
   await expect(page.getByTestId('filter-value')).toHaveText(SHOW_ALL);
   expect((await calls(page, 'loadListing'))[0])
@@ -600,8 +600,8 @@ const fill = (text, values) => Object.entries(values)
 test('an answer and its undo change the class count at once, and the list that catches up agrees', async ({ page }) => {
   await open(page, manyHotLeads(30));
   const count = page.getByTestId('section-count-hot_lead');
-  const shownOf = (total) => fill(ru['list.shown_of'],
-    { shown: 15, total, n: 10, button: ru['list.show_more'].replace('{n}', '10') });
+  const shownOf = (total) => fill(en['list.shown_of'],
+    { shown: 15, total, n: 10, button: en['list.show_more'].replace('{n}', '10') });
   await expect(count).toHaveText(shownOf(30));
 
   await page.evaluate(() => window.__holdListing());
@@ -625,21 +625,21 @@ test('an answer and its undo change the class count at once, and the list that c
 test('in a class shown whole, an answer takes one off its count at once', async ({ page }) => {
   await open(page);
   const count = page.getByTestId('section-count-hot_lead');
-  await expect(count).toHaveText(ru['list.shown_all'].replace('{n}', '2'));   // a1, a2r
+  await expect(count).toHaveText(en['list.shown_all'].replace('{n}', '2'));   // a1, a2r
   await page.evaluate(() => window.__holdListing());
   await byId(page, 'a1').getByTestId('btn-applied').click();
-  await expect(count).toHaveText(ru['list.shown_all'].replace('{n}', '1'));
+  await expect(count).toHaveText(en['list.shown_all'].replace('{n}', '1'));
   await page.evaluate(() => window.__releaseListing());
-  await expect(count).toHaveText(ru['list.shown_all'].replace('{n}', '1'));
+  await expect(count).toHaveText(en['list.shown_all'].replace('{n}', '1'));
 });
 
 test('"Not applied or denied" from every run lists every unanswered vacancy, fresh or not', async ({ page }) => {
   await open(page);
-  await expect(page.getByTestId('filter-option-new')).toHaveText(`${ru['filter.new']} (3)`);   // fresh ones
+  await expect(page.getByTestId('filter-option-new')).toHaveText(`${en['filter.new']} (3)`);   // fresh ones
   await check(page, 'filter', ['fresh', 'earlier', 'new']);
   expect(await lastListing(page)).toEqual(['sharp', view({ fresh: BOTH })]);
-  await expect(page.getByTestId('filter-option-new')).toHaveText(`${ru['filter.new']} (4)`);   // a1, a2r, a3, b1
-  await expect(page.getByTestId('filter-value')).toHaveText(ru['filter.new']);
+  await expect(page.getByTestId('filter-option-new')).toHaveText(`${en['filter.new']} (4)`);   // a1, a2r, a3, b1
+  await expect(page.getByTestId('filter-value')).toHaveText(en['filter.new']);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(4);
   await expect(byId(page, 'a3')).toBeVisible();   // not fresh
   await expect(byId(page, 'x1')).toHaveCount(0);   // has feedback
@@ -649,8 +649,8 @@ test('a capped class says how much is shown and brings ten more at a time', asyn
   await open(page, manyHotLeads(30));
   const section = page.getByTestId('section-hot_lead');
   const count = page.getByTestId('section-count-hot_lead');
-  const more = ru['list.show_more'].replace('{n}', '10');
-  await expect(count).toHaveText(fill(ru['list.shown_of'], { shown: 15, total: 30, n: 10, button: more }));
+  const more = en['list.show_more'].replace('{n}', '10');
+  await expect(count).toHaveText(fill(en['list.shown_of'], { shown: 15, total: 30, n: 10, button: more }));
   await expect(page.getByTestId('show-more-hot_lead')).toHaveText(more);
   await expect(section.locator('article')).toHaveCount(15);
   await expect(page.getByTestId('scroll-more-hot_lead')).toHaveCount(0);   // every class: buttons only
@@ -658,27 +658,27 @@ test('a capped class says how much is shown and brings ten more at a time', asyn
   await page.getByTestId('show-more-hot_lead').click();
   expect(await lastListing(page)).toEqual(['sharp', VIEW, { shown: { hot_lead: 25 } }]);
   await expect(section.locator('article')).toHaveCount(25);
-  const five = ru['list.show_more'].replace('{n}', '5');
-  await expect(count).toHaveText(fill(ru['list.shown_of'], { shown: 25, total: 30, n: 5, button: five }));
+  const five = en['list.show_more'].replace('{n}', '5');
+  await expect(count).toHaveText(fill(en['list.shown_of'], { shown: 25, total: 30, n: 5, button: five }));
 
   await page.getByTestId('show-more-hot_lead').click();
   await expect(section.locator('article')).toHaveCount(30);
-  await expect(count).toHaveText(fill(ru['list.shown_all'], { n: 30 }));
+  await expect(count).toHaveText(fill(en['list.shown_all'], { n: 30 }));
   await expect(page.getByTestId('show-more-hot_lead')).toHaveCount(0);
 
   await page.getByTestId('show-less-hot_lead').click();
   await expect(section.locator('article')).toHaveCount(15);
   await expect(page.getByTestId('show-less-hot_lead')).toHaveCount(0);
-  await expect(page.getByTestId('section-count-worth_a_look')).toHaveText(fill(ru['list.shown_all'], { n: 1 }));
+  await expect(page.getByTestId('section-count-worth_a_look')).toHaveText(fill(en['list.shown_all'], { n: 1 }));
 });
 
 test('"Fit" narrows the list to one class, and the other filters count within it', async ({ page }) => {
   await open(page);
-  await expect(page.getByTestId('fit-label')).toHaveText(ru['filter.fit_legend']);
-  await expect(page.getByTestId('fit-filter-value')).toHaveText(ru['filter.fit_all']);
-  await expect(page.getByTestId('fit-option-all')).toHaveText(`${ru['filter.fit_all']} (3)`);
-  await expect(page.getByTestId('fit-option-hot_lead')).toHaveText(`${ru['class.hot_lead']} (2)`);
-  await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${ru['class.worth_a_look']} (1)`);
+  await expect(page.getByTestId('fit-label')).toHaveText(en['filter.fit_legend']);
+  await expect(page.getByTestId('fit-filter-value')).toHaveText(en['filter.fit_all']);
+  await expect(page.getByTestId('fit-option-all')).toHaveText(`${en['filter.fit_all']} (3)`);
+  await expect(page.getByTestId('fit-option-hot_lead')).toHaveText(`${en['class.hot_lead']} (2)`);
+  await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${en['class.worth_a_look']} (1)`);
 
   await choose(page, 'fit-filter', 'hot_lead');
   await expect(page.getByTestId('section-worth_a_look')).toHaveCount(0);
@@ -689,11 +689,11 @@ test('"Fit" narrows the list to one class, and the other filters count within it
   expect((await calls(page, 'listSources')).at(-1)).toEqual(hot);
   await expect(page.getByTestId('filter-option-new')).toContainText('(2)');
   await expect(page.getByTestId('source-option-devitjobs')).toHaveCount(0);   // b1 is worth a look
-  await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${ru['class.worth_a_look']} (1)`);
+  await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${en['class.worth_a_look']} (1)`);
 
   // with the status filter: "All" adds a3 (not fresh) and x1 (a wrong pick)
   await choose(page, 'filter', 'all');
-  await expect(page.getByTestId('fit-filter-value')).toHaveText(ru['class.hot_lead']);
+  await expect(page.getByTestId('fit-filter-value')).toHaveText(en['class.hot_lead']);
   await expect(page.getByTestId('section-hot_lead').locator('article')).toHaveCount(4);
   // and with the source
   await choose(page, 'source-filter', 'devitjobs');
@@ -701,7 +701,7 @@ test('"Fit" narrows the list to one class, and the other filters count within it
   await expect(byId(page, 'x1')).toBeVisible();
 
   await page.getByTestId('refresh').click();
-  await expect(page.getByTestId('fit-filter-value')).toHaveText(ru['class.hot_lead']);
+  await expect(page.getByTestId('fit-filter-value')).toHaveText(en['class.hot_lead']);
 });
 
 test('one class chosen: the scroll brings ten more at a time', async ({ page }) => {
@@ -711,7 +711,7 @@ test('one class chosen: the scroll brings ten more at a time', async ({ page }) 
   const section = page.getByTestId('section-hot_lead');
   await expect(section.locator('article')).toHaveCount(15);
   await expect(page.getByTestId('section-count-hot_lead'))
-    .toHaveText(fill(ru['list.shown_scroll'], { shown: 15, total: 40, n: 10 }));
+    .toHaveText(fill(en['list.shown_scroll'], { shown: 15, total: 40, n: 10 }));
   await expect(page.getByTestId('show-more-hot_lead')).toBeVisible();   // the button still works
 
   for (const shown of [25, 35, 40]) {
@@ -719,7 +719,7 @@ test('one class chosen: the scroll brings ten more at a time', async ({ page }) 
     await expect(section.locator('article')).toHaveCount(shown);
   }
   await expect(page.getByTestId('scroll-more-hot_lead')).toHaveCount(0);
-  await expect(page.getByTestId('section-count-hot_lead')).toHaveText(fill(ru['list.shown_all'], { n: 40 }));
+  await expect(page.getByTestId('section-count-hot_lead')).toHaveText(fill(en['list.shown_all'], { n: 40 }));
   const asked = (await calls(page, 'loadListing')).map((args) => args[2] && args[2].shown)
     .filter(Boolean).map((shown) => shown.hot_lead);
   expect(asked).toEqual([25, 35, 45]);
@@ -756,7 +756,7 @@ test('until the identities arrive the window shows a spinner, not "no identities
   await page.addInitScript(installMockApi, fixture);
   await page.goto(PAGE);
   await expect(page.getByTestId('loading')).toBeVisible();
-  await expect(page.getByTestId('loading')).toContainText(ru['app.loading']);
+  await expect(page.getByTestId('loading')).toContainText(en['app.loading']);
   await expect(page.getByTestId('no-identities')).toHaveCount(0);
   await page.evaluate(() => window.__releaseIdentities());
   await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
@@ -811,17 +811,17 @@ test('"Refresh" still reloads against an older main process without the channel'
 test('"Vacancy expired" is recorded at once, with no reason, and has its own filter', async ({ page }) => {
   await open(page);
   const button = byId(page, 'a1').getByTestId('btn-expired');
-  await expect(button).toHaveText(ru['action.expired']);
+  await expect(button).toHaveText(en['action.expired']);
   await button.click();
   expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'expired', null]]);
   await expect(page.getByTestId('reason-form')).toHaveCount(0);
   await expect(page.getByTestId('stub-a1'))
-    .toContainText(ru['stub.marked'].replace('{status}', ru['status.expired']));
+    .toContainText(en['stub.marked'].replace('{status}', en['status.expired']));
   await expect(page.getByTestId('filter-option-expired')).toContainText('(1)');
 
   await choose(page, 'filter', 'expired');
   expect(await lastListing(page)).toEqual(['sharp', view({ statuses: ['expired'], fresh: BOTH })]);
-  await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(ru['status.expired']);
+  await expect(byId(page, 'a1').getByTestId('status-badge')).toHaveText(en['status.expired']);
   await byId(page, 'a1').getByTestId('btn-undo').click();
   expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'a1']);
 });
@@ -830,9 +830,9 @@ test('"Vacancy expired" is recorded at once, with no reason, and has its own fil
 
 test('"Source" lists the boards of the current filter, each with its count', async ({ page }) => {
   await open(page);
-  await expect(page.getByTestId('source-label')).toHaveText(ru['filter.source_legend']);
-  await expect(page.getByTestId('source-filter-value')).toHaveText(ru['filter.source_all']);
-  await expect(page.getByTestId('source-option-all')).toHaveText(`${ru['filter.source_all']} (3)`);
+  await expect(page.getByTestId('source-label')).toHaveText(en['filter.source_legend']);
+  await expect(page.getByTestId('source-filter-value')).toHaveText(en['filter.source_all']);
+  await expect(page.getByTestId('source-option-all')).toHaveText(`${en['filter.source_all']} (3)`);
   await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (2)');
   await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs.uk, devitjobs.com (1)');
   expect(await calls(page, 'listSources')).toContainEqual(['sharp', VIEW]);
@@ -842,15 +842,15 @@ test('the details open with the website the vacancy came from', async ({ page })
   await open(page);
   const details = byId(page, 'b1').locator('details');
   await details.locator('summary').click();
-  await expect(details.locator('li').first()).toHaveText(`${ru['row.source']}: devitjobs.uk, devitjobs.com`);
-  await expect(byId(page, 'a1').getByTestId('details-source')).toHaveText(`${ru['row.source']}: linkedin.com`);
+  await expect(details.locator('li').first()).toHaveText(`${en['row.source']}: devitjobs.uk, devitjobs.com`);
+  await expect(byId(page, 'a1').getByTestId('details-source')).toHaveText(`${en['row.source']}: linkedin.com`);
 });
 
 test('an exclusivity clause is a line in the details, not a refusal', async ({ page }) => {
   await open(page);
   await byId(page, 'b1').locator('details summary').click();
   await expect(byId(page, 'b1').getByTestId('details-exclusivity'))
-    .toHaveText(`${ru['row.exclusivity']}: moonlighting prohibited`);
+    .toHaveText(`${en['row.exclusivity']}: moonlighting prohibited`);
   await expect(byId(page, 'a1').getByTestId('details-exclusivity')).toHaveCount(0);
 });
 
@@ -871,14 +871,14 @@ test('"Identities" turns one off: its tab dims, it cannot be collected, and on a
   await (await command(page, 'open-identities')).click();
   const dialog = page.getByTestId('identities-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText(ru['identities.explain']);
+  await expect(dialog).toContainText(en['identities.explain']);
   await expect(page.getByTestId('identity-active-sharp')).toBeChecked();
   await expect(page.getByTestId('identity-active-partsharp')).toBeChecked();
   await expect(page.getByTestId('identity-active-newbie')).toBeDisabled();   // no base yet
 
   await page.getByTestId('identity-active-partsharp').uncheck();
   expect(await calls(page, 'setIdentityActive')).toEqual([['partsharp', false]]);
-  await expect(page.getByTestId('identity-state-partsharp')).toHaveText(ru['identities.inactive']);
+  await expect(page.getByTestId('identity-state-partsharp')).toHaveText(en['identities.inactive']);
   await expect(page.getByTestId('identity-tab-partsharp')).toHaveClass(/inactive/);
   await page.getByTestId('identities-close').click();
   await expect(dialog).toHaveCount(0);
@@ -886,7 +886,7 @@ test('"Identities" turns one off: its tab dims, it cannot be collected, and on a
   await page.getByTestId('identity-tab-partsharp').click();
   const collect = await command(page, 'run-collect');
   await expect(collect).toBeDisabled();
-  await expect(collect).toHaveAttribute('title', ru['run.inactive']);
+  await expect(collect).toHaveAttribute('title', en['run.inactive']);
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('menu')).toHaveCount(0);
 
@@ -909,7 +909,7 @@ test('the text field after the drop-downs narrows the list by words, together wi
   const order = await page.getByTestId('filters').locator('[data-dropdown], [data-testid="text-filter"]')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.dropdown || n.dataset.testid));
   expect(order.at(-1)).toBe('text-filter');
-  await expect(page.getByTestId('filters')).toContainText(ru['filter.text_legend']);
+  await expect(page.getByTestId('filters')).toContainText(en['filter.text_legend']);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(3);   // a1, a2r, b1
 
   // typed key by key: each key redraws the panel, the field keeps the focus and the caret
@@ -1005,16 +1005,16 @@ test('"Company" sits between "Source" and "Category": all, the kinds, the interm
   const order = await page.getByTestId('filters').locator('[data-dropdown]')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.dropdown));
   expect(order).toEqual(['segment-filter', 'filter', 'age-filter', 'source-filter', 'company-filter', 'fit-filter']);
-  await expect(page.getByTestId('company-label')).toHaveText(ru['filter.company_legend']);
-  await expect(page.getByTestId('company-filter-value')).toHaveText(ru['filter.company_all']);
+  await expect(page.getByTestId('company-label')).toHaveText(en['filter.company_legend']);
+  await expect(page.getByTestId('company-filter-value')).toHaveText(en['filter.company_all']);
   const rows = await page.getByTestId('company-filter-menu').locator('[role="option"]')
     .evaluateAll((nodes) => nodes.map((n) => [n.textContent, n.dataset.state]));
   expect(rows).toEqual([
-    [`${ru['filter.company_all']} (3)`, 'on'],
-    [`${ru['filter.company_kind.marketplace']} (2)`, 'on'],
+    [`${en['filter.company_all']} (3)`, 'on'],
+    [`${en['filter.company_kind.marketplace']} (2)`, 'on'],
     ['Proxify (1)', 'on'],
     ['Toptal (1)', 'on'],
-    [`${ru['filter.company_kind.other']} (1)`, 'on'],
+    [`${en['filter.company_kind.other']} (1)`, 'on'],
   ]);
   expect(await calls(page, 'listCompanies')).toContainEqual(['sharp', VIEW]);
 });
@@ -1032,7 +1032,7 @@ test('unticking one intermediary hides it alone, and the closed box says what is
   await expect(page.getByTestId('company-kind-marketplace')).toHaveAttribute('data-state', 'partial');
   await expect(page.getByTestId('company-option-all')).toHaveAttribute('data-state', 'partial');
   await expect(page.getByTestId('company-filter-value'))
-    .toHaveText(ru['filter.company_except'].replace('{list}', 'Proxify'));
+    .toHaveText(en['filter.company_except'].replace('{list}', 'Proxify'));
   // the other drop-downs count under it
   await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (1)');
   await click(page, 'company-option-Proxify');
@@ -1048,7 +1048,7 @@ test('a kind goes as a whole, and one of it ticked back brings that one alone', 
   await expect(page.getByTestId('company-option-Proxify')).toHaveAttribute('data-state', 'off');
   await expect(page.getByTestId('company-option-Toptal')).toHaveAttribute('data-state', 'off');
   await expect(page.getByTestId('company-filter-value'))
-    .toHaveText(ru['filter.company_except'].replace('{list}', ru['filter.company_kind.marketplace']));
+    .toHaveText(en['filter.company_except'].replace('{list}', en['filter.company_kind.marketplace']));
 
   await click(page, 'company-option-Toptal');
   expect(await lastListing(page)).toEqual(['sharp', view({ companies: { kinds: ALL4, hidden: ['Proxify'] } })]);
@@ -1074,7 +1074,7 @@ test('"Other companies" leaves only the intermediaries; "All companies" turns ev
   await click(page, 'company-option-all');   // on: nothing
   expect(await lastListing(page)).toEqual(['sharp', view({ companies: { kinds: [], hidden: [] } })]);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
-  await expect(page.getByTestId('company-filter-value')).toHaveText(ru['filter.none']);
+  await expect(page.getByTestId('company-filter-value')).toHaveText(en['filter.none']);
   for (const testid of ['company-kind-marketplace', 'company-option-Proxify', 'company-kind-other']) {
     await expect(page.getByTestId(testid)).toHaveAttribute('data-state', 'off');
   }
@@ -1088,7 +1088,7 @@ test('the hidden companies survive a refresh and a change of market', async ({ p
   await choose(page, 'segment-filter', '');
   await page.getByTestId('refresh').click();
   await expect(page.getByTestId('company-filter-value'))
-    .toHaveText(ru['filter.company_except'].replace('{list}', 'Proxify'));
+    .toHaveText(en['filter.company_except'].replace('{list}', 'Proxify'));
   await expect(byId(page, 'a2r')).toBeVisible();
   await expect(byId(page, 'a1')).toHaveCount(0);
 });
@@ -1098,7 +1098,7 @@ test('a base without company kinds: every company is one "Other companies" row',
   await page.getByTestId('company-filter').click();
   const rows = await page.getByTestId('company-filter-menu').locator('[role="option"]')
     .evaluateAll((nodes) => nodes.map((n) => n.textContent));
-  expect(rows).toEqual([`${ru['filter.company_all']} (3)`, `${ru['filter.company_kind.other']} (3)`]);
+  expect(rows).toEqual([`${en['filter.company_all']} (3)`, `${en['filter.company_kind.other']} (3)`]);
 });
 
 test('the company list stands in by level: all, the kinds, the companies', async ({ page }) => {
@@ -1133,7 +1133,7 @@ test('"Generate CV" sits between "Copy URL" and "Generate Cover Letter" and open
   expect(await calls(page, 'enqueueTask')).toEqual([]);
   await row.getByTestId('btn-generate-cv').click();
   await expect(row.getByTestId('cv-form')).toHaveCount(0);
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generating_cv']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.generating_cv']);
   await expect(row.getByTestId('btn-generate-cv')).toBeDisabled();
   expect(await calls(page, 'enqueueTask')).toEqual([[{
     kind: 'cv', identity: 'sharp', vacancyId: 'a1', title: 'Senior .NET Developer a1', company: 'Company a1',
@@ -1142,14 +1142,14 @@ test('"Generate CV" sits between "Copy URL" and "Generate Cover Letter" and open
   // another card is not locked: its CV queues behind this one
   const other = byId(page, 'a2r').getByTestId('btn-generate-cv');
   await other.dblclick();
-  await expect(other).toHaveText(ru['action.queued']);
+  await expect(other).toHaveText(en['action.queued']);
   await expect(other).toBeDisabled();
 
   await page.evaluate(() => window.__releaseCv());
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.cv_generated']);
   await expect(row.getByTestId('btn-generate-cv')).toBeEnabled();
-  await expect(other).toHaveText(ru['action.generating_cv']);
-  await expect(row.getByTestId('cv-summary')).toHaveText(ru['cv.ready_pages'].replace('{pages}', '3'));
+  await expect(other).toHaveText(en['action.generating_cv']);
+  await expect(row.getByTestId('cv-summary')).toHaveText(en['cv.ready_pages'].replace('{pages}', '3'));
   await expect(row.getByTestId('cv-findings')).toContainText('Kafka');
   await expect(row.getByTestId('cv-gaps')).toContainText('Kubernetes');
   await expect(row.getByTestId('cv-from-parent')).toContainText('interviewed Go developers');
@@ -1174,9 +1174,9 @@ test('"Collect reputation" queues a lookup for the vacancy and is gone once the 
   await expect(byId(page, 'a3').getByTestId('btn-collect-reputation')).toHaveCount(0);
   const row = byId(page, 'a1');
   const button = row.getByTestId('btn-collect-reputation');
-  await expect(button).toHaveText(ru['action.collect_reputation']);
+  await expect(button).toHaveText(en['action.collect_reputation']);
   await button.click();
-  await expect(button).toHaveText(ru['action.collecting_reputation']);
+  await expect(button).toHaveText(en['action.collecting_reputation']);
   await expect(button).toBeDisabled();
   expect(await calls(page, 'enqueueTask')).toEqual([[{
     kind: 'reputation', identity: 'sharp', vacancyId: 'a1', title: 'Senior .NET Developer a1', company: 'Company a1',
@@ -1184,12 +1184,12 @@ test('"Collect reputation" queues a lookup for the vacancy and is gone once the 
   // its own lane: a second lookup queues behind it
   const other = byId(page, 'a2r').getByTestId('btn-collect-reputation');
   await other.click();
-  await expect(other).toHaveText(ru['action.queued']);
-  await expect(page.getByTestId('task-1')).toContainText(ru['task.kind.reputation']);
+  await expect(other).toHaveText(en['action.queued']);
+  await expect(page.getByTestId('task-1')).toContainText(en['task.kind.reputation']);
   await page.evaluate(() => window.__finishReputation());
   await expect(button).toHaveCount(0);
   await expect(row).toContainText('4.1/5 (Glassdoor)');
-  await expect(other).toHaveText(ru['action.collecting_reputation']);
+  await expect(other).toHaveText(en['action.collecting_reputation']);
 });
 
 test('the vacancy\'s folder: opened, or its path copied, once it has a CV or a cover letter', async ({ page }) => {
@@ -1197,17 +1197,17 @@ test('the vacancy\'s folder: opened, or its path copied, once it has a CV or a c
   const row = byId(page, 'a1');
   await expect(row.getByTestId('btn-open-docs')).toHaveCount(0);
   await row.getByTestId('btn-generate-cv').dblclick();
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.cv_generated']);
   const ids = await row.locator('.answers button').evaluateAll((b) => b.map((x) => x.dataset.testid));
   expect(ids.slice(0, 8)).toEqual(['btn-open', 'btn-copy-url', 'btn-generate-cv', 'btn-generate-letter',
     'btn-collect-reputation', 'btn-open-docs', 'btn-copy-docs-path', 'btn-applied']);
-  await expect(row.getByTestId('btn-open-docs')).toHaveText(ru['action.open_docs']);
+  await expect(row.getByTestId('btn-open-docs')).toHaveText(en['action.open_docs']);
   await row.getByTestId('btn-open-docs').click();
   expect(await calls(page, 'openDocumentsDir')).toEqual([['sharp', 'a1']]);
   await row.getByTestId('btn-copy-docs-path').click();
   expect(await calls(page, 'copyText')).toEqual([['/docs/sharp/a1']]);
-  await expect(row.getByTestId('btn-copy-docs-path')).toHaveText(ru['action.copied']);
-  await expect(row.getByTestId('btn-copy-docs-path')).toHaveText(ru['action.copy_docs_path']);
+  await expect(row.getByTestId('btn-copy-docs-path')).toHaveText(en['action.copied']);
+  await expect(row.getByTestId('btn-copy-docs-path')).toHaveText(en['action.copy_docs_path']);
   await expect(byId(page, 'a2r').getByTestId('btn-open-docs')).toHaveCount(0);
 });
 
@@ -1219,27 +1219,27 @@ test('a generated CV stays generated whatever is generated after it, and makes a
   await open(page, fixture);
   const first = byId(page, 'a1').getByTestId('btn-generate-cv');
   const second = byId(page, 'a2r').getByTestId('btn-generate-cv');
-  await expect(byId(page, "b1").getByTestId("btn-generate-cv")).toHaveText(ru['action.cv_generated']);
+  await expect(byId(page, "b1").getByTestId("btn-generate-cv")).toHaveText(en['action.cv_generated']);
   await expect(byId(page, "b1").getByTestId("btn-open-docs")).toBeVisible();
 
   await first.dblclick();
   await page.evaluate(() => window.__releaseCv());
-  await expect(first).toHaveText(ru['action.cv_generated']);
+  await expect(first).toHaveText(en['action.cv_generated']);
   await expect(first).toHaveClass(/done/);
-  await expect(second).toHaveText(ru['action.generate_cv']);
+  await expect(second).toHaveText(en['action.generate_cv']);
 
   await second.dblclick();
   await page.evaluate(() => window.__releaseCv());
-  await expect(second).toHaveText(ru['action.cv_generated']);
-  await expect(first).toHaveText(ru['action.cv_generated']);
+  await expect(second).toHaveText(en['action.cv_generated']);
+  await expect(first).toHaveText(en['action.cv_generated']);
 
   // pressed again: the instructions, then a new version
   await first.click();
   await expect(byId(page, 'a1').getByTestId('cv-form')).toBeVisible();
   await first.click();
-  await expect(first).toHaveText(ru['action.generating_cv']);
+  await expect(first).toHaveText(en['action.generating_cv']);
   await page.evaluate(() => window.__releaseCv());
-  await expect(first).toHaveText(ru['action.cv_generated']);
+  await expect(first).toHaveText(en['action.cv_generated']);
   expect((await calls(page, 'enqueueTask')).map(([r]) => r.vacancyId)).toEqual(['a1', 'a2r', 'a1']);
 });
 
@@ -1255,37 +1255,37 @@ test('"Generate Cover Letter" works as "Generate CV" does, apart from it, and qu
   const row = byId(page, 'a1');
   const cv = row.getByTestId('btn-generate-cv');
   const letter = row.getByTestId('btn-generate-letter');
-  await expect(letter).toHaveText(ru['action.generate_letter']);
+  await expect(letter).toHaveText(en['action.generate_letter']);
 
   // the first click opens the letter's own instructions; the second sends them
   await letter.click();
-  await expect(row.getByTestId('letter-instructions')).toHaveAttribute('placeholder', ru['letter.instructions_hint']);
+  await expect(row.getByTestId('letter-instructions')).toHaveAttribute('placeholder', en['letter.instructions_hint']);
   await expect(row.getByTestId('cv-form')).toHaveCount(0);
   await expect(letter).toHaveClass(/pressed/);
   await row.getByTestId('letter-instructions').fill('Mention Azure.');
   await letter.click();
-  await expect(letter).toHaveText(ru['action.generating_letter']);
+  await expect(letter).toHaveText(en['action.generating_letter']);
   expect((await calls(page, 'enqueueTask')).map(([r]) => [r.kind, r.vacancyId, r.instructions]))
     .toEqual([['letter', 'a1', 'Mention Azure.']]);
 
   // a CV meanwhile: queued, one document at a time
   await expect(cv).toBeEnabled();
   await cv.dblclick();
-  await expect(cv).toHaveText(ru['action.queued']);
-  await expect(page.getByTestId('task-2')).toContainText(`${ru['task.kind.cv']} · Senior .NET Developer a1 — Company a1 · sharp`);
+  await expect(cv).toHaveText(en['action.queued']);
+  await expect(page.getByTestId('task-2')).toContainText(`${en['task.kind.cv']} · Senior .NET Developer a1 — Company a1 · sharp`);
 
   await page.evaluate(() => window.__releaseCv());
-  await expect(letter).toHaveText(ru['action.letter_generated']);
-  await expect(cv).toHaveText(ru['action.generating_cv']);
-  await expect(row.getByTestId('letter-summary')).toHaveText(ru['letter.ready_pages'].replace('{pages}', '1'));
+  await expect(letter).toHaveText(en['action.letter_generated']);
+  await expect(cv).toHaveText(en['action.generating_cv']);
+  await expect(row.getByTestId('letter-summary')).toHaveText(en['letter.ready_pages'].replace('{pages}', '1'));
   await expect(row.getByTestId('letter-findings')).toContainText('Kafka');
   await expect(row.getByTestId('letter-notes')).toContainText('the recipient is guessed');
   await row.getByTestId('letter-open-pdf').click();
   expect(await calls(page, 'openCvFile')).toEqual([['/docs/sharp/a1/Cover Letter.pdf']]);
 
   await page.evaluate(() => window.__releaseCv());
-  await expect(cv).toHaveText(ru['action.cv_generated']);
-  await expect(letter).toHaveText(ru['action.letter_generated']);
+  await expect(cv).toHaveText(en['action.cv_generated']);
+  await expect(letter).toHaveText(en['action.letter_generated']);
   await expect(row.getByTestId('cv-result')).toBeVisible();
   await expect(row.getByTestId('letter-result')).toBeVisible();
 
@@ -1293,8 +1293,8 @@ test('"Generate Cover Letter" works as "Generate CV" does, apart from it, and qu
   const other = byId(page, 'a2r').getByTestId('btn-generate-letter');
   await other.dblclick();
   await page.evaluate(() => window.__releaseCv());
-  await expect(other).toHaveText(ru['action.letter_generated']);
-  await expect(letter).toHaveText(ru['action.letter_generated']);
+  await expect(other).toHaveText(en['action.letter_generated']);
+  await expect(letter).toHaveText(en['action.letter_generated']);
   await row.getByTestId('letter-close').click();
   await expect(row.getByTestId('letter-result')).toHaveCount(0);
   await expect(row.getByTestId('cv-result')).toBeVisible();
@@ -1308,7 +1308,7 @@ test('a failed generation does not say the CV is generated', async ({ page }) =>
   await row.getByTestId('btn-generate-cv').click();
   await row.getByTestId('btn-generate-cv').click();
   await expect(row.getByTestId('cv-result')).toHaveClass(/failed/);
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generate_cv']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.generate_cv']);
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'failed');
 });
 
@@ -1318,7 +1318,7 @@ test('a vacancy found gone says so on its button, and offers no folder', async (
   fixture.docs = { sharp: { a1: { dir: '/docs/sharp/a1', cv: 0, letter: 0, errors: { cv: gone } } } };
   await open(page, fixture);
   const row = byId(page, 'a1');
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generate_cv']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.generate_cv']);
   await expect(row.getByTestId('btn-generate-cv')).toHaveAttribute('title', gone);
   await expect(row.getByTestId('btn-open-docs')).toHaveCount(0);
 });
@@ -1332,14 +1332,14 @@ test('documents the app queued itself show on their cards and in the panel, mark
     window.__addTask({ kind: 'letter', identity: 'sharp', vacancyId: 'a1', title: 'Senior .NET Developer a1', company: 'Company a1' });
   });
   const row = byId(page, 'a1');
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generating_cv']);
-  await expect(row.getByTestId('btn-generate-letter')).toHaveText(ru['action.queued']);
-  await expect(page.getByTestId('task-1')).toContainText(ru['task.auto']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.generating_cv']);
+  await expect(row.getByTestId('btn-generate-letter')).toHaveText(en['action.queued']);
+  await expect(page.getByTestId('task-1')).toContainText(en['task.auto']);
   await page.getByTestId('tasks-cancel-queued').click();
   expect(await calls(page, 'cancelQueued')).toEqual([[null]]);
-  await expect(row.getByTestId('btn-generate-letter')).toHaveText(ru['action.generate_letter']);
+  await expect(row.getByTestId('btn-generate-letter')).toHaveText(en['action.generate_letter']);
   await page.evaluate(() => window.__releaseCv());
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.cv_generated']);
   // what the app queued itself shows no result on the card: the folder has it
   await expect(row.getByTestId('cv-result')).toHaveCount(0);
   await page.getByTestId('tasks-clear').click();
@@ -1384,7 +1384,7 @@ test('the first click on "Generate CV" opens instructions; the second sends what
   await row.getByTestId('btn-generate-cv').click();
   const input = row.getByTestId('cv-instructions');
   await expect(input).toBeFocused();
-  await expect(input).toHaveAttribute('placeholder', ru['cv.instructions_hint']);
+  await expect(input).toHaveAttribute('placeholder', en['cv.instructions_hint']);
   await expect(row.getByTestId('btn-generate-cv')).toHaveClass(/pressed/);
   await input.fill('  Stress Azure.\nWrite it in German.  ');
   await row.getByTestId('btn-generate-cv').click();
@@ -1397,11 +1397,11 @@ test('the first click on "Generate CV" opens instructions; the second sends what
   await row.getByTestId('btn-generate-cv').click();
   await row.getByTestId('cv-instructions').fill('Lead with payments.');
   await row.getByTestId('cv-instructions-generate').click();
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.cv_generated']);
   await row.getByTestId('btn-generate-cv').click();
   await row.getByTestId('cv-instructions').fill('Short.');
   await row.getByTestId('cv-instructions').press('Control+Enter');
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.cv_generated']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.cv_generated']);
   await row.getByTestId('btn-generate-cv').click();
   await row.getByTestId('cv-instructions').fill('Never sent.');
   await row.getByTestId('cv-instructions-cancel').click();
@@ -1423,7 +1423,7 @@ test('a failed CV generation says why, on its card', async ({ page }) => {
   fixture.cvReply = { ok: false, error: 'the common CV is missing' };
   await open(page, fixture);
   await byId(page, 'a1').getByTestId('btn-generate-cv').dblclick();
-  await expect(byId(page, 'a1').getByTestId('cv-result')).toHaveText(new RegExp(`${ru['cv.failed']}: the common CV is missing`));
+  await expect(byId(page, 'a1').getByTestId('cv-result')).toHaveText(new RegExp(`${en['cv.failed']}: the common CV is missing`));
   await expect(byId(page, 'a2r').getByTestId('cv-result')).toHaveCount(0);
   await expect(byId(page, 'a1').getByTestId('btn-generate-cv')).toBeEnabled();
 });
@@ -1438,10 +1438,10 @@ test('a collection shows its steps under it while it runs, folded or opened by i
     { key: null, name: 'a stage the app has no name for', state: 'done', duration: '0:02', note: null, progress: null },
   ]));
   const step = (i) => page.getByTestId(`task-step-1-${i}`);
-  await expect(step(0)).toContainText(ru['step.prepare']);
+  await expect(step(0)).toContainText(en['step.prepare']);
   await expect(step(0)).toContainText('1:05');
   await expect(step(1)).toHaveAttribute('data-state', 'running');
-  await expect(step(1)).toContainText(ru['step.fetch']);
+  await expect(step(1)).toContainText(en['step.fetch']);
   await expect(step(1)).toContainText('linkedin pairs: 36/168');
   await expect(step(1)).toContainText(/1:0[5-9]/);   // its time counts on
   await expect(step(2)).toContainText('a stage the app has no name for');
@@ -1465,20 +1465,20 @@ test('the CV/CL batch is one task: its progress, its document on the card, its l
   }, ['start: sharp partsharp', '[8/971] sharp cv a1']));
   const task = page.getByTestId('task-batch');
   await expect(task).toHaveAttribute('data-state', 'running');
-  await expect(task).toContainText(`${ru['task.kind.batch']} · sharp, partsharp · 8/971`);
+  await expect(task).toContainText(`${en['task.kind.batch']} · sharp, partsharp · 8/971`);
   await expect(task).toContainText('Senior .NET Developer a1');
-  await expect(task).toContainText(ru['batch.summary'].replace('{made}', '6').replace('{gone}', '0').replace('{failed}', '1'));
+  await expect(task).toContainText(en['batch.summary'].replace('{made}', '6').replace('{gone}', '0').replace('{failed}', '1'));
   const row = byId(page, 'a1');
-  await expect(row.getByTestId('btn-generate-cv')).toHaveText(ru['action.generating_cv']);
+  await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.generating_cv']);
   await expect(row.getByTestId('btn-generate-cv')).toBeDisabled();
   await expect(page.getByTestId('task-log')).toContainText('[8/971] sharp cv a1');
-  await expect(page.getByTestId('task-log-title')).toContainText(ru['task.kind.batch']);
+  await expect(page.getByTestId('task-log-title')).toContainText(en['task.kind.batch']);
 
   await page.evaluate(() => window.__setBatch({
     identity: 'sharp, partsharp', holding: true,
     progress: { index: 8, total: 971, made: 7, failed: 1, gone: 0 }, current: null,
   }, ['paused: the app is generating documents']));
-  await expect(task).toContainText(ru['batch.holding']);
+  await expect(task).toContainText(en['batch.holding']);
   await expect.poll(async () => (await calls(page, 'documentsState')).some(([who, ids]) => who === 'sharp'
     && ids.length === 1 && ids[0] === 'a1')).toBe(true);   // the document it made shows on the card
   await expect(row.getByTestId('btn-generate-cv')).toBeEnabled();
@@ -1486,7 +1486,7 @@ test('the CV/CL batch is one task: its progress, its document on the card, its l
   await task.hover();
   await task.getByTestId('task-cancel').click();
   expect(await calls(page, 'cancelTask')).toEqual([['batch']]);
-  await expect(task).toContainText(ru['batch.stopping']);
+  await expect(task).toContainText(en['batch.stopping']);
   await page.evaluate(() => window.__setBatch({
     identity: 'sharp, partsharp', state: 'stopped', progress: { index: 9, total: 971, made: 8, failed: 1, gone: 0 },
   }, ['stopped before 10/971']));
@@ -1502,7 +1502,7 @@ test("a document asked for while the batch runs says it waits for the batch's cu
   await page.evaluate(() => window.__setBatch({ progress: { index: 1, total: 3, made: 0, failed: 0, gone: 0 } }));
   await page.evaluate(() => window.__addTask({ kind: 'cv', identity: 'sharp', vacancyId: 'b1', origin: 'manual' }));
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'queued');
-  await expect(page.getByTestId('task-1')).toHaveAttribute('title', ru['task.waiting_batch']);
+  await expect(page.getByTestId('task-1')).toHaveAttribute('title', en['task.waiting_batch']);
   await page.evaluate(() => window.__setBatch({ holding: true, progress: { index: 1, total: 3, made: 1, failed: 0, gone: 0 } }));
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'running');
 });
@@ -1512,13 +1512,13 @@ test('"Age" stands after "Status": today, a week, a month, older, each with its 
   fixture.rows.sharp.full.find((r) => r.id === 'a2r').age = 'week';
   fixture.rows.sharp.full.find((r) => r.id === 'b1').age = 'older';
   await open(page, fixture);
-  await expect(page.getByTestId('filter-label')).toHaveText(ru['filter.legend']);
-  await expect(page.getByTestId('age-label')).toHaveText(ru['filter.age_legend']);
-  await expect(page.getByTestId('age-filter-value')).toHaveText(ru['filter.age_all']);
+  await expect(page.getByTestId('filter-label')).toHaveText(en['filter.legend']);
+  await expect(page.getByTestId('age-label')).toHaveText(en['filter.age_legend']);
+  await expect(page.getByTestId('age-filter-value')).toHaveText(en['filter.age_all']);
   await page.getByTestId('age-filter').click();
-  await expect(page.getByTestId('age-option-today')).toHaveText(`${ru['filter.age.today']} (1)`);
-  await expect(page.getByTestId('age-option-week')).toHaveText(`${ru['filter.age.week']} (1)`);
-  await expect(page.getByTestId('age-option-older')).toHaveText(`${ru['filter.age.older']} (1)`);
+  await expect(page.getByTestId('age-option-today')).toHaveText(`${en['filter.age.today']} (1)`);
+  await expect(page.getByTestId('age-option-week')).toHaveText(`${en['filter.age.week']} (1)`);
+  await expect(page.getByTestId('age-option-older')).toHaveText(`${en['filter.age.older']} (1)`);
   await page.keyboard.press('Escape');
   await check(page, 'age-filter', ['today', 'week']);
   expect(await lastListing(page)).toEqual(['sharp', view({ ages: ['today', 'week'] })]);
@@ -1547,10 +1547,10 @@ test('"Score" in Details: a row per part, a cell per point, earned ones bright, 
   const card = byId(page, 'a1');
   await card.locator('details.details > summary').click();
   await card.getByTestId('score-parts').locator('summary').click();
-  await expect(card.getByTestId('score-parts').locator('summary')).toHaveText(ru['score.summary']);
-  await expect(card.getByTestId('score-label-stack')).toHaveText(`${ru['score.part.stack']} (+4/+20)`);
+  await expect(card.getByTestId('score-parts').locator('summary')).toHaveText(en['score.summary']);
+  await expect(card.getByTestId('score-label-stack')).toHaveText(`${en['score.part.stack']} (+4/+20)`);
   await expect(card.getByTestId('score-label-extra:calm')).toHaveText('calm domain (0/+6)');
-  await expect(card.getByTestId('score-label-title')).toHaveText(`${ru['score.part.title']} (-8/-24)`);
+  await expect(card.getByTestId('score-label-title')).toHaveText(`${en['score.part.title']} (-8/-24)`);
   const stack = card.getByTestId('score-bar-stack');
   await expect(stack.locator('.score-cell.plus:not(.off)')).toHaveCount(4);
   await expect(stack.locator('.score-cell.plus.off')).toHaveCount(16);
@@ -1582,8 +1582,8 @@ test('the menu holds Collect, Review feedback, Clean up, Identities; "Clean up" 
   await page.getByTestId('cleanup-statuses-expired').check();
   await page.getByTestId('cleanup-count').click();
   expect((await calls(page, 'cleanup')).at(-1)).toEqual(['sharp', { ages: ['older'], statuses: ['expired'], classes: [] }, true]);
-  await expect(page.getByTestId('cleanup-outcome')).toContainText(ru['cleanup.would_delete'].replace('{n}', '3'));
-  await expect(page.getByTestId('cleanup-delete')).toHaveText(ru['cleanup.delete_n'].replace('{n}', '3'));
+  await expect(page.getByTestId('cleanup-outcome')).toContainText(en['cleanup.would_delete'].replace('{n}', '3'));
+  await expect(page.getByTestId('cleanup-delete')).toHaveText(en['cleanup.delete_n'].replace('{n}', '3'));
   // a changed filter needs a new count first
   await page.getByTestId('cleanup-classes-rejected').check();
   await expect(page.getByTestId('cleanup-delete')).toBeDisabled();
@@ -1591,7 +1591,7 @@ test('the menu holds Collect, Review feedback, Clean up, Identities; "Clean up" 
   const before = (await calls(page, 'loadSegments')).length;
   await page.getByTestId('cleanup-delete').click();
   expect((await calls(page, 'cleanup')).at(-1)[2]).toBe(false);
-  await expect(page.getByTestId('cleanup-outcome')).toContainText(ru['cleanup.deleted'].replace('{n}', '3'));
+  await expect(page.getByTestId('cleanup-outcome')).toContainText(en['cleanup.deleted'].replace('{n}', '3'));
   expect((await calls(page, 'loadSegments')).length).toBeGreaterThan(before);
   await page.getByTestId('cleanup-close').click();
   await expect(page.getByTestId('cleanup-overlay')).toHaveCount(0);

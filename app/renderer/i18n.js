@@ -1,13 +1,15 @@
 // t(key, params): the interface's texts come from the locale files, never
 // from the markup or the code. The language is chosen in the interface and
-// remembered in this browser profile; Russian until someone picks another.
+// remembered in this browser profile; English until someone picks another
+// (the owner, 2026-10-20: English first, Russian second; it was the other
+// way round).
 // Adding a language means adding a locale file, its flag and a line below.
 (function (root) {
   const STORAGE_KEY = 'work-ide-language';
-  const DEFAULT_LANGUAGE = 'ru';
+  const DEFAULT_LANGUAGE = 'en';
   const LOCALES = {
-    ru: root.LOCALE_RU || {},
     en: root.LOCALE_EN || {},
+    ru: root.LOCALE_RU || {},
   };
 
   function stored() {

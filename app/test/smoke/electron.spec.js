@@ -8,7 +8,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { test, expect, _electron: electron } = require('@playwright/test');
 const { check } = require('../helpers/dropdown');
 const { SCHEMA_DIR, standardDatabase, tempDir } = require('../helpers/fixture-db');
-const ru = require('../../renderer/locales/ru.js');
+const en = require('../../renderer/locales/en.js');
 
 function fixtureRepo() {
   const root = tempDir('work-ide-smoke-');
@@ -54,7 +54,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     const window = await app.firstWindow();
     await expect(window.getByTestId('identity-tab-sharp')).toBeVisible();
     await expect(window.getByTestId('identity-name')).toHaveText('Test search');
-    await expect(window.getByTestId('segment-filter-value')).toHaveText('Vsyo vmeste');   // the market holding everything
+    await expect(window.getByTestId('segment-filter-value')).toHaveText('Everything');   // the market holding everything
     await expect(window.getByTestId('list').locator('article')).toHaveCount(3);   // new0..new2
 
     await window.getByTestId('vacancy-new0').getByTestId('btn-bugged').click();
@@ -78,7 +78,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await expect(window.getByTestId('task-log')).toContainText('fake rest: sharp');
     await window.getByTestId('task-1').click();
     await expect(window.getByTestId('task-log')).toContainText('fake run: /top sharp');
-    await expect(window.getByTestId('task-log-title')).toContainText(ru['task.state.done']);
+    await expect(window.getByTestId('task-log-title')).toContainText(en['task.state.done']);
     await expect(window.getByTestId('run-status')).toHaveCount(0);
     expect(fs.readdirSync(path.join(repo.root, 'data', 'identities', 'sharp', 'runs'))).toHaveLength(1);
 
