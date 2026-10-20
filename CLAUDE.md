@@ -448,14 +448,29 @@ scoring rules, filters, labels, prompts, commands, schema versions), not only
 the latest one. The history is read to find when and why a behaviour
 changed; a change missing from the message is lost to that search.
 
-**Tasks** (the owner, 2026-10-20). Work is tracked in `tasks/`. Before
-starting, find the task the work belongs to; work the owner asks for that has
-no task gets one in `tasks/2-to-do/`, an idea of the agent's own goes to
-`tasks/1-triage/` for the owner to decide. The commit that finishes an item
-marks it DONE in the same change; the commit
-that finishes the last item moves the file to `tasks/3-done/`. Numbers are
-four digits, unique, never reused; tasks are written in English, business
-first.
+**Tasks** (the owner, 2026-10-20). Work is tracked in `tasks/`, and the rule
+has no exceptions for size: **every change is a task, every commit names its
+task.** The procedure is the `task` skill (`.claude/skills/task/SKILL.md`);
+use it before the first edit of any change and before every commit.
+
+- Before starting, find the task the work belongs to
+  (`python tools/tasks.py find <words>`). Work the owner asks for that has no
+  task gets one in `tasks/2-to-do/` first, a one-line fix included; an idea
+  of the agent's own goes to `tasks/1-triage/` and waits for the owner. A
+  fix to what a done task delivered is a new task, not a reopened one.
+- Every commit carries a `Task: NNNN` line and changes that task's file in
+  the same commit: the items it finishes marked DONE, the work it does added
+  as items, the file moved to `tasks/3-done/` with its last item. A task in
+  `1-triage/` covers no work outside `tasks/`.
+- The one kind of commit with no task: one that changes task files only
+  (writing, planning, moving tasks). A change to the task system itself —
+  `tasks/README.md`, the hook, its tests, `tools/tasks.py` — has a task.
+- `.githooks/commit-msg` refuses a commit that breaks this
+  (`git config core.hooksPath .githooks`, once per clone;
+  `tests/test_commit_hook.py` fails while it is off). Never `--no-verify`.
+
+Numbers are four digits, unique, never reused; tasks are written in English,
+business first.
 
 ## 13. Where to put a change
 

@@ -58,3 +58,23 @@ def test_marks_are_spelled_one_way_and_agree_with_the_stage():
             assert "TO DO" not in marks, f"{path.name}: a TO DO left in a DONE task"
         else:
             assert "TO DO" in marks, f"{stage}/{path.name}: nothing left to do, so it belongs in 3-done"
+
+
+def test_a_new_task_takes_the_next_number_and_passes_the_format(tmp_path, monkeypatch):
+    import sys
+
+    sys.path.insert(0, str(ROOT / "tools"))
+    import tasks as tasks_tool
+
+    for stage in STAGES:
+        (tmp_path / stage).mkdir()
+    (tmp_path / "3-done" / "0007-old-work.md").write_text("# 0007 Old work\n", encoding="utf-8")
+    monkeypatch.setattr(tasks_tool, "TASKS", tmp_path)
+    assert tasks_tool.next_number() == "0008"
+    path = tasks_tool.new("to-do", "a-fix", "A fix", "the owner", "Why.")
+    assert path.name == "0008-a-fix.md" and path.parent.name == "2-to-do"
+    lines = _lines(path)
+    assert lines[0] == "# 0008 A fix"
+    assert [line for line in lines if line.startswith("## ")][0] == "## Business"
+    assert MARK.match(lines[-1]) and MARK.match(lines[-1]).group(1) == "TO DO"
+    assert tasks_tool.find(["fix"]) == [path]

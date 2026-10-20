@@ -1,0 +1,57 @@
+#!/bin/sh
+# Every commit belongs to a task in tasks/ (the owner, 2026-10-20; CLAUDE.md
+# §12 "Tasks"). The message names it on a line of its own:
+#
+#   Task: 0042
+#
+# and the commit changes that task's file: it marks the item it finishes,
+# adds the item it does, or moves the file to the next stage. A task in
+# 1-triage is not agreed work yet, so a commit naming only triage tasks may
+# change nothing outside tasks/.
+#
+# The one kind of commit with no task: one that changes task files only
+# (tasks/<stage>/NNNN-*.md) — writing, updating, moving or deleting tasks.
+# A change to the task system itself (tasks/README.md, this hook, its test,
+# tools/tasks.py) is ordinary work and has a task.
+#
+# Turned on once per clone: git config core.hooksPath .githooks
+
+msg_file="$1"
+subject=$(sed -n '1p' "$msg_file")
+case "$subject" in
+  "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"amend! "*) exit 0 ;;
+esac
+
+changed=$(git diff --cached --name-only)
+if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '^tasks/[1-3]-[a-z-]+/[0-9]{4}-[^/]*\.md$'; then
+  exit 0
+fi
+
+fail() {
+  echo "commit-msg: $1" >&2
+  echo "  Every commit belongs to a task: see tasks/README.md and CLAUDE.md §12 \"Tasks\"." >&2
+  exit 1
+}
+
+numbers=$(grep -v '^#' "$msg_file" | sed -n 's/^Task: *\([0-9][0-9][0-9][0-9]\) *\r*$/\1/p' | sort -u)
+[ -n "$numbers" ] || fail "no \"Task: NNNN\" line in the message."
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+outside=$(printf '%s\n' "$staged" | grep -v '^tasks/' | grep -v '^$')
+only_triage=yes
+
+for number in $numbers; do
+  path=$(git ls-files -- "tasks/*/$number-*.md" | sed -n '1p')
+  [ -n "$path" ] || fail "Task $number: no tasks/*/$number-*.md in the commit's tree."
+  printf '%s\n' "$staged" | grep -qx "$path" \
+    || fail "Task $number: the commit does not change $path (mark the item done, add the item, or move the file)."
+  case "$path" in
+    tasks/1-triage/*) ;;
+    *) only_triage=no ;;
+  esac
+done
+
+if [ "$only_triage" = yes ] && [ -n "$outside" ]; then
+  fail "only triage tasks are named, and a task in triage is not agreed work: move it to tasks/2-to-do/ first, or commit only the task."
+fi
+exit 0

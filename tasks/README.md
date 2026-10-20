@@ -24,7 +24,7 @@ A file can be a ticket, a feature or an epic. The shape follows its size:
 ```markdown
 # NNNN Title: what the person gets
 
-Commits: <hashes> (DONE tasks; the history is the evidence)
+Commits: <hashes> (tasks 0000-0050 only; later ones: python tools/tasks.py log NNNN)
 Source: who asked for it, and when
 
 ## Business
@@ -58,9 +58,26 @@ The items are the last section. Each is one line starting with
 `## Business` first, the marks spelled one way, no TO DO left in a DONE task,
 at least one TO DO in the other two stages.
 
-## When work is done
+## Every commit names its task
 
-The commit that finishes an item marks it DONE in the same change; the
-commit that finishes the last one moves the file to `3-done/`. Work that has
-no task yet gets one — in `2-to-do/` when the owner asked for it, in
-`1-triage/` when it is the agent's own idea.
+The owner, 2026-10-20: every change is a task, every commit names its task.
+The procedure is the `task` skill (`.claude/skills/task/SKILL.md`).
+
+- Work that has no task gets one before the first edit
+  (`python tools/tasks.py new to-do <a-few-words> "<Title>"`): in `2-to-do/`
+  when the owner asked for it, in `1-triage/` when it is the agent's own idea.
+- The commit message has a line `Task: NNNN`, and the commit changes that
+  task's file: the item it finishes marked DONE, the work it does added as an
+  item, or the file moved to `3-done/` with its last item.
+- A task in `1-triage/` is not agreed work: a commit naming only triage tasks
+  changes nothing outside `tasks/`.
+- A commit that changes task files only (`tasks/<stage>/NNNN-*.md`) needs no
+  task. A change to this README, the hook or `tools/tasks.py` does.
+- Merges, reverts and fixups are exempt.
+
+`.githooks/commit-msg` enforces this; it is turned on once per clone with
+`git config core.hooksPath .githooks`.
+
+A task's history is `python tools/tasks.py log NNNN` (the commits that name
+it). Tasks written from the history up to 2026-10-20 (0000-0050) list their
+commits in a `Commits:` line instead.

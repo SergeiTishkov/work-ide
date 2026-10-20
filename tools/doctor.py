@@ -106,6 +106,20 @@ def check_data_writable() -> None:
         _report("data/ is writable", False, str(exc))
 
 
+def check_commit_hook() -> None:
+    """Every commit names its task (CLAUDE.md §12, "Tasks"); the hook that
+    checks it is turned on once per clone. Only matters to someone who
+    commits, so it is a warning."""
+    import subprocess
+
+    if not (common.ROOT / ".git").exists():
+        return
+    proc = subprocess.run(["git", "config", "--get", "core.hooksPath"], cwd=common.ROOT,
+                          capture_output=True, text=True)
+    ok = proc.stdout.strip() == ".githooks"
+    _report("commit hook on", ok, "" if ok else "git config core.hooksPath .githooks", critical=False)
+
+
 def check_sources_reachable() -> None:
     import requests
 
@@ -146,6 +160,7 @@ def main() -> None:
     check_packages()
     check_configs()
     check_data_writable()
+    check_commit_hook()
     print()
     print("--- Source reachability (not critical for operation) ---")
     check_sources_reachable()

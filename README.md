@@ -85,6 +85,7 @@ Activating the environment depends on your system:
 
 ```bash
 python -m pip install -r requirements.txt
+git config core.hooksPath .githooks   # every commit names its task (tasks/README.md)
 python -m pytest -q          # optional, but it shows everything is intact
 ```
 

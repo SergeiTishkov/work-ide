@@ -103,8 +103,14 @@ python -m pytest -q                                   # must be green
 ## 6. Publish — only for a maintainer
 
 ```
-python tools/source_doctor.py publish <source> -m "<what changed at the source, in English>"
+python tools/source_doctor.py publish <source> --task NNNN -m "<what changed at the source, in English>"
 ```
+
+The repair is a task like any other change (the `task` skill, CLAUDE.md §12
+"Tasks"): find it or make it in `tasks/2-to-do/` before repairing, and
+before publishing mark in it what was repaired. The script commits the task
+file with the source's files and adds the `Task: NNNN` line; it refuses a
+task that does not exist or has not changed.
 
 End the message with the attribution lines your session requires for commits.
 The script decides, and every outcome except `refused` is a normal end:
