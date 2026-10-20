@@ -2381,7 +2381,7 @@
     ai_brief: 'step.ai_brief', ai_check: 'step.ai_check',
     load: 'step.load', fetch: 'step.fetch', rescore: 'step.rescore', duplicates: 'step.duplicates',
     links: 'step.links', companies: 'step.companies', descriptions: 'step.descriptions',
-    benchmark: 'step.benchmark', channels: 'step.channels', wikidata: 'step.wikidata', save: 'step.save',
+    channels: 'step.channels', wikidata: 'step.wikidata', save: 'step.save',
     selection: 'step.selection', contracts: 'step.contracts',
   };
   const TASK_STATE_KEYS = {
