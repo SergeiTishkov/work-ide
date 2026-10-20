@@ -44,9 +44,10 @@ broken base.
 **Workers, not one daemon** (`tools/taskd.py`), each claiming the tasks it
 can run, in a transaction:
 - the background worker: a Task Scheduler task at system start, "run
-  whether the user is logged on or not" (S4U, no stored password, if `claude`
-  works there; otherwise with the stored password, or AI tasks move to the
-  desktop worker). Runs collections, LinkedIn, the rest of the base,
+  whether the user is logged on or not" with no stored password (S4U). The
+  password is never stored (the owner, 2026-10-21). If `claude` does not
+  work under S4U, tasks that need AI wait for the owner's logon and run in
+  the desktop worker. Runs collections, LinkedIn, the rest of the base,
   clean-ups.
 - the desktop worker: a Task Scheduler task at the owner's logon, in the
   owner's session. Runs what needs the desktop: CVs and cover letters
