@@ -249,6 +249,8 @@ def test_the_commands_of_each_kind():
     assert taskd.command(task("rest"), python=py).argv == [py, tools("pipeline.py"), "--identity", "ftf", "--rest"]
     assert taskd.command(task("linkedin"), python=py).argv[-1] == "--linkedin"
     assert taskd.command(task("pipeline", args={"mode": "top"}), python=py).argv[-1] == "--top"
+    assert taskd.command(task("pipeline", args={"skip_contracts": True}), python=py).argv[-2:] == [
+        "ftf", "--skip-contracts"]
     clean = taskd.command(task("clean", args={"ages": ["older"], "statuses": ["expired"]}), python=py)
     assert clean.argv[2:] == ["--identity", "ftf", "--json", "--ages", "older", "--statuses", "expired"]
     cv = taskd.command(task("cv", vacancy_id="abc123", args={"instructions": " shorter "}), python=py)

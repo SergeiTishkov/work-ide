@@ -387,8 +387,8 @@ the latest selection with no answer yet; a document already in the vacancy's
 folder is not made again, nor one whose vacancy was found gone (a dead link,
 or no description — an error in its log instead of files).
 
-After a collection the app makes them in one batch (`tools/cv_batch.py`,
-a process of its own, shown in the app's task panel); it can be run by hand:
+After a collection the task queue makes them in one batch (`tools/cv_batch.py`,
+a task of the collection, shown in the app's task panel); it can be run by hand:
 `python tools/cv_batch.py <prefix>`, `--stop`, `--status`.
 
 A filter already applied picks only the **fresh** vacancies of the run. A

@@ -642,8 +642,8 @@ generated after a letter does not reset the letter's button.
    turned into "Cover Letter" (`CV Ivan Petrov.pdf` → `Cover Letter Ivan
    Petrov.pdf`), the previous letter moved to `Old versions/`.
 
-One generation at a time, of either kind (`app/main/tasks.js`, the documents
-lane): both tools drive Word through COM, and two at once could share one
+One generation at a time, of either kind (the documents slot of the task
+queue, "The task service" below): both tools drive Word through COM, and two at once could share one
 Word instance, whose `Quit()` at the end of one run would close the other's
 document.
 
@@ -683,24 +683,19 @@ follow what the folder holds (`app/main/documents.js` reads the logs).
 ### The task panel and the queue (2026-10-13)
 
 A collection and a generation used to block their buttons, with one log
-under the list. Now everything is a task in a queue (`app/main/tasks.js`),
-shown in a panel at the bottom of the window, as in an IDE: the tasks on the
+under the list. Now everything is a task in a queue, shown in a panel at the bottom of the window, as in an IDE: the tasks on the
 left, the log of the chosen one (the running one by default) on the right.
 The panel's height (20% of the window by default, at least 220px) and the
 split are dragged by their sashes and remembered.
 
-Two lanes, each running one task at a time, side by side:
-
-- **collect** — **Collect vacancies** on several identities queues them; a
-  collection started outside the app (the agent, a terminal) makes the lane
-  wait and retry;
-- **documents** — CVs and cover letters, any number queued; one at a time
-  because of Word (above).
-
 The same task queued or running twice is refused (`already_queued`). A
-queued task can be cancelled, a running one stopped. The queue is in memory:
-closing the app stops the running tasks and drops the rest; **Refresh** does
-not reload the window while a task is active.
+queued task can be cancelled, a running one stopped.
+
+Until 2026-10-21 the queue lived in the app's memory (`app/main/tasks.js`),
+with two lanes, collect and documents: closing the app stopped the running
+tasks and dropped the rest, and a run the agent or a terminal started never
+showed. The queue is now a file run by workers outside the app: "The task
+service" below.
 
 **A collection's steps** (`app/main/steps.js`). A collection runs about four
 hours (sharp, 2026-10-12: 4:24 in the pipeline alone), and one row said
@@ -715,27 +710,98 @@ minute), check links 22:00, missing descriptions 53:31, three rescores of
 about 6:00, direct channels 10:13, the rest seconds. Steps show while the
 collection runs and fold when it ends; the arrow opens them again.
 
+### The task service: a queue in a file, workers under Task Scheduler (2026-10-21)
+
+The owner, 2026-10-20: a collection started under one Windows user stopped
+when another user signed in with Fast User Switching; a collection takes
+hours (the LinkedIn walk alone six and more). The panel also never showed a
+run started by the agent or a terminal. Decided with the owner, 2026-10-21
+(task 0056):
+
+- **The queue is a file**, `data/tasks.sqlite` (`schemas/tasks.sql`,
+  `tools/taskq.py`), apart from the vacancy base: a 30-second save of the
+  base never holds up a task's state, and the queue survives a broken base.
+  Logs are files beside it (`data/tasks/<id>.log`). Every task has a kind,
+  an identity, a slot, what it needs (`ai`, `desktop`), who added it (app,
+  agent, terminal, schedule, auto) and, while it waits, why.
+- **Workers, not one daemon** (`tools/taskd.py`). The background worker is
+  a Task Scheduler task at system start, "run whether the user is logged on
+  or not" through S4U: no password is stored (the owner: if AI does not run
+  without a sign-in, it waits for the sign-in). The desktop worker starts at
+  the owner's sign-in in the owner's session: Word (COM) needs a desktop,
+  so CVs and cover letters run there, and it keeps running while another
+  user is active. Each claims, in a transaction, the tasks its
+  capabilities allow; a worker that lacks one leaves the task queued with
+  the reason ("the owner's sign-in: Word needs a desktop session").
+  Registering the S4U task needs an elevated PowerShell, once:
+  `python tools\taskd.py install`.
+- **Slots:** collect (the top, the rest of the base, a full pipeline, a
+  clean-up), linkedin, documents, reputation; one task each at a time.
+  "Collect" is a group: the top and LinkedIn side by side, the rest after
+  both (it runs when LinkedIn failed, not when the top did), a CV/CL batch
+  after each. The dependencies are rows (`task_after`), not code in the
+  app.
+- **Reliability.** Task Scheduler starts the workers at boot and sign-in
+  and restarts a failed one every minute; one worker per role; each beats
+  every 2 s. A task whose worker stopped beating for 45 s is queued again,
+  failed after three tries; a run started by hand whose process is gone
+  ends "interrupted". After a gap of more than 30 s between two beats (the
+  machine slept) no task of another worker is declared dead for a minute:
+  all of them slept, and each needs a beat to show it lives. While a task
+  runs the worker keeps the machine from sleeping on idle
+  (`SetThreadExecutionState`); closing the lid still sleeps it.
+- **Runs started by hand are listed too:** `pipeline.py` and `cv_batch.py`
+  register themselves as tasks (`taskq.Registered`) unless a worker started
+  them (`WORK_IDE_TASK_ID` in their environment). The agent adds its long
+  work to the queue instead of running it (CLAUDE.md; the `run-task`
+  skill).
+- **The app is a client** (`app/main/queue.js`): it adds, lists, stops and
+  clears tasks through `tools/taskq.py` and reads the file for the panel;
+  it runs nothing, so closing or collapsing it stops nothing. Every 30 s it
+  looks at the workers' beats (`app/main/workers.js`): a registered worker
+  that does not beat is started through Task Scheduler; with none
+  registered, the app starts a desktop worker for the session that ends
+  after ten idle minutes.
+
+**A worker the app starts goes through `taskd.py start`.** Node starts a
+child with every inheritable handle of its parent, the pipes of Electron's
+own stdio among them. A worker spawned straight from the app held those
+pipes: Playwright, closing the app in the smoke test, waited 30 s and
+failed, and a terminal after `npm start` would wait the worker's ten idle
+minutes (2026-10-21). `start` launches the worker detached with only null
+stdio, and returns at once.
+
+**Not taken:**
+- A Windows service (session 0): no desktop for Word, and the agent's
+  `claude` login lives in the owner's profile; a service account would need
+  that login copied or a stored password.
+- "Run whether the user is logged on or not" with a stored password: the
+  owner, 2026-10-21, "the password is never stored".
+- A daemon with a socket API: the file already gives every client (the
+  app, the agent, a terminal) the same view, with SQLite's locking, and
+  nothing to keep listening.
+
 ### Generation without a click (2026-10-13)
 
 The profile's `cv.auto` (`docs/IDENTITIES.md`) names filters — markets,
-sources, classes; AND inside a filter, OR between filters. When a collection
-ends with exit code 0, the app starts **one batch** for the identity:
-`tools/cv_batch.py <prefix>`, a detached process. It asks `tools/cv_auto.py`
+sources, classes; AND inside a filter, OR between filters. A collection
+queues **one batch** for the identity after its top and another after its
+LinkedIn (the task service above): `tools/cv_batch.py <prefix>`. It asks `tools/cv_auto.py`
 what to make, records the filters as applied, and makes the documents one by
 one. Until 2026-10-13 (the same day) the app queued one task per document;
 the first catch-up was 971 documents, so the owner asked for one batch task
 instead.
 
 **Why a process of its own.** About 2.4 minutes per vacancy (CV 1.6, cover
-letter 0.8): 489 vacancies are some 20 hours. The app's queue lives in
-memory; the batch outlives the window, and a stopped batch started again
+letter 0.8): 489 vacancies are some 20 hours. It runs as a task in the
+documents slot and outlives the window; a stopped batch started again
 skips what is made (`python tools/cv_batch.py sharp --all` goes on with the
 catch-up).
 
-**How the app shows it** (`app/main/batch.js`). The batch writes
+**How the app shows it** (`app/main/queue.js`). The batch writes
 `data/cv_batch.json` (pid, state, index/total, made/gone/failed, the
-document in work, where its lines begin in `data/cv_batch.log`); the app
-polls both and lists the batch as the task "CV/CL batch", with that log. Its
+document in work) and prints its lines into the task's log; the app lists
+the batch as the task "CV/CL batch" with its progress. Its
 document in work shows as generating on its card, and the card shows the
 result when the batch moves on. The ✕ writes `data/cv_batch.STOP`: the batch
 stops after the current document.
@@ -745,11 +811,12 @@ identity to `data/cv_batch.pending` and exits; the running batch takes it
 after its own list.
 
 **The app goes first.** A CV asked for in the app would wait hours behind a
-batch. While the app has documents queued or running, it keeps
-`data/cv_batch.HOLD` (its pid): the batch pauses between documents
-("holding" in its status), and the app's document waits only for the batch's
-current one. The file is removed when the app's documents are done; a hold
-whose process is gone is ignored.
+batch. While a CV or a cover letter is queued or running beside a running
+batch, the worker keeps `data/cv_batch.HOLD` (its pid): the batch pauses
+between documents ("holding" in its status), the queue lets the document
+into the documents slot, and it waits only for the batch's current one. The
+file is removed when those documents are done; a hold whose process is gone
+is ignored.
 
 **Fresh, and the catch-up.** The owner first asked for a one-off generation
 over every matching vacancy and fresh ones after that, then changed it: when
@@ -793,11 +860,11 @@ after its remote check; and the steps visible in the task panel.
 
 The app's "Collect" runs `/top <p>` (`.claude/commands/top.md`: identity,
 template check, source contracts, `pipeline.py --top`, a summary; no
-checklist and no reputation lookups). When it ends well, the CV/CL batch
-starts as before, and the task "rest" is queued in the collect lane
-(`app/main/rest.js`): `pipeline.py --rest` with no agent, after every
-collection queued before it, so with two identities queued both top runs
-come first.
+checklist and no reputation lookups). The CV/CL batch and the task "rest"
+are tasks of the same collection in the queue ("The task service"): the
+rest is `pipeline.py --rest` with no agent, in the collect slot after the
+top and LinkedIn; a rest still waiting for its LinkedIn lets the next
+identity's top run first.
 
 `pipeline.py --rest` (`run_rest`): the full tail (`finalize_and_report`)
 with a "rebuild" selection, so what the top run
@@ -878,11 +945,10 @@ others:
   (`runstate.LinkedInFetch`): the address and its rate limit are shared. The
   full cycle takes the same lock.
 
-In the app, "Collect" queues two tasks: the collection (`/top`, the collect
-lane) and "linkedin" (`app/main/rest.js`, a lane of its own, which does not
-ask whether the base is free: the run waits for it itself). The rest of the
-base is queued when the later of the two ends, if the collection ended well;
-the CV/CL batch starts after each that ends well.
+"Collect" queues the top (`/top`, the collect slot) and "linkedin" (a slot
+of its own, which does not ask whether the base is free: the run waits for
+it itself) side by side. The rest of the base waits for both and runs if
+the top ended done; a CV/CL batch follows each that ends done.
 
 The pacing of the fetch changed the same day (docs/sources/linkedin.md, "429
 and dropped connections"; "What each query brought").

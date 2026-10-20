@@ -210,6 +210,8 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
         mode = {"rest": ["--rest"], "linkedin": ["--linkedin"]}.get(kind)
         if mode is None:
             mode = ["--top"] if args.get("mode") == "top" else []
+            if args.get("skip_contracts"):   # the agent checked them just before (`/run`, step 3)
+                mode.append("--skip-contracts")
         return Command([python, tool("pipeline.py"), "--identity", _identity(task), *mode], map_line=pipeline_line)
     if kind == "clean":
         argv = [python, tool("cleanup.py"), "--identity", _identity(task), "--json"]

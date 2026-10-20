@@ -704,6 +704,7 @@ def main(argv=None) -> int:
     p = command("hide", help="clear ended tasks from the panel (no ids: all ended)")
     p.add_argument("ids", type=int, nargs="*")
     command("status", help="the workers and what they run")
+    command("current", help="the queue task this process runs in, if a worker started it")
     args = parser.parse_args(argv)
 
     try:
@@ -737,6 +738,14 @@ def main(argv=None) -> int:
                 return 0 if reply["ok"] else 1
             elif args.command == "hide":
                 print(json.dumps({"hidden": hide(conn, args.ids or None)}))
+            elif args.command == "current":
+                # An agent session asks this before long work: started by a
+                # worker it is that task already; otherwise it adds one.
+                own = os.environ.get(TASK_ENV)
+                task = get(conn, int(own)) if own and own.isdigit() else None
+                _print({"task": task["id"] if task else None,
+                        "kind": task["kind"] if task else None,
+                        "identity": task["identity"] if task else None}, True)
             elif args.command == "status":
                 _print({"workers": live_workers(conn), "ai_blocked_until": state_value(conn, "ai_blocked_until"),
                         "running": tasks(conn, active_only=True, include_hidden=True)}, True)

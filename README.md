@@ -140,14 +140,16 @@ It opens a window over the knowledge base:
   form a dated column: a commented step opens like an accordion, the pencil
   edits any comment in place, and undo goes back one step. The applications
   are listed from every run and market;
-- **Collect vacancies** runs `/run` for the identity in Claude Code, headless.
-  It is a task in the panel at the bottom of the window — the tasks on the
-  left, the live log of the chosen one on the right, both panes resized by
-  dragging — with its steps under it (preparation, each pipeline stage with
-  its time and progress, the agent's review). Collections of several
-  identities queue up; CVs and cover letters run in their own lane beside
-  them. The agent edits and tests but never commits — the changes wait for
-  you;
+- **Collect vacancies** adds a collection to the task queue: the top
+  (`/top` in Claude Code, headless), LinkedIn beside it, the rest of the base
+  after both, a CV/CL batch after each. The panel at the bottom of the
+  window lists every task of the queue, whoever added it (the app, the
+  agent, a terminal), with why a task waits — the tasks on the left, the
+  live log of the chosen one on the right, both panes resized by dragging —
+  and a collection's steps under it (preparation, each pipeline stage with
+  its time and progress). The tasks run outside the app (see "The task
+  service" below): closing the window stops nothing. The agent edits and
+  tests but never commits — the changes wait for you;
 - **Review feedback (N)** counts the answers not yet reviewed and starts
   nothing: run `/feedback <prefix>` in a Claude Code session of your own, where
   you follow and steer the review. It gathers the pending answers
@@ -179,10 +181,10 @@ It opens a window over the knowledge base:
   "Cover Letter <your name>", with what to check before sending. Any number
   can be queued; they run one at a time. **Open CV/CL Directory** and **Copy
   CV/CL Directory Path** appear once the vacancy has documents;
-- with `cv.auto` in the profile, a collection ends by starting one CV/CL
-  batch for the vacancies matching its filters (a new filter covers the
-  earlier vacancies too, once): a process of its own, so it goes on when the
-  app is closed, shown in the panel as one task with its progress and log.
+- with `cv.auto` in the profile, a collection ends with a CV/CL batch for
+  the vacancies matching its filters (a new filter covers the earlier
+  vacancies too, once), shown in the panel as one task with its progress
+  and log.
   A CV asked for in the app goes first: the batch pauses between documents —
   see [docs/IDENTITIES.md](docs/IDENTITIES.md);
 - the interface speaks Russian or English: a flag in the top right opens a
@@ -195,7 +197,26 @@ It opens a window over the knowledge base:
   renders the rows again without a new run.
 
 It needs Node.js and, for the two buttons, the `claude` CLI on `PATH`. The app
-only lists and records; everything else is the same Python as ever. Its tests
+only lists and records; everything else is the same Python as ever.
+
+### The task service
+
+Collections, CVs and the rest run in the task queue (`data/tasks.sqlite`,
+`tools/taskq.py`), worked by two processes Task Scheduler keeps running
+(`tools/taskd.py`): a background worker from system start, and a desktop
+worker from your sign-in for what needs Word. They go on when the app is
+closed and while another Windows user is signed in. Register them once,
+from a PowerShell run as administrator in the repository folder:
+
+```powershell
+.venv\Scripts\python tools\taskd.py install
+```
+
+No password is stored: a task that needs what the machine does not have
+without you signed in waits, says so in the panel, and starts when you
+sign in. `python tools/taskd.py status` shows the registered tasks and the
+live workers; `python tools/taskq.py list` the queue. Until they are
+registered, the app starts a worker for your session itself. Its tests
 (`cd app && npm test`) spend no tokens: the agent is mocked at the boundary.
 
 ## How it works
@@ -322,6 +343,7 @@ If you work through Claude Code, the project ships some ready-made entry points:
 | Command | What it does |
 |---|---|
 | `/start` | Onboarding: assemble an identity from nothing and make the first run |
+| `/top` | The fast daily cycle: the top vacancies first, through the task queue |
 | `/run` | The ordinary search cycle, including the mandatory manual check on candidates |
 | `/add-identity` | Add another search without breaking the one already tuned |
 | `/check` | Self-check: environment, identities, sources, tests |

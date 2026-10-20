@@ -281,6 +281,19 @@ The project is succeeding if:
   via `python tools/<script>.py --help` and solves one problem. It is the same
   principle as in agent environments that run reusable CLI tools rather than a
   monolith.
+- **Long work runs in the task queue, not in the agent's session.** A
+  collection in any mode, LinkedIn, the rest of the base, a clean-up, CVs,
+  cover letters and their batches, a reputation lookup: the agent adds them
+  with `tools/taskq.py` and follows them (the `run-task` skill), and never
+  starts them as a process of its own. The queue's workers
+  (`tools/taskd.py`, started by Task Scheduler) run them outside any
+  session, so a task survives the session ending, the app closing and
+  another Windows user signing in, and the app's panel lists every task
+  with who added it (task 0056). Measured before the queue: a collection
+  started in the first user's session stopped when a second user signed
+  in (the owner, 2026-10-20), and the panel never showed a run the agent
+  started. A session a worker started for a task (`taskq.py current`
+  names it) is that task and does the work itself.
 - **Dead links are not shown to a person.** Confirmed explicitly (2026-07-30):
   every vacancy link in the report must be checked, and a vacancy with an
   unambiguously broken link (404/410) is removed from the shortlist rather than

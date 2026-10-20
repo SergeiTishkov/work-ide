@@ -1,6 +1,7 @@
 """tools/taskq.py: the task queue in data/tasks.sqlite (task 0056) — tasks are
 listed whoever asks, run one per slot, wait for what they need with the
 reason shown, and never stay "running" for a dead process."""
+import json
 from datetime import timedelta
 from pathlib import Path
 
@@ -310,6 +311,18 @@ def test_the_command_line_adds_lists_and_stops(isolated_data_dir, capsys):
     assert taskq.main(["stop", "1"]) == 0
     with pytest.raises(SystemExit):   # argparse refuses an unknown kind
         taskq.main(["add", "dance"])
+
+
+def test_current_tells_a_task_the_worker_started_from_a_session_of_its_own(isolated_data_dir, capsys,
+                                                                          monkeypatch):
+    monkeypatch.delenv(taskq.TASK_ENV, raising=False)
+    assert taskq.main(["current"]) == 0
+    assert json.loads(capsys.readouterr().out)["task"] is None
+    with taskq.session() as conn:
+        task = taskq.add(conn, "collect", "ftf", origin="app")["task"]
+    monkeypatch.setenv(taskq.TASK_ENV, str(task["id"]))
+    assert taskq.main(["current"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"task": task["id"], "kind": "collect", "identity": "ftf"}
 
 
 def test_the_log_command_prints_the_file(isolated_data_dir, capsys):

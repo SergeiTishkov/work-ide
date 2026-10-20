@@ -43,17 +43,33 @@ clone: it is created when a template is cloned, see
 ## Step 1 — automatic collection and scoring
 
 ```bash
-python tools/pipeline.py --identity <p>
+python tools/taskq.py add pipeline --identity <p>    # the queue runs: python tools/pipeline.py --identity <p>
+python tools/taskq.py wait <id>                       # in the background: it runs for hours
 ```
+
+**Through the task queue, not in this session** (CLAUDE.md, "Long work
+runs in the task queue"; the `run-task` skill). `python tools/taskq.py
+current` says whether this session is already a queue task, started by a
+worker: then run the pipeline here directly. The queue's workers
+(`tools/taskd.py`) run a task whether the session lives or not, one per
+slot (collection, LinkedIn, documents), and leave it queued with the reason
+when it cannot run now: another task to end, the AI usage limit, the
+owner's sign-in (Word and, under the background worker, AI). `taskq.py
+list` shows the reasons, `taskq.py log <id>` the log, `taskq.py stop <id>`
+stops a task. No worker beating (`taskq.py status` lists none): `python
+tools	askd.py install` from an elevated PowerShell registers them with
+Task Scheduler once (no password stored); until then `python tools/taskd.py
+start --role desktop --idle-exit 600` starts one for this sign-in, as the
+app does. The commands below are what the tasks run.
 
 Three shorter modes split the same work (docs/ARCHITECTURE.md, "The top
 vacancies first", "LinkedIn beside the other sources"): `--top` does the top
-classes of every source but LinkedIn in about half an hour to an hour (the
-app's "Collect" runs it through `/top`); `--linkedin` is LinkedIn alone, run
-at the same time in a second terminal (the app queues it with "Collect"): it
+classes of every source but LinkedIn in about half an hour to an hour
+("Collect" in the app and `taskq.py collect <p>` queue it through `/top`);
+`--linkedin` is LinkedIn alone, a task beside it in a slot of its own: it
 fetches for hours without holding the base, then waits for the base and
-merges; `--rest` does the whole base afterwards (the app queues it when both
-have ended). Without a flag the command is the full cycle, LinkedIn
+merges; `--rest` does the whole base afterwards (queued after both, in the
+same collection). Without a flag the command is the full cycle, LinkedIn
 included.
 
 An identity turned off (the app's Menu → Identities, or `python

@@ -98,6 +98,8 @@ the task must appear in the queue and run there.
 - TO DO - Task Scheduler registration (`tools/taskd.py install/uninstall/status`): background at start (check `claude` under S4U first), desktop at logon, restart on failure. Code and tests done; registering the S4U task needs an elevated PowerShell, which the owner runs once (`python tools	askd.py install`)
 - DONE - Direct `pipeline.py` and `cv_batch.py` runs register themselves in the queue (`taskq.Registered`); the batch prints its log lines for the worker too
 - DONE - The app reads and controls the queue (`app/main/queue.js`): it adds, lists, stops and clears through `tools/taskq.py`, shows every task with who added it and why it waits; `tasks.js`, the runner and the batch watcher are gone; closing the window stops nothing. With no worker registered the app starts a desktop worker itself (`app/main/workers.js`, `taskd.py start`, detached from the app's handles; it ends after ten idle minutes); a registered one that stopped beating is started through Task Scheduler
-- TO DO - Agent infrastructure: `run-task` skill, CLAUDE.md and RUNBOOK rules, commands (`/run`, `/top`) use the queue; subagent check on the fixture
+- DONE - Agent infrastructure: the `run-task` skill, the CLAUDE.md and RUNBOOK rules, `/top` and `/run` add their long step to the queue unless `taskq.py current` names the session's own task; the `pipeline` kind takes `skip_contracts`
+- DONE - Docs: README (the task service, registering the workers), ARCHITECTURE (the task service, the in-memory queue it replaced, what was not taken), IDENTITIES
+- TO DO - Subagent check: given only the rules and a request (collect, a CV), the agent adds the task to the queue and follows it
 - TO DO - End-to-end check: tasks from the app, the agent, a terminal and a schedule all appear, run, and end with the right state
 - TO DO - Reproduce the user switch and the 30-minute battery sleep with the service; record what happens

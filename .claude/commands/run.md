@@ -13,6 +13,8 @@ the skeleton, plus the parts most often skipped.
 
 1. `python tools/identity.py which` — establish the identity. If several exist
    and it is unclear which is meant, ask; do not guess.
+   Then `python tools/taskq.py current`: `{"task": null}` means this session
+   is not a task of the queue, and step 4 goes through the queue (below).
 
 2. **Check whether the template has moved ahead:**
    `python tools/templates.py check --identity <p>`
@@ -40,9 +42,14 @@ the skeleton, plus the parts most often skipped.
      final summary and carry on.
    - `unreachable` — today's network; carry on.
 
-4. `python tools/pipeline.py --identity <p> --skip-contracts` — collection,
-   scoring, selection. (Without `--skip-contracts` the pipeline checks the
-   contracts itself; it is skipped only because step 3 just did.)
+4. Collection, scoring, selection: `python tools/pipeline.py --identity <p>
+   --skip-contracts`. (Without `--skip-contracts` the pipeline checks the
+   contracts itself; it is skipped only because step 3 just did.) It runs
+   for hours, so outside a queue task it is a task of the queue (the
+   `run-task` skill): `python tools/taskq.py add pipeline --identity <p>
+   --args '{"skip_contracts": true}'`, then `taskq.py wait <id>` in the
+   background; its log is `taskq.py log <id>`. Go on with step 5 when it
+   ended done.
 5. **Work through `docs/VACANCY_CHECKLIST.md` for every candidate at long_shot
    and above — this is a mandatory step, not a recommendation.** Read the full
    `description_text` from the base, not only the score breakdown:
@@ -72,10 +79,10 @@ me` when the person has marked vacancies in the desktop app. Do not review it
 in this run: the person starts `/feedback <p>` in a session of their own, to
 follow and steer the review (2026-10-07). Name the count in the summary.
 
-## Started from the desktop app (headless)
+## Run headless
 
-The app runs this command as `claude -p "/run <p>"`, with the identity given.
-Nobody is there to answer, so:
+Run as `claude -p "/run <p>"`, with the identity given: nobody is there to
+answer, so:
 
 - **Do not ask anything.** The identity is the one given; do not look for
   another.
