@@ -363,8 +363,13 @@ def plan(conn: sqlite3.Connection, at: Optional[datetime] = None) -> Dict[int, O
     at = at or now()
     workers = live_workers(conn, at)
     blocked = ai_blocked_until(conn, at)
+    # A CV/CL batch paused between documents for the app's own (taskd.py
+    # documents_hold) leaves the documents slot to a CV or a cover letter.
+    yielding = state_value(conn, "documents_yield") == "1"
     queued = [as_dict(r) for r in conn.execute("SELECT * FROM tasks WHERE state = 'queued' ORDER BY id")]
-    busy = {r["slot"]: r["id"] for r in conn.execute("SELECT slot, id FROM tasks WHERE state = 'running'")}
+    busy = {r["slot"]: r["id"] for r in conn.execute(
+        "SELECT slot, id, kind FROM tasks WHERE state = 'running'")
+        if not (r["slot"] == "documents" and r["kind"] == "cv_batch" and yielding)}
     reasons: Dict[int, Optional[str]] = {}
     first_in_slot: Dict[str, int] = {}
     for task in queued:
@@ -389,6 +394,8 @@ def plan(conn: sqlite3.Connection, at: Optional[datetime] = None) -> Dict[int, O
                     break
         if reason is None and task["slot"] in busy:
             reason = f"#{busy[task['slot']]} to end"
+        elif reason is None and yielding and task["kind"] == "cv_batch":
+            reason = "the documents the app asked for"
         if reason is None and task["slot"] in first_in_slot:
             reason = f"#{first_in_slot[task['slot']]} to end"
         if reason is None:

@@ -94,8 +94,8 @@ the task must appear in the queue and run there.
 ## Items
 - DONE - Plan (2026-10-21, with the owner)
 - DONE - Queue schema in `data/tasks.sqlite` (`schemas/tasks.sql`), `tools/taskq.py`, tests (add, claim, depend, stop, interrupted, slots); a run started by hand registers itself with `taskq.Registered`
-- TO DO - `tools/taskd.py` workers: claim by slot and capability, run, log, steps, heartbeat, keep-awake; the collection group; tests with fake runners
-- TO DO - Task Scheduler registration (`tools/taskd.py install/uninstall/status`): background at start (check `claude` under S4U first), desktop at logon, restart on failure
+- DONE - `tools/taskd.py` workers: claim by slot and capability, run, log, heartbeat, keep-awake, one worker per role, a sleep gap holds the sweep; the CV/CL batch pauses for a CV the app asked for; tests with fake and real processes
+- TO DO - Task Scheduler registration (`tools/taskd.py install/uninstall/status`): background at start (check `claude` under S4U first), desktop at logon, restart on failure. Code and tests done; registering the S4U task needs an elevated PowerShell, which the owner runs once (`python tools	askd.py install`)
 - TO DO - Direct `pipeline.py` runs register themselves in the queue
 - TO DO - The app reads and controls the queue; `tasks.js` keeps no work of its own; closing the window stops nothing
 - TO DO - Agent infrastructure: `run-task` skill, CLAUDE.md and RUNBOOK rules, commands (`/run`, `/top`) use the queue; subagent check on the fixture
