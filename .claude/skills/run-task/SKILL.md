@@ -33,7 +33,7 @@ go on.
 | The full cycle of `/run` (step 4) | `python tools/taskq.py add pipeline --identity <p> --args '{"skip_contracts": true}'` |
 | The top only (`pipeline.py --top`) | `python tools/taskq.py add pipeline --identity <p> --args '{"mode": "top"}'` |
 | LinkedIn / the rest of the base | `python tools/taskq.py add linkedin --identity <p>` / `add rest ...` |
-| A clean-up | `python tools/taskq.py add clean --identity <p> --args '{"ages": ["older"], "statuses": ["expired"]}'` (the lists of `tools/cleanup.py`'s filters, at least one) |
+| A clean-up | `python tools/taskq.py add clean --identity <p> --args '{"statuses": [...], "ages": [...], "classes": [...]}'` — at least one list, with the values of `tools/cleanup.py --help` (an age is counted from the posting date: `older` is more than 30 days, not "before the last run"). Deleting cannot be undone: run `cleanup.py ... --dry-run` first and show the person the counts |
 | A CV / a cover letter | `python tools/taskq.py add cv --identity <p> --vacancy <id> [--instructions "..."]` (`letter` alike) |
 | A CV/CL batch | `python tools/taskq.py add cv_batch --identity <p>` |
 | Employer reputation | `python tools/taskq.py add reputation --identity <p> --vacancy <id>` |
