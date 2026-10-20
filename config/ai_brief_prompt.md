@@ -28,13 +28,16 @@ country).
 
 ## Roles that fit
 The titles and kinds of work that match the CV, including the adjacent ones
-the person accepts.
+the person accepts. Where the description of the search accepts roles off
+their stack or level as a stretch, list them here as a stretch: which stacks,
+disciplines and levels, and what turns one into a "no".
 
 ## Roles that do not fit
-What the person turns down or cannot win: other stacks as the main job, other
-professions, levels far above or below theirs, and every pattern visible in
-their own reasons for turning postings down. Be concrete: name the stacks,
-title words and situations.
+What the person turns down or cannot win: other stacks as the main job (the
+ones the description does not accept as a stretch), other professions, levels
+far above or below theirs, and every pattern visible in their own reasons for
+turning postings down. Be concrete: name the stacks, title words and
+situations.
 
 ## Not a job posting
 Things that look like postings and are not: a comment or discussion, a
@@ -43,6 +46,11 @@ one role, crowdwork for training AI models.
 
 Rules:
 - Only what the documents support. Where they say nothing, say nothing.
+- Where the description of the search and the reasons disagree, the
+  description wins: it is kept current, the reasons are what the person said
+  at the time. A reason that turned a posting down for its stack alone does
+  not rule out a stack the description now accepts; the brief must not say
+  both.
 - No moral judgements and no advice; facts and rules the screening model can
   apply.
 - Write for a reader that will apply it literally.

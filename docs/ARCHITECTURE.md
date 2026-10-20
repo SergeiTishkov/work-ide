@@ -909,9 +909,10 @@ strong model, kept in the local identity and rewritten when the CV changes.
   posting, arrangement, location, role fit, verdict, reason, quote). Answers
   are stored per identity in `ai_screens` with the hash of the text read and
   of the brief; a new text or brief asks again.
-- It only removes: `score.py` turns a "reject" into the dealbreaker
-  `ai: <reason>`; a "keep" changes nothing. The reason and the quote show in
-  the app's Details.
+- On the top classes it only removes: `score.py` turns a "reject" into the
+  dealbreaker `ai: <reason>`; a "keep" changes nothing. The reason and the
+  quote show in the app's Details. A stretch role is the one place a "keep"
+  lets a vacancy in (see "Remote outranks the technology" below).
 - Through the `claude` CLI (`-p`, no tools, an empty working folder, so no
   project instructions in its context), with `MAX_THINKING_TOKENS=0`:
   measured on one posting, $0.018 and 2566 output tokens with thinking,
@@ -927,12 +928,58 @@ strong model, kept in the local identity and rewritten when the CV changes.
   employer of record is not "no"; asked again, both were kept and three
   rejects from the control sample stayed rejected. The prompt is part of
   `brief_hash`, so a prompt change reads the top again.
+- 2026-10-20, the same misreading again: "CET ±3 hours" taken to exclude
+  UTC+4 in 3 of 4 Proxify postings, both with the rule above and with the
+  window spelled out as "UTC−2 to UTC+4". Now `ai_screen.model_message` puts
+  the scorer's own reading of the window (`timezone_requirement` in the
+  breakdown) above the posting as a line "time-zone window, checked by a
+  program"; the same 4 asked again: 3 read the location as fitting, the 4th
+  was rejected for asking 5+ years of Python. The line is not part of
+  `text_hash`, which stays on the posting alone.
 
 Two script rules came from the same feedback, as personal settings:
 `remote_location_fit.unstated_remote_after_reading: reject` (a text of 600+
 characters that never says remote is rejected; 99 of 107 wrong picks in
 remote_unconfirmed had their text read), and `reject: true` on
 `title_role_penalty` rules (sharp: front-end, UI and junior titles).
+
+### Remote outranks the technology: stretch roles (2026-10-20)
+
+The owner, 2026-10-20, after applying to Cloud9's "Forward Engineer" (a Node
+role the screening model had refused as "not .NET"): remote comes first; a
+remote role the real CV can reach is wanted whatever its stack; Node, Go,
+Python and applied AI are a plus, .NET is good too; pay ranks above the
+technology. Not wanted: ML research, training models, data-heavy roles the
+CV cannot cover without inventing experience; junior is fine unless it is a
+junior developer.
+
+Measured that day on SHARP's base: 2 506 vacancies were refused only for
+their stack or title with no location objection, 1 450 of them posted in
+October; 347 of the 350 "forward engineer" ones were refused (244 by the
+title rule "forward deployed is not a developer").
+
+- `stretch_roles: {enabled, stretch_points}` in criteria (SHARP sets it in the
+  personal layer). With it, the stack relevance gate, the title stack gate,
+  a title in `stretch_discipline_title_patterns` (data, ML/AI, forward
+  deployed) and a `title_role_penalty` rule's `stretch_if` stop refusing on
+  their own: the vacancy waits with STRETCH_UNREAD and `screen_wanted`.
+- Remote first: only a vacancy whose sole objection is that wait is sent to
+  the model; one whose remote is unconfirmed waits for its description.
+- The model answers `cv_fit` (fits / stretch / no) and `work_kind` (software,
+  applied_ai, ml_research, data_heavy, other). "fits" lifts the objections,
+  "stretch" lifts them at `stretch_points`, "no" is a reject. A stretch the
+  model read is past the role complexity gate: its "no" covers ML research,
+  which is what that gate's titles catch.
+- A vacancy held only by a model's reject is `screen_wanted` too, so a new
+  prompt or brief reads it again (before, a reject left the top classes and
+  was never asked again).
+- `ai_screen.STRETCH_LIMIT` (400 a run, highest score first) after the top
+  classes: about 1 100 were waiting the first time, $0.006 a read.
+- The card shows "a stretch for the CV" or "another stack, fits the CV", with
+  the model's reason on hover (`stretch` in the row view).
+- The brief prompt now says the description of the search wins over older
+  reasons: the owner's earlier "Go role", "Node only" refusals would
+  otherwise have written "Go, Node: reject" next to "Go, Node: a stretch".
 
 ### Reputation on request, not in every collection (2026-10-17)
 

@@ -6,6 +6,30 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V28 — roles a developer can move into, 2026-10-20
+
+**Added** (`sharp_criteria.yaml` → `role_relevance_signal.stretch_discipline_title_patterns`):
+data engineer, analytics engineer, data scientist, ML/AI engineer and forward
+deployed / forward engineer titles moved out of
+`wrong_discipline_title_patterns` into a list of their own. Without
+`stretch_roles` in your criteria nothing changes: they are refused as before.
+With it, the screening model reads such a posting against the CV and may let
+it through (`tools/score.py`, STRETCH_UNREAD). Measured on SHARP's base that
+day: 347 of 350 "forward engineer" vacancies were refused, 244 of them by
+title.
+
+**Removed** from `wrong_discipline_title_patterns`: "data scientist" was one
+pattern with "data analyst"; data analyst stays refused.
+
+**Changed** (`sharp_sources.yaml`): LinkedIn also asks "forward deployed
+engineer", "forward engineer" and "AI engineer" (3 × 28 countries); Hacker
+News also "forward deployed" and "LLM".
+
+**New in the machinery** (affects your local settings only if you use them):
+`stretch_roles: {enabled, stretch_points}` in criteria; `stretch_if` on a
+`title_role_penalty` rule with `reject: true`; the screening model answers
+`cv_fit` and `work_kind`.
+
 ## V27 — remote on LinkedIn only in words, 2026-10-12
 
 **Changed** (`tools/score.py`, `_score_remote_location`): on a board that

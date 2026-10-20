@@ -41,7 +41,9 @@ sources:
     params:
       # Set explicitly rather than taken from tech_stack.core: "SQL Server" is
       # not a language, but it is half of the work this stack does.
-      keywords: [".NET", "C#", "ASP.NET", "SQL Server"]
+      # "forward deployed" and "LLM": the applied AI roles (2026-10-20, see
+      # linkedin below).
+      keywords: [".NET", "C#", "ASP.NET", "SQL Server", "forward deployed", "LLM"]
       hits_per_keyword: 50
 
   - name: arbeitnow
@@ -64,9 +66,21 @@ sources:
       # because they are where the pay is (2026-10-05, replacing two queries
       # for part-time work). LinkedIn's f_JT=P/C filter will not do for a
       # contract search — verified, the guest endpoint ignores it.
+      #
+      # 2026-10-20, the owner: "remote outranks the technology" — applied AI
+      # and forward deployed roles are wanted when the CV can be stretched to
+      # them (criteria `stretch_roles`, the screening model's cv_fit).
+      # Titles in the base that day (55 268 since August, every board): "AI
+      # engineer" in 1 035, "forward deployed" in 363, "forward engineer" in
+      # 2 (one is the Cloud9 role the owner applied to). LinkedIn matches the
+      # words, not the phrase, so "forward engineer" may also bring "forward
+      # deployed" ones; the per-query statistics
+      # (data/identities/<p>/runs/linkedin_queries_*.json) show which earns
+      # its 28 pairs.
       keywords: [".NET developer", "C# developer", "ASP.NET",
                  "senior .NET engineer", "contract C# developer",
-                 ".NET architect"]
+                 ".NET architect", "forward deployed engineer",
+                 "forward engineer", "AI engineer"]
       # Every page of every (word x country) pair, postings of the last week
       # (measured 2026-10-03: ten cards a page and at most 100 per query to an
       # anonymous request; a query that reaches that ceiling is split by the

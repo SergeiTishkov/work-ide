@@ -227,6 +227,15 @@ def top_subset(vacancies: dict, extra=()) -> dict:
             if vid in extra or (v.get("computed") or {}).get("classification") in TOP_CLASSES}
 
 
+def screened_subset(vacancies: dict) -> dict:
+    """What the AI check may have read: the top classes and the stretches
+    waiting for a read (score.STRETCH_UNREAD); taken before the rescore that
+    settles the stretches."""
+    return {vid: v for vid, v in vacancies.items()
+            if (v.get("computed") or {}).get("classification") in TOP_CLASSES
+            or (v.get("computed") or {}).get("screen_wanted")}
+
+
 def _archive_raw_records(source_name: str, raw_records: list) -> None:
     """An audit trail: the source's raw data as it was at run time, before any
     normalisation or scoring. Not critical to the pipeline — a write error must
@@ -395,7 +404,7 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
     # The cheap model reads what reached the top classes (tools/ai_screen.py).
     # Answers are kept, so a vacancy is read once per text and brief.
     if ai_check_stage(vacancies, state):
-        top = top_subset(vacancies)
+        top = screened_subset(vacancies)
         with progress.stage(f"rescore the top, with the AI check ({progress.number(len(top))} vacancies)"):
             rescore_all(top, criteria, profile, prev_companies)
 
@@ -747,7 +756,7 @@ def process_top(vacancies: dict, prev_companies: dict, state: dict, criteria: di
         rescore_all(top, criteria, profile, prev_companies)
 
     if ai_check_stage(vacancies, state, limit=TOP_AI_LIMIT):
-        top = top_subset(vacancies)
+        top = screened_subset(vacancies)
         with progress.stage(f"rescore the top, with the AI check ({progress.number(len(top))} vacancies)"):
             rescore_all(top, criteria, profile, prev_companies)
 
