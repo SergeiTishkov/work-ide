@@ -118,12 +118,21 @@
   const REASON_KEYS = { rejected: 'reason.rejected', bugged: 'reason.bugged' };
   const LOG_LIMIT = 3000;
   const PANEL_KEY = 'work-ide-task-panel';
+  // The app's own settings (Menu -> Settings...), kept per Windows user with
+  // the rest of the app's storage
+  const SETTINGS_KEY = 'work-ide-settings';
+  const DEFAULT_SETTINGS = { showTasks: true };
   // How often the pipeline indicator asks the databases. Tests shorten it.
   const POLL_MS = window.__WORK_IDE_POLL_MS || 5000;
   const SESSION_KEY = 'work-ide-view';
 
   const state = {
     identities: [],
+    settings: readSettings(),
+    settingsOpen: false,
+    // the task the panel's cross asks about: { id, label }
+    confirmStop: null,
+    panelFolded: false,
     // false until the first answer of listIdentities: an empty list before it
     // is "not known yet", not "there are none"
     booted: false,
@@ -829,6 +838,7 @@
     renderIdentityTabs();
     renderPanel();
     renderTaskPanel();
+    renderModals();
     watchScroll();
   }
 
@@ -1100,7 +1110,8 @@
     running && menuItem({ testid: 'run-stop', text: t('run.stop'), onclick: stopCollect }),
     feedbackItem(pending),
     menuItem({ testid: 'cleanup', text: t('cleanup.button'), title: t('cleanup.hint'), onclick: openCleanup }),
-    menuItem({ testid: 'open-identities', text: t('menu.identities'), onclick: openIdentities }));
+    menuItem({ testid: 'open-identities', text: t('menu.identities'), onclick: openIdentities }),
+    menuItem({ testid: 'open-settings', text: t('menu.settings'), onclick: openSettings }));
     return el('span', { class: 'commands' }, button, menu);
   }
 
@@ -1173,6 +1184,99 @@
       el('div', { class: 'reason-actions' },
         el('button', { testid: 'identities-close', onclick: closeIdentities }, t('identities.close')))));
   }
+
+  // --- "Settings...": the app's own settings (the owner, 2026-10-21) ------------
+  // The first one: whether the task list is shown at all. Hidden, the tasks
+  // run as before; neither the panel nor its tab is there.
+
+  function readSettings() {
+    try {
+      return { ...DEFAULT_SETTINGS, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') || {}) };
+    } catch {
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+
+  function saveSetting(name, value) {
+    state.settings = { ...state.settings, [name]: value };
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    } catch {
+      // storage unavailable: the setting holds until the app restarts
+    }
+  }
+
+  function openSettings() {
+    state.settingsOpen = true;
+    renderModals();
+  }
+
+  function closeSettings() {
+    state.settingsOpen = false;
+    renderModals();
+  }
+
+  function renderSettings() {
+    if (!state.settingsOpen) return null;
+    return el('div', {
+      class: 'overlay', testid: 'settings-overlay',
+      onclick: (event) => { if (event.target === event.currentTarget) closeSettings(); },
+    },
+    el('div', { class: 'popup settings', role: 'dialog', 'aria-modal': 'true', testid: 'settings-dialog' },
+      el('h2', {}, t('settings.title')),
+      el('label', { class: 'setting' },
+        el('input', {
+          type: 'checkbox', testid: 'setting-show-tasks', checked: state.settings.showTasks,
+          onchange: (event) => {
+            saveSetting('showTasks', event.target.checked);
+            renderTaskPanel();
+          },
+        }),
+        el('span', {}, t('settings.show_tasks'))),
+      el('p', { class: 'muted setting-hint' }, t('settings.show_tasks_hint')),
+      el('div', { class: 'reason-actions' },
+        el('button', { testid: 'settings-close', onclick: closeSettings }, t('settings.close')))));
+  }
+
+  // --- the stop confirmation: the panel's cross (the owner, 2026-10-21) -------
+
+  function askStop(task) {
+    state.confirmStop = { id: task.id, label: taskLabel(task) };
+    renderModals();
+  }
+
+  function answerStop(stop) {
+    const asked = state.confirmStop;
+    state.confirmStop = null;
+    renderModals();
+    if (stop && asked) guarded(() => api.cancelTask(asked.id));
+  }
+
+  function renderStopConfirm() {
+    const asked = state.confirmStop;
+    if (!asked) return null;
+    return el('div', {
+      class: 'overlay', testid: 'stop-overlay',
+      onclick: (event) => { if (event.target === event.currentTarget) answerStop(false); },
+    },
+    el('div', { class: 'popup confirm', role: 'alertdialog', 'aria-modal': 'true', testid: 'stop-dialog' },
+      el('p', { class: 'confirm-question' }, t('task.stop_confirm')),
+      el('p', { class: 'muted' }, asked.label),
+      el('div', { class: 'reason-actions' },
+        el('button', { class: 'primary', testid: 'stop-yes', onclick: () => answerStop(true) }, t('task.stop_yes')),
+        el('button', { testid: 'stop-no', onclick: () => answerStop(false) }, t('task.stop_no')))));
+  }
+
+  function renderModals() {
+    document.querySelector('[data-testid="modal-host"]').replaceChildren(
+      ...[renderSettings(), renderStopConfirm()].filter(Boolean));
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (state.confirmStop) answerStop(false);
+    else if (state.settingsOpen) closeSettings();
+  });
 
   function renderToolbar(identity, info) {
     const pending = info.pending ? info.pending.bugged + info.pending.rejected : 0;
@@ -2369,6 +2473,7 @@
 
   const TASK_STATE_ICONS = {
     queued: '○', running: null, done: '✓', failed: '✕', stopped: '■', skipped: '–', interrupted: '■',
+    pending: '○',
   };
   // the tasks that run the pipeline: an identity's base changes when they end
   const PIPELINE_KINDS = new Set(['collect', 'rest', 'linkedin', 'pipeline', 'clean']);
@@ -2541,9 +2646,38 @@
     });
   }
 
+  // Folded (the owner, 2026-10-21), the panel is a tab out of the window's
+  // bottom edge; the setting "Show the task list" off, neither is shown. The
+  // tasks run either way.
+  function renderTaskTab() {
+    const tab = document.querySelector('[data-testid="task-tab"]');
+    const listed = state.tasks.length > 0 && state.settings.showTasks;
+    tab.hidden = !listed || !state.panelFolded;
+    if (tab.hidden) return;
+    const active = state.tasks.filter((task) => ACTIVE_TASK.has(task.state)).length;
+    tab.title = t('task.unfold');
+    tab.replaceChildren(
+      state.tasks.some((task) => task.state === 'running') && el('span', { class: 'spinner small' }),
+      el('span', {}, t('task.list_title', { n: active })));
+  }
+
+  function chevronDown() {
+    const icon = el('span', { class: 'chevron', 'aria-hidden': 'true' });
+    icon.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" '
+      + 'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>';
+    return icon;
+  }
+
+  function foldTaskPanel(folded) {
+    state.panelFolded = folded;
+    savePanelLayout({ folded });
+    renderTaskPanel();
+  }
+
   function renderTaskPanel() {
     const panel = document.querySelector('[data-testid="task-panel"]');
-    panel.hidden = !state.tasks.length;
+    renderTaskTab();
+    panel.hidden = !state.tasks.length || !state.settings.showTasks || state.panelFolded;
     if (panel.hidden) return;
     const id = shownTaskId();
     const list = document.querySelector('[data-testid="task-list"]');
@@ -2565,7 +2699,7 @@
     ACTIVE_TASK.has(task.state) && !task.stopping && el('button', {
       class: 'link task-cancel', testid: 'task-cancel',
       title: task.kind === 'batch' ? t('batch.stop') : t('task.cancel'),
-      onclick: (event) => { event.stopPropagation(); guarded(() => api.cancelTask(task.id)); },
+      onclick: (event) => { event.stopPropagation(); askStop(task); },
     }, '✕')), ...stepRows(task)]));
     list.scrollTop = scroll;
     const queued = state.tasks.filter((task) => task.state === 'queued').length;
@@ -2580,8 +2714,14 @@
           class: 'link', testid: 'tasks-clear', onclick: () => guarded(() => api.clearTasks()),
         }, t('task.clear'))));
     const shown = state.tasks.find((task) => task.id === id);
-    document.querySelector('[data-testid="task-log-title"]').textContent = shown
-      ? `${t('task.log_title')} · ${taskLabel(shown)} · ${taskStateText(shown)}` : t('task.log_title');
+    document.querySelector('[data-testid="task-log-title"]').replaceChildren(
+      el('span', { class: 'pane-caption' }, shown
+        ? `${t('task.log_title')} · ${taskLabel(shown)} · ${taskStateText(shown)}` : t('task.log_title')),
+      el('span', { class: 'pane-actions' },
+        el('button', {
+          class: 'link pane-fold', testid: 'task-panel-fold', title: t('task.fold'), 'aria-label': t('task.fold'),
+          onclick: () => foldTaskPanel(true),
+        }, chevronDown())));
     showTaskLog(id);
   }
 
@@ -2637,6 +2777,8 @@
   function setupTaskPanel() {
     const panel = document.querySelector('[data-testid="task-panel"]');
     applyPanelLayout();
+    state.panelFolded = Boolean(readPanelLayout().folded);
+    document.querySelector('[data-testid="task-tab"]').addEventListener('click', () => foldTaskPanel(false));
     dragSash(document.querySelector('[data-testid="task-panel-sash"]'), (event) => {
       const height = clamp(window.innerHeight - event.clientY, 100, window.innerHeight - 160);
       panel.style.height = `${height}px`;

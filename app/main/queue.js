@@ -17,7 +17,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
-const { StepTracker } = require('./steps');
+const { StepTracker, OUTLINES } = require('./steps');
 
 const ACTIVE = new Set(['queued', 'running']);
 const LOG_LIMIT = 3000;
@@ -190,7 +190,8 @@ class QueueClient {
       const agent = STEP_KINDS[row.kind];
       entry = {
         file: row.log_path, offset: 0, rest: '', lines: [],
-        tracker: agent === undefined ? null : new StepTracker({ now: this.clock, agent }),
+        tracker: agent === undefined ? null
+          : new StepTracker({ now: this.clock, agent, outline: OUTLINES[row.kind] || [] }),
         ended: false,
       };
       this.logs.set(row.id, entry);

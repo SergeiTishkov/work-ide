@@ -30,7 +30,7 @@ the setting are remembered across restarts. The stage checklist reuses
 
 ## Items
 - DONE - Plan (2026-10-21, with the owner)
-- TO DO - Fold into a trapezoid tab and open from it; remembered; UI tests
-- TO DO - "Settings…" with "Show the task list"; hidden means no panel and no tab; UI tests
-- TO DO - Stop asks for confirmation; UI test
-- TO DO - A collection row lists its stages with circle, spinner and tick; UI test
+- DONE - Fold into a trapezoid tab and open from it; remembered; UI tests (the chevron at the log's title folds it; the tab on the bottom edge, right, says how many are active, a spinner while one runs)
+- DONE - "Settings…" with "Show the task list"; hidden means no panel and no tab; UI tests (kept in the app's storage, per Windows user)
+- DONE - Stop asks for confirmation; UI test (the panel's cross; Cancel, Escape and a click outside stop nothing; the menu's "Stop" is unchanged)
+- DONE - A collection row lists its stages with circle, spinner and tick; UI test (the stages to come from an outline per kind in `app/main/steps.js`: a collection, the rest, LinkedIn; a stage passed over drops out; unit tests)

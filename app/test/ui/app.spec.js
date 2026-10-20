@@ -92,7 +92,100 @@ test('"Stop" and the panel\'s cross cancel a collection', async ({ page }) => {
   await (await command(page, 'run-collect')).click();
   await page.getByTestId('task-2').hover();
   await page.getByTestId('task-2').getByTestId('task-cancel').click();
+  await page.getByTestId('stop-yes').click();
   await expect(page.getByTestId('task-2')).toHaveAttribute('data-state', 'stopped');
+});
+
+test('the panel\'s cross asks before it stops a task; "Cancel", Escape and a click outside stop nothing', async ({ page }) => {
+  await open(page);
+  await (await command(page, 'run-collect')).click();
+  const cross = async () => {
+    await page.getByTestId('task-1').hover();
+    await page.getByTestId('task-1').getByTestId('task-cancel').click();
+    await expect(page.getByTestId('stop-dialog')).toContainText(en['task.stop_confirm']);
+    await expect(page.getByTestId('stop-dialog')).toContainText(`${en['task.kind.collect']} · sharp`);
+  };
+  await cross();
+  await page.getByTestId('stop-no').click();
+  await expect(page.getByTestId('stop-dialog')).toHaveCount(0);
+  await cross();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('stop-dialog')).toHaveCount(0);
+  await cross();
+  await page.getByTestId('stop-overlay').click({ position: { x: 5, y: 5 } });
+  await expect(page.getByTestId('stop-dialog')).toHaveCount(0);
+  expect(await calls(page, 'cancelTask')).toEqual([]);
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'running');
+  await cross();
+  await page.getByTestId('stop-yes').click();
+  expect(await calls(page, 'cancelTask')).toEqual([[1]]);
+  await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'stopped');
+});
+
+test('the panel folds into a tab at the bottom edge, opens from it, and stays folded after a restart', async ({ page }) => {
+  await open(page);
+  await expect(page.getByTestId('task-tab')).toBeHidden();
+  await (await command(page, 'run-collect')).click();
+  const panel = page.getByTestId('task-panel');
+  const tab = page.getByTestId('task-tab');
+  await expect(panel).toBeVisible();
+  await expect(tab).toBeHidden();
+  await page.evaluate(() => window.__taskLine('fetching sources'));
+  await page.getByTestId('task-panel-fold').click();
+  await expect(panel).toBeHidden();
+  await expect(tab).toBeVisible();
+  await expect(tab).toContainText(en['task.list_title'].replace('{n}', '1'));
+  await expect(tab.locator('.spinner')).toBeVisible();   // something runs
+  const box = await tab.boundingBox();
+  const height = await page.evaluate(() => window.innerHeight);
+  expect(Math.round(box.y + box.height)).toBe(height);   // on the bottom edge
+  await expect(tab).toHaveCSS('clip-path', /polygon/);
+  // folded, the task runs on: nothing was stopped
+  expect(await calls(page, 'cancelTask')).toEqual([]);
+  await page.evaluate(() => window.__taskLine('still fetching'));
+  await tab.click();
+  await expect(panel).toBeVisible();
+  await expect(tab).toBeHidden();
+  await expect(page.getByTestId('task-log')).toContainText('fetching sources\nstill fetching');
+
+  await page.getByTestId('task-panel-fold').click();
+  await page.reload();
+  await (await command(page, 'run-collect')).click();
+  await expect(tab).toBeVisible();
+  await expect(panel).toBeHidden();
+  await tab.click();
+  await page.reload();
+  await (await command(page, 'run-collect')).click();
+  await expect(panel).toBeVisible();
+});
+
+test('"Settings…" hides the task list: no panel and no tab, the tasks run on; kept after a restart', async ({ page }) => {
+  await open(page);
+  await (await command(page, 'run-collect')).click();
+  await expect(page.getByTestId('task-panel')).toBeVisible();
+  await (await command(page, 'open-settings')).click();
+  const show = page.getByTestId('setting-show-tasks');
+  await expect(page.getByTestId('settings-dialog')).toContainText(en['settings.show_tasks']);
+  await expect(show).toBeChecked();
+  await show.uncheck();
+  await expect(page.getByTestId('task-panel')).toBeHidden();
+  await expect(page.getByTestId('task-tab')).toBeHidden();
+  await page.getByTestId('settings-close').click();
+  await expect(page.getByTestId('settings-dialog')).toHaveCount(0);
+  expect(await calls(page, 'cancelTask')).toEqual([]);
+  await expect(page.getByTestId('run-collect')).toHaveCount(0);
+  await expect(page.getByTestId('menu-button').getByTestId('menu-busy')).toBeVisible();   // it runs on
+
+  await page.reload();
+  await (await command(page, 'run-collect')).click();
+  await expect(page.getByTestId('menu-button').getByTestId('menu-busy')).toBeVisible();
+  await expect(page.getByTestId('task-panel')).toBeHidden();
+  await (await command(page, 'open-settings')).click();
+  await expect(page.getByTestId('setting-show-tasks')).not.toBeChecked();
+  await page.getByTestId('setting-show-tasks').check();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('settings-dialog')).toHaveCount(0);
+  await expect(page.getByTestId('task-panel')).toBeVisible();
 });
 
 test('collections of several identities queue: the first runs, the others wait their turn', async ({ page }) => {
@@ -1502,6 +1595,35 @@ test('a collection shows its steps under it while it runs, folded or opened by i
   await expect(step(0)).toBeVisible();
 });
 
+test('a collection lists the stages still to come: a circle to do, a spinner going, a tick done', async ({ page }) => {
+  await open(page);
+  await (await command(page, 'run-collect')).click();
+  await page.evaluate(() => window.__setSteps([
+    { key: 'prepare', state: 'done', duration: '1:05', note: null, progress: null },
+    { key: 'fetch', name: 'fetch 19 sources', state: 'running', began: Date.now() - 5000,
+      progress: null, note: null, duration: null },
+    { key: 'rescore_top', state: 'pending' },
+    { key: 'summary', state: 'pending' },
+  ]));
+  const step = (i) => page.getByTestId(`task-step-1-${i}`);
+  await expect(step(0)).toHaveAttribute('data-state', 'done');
+  await expect(step(0).locator('.task-icon')).toHaveText('✓');
+  await expect(step(0).locator('.task-icon')).toHaveCSS('color', await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--applied)';
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }));
+  await expect(step(1).locator('.spinner')).toBeVisible();
+  await expect(step(2)).toHaveAttribute('data-state', 'pending');
+  await expect(step(2).locator('.task-icon')).toHaveText('○');
+  await expect(step(2)).toContainText(en['step.rescore_top']);
+  await expect(step(3)).toContainText(en['step.summary']);
+  await expect(step(2).locator('.step-time')).toHaveText('');
+});
+
 test('the CV/CL batch is one task: its progress, its document on the card, its log, its stop', async ({ page }) => {
   await open(page);
   await page.evaluate(() => window.__setBatch({
@@ -1531,6 +1653,7 @@ test('the CV/CL batch is one task: its progress, its document on the card, its l
 
   await task.hover();
   await task.getByTestId('task-cancel').click();
+  await page.getByTestId('stop-yes').click();
   expect(await calls(page, 'cancelTask')).toEqual([['batch']]);
   await expect(task).toContainText(en['batch.stopping']);
   await page.evaluate(() => window.__setBatch({
@@ -1640,14 +1763,14 @@ test('Refresh is a button of its own, left of the theme and the language, the sa
   await expect(page.getByTestId('menu').getByTestId('refresh')).toHaveCount(0);
 });
 
-test('the menu holds Collect, Review feedback, Clean up, Identities; "Clean up" filters, counts, deletes', async ({ page }) => {
+test('the menu holds Collect, Review feedback, Clean up, Identities, Settings; "Clean up" filters, counts, deletes', async ({ page }) => {
   await open(page);
   const order = await page.locator('.actions > *').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.className));
   expect(order).toEqual(['commands']);
   await command(page, 'cleanup');
   const items = await page.getByTestId('menu').locator('[role="menuitem"]')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.querySelector('[data-testid]').dataset.testid));
-  expect(items).toEqual(['run-collect', 'run-feedback', 'cleanup', 'open-identities']);
+  expect(items).toEqual(['run-collect', 'run-feedback', 'cleanup', 'open-identities', 'open-settings']);
   await page.getByTestId('cleanup').click();
   const dialog = page.getByTestId('cleanup-dialog');
   await expect(dialog).toBeVisible();

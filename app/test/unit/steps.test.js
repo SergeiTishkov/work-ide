@@ -2,7 +2,7 @@
 // main/steps.js: a collection's steps, read from its log as it comes.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { StepTracker } = require('../../main/steps');
+const { StepTracker, OUTLINES } = require('../../main/steps');
 
 test('a collection shows its steps as its log comes', () => {
   let ms = 0;
@@ -50,6 +50,37 @@ test('the rest of the base shows the pipeline stages, with no agent steps', () =
   steps.feed('  | [04:15:00] ok check links - 49 s');
   steps.feed('  | [04:15:01] pipeline finished in 0:50');
   assert.deepEqual(steps.steps().map((s) => [s.key, s.state]), [['links', 'done']]);
+});
+
+test('the stages still to come are listed from the outline, and a stage passed over drops out', () => {
+  const steps = new StepTracker({ agent: false, outline: OUTLINES.linkedin });
+  assert.deepEqual(steps.steps().map((s) => [s.key, s.state]), [
+    ['fetch', 'pending'], ['wait_base', 'pending'], ['load', 'pending'], ['merge_linkedin', 'pending'],
+    ['save', 'pending'], ['selection', 'pending']]);
+  steps.feed('  | [04:14:11] >> fetch LinkedIn (posted in the last 1 day)');
+  steps.feed('  | [04:20:11] ok fetch LinkedIn (posted in the last 1 day) - 6:00 (300 records)');
+  // the base was free: no wait
+  steps.feed('  | [04:20:12] >> load the knowledge base');
+  assert.deepEqual(steps.steps().map((s) => [s.key, s.state]), [
+    ['fetch', 'done'], ['load', 'running'], ['merge_linkedin', 'pending'], ['save', 'pending'],
+    ['selection', 'pending']]);
+  steps.finish('failed');
+  assert.deepEqual(steps.steps().map((s) => [s.key, s.state]), [['fetch', 'done'], ['load', 'failed']]);
+});
+
+test('a stage that comes more than once is matched in order', () => {
+  const steps = new StepTracker({ outline: OUTLINES.collect });
+  steps.feed('> Bash: python tools/pipeline.py --identity sharp --top --skip-contracts');
+  steps.feed('  | [04:14:11] >> load the knowledge base');
+  steps.feed('  | [04:14:12] ok load the knowledge base - 1 s');
+  steps.feed('  | [04:14:13] >> fetch 19 sources (LinkedIn apart)');
+  steps.feed('  | [04:20:00] ok fetch 19 sources (LinkedIn apart) - 5:47');
+  steps.feed('  | [04:20:01] >> rescore the top (900 vacancies)');
+  steps.feed('  | [04:20:05] ok rescore the top (900 vacancies) - 4 s');
+  const pending = steps.steps().filter((s) => s.state === 'pending').map((s) => s.key);
+  assert.deepEqual(pending.slice(0, 3), ['remote_check', 'rescore_top', 'ai_brief']);
+  assert.equal(pending[pending.length - 1], 'summary');
+  assert.ok(!pending.includes('contracts'), 'skipped: --skip-contracts');
 });
 
 test('a task that failed fails the step it was in', () => {

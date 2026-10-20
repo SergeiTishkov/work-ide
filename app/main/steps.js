@@ -21,6 +21,11 @@
 // no agent steps.
 //
 // The CVs and cover letters after it are a task of their own (batch.js).
+//
+// The steps still to come are listed too, from the outline of the task's
+// kind (the owner, 2026-10-21: an empty circle for a stage to do). A stage
+// the run passed over (no AI, no contracts) drops out of the outline when a
+// later one starts; the outline goes when the task ends.
 
 const STAGE = /^\s*\|\s*\[(\d\d:\d\d:\d\d)\] (>>|ok|!!) (.+)$/;
 const PROGRESS = /^\s*\|\s*\[\d\d:\d\d:\d\d\] {4}(\S.*)$/;
@@ -50,6 +55,18 @@ const STAGE_KEYS = [
   [/^check source contracts/, 'contracts'],
 ];
 
+// The stages each kind of task goes through, in order, as tools/pipeline.py
+// runs them: run_top for a collection (the agent's /top), run_rest,
+// fetch_linkedin_apart and merge_linkedin. A key may come more than once.
+const OUTLINES = {
+  collect: ['prepare', 'load', 'contracts', 'fetch', 'rescore_top', 'remote_check', 'rescore_top',
+    'ai_brief', 'ai_check', 'rescore_top', 'duplicates', 'links', 'companies', 'channels', 'wikidata',
+    'rescore_top', 'save', 'selection', 'summary'],
+  rest: ['load', 'rescore', 'duplicates', 'links', 'companies', 'descriptions', 'rescore', 'ai_brief',
+    'ai_check', 'rescore_top', 'channels', 'wikidata', 'rescore', 'save', 'selection'],
+  linkedin: ['fetch', 'wait_base', 'load', 'merge_linkedin', 'save', 'selection'],
+};
+
 function stageKey(name) {
   const hit = STAGE_KEYS.find(([pattern]) => pattern.test(name));
   return hit ? hit[1] : null;
@@ -65,9 +82,12 @@ function clock(ms) {
 
 class StepTracker {
   // agent: false for the pipeline alone (rest.js): no agent steps
-  constructor({ now = () => Date.now(), agent = true } = {}) {
+  // outline: the keys of the steps to come (OUTLINES), or none
+  constructor({ now = () => Date.now(), agent = true, outline = [] } = {}) {
     this.now = now;
     this.agent = agent;
+    this.outline = outline;
+    this.ended = false;
     this.list = [];
     this.pipelineDone = false;
     this.after = 'checklist';
@@ -140,12 +160,27 @@ class StepTracker {
   // The task ended: the step going ends with it.
   finish(state) {
     this.close(state === 'done' ? 'done' : state);
+    this.ended = true;
+  }
+
+  // The outline's keys after the last step that matched it, in order.
+  pending() {
+    if (this.ended) return [];
+    let next = 0;
+    for (const step of this.list) {
+      const at = this.outline.indexOf(step.key, next);
+      if (at >= 0) next = at + 1;
+    }
+    return this.outline.slice(next);
   }
 
   // A running step carries `began` (ms): the panel counts its time itself.
   steps() {
-    return this.list.map(({ began, agent, ...step }) => (step.state === 'running' ? { ...step, began } : step));
+    return [
+      ...this.list.map(({ began, agent, ...step }) => (step.state === 'running' ? { ...step, began } : step)),
+      ...this.pending().map((key) => ({ key, state: 'pending' })),
+    ];
   }
 }
 
-module.exports = { StepTracker, stageKey, clock };
+module.exports = { StepTracker, OUTLINES, stageKey, clock };
