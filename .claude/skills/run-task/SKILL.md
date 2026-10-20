@@ -37,6 +37,8 @@ go on.
 | A CV / a cover letter | `python tools/taskq.py add cv --identity <p> --vacancy <id> [--instructions "..."]` (`letter` alike) |
 | A CV/CL batch | `python tools/taskq.py add cv_batch --identity <p>` |
 | Employer reputation | `python tools/taskq.py add reputation --identity <p> --vacancy <id>` |
+| The shortlist's links again | `python tools/taskq.py add links --identity <p>` |
+| On a timetable ("every day at 7") | `python tools/taskq.py schedule add <collect\|linkedin\|rest\|clean\|cv_batch\|links> --identities <p,p\|all> --cron "0 7 * * *" [--missed catch_up\|skip] [--args '<JSON>']`; `schedule list`, `schedule next "<cron>"` (show the person the next runs before adding), `schedule on\|off\|remove <id>`. Ask the person what a run missed while the computer was off does: caught up once, or skipped |
 
 `collect` queues a group: the top (the agent's `/top`), LinkedIn beside it,
 the rest of the base after both, a CV/CL batch after each. `--after <ids>`

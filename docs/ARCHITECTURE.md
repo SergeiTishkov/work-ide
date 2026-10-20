@@ -1046,6 +1046,37 @@ title rule "forward deployed is not a developer").
   reasons: the owner's earlier "Go role", "Node only" refusals would
   otherwise have written "Go, Node: reject" next to "Go, Node: a stretch".
 
+### Schedules: the queue's work on a timetable (2026-10-21)
+
+The owner, 2026-10-21: with the task service running outside any session,
+it can start collections and clean-ups itself, on a timetable set in the
+app. A schedule is a row in `data/tasks.sqlite` (`schedules`,
+`tools/schedules.py`): what (a collection as its group, LinkedIn, the rest,
+a clean-up with its filters, a CV/CL batch, a re-check of the shortlist's
+links — `pipeline.py --links`), for which identities (named, or every
+active one at the time), a cron line in local time, on or off, and what a
+missed run does.
+
+- **The workers queue it.** Every worker looks every 20 s; the run is
+  claimed in one transaction, so two workers never queue it twice. What it
+  queues is an ordinary task, origin "schedule", in the panel like any
+  other. No new process, no Task Scheduler entry per schedule: one
+  `schtasks` line per schedule would be a second place to look for what
+  runs, outside the queue's file and its tests.
+- **A run missed while off or asleep** (found more than 10 minutes late):
+  caught up once, or skipped, per schedule (the owner: both ways). Several
+  missed run times are one run caught up, not a burst at wake-up.
+- **One run at a time.** A schedule whose previous run is still queued or
+  going skips the next, and says so in its last note.
+- **A changed timetable, or a schedule turned on, counts from then**: the
+  run times before it were not asked for, so nothing is caught up for them.
+- **The cron parser is our own** (fields, lists, ranges, steps, names,
+  @daily and the like, cron's either-day rule): about 80 lines, against a
+  new dependency (`croniter`) for the same.
+- A schedule is due only while a worker runs: with the workers registered
+  (`taskd.py install`) from system start; without, while the app's worker
+  is up. Waking the computer for a schedule is not done.
+
 ### The AI usage limit stops the AI work, and the queue waits for the reset (2026-10-21)
 
 The owner, 2026-10-20: when AI refuses because the limit is used up, the

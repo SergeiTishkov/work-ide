@@ -18,6 +18,8 @@
 --                                               or the process that registered itself
 --   workers                                    - each worker, its own row
 --   queue_state                                - the workers (the AI limit, task 0057)
+--   schedules                                  - tools/schedules.py: the app, the agent
+--                                                (rows), the workers (last_*)
 
 PRAGMA journal_mode = WAL;
 
@@ -80,4 +82,22 @@ CREATE TABLE IF NOT EXISTS workers (
 CREATE TABLE IF NOT EXISTS queue_state (
   key   TEXT PRIMARY KEY,
   value TEXT
+);
+
+-- Work on a timetable (task 0061, tools/schedules.py). The workers queue a
+-- schedule's tasks when it is due, with origin "schedule".
+CREATE TABLE IF NOT EXISTS schedules (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL DEFAULT '',
+  what        TEXT NOT NULL,               -- schedules.WHAT: collect, linkedin, rest, clean, cv_batch, links
+  identities  TEXT NOT NULL DEFAULT 'all', -- comma-separated prefixes, or 'all': every active one
+  args        TEXT NOT NULL DEFAULT '{}',  -- JSON: the clean-up's filters, the batch's "all"
+  cron        TEXT NOT NULL,               -- minute hour day month weekday, local time
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  missed      TEXT NOT NULL DEFAULT 'catch_up', -- a run missed while off or asleep: catch_up, skip
+  created_at  TEXT NOT NULL,
+  last_due_at TEXT,                        -- the last run time handled (queued, skipped)
+  last_run_at TEXT,                        -- when it last queued its tasks
+  last_tasks  TEXT,                        -- JSON: the ids it queued then
+  last_note   TEXT                         -- what the last run time did, in words
 );

@@ -242,6 +242,9 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
     if kind == "reputation":
         return Command([python, tool("reputation_lookup.py"), "--identity", _identity(task),
                         "--vacancy", _vacancy(task)])
+    if kind == "links":
+        return Command([python, tool("pipeline.py"), "--identity", _identity(task), "--links"],
+                       map_line=pipeline_line)
     raise ValueError(f"no runner for the kind {kind!r}")
 
 
@@ -533,6 +536,7 @@ class Worker:
         self.probe = probe_limit
         self.probing: Optional[threading.Thread] = None
         self.probed: Optional[tuple] = None   # what the last check of the limit found
+        self.schedules_at = 0.0               # when the schedules were last looked at (wall)
 
     def register(self) -> None:
         """Takes the role's row, or raises AnotherWorker; a task this role
@@ -589,6 +593,7 @@ class Worker:
                     handle.stop()
             self.documents_hold(conn)
             self.check_ai_limit(conn)
+            self.check_schedules(conn, wall)
             while True:
                 task = taskq.claim(conn, self.role, self.capabilities, pid=self.pid, base_holder=self.holder)
                 if task is None:
@@ -635,6 +640,19 @@ class Worker:
             self.log_to(task)(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] ended: {state}" + (f" ({error})" if error else ""))
         taskq.finish(conn, task_id, state, error, result)
         self.say(f"#{task_id}: {state}" + (f" ({error})" if error else ""))
+
+    def check_schedules(self, conn, wall: float) -> None:
+        """Queues the schedules that are due (tools/schedules.py, task 0061),
+        every CHECK_EVERY_SECONDS. A broken schedule is said, not fatal."""
+        import schedules
+        if wall - self.schedules_at < schedules.CHECK_EVERY_SECONDS:
+            return
+        self.schedules_at = wall
+        try:
+            for line in schedules.run_due(conn):
+                self.say(line)
+        except Exception as exc:  # noqa: BLE001 - the worker goes on with its tasks
+            self.say(f"schedules: {type(exc).__name__}: {exc}")
 
     def check_ai_limit(self, conn) -> None:
         """At the expected reset, one minimal call says whether `claude`

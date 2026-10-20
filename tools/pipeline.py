@@ -884,7 +884,29 @@ def run_rest() -> dict:
             "collected": "nothing: the rest run fetches nothing"}
 
 
+# The links mode checks again what was not checked in this many hours.
+LINKS_RECHECK_HOURS = 6
+
+
+def run_links() -> dict:
+    """The links of the shortlist checked again (a schedule's "re-check of
+    the shortlist's links", task 0061): what the shortlist lists, every link
+    not checked in LINKS_RECHECK_HOURS; a dead one leaves the shortlist with
+    the "rebuild" selection. Nothing fetched, nothing rescored."""
+    vacancies, companies, state = _load()
+    listed = {v["id"]: v for v in selections.listed_vacancies(vacancies)}
+    with progress.stage(f"check links of the shortlist ({progress.number(len(listed))} vacancies)") as st:
+        stats = link_check.check_links(listed, recheck_after_hours=LINKS_RECHECK_HOURS)
+        st.note = _stats_note(stats)
+    state["last_link_check"] = stats
+    selection_id = _save_and_select(vacancies, companies, state, "rebuild")
+    return {"new_vacancies": 0, "total_in_kb": len(vacancies), "selection_id": selection_id,
+            "links": _stats_note(stats), "collected": "nothing: the links run fetches nothing"}
+
+
 def _run_mode(args, staged: Optional[dict]) -> dict:
+    if args.links:
+        return run_links()
     if args.linkedin:
         return merge_linkedin(staged)
     if args.top:
@@ -913,6 +935,8 @@ def main() -> None:
     mode.add_argument("--linkedin", action="store_true",
                       help="LinkedIn alone, beside any other run: fetched without holding "
                            "the base, then merged when the base is free (see fetch_linkedin_apart)")
+    mode.add_argument("--links", action="store_true",
+                      help="only the links of the shortlist checked again (see run_links)")
     args = parser.parse_args()
     prefix = identity_mod.activate_or_exit(args.identity)
     if identity_mod.skip_if_inactive(prefix):
@@ -923,11 +947,12 @@ def main() -> None:
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     log_path = progress.open_log(common.DATA_DIR / "runs" / f"pipeline_{stamp}.log")
     started = time.monotonic()
-    mode_name = "top" if args.top else "rest" if args.rest else "linkedin" if args.linkedin else "full"
+    mode_name = ("top" if args.top else "rest" if args.rest else "linkedin" if args.linkedin
+                 else "links" if args.links else "full")
     progress.log(f"pipeline ({mode_name}) for '{common.ACTIVE_IDENTITY}' started; log: {log_path}")
     # Listed in the task queue like any other task (tools/taskq.py), whoever
     # started it; under the queue's worker it is that task already.
-    kind = mode_name if mode_name in ("rest", "linkedin") else "pipeline"
+    kind = mode_name if mode_name in ("rest", "linkedin", "links") else "pipeline"
     with taskq.Registered(kind, common.ACTIVE_IDENTITY, log_path=log_path,
                           args={"mode": mode_name} if kind == "pipeline" else None):
         try:

@@ -22,6 +22,7 @@ for a stop. Closing the app stops nothing.
     python tools/taskq.py wait 12                    # until it ends; exit 0 if done
     python tools/taskq.py stop 12
     python tools/taskq.py status                     # the workers
+    python tools/taskq.py schedule list              # work on a timetable (tools/schedules.py)
 
 SLOTS, NEEDS, ORDER
 -------------------
@@ -78,6 +79,7 @@ KINDS: Dict[str, tuple] = {
     "letter": ("documents", ("desktop", "ai")),  # tools/cover_letter.py
     "cv_batch": ("documents", ("desktop", "ai")),  # tools/cv_batch.py
     "reputation": ("reputation", ("ai",)),  # tools/reputation_lookup.py
+    "links": ("collect", ()),               # pipeline.py --links: the shortlist's links again
 }
 ACTIVE = ("queued", "running")
 ENDED = ("done", "failed", "stopped", "skipped", "interrupted")
@@ -698,6 +700,78 @@ def wait(task_ids: Sequence[int], timeout: Optional[float] = None, poll: float =
         time.sleep(poll)
 
 
+def _schedule_parser(parser: argparse.ArgumentParser) -> None:
+    import schedules
+    sub = parser.add_subparsers(dest="action", required=True)
+
+    def fields(p, new: bool) -> None:
+        if new:
+            p.add_argument("what", choices=sorted(schedules.WHAT))
+        else:
+            p.add_argument("id", type=int)
+            p.add_argument("--what", choices=sorted(schedules.WHAT))
+        p.add_argument("--identities", help="comma-separated prefixes, or 'all' (every active one)",
+                       default="all" if new else None)
+        p.add_argument("--cron", required=new, help='minute hour day month weekday, local time: "0 7 * * *"')
+        p.add_argument("--missed", choices=schedules.MISSED, default="catch_up" if new else None,
+                       help="a run missed while the computer was off or asleep")
+        p.add_argument("--args", help="JSON: a clean-up's filters, {\"all\": true} for a batch")
+        p.add_argument("--name")
+        p.add_argument("--json", action="store_true")
+
+    fields(sub.add_parser("add", help="a new schedule"), True)
+    fields(sub.add_parser("set", help="change a schedule"), False)
+    for name, text in (("on", "turn a schedule on"), ("off", "turn a schedule off"),
+                       ("remove", "delete a schedule (its tasks stay)")):
+        sub.add_parser(name, help=text).add_argument("id", type=int)
+    sub.add_parser("list", help="every schedule, its next run and its last result").add_argument(
+        "--json", action="store_true")
+    p = sub.add_parser("next", help="the next runs of a cron line")
+    p.add_argument("cron")
+    p.add_argument("-n", type=int, default=3)
+    sub.add_parser("due", help="queue what is due now (the workers do this every few seconds)")
+
+
+def _schedule_main(args) -> int:
+    import schedules
+    try:
+        with session() as conn:
+            if args.action in ("add", "set"):
+                fields = {k: getattr(args, k) for k in ("what", "identities", "cron", "missed", "name")
+                          if getattr(args, k, None) is not None}
+                if args.args is not None:
+                    fields["args"] = json.loads(args.args)
+                if args.action == "add":
+                    what = fields.pop("what")
+                    reply = schedules.add(conn, what, **fields)
+                else:
+                    reply = schedules.update(conn, args.id, **fields)
+                _print(reply, True)
+            elif args.action in ("on", "off"):
+                _print(schedules.update(conn, args.id, enabled=args.action == "on"), True)
+            elif args.action == "remove":
+                removed = schedules.remove(conn, args.id)
+                print(json.dumps({"removed": removed}))
+                return 0 if removed else 1
+            elif args.action == "list":
+                rows = schedules.listing(conn)
+                if args.json:
+                    _print(rows, True)
+                for s in [] if args.json else rows:
+                    print(f"#{s['id']:<4} {'on ' if s['enabled'] else 'off'} {s['cron']:<18} {s['what']:<9} "
+                          f"{','.join(s['identities']):<16} next {s['next_at'] or '-'}  "
+                          f"last {s['last_result'] or '-'}: {s['last_note'] or ''}")
+            elif args.action == "next":
+                print(json.dumps([iso(m.astimezone()) for m in schedules.next_runs(args.cron, args.n)]))
+            elif args.action == "due":
+                for line in schedules.run_due(conn):
+                    print(line)
+    except ValueError as exc:   # CronError, a bad field, bad JSON
+        print(f"taskq schedule: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="The task queue: every long piece of work (data/tasks.sqlite)")
     common_args = argparse.ArgumentParser(add_help=False)
@@ -739,7 +813,10 @@ def main(argv=None) -> int:
     p.add_argument("ids", type=int, nargs="*")
     command("status", help="the workers and what they run")
     command("current", help="the queue task this process runs in, if a worker started it")
+    _schedule_parser(command("schedule", help="work on a timetable (tools/schedules.py)"))
     args = parser.parse_args(argv)
+    if args.command == "schedule":
+        return _schedule_main(args)
 
     try:
         with session() as conn:

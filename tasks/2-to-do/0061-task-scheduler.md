@@ -40,9 +40,13 @@ with the next three runs shown before saving.
 Waking the laptop for a schedule (Task Scheduler wake timers) is not part
 of this task.
 
+Docs: ARCHITECTURE "Schedules: the queue's work on a timetable", README
+"The task service".
+
 ## Items
 - DONE - Plan (2026-10-21, with the owner)
-- TO DO - Schedules in the queue's file; cron parsing; due, skip-while-running, catch-up or skip; tests with a fake clock
-- TO DO - `tools/taskq.py schedule add/list/remove` for the agent
+- DONE - Schedules in the queue's file; cron parsing; due, skip-while-running, catch-up or skip; tests with a fake clock (`tools/schedules.py`, the `schedules` table, the workers look every 20 s; `tests/test_schedules.py`)
+- DONE - The re-check of the shortlist's links as a task: `pipeline.py --links`, the kind `links`
+- DONE - `tools/taskq.py schedule add/list/remove` for the agent (also `set`, `on`, `off`, `next`, `due`; the run-task skill)
 - TO DO - "Task scheduler…" popup: list, add, edit, on/off, next runs; UI tests
 - TO DO - End-to-end: a schedule adds its task, the task runs and ends, the schedule shows the result

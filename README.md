@@ -216,7 +216,14 @@ No password is stored: a task that needs what the machine does not have
 without you signed in waits, says so in the panel, and starts when you
 sign in. `python tools/taskd.py status` shows the registered tasks and the
 live workers; `python tools/taskq.py list` the queue. Until they are
-registered, the app starts a worker for your session itself. Its tests
+registered, the app starts a worker for your session itself.
+
+Work can run on a timetable: the app's Menu → "Task scheduler…", or
+`python tools/taskq.py schedule add collect --identities all --cron "0 7 * * *"`.
+A schedule is due while a worker runs; a run missed while the computer was
+off or asleep is caught up once or skipped, as the schedule says.
+
+The app's tests
 (`cd app && npm test`) spend no tokens: the agent is mocked at the boundary.
 
 ## How it works

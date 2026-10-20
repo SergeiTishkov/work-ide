@@ -502,3 +502,25 @@ def test_the_rest_run_fetches_nothing(isolated_data_dir, monkeypatch):
     monkeypatch.setattr(pipeline, "finalize", lambda *_a, **_k: 1)
     assert pipeline.run_rest()["new_vacancies"] == 0
 
+
+
+def test_the_links_run_checks_the_shortlist_only_and_records_a_rebuild(isolated_data_dir, monkeypatch):
+    import link_check
+    import selections
+    vacancies = {"a": {"id": "a"}, "b": {"id": "b"}}
+    monkeypatch.setattr(pipeline, "_load", lambda: (vacancies, {}, {"sources": {}}))
+    monkeypatch.setattr(selections, "listed_vacancies", lambda vs: [vs["a"]])
+    seen = {}
+
+    def check(listed, recheck_after_hours):
+        seen.update(ids=sorted(listed), hours=recheck_after_hours)
+        return {"checked": 1, "dead": 0}
+
+    monkeypatch.setattr(link_check, "check_links", check)
+    monkeypatch.setattr(pipeline, "_save_and_select",
+                        lambda v, c, s, kind: seen.update(kind=kind, state=s, saved=sorted(v)) or 7)
+    result = pipeline.run_links()
+    assert seen["ids"] == ["a"] and seen["hours"] == pipeline.LINKS_RECHECK_HOURS
+    assert seen["kind"] == "rebuild" and seen["saved"] == ["a", "b"]
+    assert seen["state"]["last_link_check"] == {"checked": 1, "dead": 0}
+    assert result["selection_id"] == 7 and result["new_vacancies"] == 0
