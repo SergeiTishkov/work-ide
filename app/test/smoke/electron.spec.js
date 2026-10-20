@@ -79,7 +79,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await window.getByTestId('task-1').click();
     await expect(window.getByTestId('task-log')).toContainText('fake run: /top sharp');
     await expect(window.getByTestId('task-log-title')).toContainText(en['task.state.done']);
-    await expect(window.getByTestId('run-status')).toHaveCount(0);
+    await expect(window.getByTestId('menu-busy')).toHaveCount(0);
     expect(fs.readdirSync(path.join(repo.root, 'data', 'identities', 'sharp', 'runs'))).toHaveLength(1);
 
     // The indicator reads tools/runstate.py's row: a live one (this test's own
@@ -89,11 +89,11 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     const { lastInsertRowid } = runs.prepare(
       "INSERT INTO pipeline_runs (identity_id, started_at, heartbeat_at, status, stage, pid, host) "
       + "VALUES ('sharp', ?, ?, 'running', 'check links', ?, ?)").run(now, now, process.pid, os.hostname());
-    await expect(window.getByTestId('collect-indicator')).toBeVisible({ timeout: 10000 });
-    await expect(window.getByTestId('run-status')).toContainText('check links');
+    await expect(window.getByTestId('menu-busy')).toBeVisible({ timeout: 10000 });
+    await expect(window.getByTestId('menu-button')).toHaveAttribute('title', /check links/);
     runs.prepare("UPDATE pipeline_runs SET status = 'finished' WHERE id = ?").run(lastInsertRowid);
     runs.close();
-    await expect(window.getByTestId('collect-indicator')).toHaveCount(0, { timeout: 10000 });
+    await expect(window.getByTestId('menu-busy')).toHaveCount(0, { timeout: 10000 });
 
     // Refresh through the real IPC: the main process's code has not changed
     // since start, so the page reloads, keeps the view and works. One click:
@@ -101,6 +101,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     // (the check box, then the spinner, then the list) makes Playwright retry.
     await check(window, 'filter', ['fresh', 'earlier', 'new']);
     await window.evaluate(() => { window.__beforeRefresh = true; });
+    await window.getByTestId('menu-button').click();
     await window.getByTestId('refresh').click();
     await expect.poll(() => window.evaluate(() => window.__beforeRefresh)).toBeUndefined();
     await expect(window.getByTestId('filter-option-earlier')).toHaveAttribute('data-state', 'on');

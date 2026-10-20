@@ -301,6 +301,8 @@ function installMockApi(fixture) {
     // fixture.cleanupReply: what tools/cleanup.py answers; the count by default
     async cleanup(identity, filters, dryRun) {
       record('cleanup', [identity, filters, dryRun]);
+      // window.__holdCleanup: the answer waits for window.__releaseCleanup()
+      if (window.__holdCleanup) await new Promise((resolve) => { window.__releaseCleanup = resolve; });
       const reply = data.cleanupReply || { matched: 3, kept_funnel: 1, kept_unreviewed: 2, kept_other_identity: 0 };
       return { ...reply, dry_run: dryRun, deleted: dryRun ? 0 : reply.matched };
     },

@@ -973,9 +973,10 @@
   }
 
   // --- the commands menu (the owner, 2026-10-20) ----------------------------
-  // Collect, Stop, Review feedback, Clean up and the identities live in one
-  // menu beside "Refresh". A collection going or queued shows beside it, so
-  // it is seen with the menu closed.
+  // Refresh, Collect, Stop, Review feedback, Clean up and the identities live
+  // in one menu. Collect shows its spinner and stage in the menu; the menu's
+  // own button spins while anything runs (busyWith), so it is seen with the
+  // menu closed.
 
   function collectState() {
     const pipeline = state.pipelines[state.active] || { running: false };
@@ -991,29 +992,25 @@
     return pipeline.stage ? t('run.collecting_stage', { stage: pipeline.stage }) : t('run.collecting');
   }
 
-  // A run of this identity going (from here or from anywhere else), or
-  // waiting its turn: behind another collection, or a run started elsewhere
-  // that holds the shared base (tools/runstate.py).
-  function runStatus() {
-    const { pipeline, task, running, queued } = collectState();
-    if (running) {
-      const since = String(pipeline.startedAt || '').slice(11, 16);
-      return el('span', {
-        class: 'run-status', testid: 'run-status', title: t('run.collecting_since', { time: since }),
-      }, el('span', { class: 'spinner', testid: 'collect-indicator' }), collectingText(pipeline));
+  // What runs right now, one line each: the app's tasks, a pipeline run of
+  // any identity started anywhere, a clean-up being counted or deleted.
+  function busyWith() {
+    const lines = [];
+    for (const task of state.tasks) {
+      if (task.state !== 'running') continue;
+      const kind = TASK_KIND_KEYS[task.kind] ? t(TASK_KIND_KEYS[task.kind]) : task.kind;
+      lines.push(task.identity ? `${kind} · ${task.identity}` : kind);
     }
-    if (queued) {
-      return el('span', {
-        class: 'run-status queued', testid: 'run-status',
-        title: task.waitingFor ? t('run.waiting_for', { identity: task.waitingFor }) : t('run.queued_hint'),
-      }, t('run.queued'));
+    for (const [prefix, pipeline] of Object.entries(state.pipelines)) {
+      if (pipeline && pipeline.running) lines.push(`${collectingText(pipeline)} · ${prefix}`);
     }
-    return null;
+    if (state.cleanup && state.cleanup.busy) lines.push(t('cleanup.button'));
+    return lines;
   }
 
-  function menuItem({ testid, text, title, disabled, onclick }) {
+  function menuItem({ testid, text, title, disabled, onclick, busy = false }) {
     return el('button', {
-      class: 'menu-item', role: 'menuitem', type: 'button', testid, title, disabled,
+      class: busy ? 'menu-item busy' : 'menu-item', role: 'menuitem', type: 'button', testid, title, disabled,
       onclick: (event) => {
         event.stopPropagation();
         state.openMenu = false;
@@ -1031,7 +1028,14 @@
         title: task.waitingFor ? t('run.waiting_for', { identity: task.waitingFor }) : t('run.queued_hint'),
       });
     }
-    if (running) return menuItem({ testid: 'run-collect', disabled: true, text: collectingText(pipeline) });
+    if (running) {
+      return menuItem({
+        testid: 'run-collect', disabled: true, busy: true,
+        title: t('run.collecting_since', { time: String(pipeline.startedAt || '').slice(11, 16) }),
+        text: [el('span', { class: 'spinner small', testid: 'collect-indicator' }),
+          el('span', { class: 'menu-text' }, collectingText(pipeline))],
+      });
+    }
     if (identity && identity.active === false) {
       return menuItem({ testid: 'run-collect', disabled: true, text: t('run.collect'), title: t('run.inactive') });
     }
@@ -1056,18 +1060,24 @@
     // "Stop" stops what the app started; a run started elsewhere is shown, not stopped
     const { task } = collectState();
     const running = Boolean(task && task.state === 'running');
+    const busy = busyWith();
     const button = el('button', {
       class: 'menu-button', testid: 'menu-button', type: 'button',
       'aria-haspopup': 'menu', 'aria-expanded': open ? 'true' : 'false',
+      title: busy.length ? busy.join('\n') : null,
       onclick: (event) => {
         event.stopPropagation();
         state.openMenu = !open;
         render();
       },
-    }, el('span', { class: 'menu-icon', 'aria-hidden': 'true' }, '\u2630'), t('menu.button'));
+    }, busy.length
+      ? el('span', { class: 'spinner small', testid: 'menu-busy' })
+      : el('span', { class: 'menu-icon', 'aria-hidden': 'true' }, '\u2630'),
+    t('menu.button'));
     const menu = open && el('div', {
       class: 'commands-menu', role: 'menu', testid: 'menu', onclick: (event) => event.stopPropagation(),
     },
+    menuItem({ testid: 'refresh', text: t('app.refresh'), title: t('app.refresh_hint'), onclick: refresh }),
     collectItem(identity),
     running && menuItem({ testid: 'run-stop', text: t('run.stop'), onclick: stopCollect }),
     feedbackItem(pending),
@@ -1158,10 +1168,7 @@
             run: selection.run,
             date: String(selection.created_at || '').slice(0, 16).replace('T', ' '),
           }) + (selection.kind === 'rebuild' ? ` · ${t('selection.rebuild')}` : ''))),
-      el('div', { class: 'actions' },
-        runStatus(),
-        el('button', { testid: 'refresh', title: t('app.refresh_hint'), onclick: refresh }, t('app.refresh')),
-        renderMenu(identity, pending)));
+      el('div', { class: 'actions' }, renderMenu(identity, pending)));
   }
 
   // --- "Clean up": vacancies deleted for good (tools/cleanup.py) ----------------

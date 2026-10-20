@@ -59,8 +59,9 @@ test('"Collect vacancies" queues a collection; the bottom panel lists it with it
   await (await command(page, 'run-collect')).click();
   await expect(page.getByTestId('menu')).toHaveCount(0);   // an item closes the menu
   expect(await calls(page, 'enqueueTask')).toEqual([[{ kind: 'collect', identity: 'sharp' }]]);
-  await expect(page.getByTestId('run-status').getByTestId('collect-indicator')).toBeVisible();
+  await expect(page.getByTestId('menu-button').getByTestId('menu-busy')).toBeVisible();   // seen with the menu closed
   const button = await command(page, 'run-collect');
+  await expect(button.getByTestId('collect-indicator')).toBeVisible();
   await expect(button).toBeDisabled();
   await expect(page.getByTestId('run-stop')).toBeVisible();
   await expect(page.getByTestId('task-panel')).toBeVisible();
@@ -74,7 +75,8 @@ test('"Collect vacancies" queues a collection; the bottom panel lists it with it
   await page.evaluate(() => window.__finishCollect({ ok: true, code: 0 }));
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'done');
   await expect(button).toBeEnabled();   // the menu stays open across the redraws
-  await expect(page.getByTestId('run-status')).toHaveCount(0);
+  await expect(page.getByTestId('collect-indicator')).toHaveCount(0);
+  await expect(page.getByTestId('menu-busy')).toHaveCount(0);
   await expect(page.getByTestId('task-log')).toContainText('fetching sources');   // the log stays
   await expect.poll(async () => (await calls(page, 'listIdentities')).length).toBe(2);   // reloaded after the run
 });
@@ -101,7 +103,6 @@ test('collections of several identities queue: the first runs, the others wait t
   const button = await command(page, 'run-collect');
   await expect(button).toBeEnabled();
   await button.click();
-  await expect(page.getByTestId('run-status')).toHaveText(en['run.queued']);
   await command(page, 'run-collect');
   await expect(button).toHaveText(en['run.queued']);
   await expect(button).toBeDisabled();
@@ -535,15 +536,17 @@ test('"Open the vacancy link" hands the URL to the system browser, marked or not
   expect((await calls(page, 'openExternal')).at(-1)).toEqual(['https://example.test/x1']);
 });
 
-test('a pipeline run going anywhere shows beside the menu, in it, and on the tab, then clears', async ({ page }) => {
+test('a pipeline run going anywhere spins the menu button, shows in the menu and on the tab, then clears', async ({ page }) => {
   await open(page);
   await page.evaluate(() => window.__setPipeline('sharp',
     { running: true, stage: 'check links', startedAt: '2026-09-30T00:23:41+00:00' }));
-  const status = page.getByTestId('run-status');
-  await expect(status).toContainText(en['run.collecting_stage'].replace('{stage}', 'check links'));
-  await expect(status.getByTestId('collect-indicator')).toBeVisible();
+  const menuButton = page.getByTestId('menu-button');
+  await expect(menuButton.getByTestId('menu-busy')).toBeVisible();
+  await expect(menuButton).toHaveAttribute('title',
+    `${en['run.collecting_stage'].replace('{stage}', 'check links')} · sharp`);
   const button = await command(page, 'run-collect');
   await expect(button).toContainText(en['run.collecting_stage'].replace('{stage}', 'check links'));
+  await expect(button.getByTestId('collect-indicator')).toBeVisible();
   await expect(button).toBeDisabled();
   await expect(page.getByTestId('run-stop')).toHaveCount(0);   // started elsewhere: shown, not stopped here
   await expect(page.getByTestId('identity-tab-sharp').getByTestId('tab-collecting')).toBeVisible();
@@ -553,7 +556,7 @@ test('a pipeline run going anywhere shows beside the menu, in it, and on the tab
   await page.evaluate(() => window.__setPipeline('sharp', { running: false }));
   await expect(button).toHaveText(en['run.collect']);
   await expect(button).toBeEnabled();
-  await expect(status).toHaveCount(0);
+  await expect(page.getByTestId('menu-busy')).toHaveCount(0);
   await expect(page.getByTestId('tab-collecting')).toHaveCount(0);
   await expect.poll(async () => (await calls(page, 'loadSegments')).length).toBeGreaterThan(loadsBefore);
 });
@@ -563,7 +566,7 @@ test('a reason being typed survives the indicator re-rendering the list', async 
   await byId(page, 'a1').getByTestId('btn-bugged').click();
   await byId(page, 'a1').getByTestId('reason-input').fill('half typed');
   await page.evaluate(() => window.__setPipeline('sharp', { running: true, stage: 'rescore' }));
-  await expect(page.getByTestId('run-status')).toContainText('rescore');
+  await expect(page.getByTestId('menu-busy')).toBeVisible();
   await expect(byId(page, 'a1').getByTestId('reason-input')).toHaveValue('half typed');
 });
 
@@ -572,10 +575,10 @@ test('"Refresh" reloads the interface and keeps the tab and the view', async ({ 
   await page.getByTestId('identity-tab-sharp').click();
   await choose(page, 'segment-filter', 'uk');
   await choose(page, 'filter', 'all');
-  await expect(page.getByTestId('refresh')).toHaveText(en['app.refresh']);
+  await expect(await command(page, 'refresh')).toHaveText(en['app.refresh']);
   await page.evaluate(() => { window.__beforeRefresh = true; });
 
-  await page.getByTestId('refresh').click();
+  await (await command(page, 'refresh')).click();
   await expect(page.getByTestId('segment-filter-value')).toHaveText('United Kingdom');
   expect(await page.evaluate(() => window.__beforeRefresh)).toBeUndefined();   // a new page
   await expect(page.getByTestId('filter-value')).toHaveText(SHOW_ALL);
@@ -700,7 +703,7 @@ test('"Fit" narrows the list to one class, and the other filters count within it
   await expect(page.getByTestId('list').locator('article')).toHaveCount(1);   // x1
   await expect(byId(page, 'x1')).toBeVisible();
 
-  await page.getByTestId('refresh').click();
+  await (await command(page, 'refresh')).click();
   await expect(page.getByTestId('fit-filter-value')).toHaveText(en['class.hot_lead']);
 });
 
@@ -791,7 +794,7 @@ test('"Refresh" leaves the reload to the app when the app restarts itself', asyn
   await open(page, fixture);
   await choose(page, 'filter', 'all');
   await page.evaluate(() => { window.__beforeRefresh = true; });
-  await page.getByTestId('refresh').click();
+  await (await command(page, 'refresh')).click();
   await expect.poll(() => calls(page, 'refresh')).toHaveLength(1);
   expect(await page.evaluate(() => window.__beforeRefresh)).toBe(true);   // not reloaded here
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('work-ide-view')));
@@ -803,7 +806,7 @@ test('"Refresh" still reloads against an older main process without the channel'
   fixture.withoutRefresh = true;
   await open(page, fixture);
   await page.evaluate(() => { window.__beforeRefresh = true; });
-  await page.getByTestId('refresh').click();
+  await (await command(page, 'refresh')).click();
   await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__beforeRefresh)).toBeUndefined();
 });
@@ -967,7 +970,7 @@ test('the chosen boards stay across markets, and a refresh brings them back', as
   await choose(page, 'segment-filter', 'uk');
   await expect(page.getByTestId('source-filter-value')).toHaveText('devitjobs.uk, devitjobs.com');
   await choose(page, 'segment-filter', '');
-  await page.getByTestId('refresh').click();
+  await (await command(page, 'refresh')).click();
   await expect(page.getByTestId('source-filter-value')).toHaveText('devitjobs.uk, devitjobs.com');
   await expect(byId(page, 'b1')).toBeVisible();
   await expect(byId(page, 'a1')).toHaveCount(0);
@@ -1086,7 +1089,7 @@ test('the hidden companies survive a refresh and a change of market', async ({ p
   await page.keyboard.press('Escape');
   await choose(page, 'segment-filter', 'uk');
   await choose(page, 'segment-filter', '');
-  await page.getByTestId('refresh').click();
+  await (await command(page, 'refresh')).click();
   await expect(page.getByTestId('company-filter-value'))
     .toHaveText(en['filter.company_except'].replace('{list}', 'Proxify'));
   await expect(byId(page, 'a2r')).toBeVisible();
@@ -1566,14 +1569,14 @@ test('"Score" in Details: a row per part, a cell per point, earned ones bright, 
   expect(lastMinus).not.toContain('off');
 });
 
-test('the menu holds Collect, Review feedback, Clean up, Identities; "Clean up" filters, counts, deletes', async ({ page }) => {
+test('the menu holds Refresh, Collect, Review feedback, Clean up, Identities; "Clean up" filters, counts, deletes', async ({ page }) => {
   await open(page);
   const order = await page.locator('.actions > *').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.className));
-  expect(order).toEqual(['refresh', 'commands']);
+  expect(order).toEqual(['commands']);
   await command(page, 'cleanup');
   const items = await page.getByTestId('menu').locator('[role="menuitem"]')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.querySelector('[data-testid]').dataset.testid));
-  expect(items).toEqual(['run-collect', 'run-feedback', 'cleanup', 'open-identities']);
+  expect(items).toEqual(['refresh', 'run-collect', 'run-feedback', 'cleanup', 'open-identities']);
   await page.getByTestId('cleanup').click();
   const dialog = page.getByTestId('cleanup-dialog');
   await expect(dialog).toBeVisible();
@@ -1596,3 +1599,30 @@ test('the menu holds Collect, Review feedback, Clean up, Identities; "Clean up" 
   await page.getByTestId('cleanup-close').click();
   await expect(page.getByTestId('cleanup-overlay')).toHaveCount(0);
 });
+
+test('a long stage wraps inside the wider menu, the spinner beside it', async ({ page }) => {
+  await open(page);
+  const stage = 'rescore the top, with company facts (12 345 vacancies) and a long note after it';
+  await page.evaluate((s) => window.__setPipeline('sharp', { running: true, stage: s }), stage);
+  const button = await command(page, 'run-collect');
+  await expect(button).toContainText(stage);
+  const menu = await page.getByTestId('menu').boundingBox();
+  expect(menu.width).toBeGreaterThanOrEqual(300);
+  expect(menu.width).toBeLessThanOrEqual(400);
+  const text = await button.locator('.menu-text').boundingBox();
+  expect(text.x + text.width).toBeLessThanOrEqual(menu.x + menu.width);   // wrapped, not cut
+  expect(text.height).toBeGreaterThan(25);   // two lines or more
+});
+
+test('the menu button spins while a clean-up counts', async ({ page }) => {
+  await open(page);
+  await (await command(page, 'cleanup')).click();
+  await page.evaluate(() => { window.__holdCleanup = true; });
+  await page.getByTestId('cleanup-statuses-expired').check();
+  await page.getByTestId('cleanup-count').click();
+  await expect(page.getByTestId('menu-busy')).toBeVisible();
+  await expect(page.getByTestId('menu-button')).toHaveAttribute('title', en['cleanup.button']);
+  await page.evaluate(() => window.__releaseCleanup());
+  await expect(page.getByTestId('menu-busy')).toHaveCount(0);
+});
+

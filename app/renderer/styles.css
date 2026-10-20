@@ -146,24 +146,22 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .menu-button { display: inline-flex; align-items: center; gap: 6px; }
 .menu-button[aria-expanded="true"] { border-color: var(--accent); }
 .commands-menu {
-  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 260px; max-width: 340px;
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 300px; max-width: 400px;
   display: flex; flex-direction: column; padding: 4px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
 }
 .menu-item {
   display: block; width: 100%; text-align: left; border: none; border-radius: 4px;
-  background: none; padding: 7px 10px;
+  background: none; padding: 7px 10px; white-space: normal; line-height: 1.35;
 }
+/* a collection going: the spinner beside its stage, which wraps to two or
+   three lines when long */
+.menu-item.busy { display: flex; align-items: flex-start; gap: 8px; cursor: progress; }
+.menu-item.busy .spinner { flex: none; margin-top: 3px; }
 .menu-item:hover:not(:disabled):not(.inert) { background: var(--accent-soft); }
 .menu-item.inert { opacity: .6; cursor: default; }
 .menu-tip { display: block; font-size: 11.5px; line-height: 1.35; color: var(--muted); margin-top: 2px; }
-/* a collection going (spinner and stage) or queued, beside the menu */
-.run-status {
-  display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 6px;
-  background: var(--accent); color: #fff; cursor: progress; white-space: nowrap;
-}
-.run-status.queued { background: var(--accent-soft); color: var(--text); cursor: default; }
 /* "Identities": a switch per identity */
 .identity-list { list-style: none; margin: 10px 0; padding: 0; }
 .identity-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }

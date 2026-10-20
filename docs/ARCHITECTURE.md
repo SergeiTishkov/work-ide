@@ -1015,10 +1015,15 @@ base (`identity.inactive_identities`): a test that lists the identities must
 not migrate the real base. An inactive identity keeps its tab, dimmed, and
 its vacancies.
 
-The same day the toolbar's commands moved into one menu beside "Refresh":
-Collect (and Stop, for a collection the app started), Review feedback with the
-way to start it, Clean up, Identities. A collection going or queued shows
-beside the menu with its stage, so it is seen with the menu closed.
+The same day the toolbar's commands moved into one menu: Refresh, Collect
+(and Stop, for a collection the app started), Review feedback with the way to
+start it, Clean up, Identities. A collection going shows in the menu as
+Collect's spinner and stage, wrapping to two or three lines when long. The
+menu's own button spins while anything runs — a task of the app, a pipeline
+run of any identity started anywhere, a clean-up — and its tooltip names
+what (`busyWith`), so it is seen with the menu closed. Until the owner's
+second request that day, Refresh and the collection's status stood beside
+the menu.
 
 ### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)
 
