@@ -1046,6 +1046,43 @@ title rule "forward deployed is not a developer").
   reasons: the owner's earlier "Go role", "Node only" refusals would
   otherwise have written "Go, Node: reject" next to "Go, Node: a stretch".
 
+### The AI usage limit stops the AI work, and the queue waits for the reset (2026-10-21)
+
+The owner, 2026-10-20: when AI refuses because the limit is used up, the
+scripts must stop, not keep calling. Before this a refused call was an
+ordinary error: `ai_screen` counted it and went on to the next posting, so
+at the limit it sent one refused call per posting left, and the run ended
+looking finished with an error count.
+
+- **One recogniser** (`tools/ai_limit.py`). Every `call_model` (`ai_brief`,
+  `ai_screen`, `reputation_lookup`, `cv_tailor` and through it
+  `cover_letter`) passes its finished process to `ai_limit.check`, which
+  raises `UsageLimit` with the reset time when the answer gives one. It
+  reads only a refused call (`is_error` or a non-zero exit), so a posting
+  or a CV that mentions a limit is never taken for one, and only the
+  wordings of the AI limit: LinkedIn's "rate limit reached" is not it. The
+  exact shape of the answer at the limit was not captured on this machine
+  (no refused call in any log, 2026-10-21); the recogniser takes the
+  wordings Claude Code is known to print, and is to be checked against the
+  first real one.
+- **The stage stops and keeps what it did.** `ai_screen` sends no call after
+  the first refusal (the calls already in flight finish), saves the
+  answers given, and raises with its stats. The pipeline goes on without
+  AI: links, channels and the selection are made, and it exits with
+  `ai_limit.EXIT_CODE` (75) and the line `AI usage limit reached; resets at
+  <time>`. Run again after the reset, the screen asks only what was not
+  answered. `cv_tailor`, `cover_letter` and `reputation_lookup` exit 75; a
+  CV/CL batch stops before its next document.
+- **The queue waits.** A tool that meets the limit records it in the queue
+  (`taskq.block_ai`), and so does a worker whose task exited 75 or printed
+  the line; the task goes back to the queue (not failed), and every task
+  that needs AI waits, "the AI usage limit; tried again at 17:05". At that
+  time one worker makes one minimal `claude -p` call (haiku, in a thread,
+  so the beats go on): answered, the tasks go on; refused, they wait for
+  the new reset. A refusal with no reset time is checked again after 8
+  hours (the owner, 2026-10-21). Until the check has answered, a task is
+  not started only to meet the limit an hour into a run.
+
 ### Reputation on request, not in every collection (2026-10-17)
 
 The owner: reputation lookups did not pay for their time. Until then /run

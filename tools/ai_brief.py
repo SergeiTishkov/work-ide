@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import ai_limit
 import common
 import db
 
@@ -127,6 +128,7 @@ def call_model(message: str, *, model: str = MODEL, claude: str = "claude", run=
             raise BriefError("the `claude` command was not found (Claude Code CLI)")
         except subprocess.TimeoutExpired:
             raise BriefError(f"claude did not answer in {TIMEOUT_SECONDS} s")
+    ai_limit.check(completed)
     try:
         answer = json.loads(completed.stdout or "")
     except json.JSONDecodeError:

@@ -125,8 +125,20 @@ def test_ai_limit_holds_ai_work_and_lets_the_rest_go(conn):
     linkedin = taskq.add(conn, "linkedin", "ftf", origin="app")["task"]
     assert claim(conn)["id"] == linkedin["id"]
     assert taskq.get(conn, top["id"])["waiting_for"].startswith("the AI usage limit")
+    # the reset time passed: still held until a worker checked that AI answers
     taskq.set_state_value(conn, "ai_blocked_until", taskq.iso(taskq.now() - timedelta(minutes=1)))
+    assert claim(conn) is None
+    assert taskq.get(conn, top["id"])["waiting_for"] == "the AI usage limit; checking whether it has reset"
+    taskq.unblock_ai(conn)
     assert claim(conn)["id"] == top["id"]
+
+
+def test_a_limit_with_no_reset_time_is_checked_again_in_eight_hours(conn):
+    at = taskq.now()
+    assert taskq.block_ai(conn, None, at=at) == at + timedelta(hours=8)
+    assert taskq.block_ai(conn, at - timedelta(hours=1), at=at) == at + timedelta(hours=8)
+    assert taskq.block_ai(conn, at + timedelta(hours=3), at=at) == at + timedelta(hours=3)
+    assert taskq.ai_block(conn) == (at + timedelta(hours=3)).replace(microsecond=0)
 
 
 def test_a_collection_is_a_group_in_order(conn):

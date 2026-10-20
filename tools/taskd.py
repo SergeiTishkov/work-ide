@@ -52,11 +52,12 @@ import sys
 import tempfile
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ai_limit  # noqa: E402
 import common  # noqa: E402
 import taskq  # noqa: E402
 
@@ -261,6 +262,8 @@ class Process:
                  popen=subprocess.Popen, kill=kill_tree, root: Optional[Path] = None) -> None:
         self.task, self.cmd, self.on_line, self.kill = task, cmd, on_line, kill
         self.lines: List[str] = []
+        # the usage limit, as a line of the output said it (task 0057)
+        self.limit: Optional[ai_limit.UsageLimit] = None
         self.stopping_since: Optional[float] = None
         self.forced = False
         self._lock = threading.Lock()
@@ -277,6 +280,11 @@ class Process:
         for thread in self._threads:
             thread.start()
 
+    def _seen(self, line: str) -> None:
+        found = ai_limit.from_line(line)
+        if found is not None and self.limit is None:
+            self.limit = found
+
     def _emit(self, text: Optional[str]) -> None:
         if text:
             with self._lock:
@@ -287,6 +295,7 @@ class Process:
             line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
             if not line.strip():
                 continue
+            self._seen(line)
             if is_stdout:
                 self.lines.append(line)
                 del self.lines[:-200]
@@ -325,6 +334,7 @@ class Process:
                 rest[path] = parts.pop()
                 for part in parts:
                     if part.strip():
+                        self._seen(part)
                         self._emit(f"  | {part.rstrip()}")
             if not alive:
                 return
@@ -442,9 +452,44 @@ def probe_ai(claude: Optional[str] = None, run=subprocess.run, timeout: int = 18
         answer = None
     if isinstance(answer, dict) and not answer.get("is_error"):
         return True, "claude answers"
-    if re.search(r"usage limit|limit reached|resets? (at|in)", text, re.I):
+    if ai_limit.recognise(text):
         return True, "claude answers (usage limit now)"
     return False, f"claude did not answer: {text.strip()[:300]}"
+
+
+# One worker checks the limit at a time; a check that died frees this soon.
+PROBE_CLAIM = timedelta(minutes=5)
+# A check that got no answer for another reason (network, a timeout).
+PROBE_RETRY = timedelta(minutes=30)
+
+
+def probe_limit(claude: Optional[str] = None, run=subprocess.run, timeout: int = 120) -> tuple:
+    """(limited, resets_at, note): one minimal `claude -p` call. limited
+    False with resets_at set: no answer for another reason, look again at
+    resets_at."""
+    claude = claude or claude_executable()
+    if not claude:
+        return False, taskq.now() + PROBE_RETRY, "the `claude` command was not found"
+    with tempfile.TemporaryDirectory() as workdir:
+        try:
+            done = run([claude, "-p", "Reply with the single word OK.", "--output-format", "json",
+                        "--tools", "", "--no-session-persistence", "--model", "haiku"],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=workdir,
+                       timeout=timeout, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return False, taskq.now() + PROBE_RETRY, f"{type(exc).__name__}: {exc}"
+    try:
+        ai_limit.check(done)
+    except ai_limit.UsageLimit as limit:
+        return True, limit.resets_at, limit.text
+    try:
+        answer = json.loads(done.stdout or "")
+    except ValueError:
+        answer = None
+    if isinstance(answer, dict) and not answer.get("is_error") and (done.returncode or 0) == 0:
+        return False, None, "claude answers"
+    said = ((done.stdout or "") + (done.stderr or "")).strip()[:200]
+    return False, taskq.now() + PROBE_RETRY, f"claude did not answer: {said}"
 
 
 def base_holder() -> Optional[str]:
@@ -485,6 +530,9 @@ class Worker:
         self.last_tick: Optional[float] = None
         self.no_sweep_until = 0.0
         self.awake_now = False
+        self.probe = probe_limit
+        self.probing: Optional[threading.Thread] = None
+        self.probed: Optional[tuple] = None   # what the last check of the limit found
 
     def register(self) -> None:
         """Takes the role's row, or raises AnotherWorker; a task this role
@@ -540,6 +588,7 @@ class Worker:
                 elif taskq.stop_requested(conn, task_id):
                     handle.stop()
             self.documents_hold(conn)
+            self.check_ai_limit(conn)
             while True:
                 task = taskq.claim(conn, self.role, self.capabilities, pid=self.pid, base_holder=self.holder)
                 if task is None:
@@ -569,10 +618,64 @@ class Worker:
         del self.running[task_id]
         state, error, result = handle.outcome(code)
         task = taskq.get(conn, task_id)
+        limit = getattr(handle, "limit", None)
+        if state != "stopped" and (limit is not None or code == ai_limit.EXIT_CODE):
+            # Not the task's failure: it goes back to the queue and runs again
+            # after the reset, from where it stopped (the answers it got are
+            # kept); every AI task waits until then (task 0057).
+            until = taskq.block_ai(conn, limit.resets_at if limit else None)
+            why = f"the AI usage limit; tried again at {until.astimezone():%H:%M}"
+            if task is not None:
+                self.log_to(task)(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] stopped at the AI usage limit; "
+                                  f"queued again, AI work waits until {until.astimezone():%Y-%m-%d %H:%M}")
+            taskq.requeue(conn, task_id, why)
+            self.say(f"#{task_id}: the AI usage limit; queued again until {until.isoformat(timespec='minutes')}")
+            return
         if task is not None:
             self.log_to(task)(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] ended: {state}" + (f" ({error})" if error else ""))
         taskq.finish(conn, task_id, state, error, result)
         self.say(f"#{task_id}: {state}" + (f" ({error})" if error else ""))
+
+    def check_ai_limit(self, conn) -> None:
+        """At the expected reset, one minimal call says whether `claude`
+        answers again; until it does, the AI tasks stay queued. The call runs
+        in a thread: it takes seconds, and the beats go on meanwhile. One
+        worker checks at a time (`ai_probe_at`)."""
+        if self.probed is not None:
+            limited, resets, note = self.probed
+            self.probed = None
+            if limited:
+                until = taskq.block_ai(conn, resets)
+                self.say(f"the AI usage limit holds ({note}); checked again at {until.isoformat(timespec='minutes')}")
+            elif resets is not None:   # no answer for another reason: look again later
+                taskq.block_ai(conn, resets)
+                self.say(f"the AI limit check got no answer ({note}); looked at again later")
+            else:
+                taskq.unblock_ai(conn)
+                self.say("the AI usage limit has reset: the AI tasks go on")
+            taskq.set_state_value(conn, "ai_probe_at", None)
+            return
+        if self.probing is not None and self.probing.is_alive():
+            return
+        if "ai" not in self.capabilities:
+            return
+        until = taskq.ai_block(conn)
+        if until is None or until > taskq.now():
+            return
+        claimed = taskq.state_value(conn, "ai_probe_at")
+        try:
+            fresh = bool(claimed) and taskq.now() - datetime.fromisoformat(claimed) < PROBE_CLAIM
+        except ValueError:
+            fresh = False
+        if fresh:
+            return
+        taskq.set_state_value(conn, "ai_probe_at", taskq.iso())
+
+        def check() -> None:
+            self.probed = self.probe()
+
+        self.probing = threading.Thread(target=check, daemon=True)
+        self.probing.start()
 
     def documents_hold(self, conn) -> None:
         """A CV the person asked for does not wait hours behind a batch: while

@@ -2428,6 +2428,7 @@
     }
     const limit = /^the AI usage limit; tried again at (.+)$/.exec(reason);
     if (limit) return t('task.wait.ai_limit', { time: limit[1] });
+    if (reason === 'the AI usage limit; checking whether it has reset') return t('task.wait.ai_checking');
     const base = /^the base: (.+)$/.exec(reason);
     if (base) return t('task.wait.base', { holder: base[1] });
     if (reason.startsWith("the owner's sign-in: Word")) return t('task.wait.signin_desktop');

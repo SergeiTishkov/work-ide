@@ -1553,6 +1553,16 @@ test("a document asked for while the batch runs says it waits for the batch's cu
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'running');
 });
 
+test('a task held by the AI usage limit says until when, then that the reset is being checked', async ({ page }) => {
+  await open(page, standardFixture());
+  await page.evaluate(() => window.__addTask({ kind: 'rest', identity: 'sharp', held: true,
+    waitingFor: 'the AI usage limit; tried again at 17:05' }));
+  await page.evaluate(() => window.__addTask({ kind: 'reputation', identity: 'sharp', vacancyId: 'b1', held: true,
+    waitingFor: 'the AI usage limit; checking whether it has reset' }));
+  await expect(page.getByTestId('task-1')).toHaveAttribute('title', en['task.wait.ai_limit'].replace('{time}', '17:05'));
+  await expect(page.getByTestId('task-2')).toHaveAttribute('title', en['task.wait.ai_checking']);
+});
+
 test('"Age" stands after "Status": today, a week, a month, older, each with its count', async ({ page }) => {
   const fixture = standardFixture();
   fixture.rows.sharp.full.find((r) => r.id === 'a2r').age = 'week';

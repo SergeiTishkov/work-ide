@@ -68,6 +68,7 @@ from pathlib import Path
 from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ai_limit  # noqa: E402
 import common  # noqa: E402
 import cv_convert  # noqa: E402
 import cv_docx  # noqa: E402
@@ -345,6 +346,7 @@ def call_model(message: str, *, model: str, workdir: Path, claude: str = "claude
     except subprocess.TimeoutExpired:
         raise TailorError(f"claude did not answer in {CLAUDE_TIMEOUT_SECONDS} s")
     (workdir / "model_output.json").write_text(completed.stdout or "", encoding="utf-8")
+    ai_limit.check(completed)
     if completed.returncode != 0 and not completed.stdout:
         raise TailorError(f"claude exited with {completed.returncode}: {(completed.stderr or '').strip()[:500]}")
     try:
@@ -800,6 +802,14 @@ def main(argv=None) -> int:
             content=content,
             instructions=args.instructions,
         )
+    except ai_limit.UsageLimit as exc:
+        # its own exit code: the task queue holds AI work until the reset (task 0057)
+        ai_limit.record(exc)
+        if args.json:
+            print(json.dumps(exc.as_json(), ensure_ascii=False))
+        else:
+            common.eprint(f"cv_tailor: {exc}")
+        return ai_limit.EXIT_CODE
     except (TailorError, documents.DocumentsError, cv_convert.ConversionError, OSError, ValueError) as exc:
         if args.json:
             print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))

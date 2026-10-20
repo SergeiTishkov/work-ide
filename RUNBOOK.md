@@ -72,6 +72,13 @@ merges; `--rest` does the whole base afterwards (queued after both, in the
 same collection). Without a flag the command is the full cycle, LinkedIn
 included.
 
+At the AI usage limit the run stops its AI work at the first refusal, makes
+the rest without it, and exits with code 75 and the line `AI usage limit
+reached; resets at <time>` (docs/ARCHITECTURE.md, "The AI usage limit").
+In the queue the task waits for the reset and runs again by itself; say in
+the summary what the AI check did not read. Do not start it again by hand
+before the reset: every call is refused until then.
+
 An identity turned off (the app's Menu → Identities, or `python
 tools/identity.py set-active --identity <p> off`) is not collected: every mode
 prints `SKIPPED: identity '<p>' is inactive` and stops with success. Say so in

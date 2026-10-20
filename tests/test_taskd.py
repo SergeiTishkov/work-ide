@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import timedelta
+from datetime import timedelta  # noqa: F401
 from pathlib import Path
 
 import pytest
@@ -371,6 +371,127 @@ def test_a_worker_started_for_the_app_returns_at_once_and_holds_no_pipe_of_its_c
             time.sleep(0.2)
     finally:
         taskd.kill_tree(pid)
+
+
+# --- the AI usage limit (task 0057) ---------------------------------------------------
+
+class LimitHandle(FakeHandle):
+    """A task whose output said the usage limit."""
+
+    def __init__(self, task, on_line, resets_at=None):
+        super().__init__(task, on_line)
+        self.limit = taskd.ai_limit.UsageLimit("Claude AI usage limit reached", resets_at)
+
+
+def test_a_task_that_meets_the_limit_goes_back_to_the_queue_and_holds_the_ai_work(made, isolated_data_dir):
+    resets = taskq.now() + timedelta(hours=3)
+    handles = {}
+
+    def start(task, on_line):
+        handles[task["id"]] = LimitHandle(task, on_line, resets) if task["kind"] == "collect" else FakeHandle(task, on_line)
+        return handles[task["id"]]
+
+    worker = made[0]("background", ("ai",))
+    worker.start = start
+    with taskq.session() as conn:
+        top = taskq.add(conn, "collect", "ftf", origin="app")["task"]
+        rest = taskq.add(conn, "rest", "ftf", origin="app")["task"]
+    worker.tick()
+    handles[top["id"]].code = 0      # it ended, and its output said the limit
+    worker.tick()
+    with taskq.session() as conn:
+        again = taskq.get(conn, top["id"])
+        assert again["state"] == "queued"
+        assert again["waiting_for"].startswith("the AI usage limit; tried again at")
+        assert taskq.ai_block(conn) == resets.replace(microsecond=0)
+    assert "stopped at the AI usage limit" in Path(again["log_path"]).read_text(encoding="utf-8")
+
+
+def test_exit_code_75_is_the_limit_even_unsaid(made, isolated_data_dir):
+    make, handles, _ = made
+    worker = make("background", ("ai",))
+    with taskq.session() as conn:
+        task = taskq.add(conn, "reputation", "ftf", vacancy_id="v1", origin="app")["task"]
+    worker.tick()
+    handles[task["id"]].code = 75
+    worker.tick()
+    with taskq.session() as conn:
+        assert taskq.get(conn, task["id"])["state"] == "queued"
+        assert taskq.ai_block(conn) > taskq.now() + timedelta(hours=7)
+
+
+def _wait_probe(worker):
+    worker.probing.join(timeout=5)
+
+
+def test_at_the_reset_one_check_lets_the_ai_work_go_on(made, isolated_data_dir):
+    worker = made[0]("background", ("ai",))
+    calls = []
+    worker.probe = lambda: calls.append(1) or (False, None, "claude answers")
+    with taskq.session() as conn:
+        taskq.set_state_value(conn, "ai_blocked_until", taskq.iso(taskq.now() - timedelta(seconds=5)))
+        task = taskq.add(conn, "collect", "ftf", origin="app")["task"]
+    worker.tick()
+    _wait_probe(worker)
+    with taskq.session() as conn:
+        assert taskq.get(conn, task["id"])["state"] == "queued"   # not before the check answered
+    worker.tick()
+    with taskq.session() as conn:
+        assert taskq.ai_block(conn) is None
+    worker.tick()
+    with taskq.session() as conn:
+        assert taskq.get(conn, task["id"])["state"] == "running"
+    assert calls == [1]
+
+
+def test_a_check_that_meets_the_limit_again_waits_for_the_new_reset(made, isolated_data_dir):
+    worker = made[0]("background", ("ai",))
+    later = taskq.now() + timedelta(hours=2)
+    worker.probe = lambda: (True, later, "usage limit reached")
+    with taskq.session() as conn:
+        taskq.set_state_value(conn, "ai_blocked_until", taskq.iso(taskq.now() - timedelta(seconds=5)))
+    worker.tick()
+    _wait_probe(worker)
+    worker.tick()
+    with taskq.session() as conn:
+        assert taskq.ai_block(conn) == later.replace(microsecond=0)
+        assert taskq.state_value(conn, "ai_probe_at") is None
+
+
+def test_a_worker_without_ai_does_not_check(made, isolated_data_dir):
+    worker = made[0]("desktop", ("desktop",))
+    worker.probe = lambda: pytest.fail("checked")
+    with taskq.session() as conn:
+        taskq.set_state_value(conn, "ai_blocked_until", taskq.iso(taskq.now() - timedelta(seconds=5)))
+    worker.tick()
+    assert worker.probing is None
+
+
+@pytest.mark.parametrize("stdout, code, expected", [
+    ('{"type":"result","is_error":false,"result":"OK"}', 0, (False, None)),
+    ('{"type":"result","is_error":true,"result":"Claude AI usage limit reached|1792540800"}', 1, (True, "epoch")),
+    ('{"type":"result","is_error":true,"result":"Not logged in"}', 1, (False, "retry")),
+])
+def test_the_limit_check(stdout, code, expected):
+    import types
+    done = types.SimpleNamespace(stdout=stdout, stderr="", returncode=code)
+    limited, resets, _ = taskd.probe_limit(claude="claude", run=lambda *a, **k: done)
+    assert limited is expected[0]
+    if expected[1] is None:
+        assert resets is None
+    elif expected[1] == "epoch":
+        assert resets.timestamp() == 1792540800
+    else:
+        assert resets > taskq.now()
+
+
+def test_a_process_line_with_the_limit_is_remembered(isolated_data_dir):
+    script = "print('  | [10:00:00] !! AI usage limit reached; resets at 2026-10-21T18:00+00:00: limit')"
+    with taskq.session() as conn:
+        task = taskq.add(conn, "rest", "ftf", origin="app")["task"]
+    proc = taskd.Process(task, taskd.Command([sys.executable, "-c", script]), lambda line: None)
+    assert run_until_ended(proc) == 0
+    assert proc.limit is not None and proc.limit.resets_at.hour == 18
 
 
 def test_the_scheduled_tasks_store_no_password_and_restart():

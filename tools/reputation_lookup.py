@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ai_limit  # noqa: E402
 import common  # noqa: E402
 import db  # noqa: E402
 
@@ -116,6 +117,7 @@ def call_model(text: str, *, model: str = MODEL, claude: str = "claude",
             raise ReputationLookupError("the `claude` command was not found (Claude Code CLI)")
         except subprocess.TimeoutExpired:
             raise ReputationLookupError(f"claude did not answer in {TIMEOUT_SECONDS} s")
+    ai_limit.check(completed)
     try:
         answer = json.loads(completed.stdout or "")
     except json.JSONDecodeError:
@@ -218,6 +220,10 @@ def main() -> None:
     identity_mod.activate_or_exit(args.identity)
     try:
         outcome = lookup(args.vacancy)
+    except ai_limit.UsageLimit as exc:
+        ai_limit.record(exc)
+        print(f"reputation: {exc}")
+        sys.exit(ai_limit.EXIT_CODE)   # the task queue holds AI work until the reset (task 0057)
     except ReputationLookupError as exc:
         print(f"reputation: {exc}")
         sys.exit(1)

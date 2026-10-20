@@ -328,23 +328,54 @@ def set_state_value(conn: sqlite3.Connection, key: str, value: Optional[str]) ->
                      "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
 
 
-def ai_blocked_until(conn: sqlite3.Connection, at: Optional[datetime] = None) -> Optional[datetime]:
-    """When the AI usage limit is expected to reset, while it is in force (task 0057)."""
+# With no reset time in the refusal, the limit is checked again this often
+# (the owner, 2026-10-21).
+AI_CHECK_EVERY = timedelta(hours=8)
+AI_LIMIT_EXIT = 75   # ai_limit.EXIT_CODE
+
+
+def ai_block(conn: sqlite3.Connection) -> Optional[datetime]:
+    """When the AI usage limit was expected to reset (task 0057). It holds
+    the AI tasks until a worker has checked, at or after that moment, that
+    `claude` answers again (taskd.py), so a run is not started only to meet
+    the limit an hour in."""
     value = state_value(conn, "ai_blocked_until")
     try:
-        until = datetime.fromisoformat(value) if value else None
+        return datetime.fromisoformat(value) if value else None
     except ValueError:
         return None
+
+
+def ai_blocked_until(conn: sqlite3.Connection, at: Optional[datetime] = None) -> Optional[datetime]:
+    """The expected reset, while it is still ahead."""
+    until = ai_block(conn)
     return until if until and until > (at or now()) else None
+
+
+def block_ai(conn: sqlite3.Connection, resets_at: Optional[datetime] = None,
+             at: Optional[datetime] = None) -> datetime:
+    """The usage limit was met: AI tasks wait until `resets_at`, or
+    AI_CHECK_EVERY when the refusal named no time."""
+    at = at or now()
+    until = resets_at if resets_at and resets_at > at else at + AI_CHECK_EVERY
+    set_state_value(conn, "ai_blocked_until", iso(until.astimezone(timezone.utc)))
+    return until
+
+
+def unblock_ai(conn: sqlite3.Connection) -> None:
+    set_state_value(conn, "ai_blocked_until", None)
 
 
 def _local_clock(moment: datetime) -> str:
     return moment.astimezone().strftime("%H:%M")
 
 
-def _needs_reason(need: str, workers: List[dict], blocked: Optional[datetime]) -> Optional[str]:
+def _needs_reason(need: str, workers: List[dict], blocked: Optional[datetime],
+                  at: Optional[datetime] = None) -> Optional[str]:
     if need == "ai" and blocked:
-        return f"the AI usage limit; tried again at {_local_clock(blocked)}"
+        if blocked > (at or now()):
+            return f"the AI usage limit; tried again at {_local_clock(blocked)}"
+        return "the AI usage limit; checking whether it has reset"
     if any(need in w["capabilities"] for w in workers):
         return None
     if not workers:
@@ -362,7 +393,7 @@ def plan(conn: sqlite3.Connection, at: Optional[datetime] = None) -> Dict[int, O
     caller's transaction."""
     at = at or now()
     workers = live_workers(conn, at)
-    blocked = ai_blocked_until(conn, at)
+    blocked = ai_block(conn)
     # A CV/CL batch paused between documents for the app's own (taskd.py
     # documents_hold) leaves the documents slot to a CV or a cover letter.
     yielding = state_value(conn, "documents_yield") == "1"
@@ -389,7 +420,7 @@ def plan(conn: sqlite3.Connection, at: Optional[datetime] = None) -> Dict[int, O
             continue
         if reason is None:
             for need in task["needs"]:
-                reason = _needs_reason(need, workers, blocked)
+                reason = _needs_reason(need, workers, blocked, at)
                 if reason:
                     break
         if reason is None and task["slot"] in busy:
@@ -585,6 +616,9 @@ class Registered:
             state, error = "done", None
         elif issubclass(exc_type, KeyboardInterrupt):
             state, error = ("stopped" if self._asked else "interrupted"), "interrupted"
+        elif issubclass(exc_type, SystemExit) and exc.code == AI_LIMIT_EXIT:
+            # the tool met the usage limit and recorded it (block_ai)
+            state, error = "failed", f"stopped at the AI usage limit (exit {exc.code})"
         elif issubclass(exc_type, SystemExit):
             state, error = "failed", f"exit {exc.code}"
         else:

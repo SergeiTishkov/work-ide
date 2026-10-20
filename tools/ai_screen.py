@@ -41,6 +41,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import ai_limit
 import common
 import db
 
@@ -177,6 +178,7 @@ def call_model(system_prompt: Path, text: str, *, model: str = MODEL, claude: st
         raise ScreenError("the `claude` command was not found (Claude Code CLI)")
     except subprocess.TimeoutExpired:
         raise ScreenError(f"claude did not answer in {TIMEOUT_SECONDS} s")
+    ai_limit.check(completed)
     try:
         answer = json.loads(completed.stdout or "")
     except json.JSONDecodeError:
@@ -218,7 +220,10 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
            limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT,
            workers: int = WORKERS, call=None) -> dict:
     """Screens what needs it and attaches every answer as `_ai_screen`.
-    Mutates `vacancies` in place; never raises for one posting. `call`
+    Mutates `vacancies` in place; never raises for one posting. The usage
+    limit is not one posting's failure: the first refusal stops the screen,
+    no further call is sent, the answers already given are saved, and
+    ai_limit.UsageLimit is raised with the stats on it (task 0057). `call`
     stands in for call_model (tests)."""
     call = call or call_model
     import progress
@@ -233,6 +238,7 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
     keys = worklist(vacancies, stored, digest, classes, limit, stretch_limit)
     stats["considered"] = len(keys)
     lock = threading.Lock()
+    limited: list = []   # the UsageLimit that stopped the screen
     tick = progress.Progress(len(keys), "ai screen")
     with tempfile.TemporaryDirectory() as workdir:
         system_prompt = Path(workdir) / "screen_prompt.md"
@@ -240,8 +246,19 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
 
         def one(vid):
             record = vacancies[vid]
+            if limited:
+                with lock:
+                    stats["not_sent"] = stats.get("not_sent", 0) + 1
+                return None
             try:
                 answer, cost = call(system_prompt, model_message(record), workdir=workdir)
+            except ai_limit.UsageLimit as exc:
+                with lock:
+                    if not limited:
+                        limited.append(exc)
+                        progress.log(f"!! {exc}: the AI check stops, no further call is sent")
+                    stats["not_sent"] = stats.get("not_sent", 0) + 1
+                return None
             except Exception as exc:  # noqa: BLE001 — one posting must not stop the rest
                 with lock:
                     stats["errors"] += 1
@@ -270,6 +287,10 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
         stored[vid] = {**answer, "text_hash": th, "brief_hash": digest}
     attach(vacancies, stored)
     stats["cost_usd"] = round(stats["cost_usd"], 3)
+    if limited:
+        stats["ai_limit"] = limited[0].when()
+        limited[0].stats = stats
+        raise limited[0]
     return stats
 
 

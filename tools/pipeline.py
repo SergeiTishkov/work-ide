@@ -71,6 +71,7 @@ import company_intel  # noqa: E402
 import apply_channels  # noqa: E402
 import enrich_descriptions  # noqa: E402
 import ai_brief  # noqa: E402
+import ai_limit  # noqa: E402
 import ai_screen  # noqa: E402
 import link_check  # noqa: E402
 import normalize  # noqa: E402
@@ -329,15 +330,30 @@ def _stats_note(stats) -> str:
                      if isinstance(v, (int, float, str)))
 
 
+# The usage limit that stopped this run's AI work (task 0057): the run goes
+# on without AI and exits with ai_limit.EXIT_CODE, so the task queue runs
+# it again after the reset; the answers given are kept and not asked again.
+AI_LIMIT: Optional[ai_limit.UsageLimit] = None
+
+
 def ai_check_stage(vacancies: dict, state: dict, limit: Optional[int] = None) -> bool:
     """The screening brief (rewritten when the CV or the identity changed),
     then the cheap model on the top classes (tools/ai_screen.py). True when
-    an answer was added, so the caller rescores. Never raises."""
+    an answer was added, so the caller rescores. Never raises; the usage
+    limit is kept in AI_LIMIT."""
+    global AI_LIMIT
     prefix = common.ACTIVE_IDENTITY
+    if AI_LIMIT is not None:
+        state["last_ai_screen"] = {"error": str(AI_LIMIT), "ai_limit": AI_LIMIT.when(), "at": kb.now_iso()}
+        return False
     try:
         with progress.stage("AI brief") as st:
             brief = ai_brief.ensure(prefix)
             st.note = "written" if brief["written"] else "current"
+    except ai_limit.UsageLimit as exc:
+        AI_LIMIT = exc
+        state["last_ai_screen"] = {"error": str(exc), "ai_limit": exc.when(), "at": kb.now_iso()}
+        return False
     except Exception as exc:  # noqa: BLE001 — without a brief the check is skipped, not the run
         state["last_ai_screen"] = {"error": f"brief: {type(exc).__name__}: {exc}"}
         return False
@@ -345,6 +361,11 @@ def ai_check_stage(vacancies: dict, state: dict, limit: Optional[int] = None) ->
         with progress.stage("AI check of the top") as st:
             stats = ai_screen.screen(vacancies, prefix, ai_brief.load(prefix), limit=limit)
             st.note = _stats_note(stats)
+    except ai_limit.UsageLimit as exc:
+        AI_LIMIT = exc
+        stats = getattr(exc, "stats", None) or {}
+        state["last_ai_screen"] = {**stats, "error": str(exc), "ai_limit": exc.when(), "at": kb.now_iso()}
+        return bool(stats.get("screened"))
     except Exception as exc:  # noqa: BLE001
         state["last_ai_screen"] = {"error": f"{type(exc).__name__}: {exc}"}
         return False
@@ -876,6 +897,9 @@ def _run_mode(args, staged: Optional[dict]) -> dict:
 def main() -> None:
     import identity as identity_mod
 
+    global AI_LIMIT
+    AI_LIMIT = None
+
     parser = argparse.ArgumentParser(description="The full Work IDE research cycle")
     identity_mod.add_identity_arg(parser)
     parser.add_argument("--skip-contracts", action="store_true",
@@ -928,6 +952,11 @@ def main() -> None:
             progress.close_log()
             sys.exit(2)
         finally:
+            if AI_LIMIT is not None:
+                ai_limit.record(AI_LIMIT)
+                # the line the task queue looks for (tools/taskd.py)
+                progress.log(f"!! {ai_limit.mark(AI_LIMIT)}; the AI work of this run stopped there, "
+                             f"the rest ran without it")
             progress.log(f"pipeline finished in {progress.duration(time.monotonic() - started)}")
             progress.close_log()
         print("Pipeline finished:")
@@ -953,6 +982,11 @@ def main() -> None:
             print(f"  pending feedback: {pending['bugged']} wrong picks, "
                   f"{pending['rejected']} not for me — review with /feedback "
                   f"(python tools/feedback.py --identity {common.ACTIVE_IDENTITY} collect)")
+        if AI_LIMIT is not None:
+            print(f"  {ai_limit.mark(AI_LIMIT)}")
+            print(f"  the AI check stopped at the limit; run again after the reset: "
+                  f"the answers given are kept")
+            sys.exit(ai_limit.EXIT_CODE)
 
 
 if __name__ == "__main__":

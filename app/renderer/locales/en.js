@@ -110,6 +110,7 @@
   'task.origin.auto': 'auto',
   'task.wait.after': 'Waits for {task} to end',
   'task.wait.ai_limit': 'Waits for the AI usage limit to reset; tries again at {time}',
+  'task.wait.ai_checking': 'Waits for the AI usage limit: checking whether it has reset',
   'task.wait.base': 'Waits: {holder} holds the shared base',
   'task.wait.signin_desktop': 'Waits for the owner to sign in to Windows: Word needs a desktop session',
   'task.wait.signin_ai': 'Waits for the owner to sign in to Windows: AI does not run without it',

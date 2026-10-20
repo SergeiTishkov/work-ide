@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+import ai_limit
 import cv_docx
 import cv_tailor
 
@@ -406,10 +407,20 @@ def test_the_model_runs_without_tools_and_with_the_schema(tmp_path):
 
 def test_a_model_error_is_reported(tmp_path):
     def run(command, **kwargs):
-        answer = {"type": "result", "is_error": True, "result": "usage limit reached"}
+        answer = {"type": "result", "is_error": True, "result": "Not logged in"}
         return subprocess.CompletedProcess(command, 1, stdout=json.dumps(answer), stderr="")
 
-    with pytest.raises(cv_tailor.TailorError, match="usage limit"):
+    with pytest.raises(cv_tailor.TailorError, match="Not logged in"):
+        cv_tailor.call_model("m", model="opus", workdir=tmp_path, run=run)
+
+
+def test_the_usage_limit_is_not_an_ordinary_error(tmp_path):
+    """The task queue waits for the reset instead of failing the CV (task 0057)."""
+    def run(command, **kwargs):
+        answer = {"type": "result", "is_error": True, "result": "Claude AI usage limit reached|1792540800"}
+        return subprocess.CompletedProcess(command, 1, stdout=json.dumps(answer), stderr="")
+
+    with pytest.raises(ai_limit.UsageLimit):
         cv_tailor.call_model("m", model="opus", workdir=tmp_path, run=run)
 
 

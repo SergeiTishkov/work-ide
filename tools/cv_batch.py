@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ai_limit  # noqa: E402
 import common  # noqa: E402
 import taskq  # noqa: E402
 
@@ -218,6 +219,12 @@ class Batch:
                     return self.status
                 self.save(state="running", ended_at=None)
                 self.add(work, late, plan)
+        except ai_limit.UsageLimit as exc:
+            # every document after this one would be refused too (task 0057);
+            # a batch started again skips what is made
+            self.log(f"stopped: {ai_limit.mark(exc)}")
+            self.save(state="stopped", current=None, error=str(exc), ended_at=_now())
+            raise
         except Exception as exc:  # the panel must not show a dead batch as running
             self.log(f"crashed: {exc}")
             self.save(state="crashed", current=None, error=str(exc), ended_at=_now())
@@ -231,6 +238,12 @@ class Batch:
         started = time.monotonic()
         result = generate(prefix, item, kind)
         minutes = (time.monotonic() - started) / 60
+        limit = result.get("ai_limit")
+        if isinstance(limit, dict):
+            self.save()
+            resets = limit.get("resets_at")
+            raise ai_limit.UsageLimit(str(result.get("error") or ai_limit.MARK),
+                                      datetime.fromisoformat(resets) if resets else None)
         if result.get("ok"):
             self.status["made"] += 1
             self.log(f"ok      {kind} {minutes:.1f} min, {result.get('pages')} page(s)")
@@ -306,6 +319,10 @@ def main(argv=None) -> int:
         with taskq.Registered("cv_batch", args.identities[0] if len(args.identities) == 1 else None,
                               log_path=where["log"], args={"identities": args.identities, "all": args.all}):
             Batch(where).run(requests, plan_for, generate_with_tools)
+    except ai_limit.UsageLimit as exc:
+        ai_limit.record(exc)
+        print(ai_limit.mark(exc), flush=True)
+        return ai_limit.EXIT_CODE
     except RuntimeError as exc:
         common.eprint(f"cv_batch: {exc}")
         return 1

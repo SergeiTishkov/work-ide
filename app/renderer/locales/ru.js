@@ -113,6 +113,7 @@
   'task.origin.auto': 'авто',
   'task.wait.after': 'Ждёт окончания: {task}',
   'task.wait.ai_limit': 'Ждёт сброса лимита AI; попробует снова в {time}',
+  'task.wait.ai_checking': 'Ждёт лимита AI: проверяет, сбросился ли он',
   'task.wait.base': 'Ждёт: общую базу держит {holder}',
   'task.wait.signin_desktop': 'Ждёт входа владельца в Windows: Word нужен рабочий стол',
   'task.wait.signin_ai': 'Ждёт входа владельца в Windows: без него AI не работает',

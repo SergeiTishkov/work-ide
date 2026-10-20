@@ -57,7 +57,8 @@ function installMockApi(fixture) {
   function pumpTasks() {
     for (const lane of ['collect', 'documents', 'reputation']) {
       if (tasks.some((task) => laneOf(task.kind) === lane && task.state === 'running')) continue;
-      const next = tasks.find((task) => laneOf(task.kind) === lane && task.state === 'queued');
+      // held: a task the queue keeps waiting, with the reason it gives
+      const next = tasks.find((task) => laneOf(task.kind) === lane && task.state === 'queued' && !task.held);
       if (!next) continue;
       // the batch's document goes first; the batch pauses after it (holding)
       if (lane === 'documents' && batch && batch.state === 'running' && !batch.holding) {
