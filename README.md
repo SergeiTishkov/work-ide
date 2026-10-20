@@ -304,6 +304,7 @@ texts — your own settings sit elsewhere and cannot be lost.
 | [docs/VACANCY_CHECKLIST.md](docs/VACANCY_CHECKLIST.md) | The mandatory manual check on candidates |
 | [docs/SOURCES.md](docs/SOURCES.md) | The sources, with measured response codes |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Decisions and rejected alternatives |
+| [tasks/README.md](tasks/README.md) | The list of work: triage, to do, done |
 
 ## Language
 

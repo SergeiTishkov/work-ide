@@ -424,6 +424,8 @@ history.
   something": it dissects the class of mistake that has recurred here more often
   than any other.
 - `docs/VACANCY_CHECKLIST.md` — the mandatory manual checklist for candidates.
+- `tasks/` — the list of work: one file per task, the folder its stage
+  (`1-triage`, `2-to-do`, `3-done`). The format is `tasks/README.md`.
 
 **Identity-level documents** (in its folder, with its prefix):
 
@@ -445,6 +447,15 @@ it carries: what changed for the person and the app (features, behaviour,
 scoring rules, filters, labels, prompts, commands, schema versions), not only
 the latest one. The history is read to find when and why a behaviour
 changed; a change missing from the message is lost to that search.
+
+**Tasks** (the owner, 2026-10-20). Work is tracked in `tasks/`. Before
+starting, find the task the work belongs to; work the owner asks for that has
+no task gets one in `tasks/2-to-do/`, an idea of the agent's own goes to
+`tasks/1-triage/` for the owner to decide. The commit that finishes an item
+marks it DONE in the same change; the commit
+that finishes the last item moves the file to `tasks/3-done/`. Numbers are
+four digits, unique, never reused; tasks are written in English, business
+first.
 
 ## 13. Where to put a change
 
