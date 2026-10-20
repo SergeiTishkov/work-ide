@@ -37,4 +37,4 @@ still writes it.
 - DONE - `common`: reports folders removed; tests and fixture clean-up follow
 - DONE - Docs, commands, configuration comments, `.gitignore`
 - DONE - Triage tasks for what only the report showed
-- TO DO - Delete the local `reports/` folder after the merge
+- DONE - Delete the local `reports/` folder after the merge
