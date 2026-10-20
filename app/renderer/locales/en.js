@@ -16,7 +16,7 @@
   'app.loading': 'Loading…',
   'app.error': 'Error: {message}',
   'app.no_identities': 'No identities yet. How to create the first one: docs/ONBOARDING.md.',
-  'app.refresh': '⟳ Refresh',
+  'app.refresh': 'Refresh',
   'app.refresh_hint': 'Re-read the lists and reload the interface (markup, styles, code)',
   'cleanup.button': '🧹 Clean up',
   'cleanup.hint': 'Delete vacancies from the base for good, by age, status and class',

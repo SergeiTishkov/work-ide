@@ -154,8 +154,9 @@ It opens a window over the knowledge base:
   (`tools/feedback.py`), fixes the filter and marks them reviewed;
 - the collect button shows when a run of that identity is going, and at what
   stage — whoever started it (the app, the agent, a terminal); a dot marks the
-  identity's tab. **Refresh** re-reads everything and reloads the interface
-  itself (markup, styles, code), keeping the tab and the drop-downs' choice.
+  identity's tab. **Refresh** (⟳ in the top bar, left of the theme and the
+  language) re-reads everything and reloads the interface itself (markup,
+  styles, code), keeping the tab and the drop-downs' choice.
 - **Generate CV** on a vacancy writes a CV tailored to it — `.docx` and `.pdf`
   under the name of your own CV, in the vacancy's folder (`<folder>/<prefix>/
   <vacancy id>/`, the folder chosen at onboarding; older versions go to

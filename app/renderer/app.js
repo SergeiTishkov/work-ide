@@ -834,7 +834,9 @@
 
   // --- the top bar's pickers: theme and language --------------------------------
   // Each is a button showing the current choice — an icon, a flag, no arrow —
-  // that opens a short list under it. One open at a time.
+  // that opens a short list under it. One open at a time. Refresh stands to
+  // their left, a button of the same size (the owner, 2026-10-20: out of the
+  // menu, the same ring-arrow icon).
 
   function flag(language) {
     return el('img', { class: 'flag', src: `flags/${language}.svg`, alt: '', width: 21, height: 14 });
@@ -880,7 +882,16 @@
     host.replaceChildren(button, menu || '');
   }
 
+  function renderRefreshButton() {
+    const host = document.querySelector('[data-testid="refresh-slot"]');
+    host.replaceChildren(el('button', {
+      class: 'picker-button', testid: 'refresh', type: 'button',
+      title: t('app.refresh_hint'), 'aria-label': t('app.refresh'), onclick: refresh,
+    }, el('span', { class: 'refresh-icon', 'aria-hidden': 'true' }, '\u27F3')));
+  }
+
   function renderPickers() {
+    renderRefreshButton();
     renderPicker('theme', {
       title: t('theme.choose'),
       current: Theme.theme(),
@@ -981,8 +992,8 @@
   }
 
   // --- the commands menu (the owner, 2026-10-20) ----------------------------
-  // Refresh, Collect, Stop, Review feedback, Clean up and the identities live
-  // in one menu. Collect shows its spinner and stage in the menu; the menu's
+  // Collect, Stop, Review feedback, Clean up and the identities live in one
+  // menu; Refresh is a button of its own in the top bar. Collect shows its spinner and stage in the menu; the menu's
   // own button spins while anything runs (busyWith), so it is seen with the
   // menu closed.
 
@@ -1085,7 +1096,6 @@
     const menu = open && el('div', {
       class: 'commands-menu', role: 'menu', testid: 'menu', onclick: (event) => event.stopPropagation(),
     },
-    menuItem({ testid: 'refresh', text: t('app.refresh'), title: t('app.refresh_hint'), onclick: refresh }),
     collectItem(identity),
     running && menuItem({ testid: 'run-stop', text: t('run.stop'), onclick: stopCollect }),
     feedbackItem(pending),

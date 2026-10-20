@@ -584,10 +584,10 @@ test('"Refresh" reloads the interface and keeps the tab and the view', async ({ 
   await page.getByTestId('identity-tab-sharp').click();
   await choose(page, 'segment-filter', 'uk');
   await choose(page, 'filter', 'all');
-  await expect(await command(page, 'refresh')).toHaveText(en['app.refresh']);
+  await expect(page.getByTestId('refresh')).toHaveAttribute('aria-label', en['app.refresh']);
   await page.evaluate(() => { window.__beforeRefresh = true; });
 
-  await (await command(page, 'refresh')).click();
+  await page.getByTestId('refresh').click();
   await expect(page.getByTestId('segment-filter-value')).toHaveText('United Kingdom');
   expect(await page.evaluate(() => window.__beforeRefresh)).toBeUndefined();   // a new page
   await expect(page.getByTestId('filter-value')).toHaveText(SHOW_ALL);
@@ -712,7 +712,7 @@ test('"Fit" narrows the list to one class, and the other filters count within it
   await expect(page.getByTestId('list').locator('article')).toHaveCount(1);   // x1
   await expect(byId(page, 'x1')).toBeVisible();
 
-  await (await command(page, 'refresh')).click();
+  await page.getByTestId('refresh').click();
   await expect(page.getByTestId('fit-filter-value')).toHaveText(en['class.hot_lead']);
 });
 
@@ -820,7 +820,7 @@ test('"Refresh" leaves the reload to the app when the app restarts itself', asyn
   await open(page, fixture);
   await choose(page, 'filter', 'all');
   await page.evaluate(() => { window.__beforeRefresh = true; });
-  await (await command(page, 'refresh')).click();
+  await page.getByTestId('refresh').click();
   await expect.poll(() => calls(page, 'refresh')).toHaveLength(1);
   expect(await page.evaluate(() => window.__beforeRefresh)).toBe(true);   // not reloaded here
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('work-ide-view')));
@@ -832,7 +832,7 @@ test('"Refresh" still reloads against an older main process without the channel'
   fixture.withoutRefresh = true;
   await open(page, fixture);
   await page.evaluate(() => { window.__beforeRefresh = true; });
-  await (await command(page, 'refresh')).click();
+  await page.getByTestId('refresh').click();
   await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__beforeRefresh)).toBeUndefined();
 });
@@ -1013,7 +1013,7 @@ test('the chosen boards stay across markets, and a refresh brings them back', as
   await choose(page, 'segment-filter', 'uk');
   await expect(page.getByTestId('source-filter-value')).toHaveText('devitjobs.uk, devitjobs.com');
   await choose(page, 'segment-filter', '');
-  await (await command(page, 'refresh')).click();
+  await page.getByTestId('refresh').click();
   await expect(page.getByTestId('source-filter-value')).toHaveText('devitjobs.uk, devitjobs.com');
   await expect(byId(page, 'b1')).toBeVisible();
   await expect(byId(page, 'a1')).toHaveCount(0);
@@ -1132,7 +1132,7 @@ test('the hidden companies survive a refresh and a change of market', async ({ p
   await page.keyboard.press('Escape');
   await choose(page, 'segment-filter', 'uk');
   await choose(page, 'segment-filter', '');
-  await (await command(page, 'refresh')).click();
+  await page.getByTestId('refresh').click();
   await expect(page.getByTestId('company-filter-value'))
     .toHaveText(en['filter.company_except'].replace('{list}', 'Proxify'));
   await expect(byId(page, 'a2r')).toBeVisible();
@@ -1612,14 +1612,32 @@ test('"Score" in Details: a row per part, a cell per point, earned ones bright, 
   expect(lastMinus).not.toContain('off');
 });
 
-test('the menu holds Refresh, Collect, Review feedback, Clean up, Identities; "Clean up" filters, counts, deletes', async ({ page }) => {
+test('Refresh is a button of its own, left of the theme and the language, the same size and icon', async ({ page }) => {
+  await open(page);
+  const order = await page.locator('header.topbar > .picker')
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
+  expect(order).toEqual(['refresh-slot', 'theme-picker', 'language-picker']);
+  const refresh = page.getByTestId('refresh');
+  await expect(refresh).toHaveText('\u27F3');
+  await expect(refresh).toHaveAttribute('title', en['app.refresh_hint']);
+  const size = async (testid) => {
+    const box = await page.getByTestId(testid).boundingBox();
+    return [box.width, box.height];
+  };
+  expect(await size('refresh')).toEqual(await size('theme-button'));
+  expect(await size('refresh')).toEqual(await size('language-button'));
+  await page.getByTestId('menu-button').click();
+  await expect(page.getByTestId('menu').getByTestId('refresh')).toHaveCount(0);
+});
+
+test('the menu holds Collect, Review feedback, Clean up, Identities; "Clean up" filters, counts, deletes', async ({ page }) => {
   await open(page);
   const order = await page.locator('.actions > *').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.className));
   expect(order).toEqual(['commands']);
   await command(page, 'cleanup');
   const items = await page.getByTestId('menu').locator('[role="menuitem"]')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.querySelector('[data-testid]').dataset.testid));
-  expect(items).toEqual(['refresh', 'run-collect', 'run-feedback', 'cleanup', 'open-identities']);
+  expect(items).toEqual(['run-collect', 'run-feedback', 'cleanup', 'open-identities']);
   await page.getByTestId('cleanup').click();
   const dialog = page.getByTestId('cleanup-dialog');
   await expect(dialog).toBeVisible();
