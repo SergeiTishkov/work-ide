@@ -29,6 +29,8 @@ Identity: `$ARGUMENTS` (empty means: establish it in step 1).
      `tools/ai_brief.py`), then a rescore;
    - links, direct application channels and company facts of the top;
    - selection and report.
+   If it prints `SKIPPED: identity '<p>' is inactive`, the person turned the
+   identity off: stop here and say so; do not turn it on.
 5. A short summary: **how many days of vacancies were collected** (the
    pipeline's `collected` line, as it is: the LinkedIn window, whether the
    fetch failed), how many hot leads and worth-a-look there are,

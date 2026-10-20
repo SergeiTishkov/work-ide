@@ -482,7 +482,9 @@ def standalone_main(fetch_fn, source_name: str) -> None:
         description=f"Run the {source_name} source on its own")
     add_identity_arg(parser)
     args = parser.parse_args()
-    activate_or_exit(args.identity)
+    prefix = activate_or_exit(args.identity)
+    if skip_if_inactive(prefix):
+        return
 
     records, err = fetch_fn()
     print(f"{source_name}: fetched {len(records)} records" + (f" | note: {err}" if err else ""))
@@ -513,6 +515,44 @@ def activate_or_exit(cli_value: Optional[str] = None, *, quiet: bool = False) ->
     return prefix
 
 
+def inactive_identities() -> set:
+    """The identities the person turned off in the app's "Identities"
+    window (identities.active, the owner 2026-10-20). Read only, without
+    creating or upgrading the base: no base, no row, or a base from before the
+    column — every identity active."""
+    import sqlite3
+    from contextlib import closing
+    path = common.DB_PATH
+    if not path.exists():
+        return set()
+    with closing(sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)) as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(identities)")}
+        if "active" not in columns:
+            return set()
+        return {row[0] for row in conn.execute("SELECT id FROM identities WHERE active = 0")}
+
+
+def is_active(prefix: str) -> bool:
+    return prefix not in inactive_identities()
+
+
+def skip_if_inactive(prefix: str) -> bool:
+    """True, having said so, when nothing may be collected for the
+    identity: the collecting entry points return at once, with success —
+    a skip, not a failure (a queue of runs goes on to the next)."""
+    if is_active(prefix):
+        return False
+    print(f"SKIPPED: identity '{prefix}' is inactive (turned off in the app's "
+          f"Identities window); nothing collected.")
+    return True
+
+
+def set_active(prefix: str, active: bool) -> None:
+    import db
+    with db.session() as conn:
+        db.set_identity_active(conn, prefix, active)
+
+
 # --- CLI ------------------------------------------------------------------
 
 def identities_for_app() -> List[dict]:
@@ -533,6 +573,8 @@ def identities_for_app() -> List[dict]:
         position = templates.local_manifest(prefix).get("tab_position")
         return (position is None, position or 0, prefix)
 
+    database = common.DATA_ROOT / common.DB_NAME
+    inactive = inactive_identities()
     result = []
     for prefix in sorted(list_identities(include_fixtures=False), key=tab_order):
         try:
@@ -541,10 +583,10 @@ def identities_for_app() -> List[dict]:
         except Exception:  # noqa: BLE001 — a caption must not hide the tab
             display_name = ""
         # The base is shared; the folder is the identity's own (run logs).
-        database = common.DATA_ROOT / common.DB_NAME
         result.append({
             "prefix": prefix,
             "display_name": display_name,
+            "active": prefix not in inactive,
             "database": str(database),
             "has_database": database.exists(),
             "data_dir": str(common.identity_data_dir(prefix)),
@@ -921,6 +963,14 @@ def cmd_which(args) -> None:
     print(f"{describe(prefix)}\n  reason: {reason}")
 
 
+def cmd_set_active(args) -> None:
+    if args.identity not in list_identities(include_fixtures=True):
+        print(f"no identity '{args.identity}'")
+        sys.exit(1)
+    set_active(args.identity, args.state == "on")
+    print(f"OK: identity '{args.identity}' is {'active' if args.state == 'on' else 'inactive'}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Manage search identities")
     sub = p.add_subparsers(dest="command", required=True)
@@ -965,6 +1015,14 @@ def build_parser() -> argparse.ArgumentParser:
                              help="Which identity would be chosen, and why")
     p_which.add_argument("--identity", default=None)
     p_which.set_defaults(func=cmd_which)
+
+    p_active = sub.add_parser(
+        "set-active",
+        help="Turn an identity on or off: nothing collects for one turned off "
+             "(the app's Identities window does the same)")
+    p_active.add_argument("--identity", required=True)
+    p_active.add_argument("state", choices=("on", "off"))
+    p_active.set_defaults(func=cmd_set_active)
 
     p_diff = sub.add_parser(
         "diff-template",

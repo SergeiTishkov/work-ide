@@ -24,6 +24,12 @@ function calls(page, name) {
 }
 
 const byId = (page, id) => page.getByTestId(`vacancy-${id}`);
+// An item of the commands menu (renderMenu), the menu opened first when closed.
+// A click on an item closes it again.
+async function command(page, testid) {
+  if (!(await page.getByTestId('menu').isVisible())) await page.getByTestId('menu-button').click();
+  return page.getByTestId(testid);
+}
 const lastListing = async (page) => { await settled(page); return (await calls(page, 'loadListing')).at(-1); };
 // "Show" closed: every status and both freshness rows checked; the start
 const SHOW_ALL = [ru['filter.new'], ru['filter.group.applications'], ru['filter.group.denied']].join(' · ');
@@ -50,11 +56,12 @@ test('sections follow the class order, with their titles from the locale', async
 test('"Collect vacancies" queues a collection; the bottom panel lists it with its log', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('task-panel')).toBeHidden();
-  await page.getByTestId('run-collect').click();
+  await (await command(page, 'run-collect')).click();
+  await expect(page.getByTestId('menu')).toHaveCount(0);   // an item closes the menu
   expect(await calls(page, 'enqueueTask')).toEqual([[{ kind: 'collect', identity: 'sharp' }]]);
-  const button = page.getByTestId('run-collect');
+  await expect(page.getByTestId('run-status').getByTestId('collect-indicator')).toBeVisible();
+  const button = await command(page, 'run-collect');
   await expect(button).toBeDisabled();
-  await expect(button.getByTestId('collect-indicator')).toBeVisible();
   await expect(page.getByTestId('run-stop')).toBeVisible();
   await expect(page.getByTestId('task-panel')).toBeVisible();
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'running');
@@ -66,19 +73,21 @@ test('"Collect vacancies" queues a collection; the bottom panel lists it with it
 
   await page.evaluate(() => window.__finishCollect({ ok: true, code: 0 }));
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'done');
-  await expect(button).toBeEnabled();
+  await expect(button).toBeEnabled();   // the menu stays open across the redraws
+  await expect(page.getByTestId('run-status')).toHaveCount(0);
   await expect(page.getByTestId('task-log')).toContainText('fetching sources');   // the log stays
   await expect.poll(async () => (await calls(page, 'listIdentities')).length).toBe(2);   // reloaded after the run
 });
 
 test('"Stop" and the panel\'s cross cancel a collection', async ({ page }) => {
   await open(page);
-  await page.getByTestId('run-collect').click();
-  await page.getByTestId('run-stop').click();
+  await (await command(page, 'run-collect')).click();
+  await (await command(page, 'run-stop')).click();
   expect(await calls(page, 'cancelTask')).toEqual([[1]]);
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'stopped');
+  await command(page, 'run-collect');
   await expect(page.getByTestId('run-stop')).toHaveCount(0);
-  await page.getByTestId('run-collect').click();
+  await (await command(page, 'run-collect')).click();
   await page.getByTestId('task-2').hover();
   await page.getByTestId('task-2').getByTestId('task-cancel').click();
   await expect(page.getByTestId('task-2')).toHaveAttribute('data-state', 'stopped');
@@ -86,12 +95,14 @@ test('"Stop" and the panel\'s cross cancel a collection', async ({ page }) => {
 
 test('collections of several identities queue: the first runs, the others wait their turn', async ({ page }) => {
   await open(page);
-  await page.getByTestId('run-collect').click();
+  await (await command(page, 'run-collect')).click();
   await page.getByTestId('identity-tab-partsharp').click();
   await expect(page.getByTestId('identity-name')).toHaveText('Part-time side work');
-  const button = page.getByTestId('run-collect');
+  const button = await command(page, 'run-collect');
   await expect(button).toBeEnabled();
   await button.click();
+  await expect(page.getByTestId('run-status')).toHaveText(ru['run.queued']);
+  await command(page, 'run-collect');
   await expect(button).toHaveText(ru['run.queued']);
   await expect(button).toBeDisabled();
   await expect(page.getByTestId('task-2')).toHaveAttribute('data-state', 'queued');
@@ -100,6 +111,7 @@ test('collections of several identities queue: the first runs, the others wait t
   await page.evaluate(() => window.__finishCollect({ ok: true, code: 0 }));
   await expect(page.getByTestId('task-2')).toHaveAttribute('data-state', 'running');
   await expect(page.getByTestId('run-stop')).toBeVisible();
+  await page.keyboard.press('Escape');
   // the running one is the one whose log shows, until a click chooses another
   await expect(page.getByTestId('task-2')).toHaveClass(/chosen/);
   await page.getByTestId('task-1').click();
@@ -111,33 +123,21 @@ test('collections of several identities queue: the first runs, the others wait t
 // the person follows and steers it; the button only says so.
 test('"Review feedback" shows the pending count and starts nothing', async ({ page }) => {
   await open(page);
-  const button = page.getByTestId('run-feedback');
-  const tip = page.getByTestId('run-feedback-tip');
-  const hint = ru['run.feedback_hint'].replace('{identity}', 'sharp');
-  await expect(button).toHaveText(ru['run.feedback'].replace('{n}', '1'));
-  await expect(button).toHaveAttribute('aria-disabled', 'true');
-  await expect(tip).toBeHidden();
-
-  await button.hover();
-  await expect(tip).toBeVisible();
-  await expect(tip).toHaveText(hint);
-
-  // A click opens it without the hover: the mouse stays away. Playwright's own
-  // click refuses an aria-disabled button, so the event is sent.
-  await page.mouse.move(0, 0);
-  await expect(tip).toBeHidden();
-  await button.dispatchEvent('click');
-  await expect(tip).toBeVisible();
-  await button.hover();
-  await page.mouse.move(0, 0);
-  await expect(tip).toBeHidden();
+  const label = await command(page, 'run-feedback');
+  await expect(label).toHaveText(ru['run.feedback'].replace('{n}', '1'));
+  await expect(page.getByTestId('menu').locator('[aria-disabled="true"]')).toContainText(ru['run.feedback'].replace('{n}', '1'));
+  // the item says how the review starts, with the menu open
+  await expect(page.getByTestId('run-feedback-tip')).toHaveText(ru['run.feedback_hint'].replace('{identity}', 'sharp'));
+  await label.click();
+  await expect(page.getByTestId('menu')).toBeVisible();   // nothing to choose: the menu stays
   expect(await calls(page, 'startRun')).toEqual([]);
+  expect(await calls(page, 'enqueueTask')).toEqual([]);
 });
 
 test('"Review feedback" names the identity of the open tab', async ({ page }) => {
   await open(page);
   await page.getByTestId('identity-tab-partsharp').click();
-  await expect(page.getByTestId('run-feedback')).toHaveText(ru['run.feedback'].replace('{n}', '0'));
+  await expect(await command(page, 'run-feedback')).toHaveText(ru['run.feedback'].replace('{n}', '0'));
   await expect(page.getByTestId('run-feedback-tip'))
     .toHaveText(ru['run.feedback_hint'].replace('{identity}', 'partsharp'));
 });
@@ -156,7 +156,7 @@ test('"Wrong pick" asks for a reason, saves it, and leaves an undoable stub', as
   await expect(byId(page, 'a1')).toHaveCount(0);
   const stub = page.getByTestId('stub-a1');
   await expect(stub).toContainText(ru['stub.marked'].replace('{status}', ru['status.bugged']));
-  await expect(page.getByTestId('run-feedback')).toHaveText(ru['run.feedback'].replace('{n}', '2'));
+  await expect(await command(page, 'run-feedback')).toHaveText(ru['run.feedback'].replace('{n}', '2'));
 
   await stub.getByTestId('btn-undo').click();
   expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'a1']);
@@ -464,7 +464,7 @@ test('an identity never collected says so and offers to collect', async ({ page 
   await open(page);
   await page.getByTestId('identity-tab-newbie').click();
   await expect(page.getByTestId('never-collected')).toHaveText(ru['identity.never_collected']);
-  await page.getByTestId('run-collect').click();
+  await (await command(page, 'run-collect')).click();
   expect(await calls(page, 'enqueueTask')).toEqual([[{ kind: 'collect', identity: 'newbie' }]]);
 });
 
@@ -498,9 +498,9 @@ test('a missing claude is explained', async ({ page }) => {
   const fixture = standardFixture();
   fixture.collectReply = { ok: false, error: 'claude_not_found' };
   await open(page, fixture);
-  await page.getByTestId('run-collect').click();
+  await (await command(page, 'run-collect')).click();
   await expect(page.getByTestId('error')).toContainText(ru['run.claude_not_found']);
-  await expect(page.getByTestId('run-collect')).toBeEnabled();
+  await expect(await command(page, 'run-collect')).toBeEnabled();
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'failed');
 });
 
@@ -535,14 +535,17 @@ test('"Open the vacancy link" hands the URL to the system browser, marked or not
   expect((await calls(page, 'openExternal')).at(-1)).toEqual(['https://example.test/x1']);
 });
 
-test('a pipeline run going anywhere shows on the button and the tab, then clears', async ({ page }) => {
+test('a pipeline run going anywhere shows beside the menu, in it, and on the tab, then clears', async ({ page }) => {
   await open(page);
   await page.evaluate(() => window.__setPipeline('sharp',
     { running: true, stage: 'check links', startedAt: '2026-09-30T00:23:41+00:00' }));
-  const button = page.getByTestId('run-collect');
+  const status = page.getByTestId('run-status');
+  await expect(status).toContainText(ru['run.collecting_stage'].replace('{stage}', 'check links'));
+  await expect(status.getByTestId('collect-indicator')).toBeVisible();
+  const button = await command(page, 'run-collect');
   await expect(button).toContainText(ru['run.collecting_stage'].replace('{stage}', 'check links'));
   await expect(button).toBeDisabled();
-  await expect(button.getByTestId('collect-indicator')).toBeVisible();
+  await expect(page.getByTestId('run-stop')).toHaveCount(0);   // started elsewhere: shown, not stopped here
   await expect(page.getByTestId('identity-tab-sharp').getByTestId('tab-collecting')).toBeVisible();
   await expect(page.getByTestId('identity-tab-partsharp').getByTestId('tab-collecting')).toHaveCount(0);
 
@@ -550,6 +553,7 @@ test('a pipeline run going anywhere shows on the button and the tab, then clears
   await page.evaluate(() => window.__setPipeline('sharp', { running: false }));
   await expect(button).toHaveText(ru['run.collect']);
   await expect(button).toBeEnabled();
+  await expect(status).toHaveCount(0);
   await expect(page.getByTestId('tab-collecting')).toHaveCount(0);
   await expect.poll(async () => (await calls(page, 'loadSegments')).length).toBeGreaterThan(loadsBefore);
 });
@@ -559,7 +563,7 @@ test('a reason being typed survives the indicator re-rendering the list', async 
   await byId(page, 'a1').getByTestId('btn-bugged').click();
   await byId(page, 'a1').getByTestId('reason-input').fill('half typed');
   await page.evaluate(() => window.__setPipeline('sharp', { running: true, stage: 'rescore' }));
-  await expect(page.getByTestId('run-collect')).toContainText('rescore');
+  await expect(page.getByTestId('run-status')).toContainText('rescore');
   await expect(byId(page, 'a1').getByTestId('reason-input')).toHaveValue('half typed');
 });
 
@@ -741,7 +745,7 @@ test('a failing request shows the error over the real screen, not the start one'
   await expect(page.getByTestId('identity-tab-sharp')).toBeVisible();
   await expect(page.getByTestId('identity-tab-partsharp')).toBeVisible();
   await expect(page.getByTestId('no-identities')).toHaveCount(0);
-  await expect(page.getByTestId('run-collect')).toBeVisible();
+  await expect(page.getByTestId('menu-button')).toBeVisible();
 });
 
 test('until the identities arrive the window shows a spinner, not "no identities"', async ({ page }) => {
@@ -860,6 +864,44 @@ test('choosing a source lists only its vacancies, and the filter counts follow i
   expect((await calls(page, 'listingCounts')).at(-1)).toEqual(devitjobs);
   await expect(page.getByTestId('filter-option-bugged')).toContainText('(1)');   // x1
   await expect(page.getByTestId('filter-option-new')).toContainText('(1)');   // b1
+});
+
+test('"Identities" turns one off: its tab dims, it cannot be collected, and on again it can', async ({ page }) => {
+  await open(page);
+  await (await command(page, 'open-identities')).click();
+  const dialog = page.getByTestId('identities-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText(ru['identities.explain']);
+  await expect(page.getByTestId('identity-active-sharp')).toBeChecked();
+  await expect(page.getByTestId('identity-active-partsharp')).toBeChecked();
+  await expect(page.getByTestId('identity-active-newbie')).toBeDisabled();   // no base yet
+
+  await page.getByTestId('identity-active-partsharp').uncheck();
+  expect(await calls(page, 'setIdentityActive')).toEqual([['partsharp', false]]);
+  await expect(page.getByTestId('identity-state-partsharp')).toHaveText(ru['identities.inactive']);
+  await expect(page.getByTestId('identity-tab-partsharp')).toHaveClass(/inactive/);
+  await page.getByTestId('identities-close').click();
+  await expect(dialog).toHaveCount(0);
+
+  await page.getByTestId('identity-tab-partsharp').click();
+  const collect = await command(page, 'run-collect');
+  await expect(collect).toBeDisabled();
+  await expect(collect).toHaveAttribute('title', ru['run.inactive']);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('menu')).toHaveCount(0);
+
+  await (await command(page, 'open-identities')).click();
+  await page.getByTestId('identity-active-partsharp').check();
+  await page.getByTestId('identities-close').click();
+  await expect(page.getByTestId('identity-tab-partsharp')).not.toHaveClass(/inactive/);
+  await expect(await command(page, 'run-collect')).toBeEnabled();
+});
+
+test('the menu closes on a click elsewhere', async ({ page }) => {
+  await open(page);
+  await command(page, 'cleanup');
+  await page.getByTestId('panel').click({ position: { x: 5, y: 5 } });
+  await expect(page.getByTestId('menu')).toHaveCount(0);
 });
 
 test('the text field after the drop-downs narrows the list by words, together with them', async ({ page }) => {
@@ -1306,7 +1348,7 @@ test('documents the app queued itself show on their cards and in the panel, mark
 
 test('the panel\'s height and split are dragged on their sashes and kept', async ({ page }) => {
   await open(page);
-  await page.getByTestId('run-collect').click();
+  await (await command(page, 'run-collect')).click();
   const panel = page.getByTestId('task-panel');
   await expect(panel).toBeVisible();
   const before = await panel.boundingBox();
@@ -1330,7 +1372,7 @@ test('the panel\'s height and split are dragged on their sashes and kept', async
   expect(listAfter.width - listBefore.width).toBeGreaterThan(80);
 
   await page.reload();
-  await page.getByTestId('run-collect').click();
+  await (await command(page, 'run-collect')).click();
   await expect(panel).toBeVisible();
   expect(Math.abs((await panel.boundingBox()).height - after.height)).toBeLessThan(3);
   expect(Math.abs((await page.locator('.tasks-pane').boundingBox()).width - listAfter.width)).toBeLessThan(3);
@@ -1388,7 +1430,7 @@ test('a failed CV generation says why, on its card', async ({ page }) => {
 
 test('a collection shows its steps under it while it runs, folded or opened by its arrow', async ({ page }) => {
   await open(page);
-  await page.getByTestId('run-collect').click();
+  await (await command(page, 'run-collect')).click();
   await page.evaluate(() => window.__setSteps([
     { key: 'prepare', state: 'done', duration: '1:05', note: null, progress: null },
     { key: 'fetch', name: 'fetch 19 sources', state: 'running', began: Date.now() - 65000,
@@ -1524,10 +1566,14 @@ test('"Score" in Details: a row per part, a cell per point, earned ones bright, 
   expect(lastMinus).not.toContain('off');
 });
 
-test('"Clean up" sits between "Refresh" and "Collect": filters, a count, then the deletion', async ({ page }) => {
+test('the menu holds Collect, Review feedback, Clean up, Identities; "Clean up" filters, counts, deletes', async ({ page }) => {
   await open(page);
-  const order = await page.locator('.actions > button').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
-  expect(order.slice(0, 3)).toEqual(['refresh', 'cleanup', 'run-collect']);
+  const order = await page.locator('.actions > *').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.className));
+  expect(order).toEqual(['refresh', 'commands']);
+  await command(page, 'cleanup');
+  const items = await page.getByTestId('menu').locator('[role="menuitem"]')
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.querySelector('[data-testid]').dataset.testid));
+  expect(items).toEqual(['run-collect', 'run-feedback', 'cleanup', 'open-identities']);
   await page.getByTestId('cleanup').click();
   const dialog = page.getByTestId('cleanup-dialog');
   await expect(dialog).toBeVisible();

@@ -901,10 +901,14 @@
     renderPickers();
   }
 
-  document.addEventListener('click', () => togglePicker(null));
+  document.addEventListener('click', () => {
+    togglePicker(null);
+    closeMenu();
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       togglePicker(null);
+      closeMenu();
       closeDropdowns();
     }
   });
@@ -913,11 +917,12 @@
     const nav = document.querySelector('[data-testid="identity-tabs"]');
     nav.replaceChildren(...state.identities.map((identity) => {
       const collecting = (state.pipelines[identity.prefix] || {}).running;
+      const inactive = identity.active === false;
       return el('button', {
-        class: `tab${identity.prefix === state.active ? ' active' : ''}`,
+        class: `tab${identity.prefix === state.active ? ' active' : ''}${inactive ? ' inactive' : ''}`,
         role: 'tab',
         'aria-selected': identity.prefix === state.active ? 'true' : 'false',
-        title: identity.displayName || null,
+        title: [identity.displayName, inactive && t('identities.inactive')].filter(Boolean).join(' · ') || null,
         testid: `identity-tab-${identity.prefix}`,
         onclick: () => selectIdentity(identity.prefix),
       }, identity.prefix,
@@ -948,6 +953,7 @@
     const identity = state.identities.find((i) => i.prefix === state.active);
     const parts = [renderToolbar(identity, info)];
     if (state.cleanup) parts.push(renderCleanup());
+    if (state.identitiesPopup) parts.push(renderIdentities());
     if (!info.selection) {
       parts.push(el('p', { class: 'empty', testid: 'never-collected' }, t('identity.never_collected')));
     } else if (!info.segments.length) {
@@ -966,40 +972,181 @@
     else state.openDropdown = null;
   }
 
-  function collectButton() {
+  // --- the commands menu (the owner, 2026-10-20) ----------------------------
+  // Collect, Stop, Review feedback, Clean up and the identities live in one
+  // menu beside "Refresh". A collection going or queued shows beside it, so
+  // it is seen with the menu closed.
+
+  function collectState() {
     const pipeline = state.pipelines[state.active] || { running: false };
     const task = findTask(state.active, 'collect');
-    const running = pipeline.running || (task && task.state === 'running');
-    if (task && task.state === 'queued') {
-      // Waiting its turn: behind another collection, or a run started
-      // elsewhere that holds the shared base (tools/runstate.py).
-      return el('button', {
-        class: 'primary queued', testid: 'run-collect', disabled: true,
+    return {
+      pipeline, task,
+      running: Boolean(pipeline.running || (task && task.state === 'running')),
+      queued: Boolean(task && task.state === 'queued'),
+    };
+  }
+
+  function collectingText(pipeline) {
+    return pipeline.stage ? t('run.collecting_stage', { stage: pipeline.stage }) : t('run.collecting');
+  }
+
+  // A run of this identity going (from here or from anywhere else), or
+  // waiting its turn: behind another collection, or a run started elsewhere
+  // that holds the shared base (tools/runstate.py).
+  function runStatus() {
+    const { pipeline, task, running, queued } = collectState();
+    if (running) {
+      const since = String(pipeline.startedAt || '').slice(11, 16);
+      return el('span', {
+        class: 'run-status', testid: 'run-status', title: t('run.collecting_since', { time: since }),
+      }, el('span', { class: 'spinner', testid: 'collect-indicator' }), collectingText(pipeline));
+    }
+    if (queued) {
+      return el('span', {
+        class: 'run-status queued', testid: 'run-status',
         title: task.waitingFor ? t('run.waiting_for', { identity: task.waitingFor }) : t('run.queued_hint'),
       }, t('run.queued'));
     }
-    if (!running) {
-      // Another identity's run holds the shared base: this one queues
-      // behind it (main/tasks.js).
-      return el('button', {
-        class: 'primary', testid: 'run-collect',
-        title: pipeline.busyWith ? t('run.busy_other', { identity: pipeline.busyWith }) : null,
-        onclick: startCollect,
-      }, t('run.collect'));
-    }
-    // A run of this identity is going — from here or from anywhere else.
-    const since = String(pipeline.startedAt || '').slice(11, 16);
+    return null;
+  }
+
+  function menuItem({ testid, text, title, disabled, onclick }) {
     return el('button', {
-      class: 'primary collecting', testid: 'run-collect', disabled: true,
-      title: t('run.collecting_since', { time: since }),
+      class: 'menu-item', role: 'menuitem', type: 'button', testid, title, disabled,
+      onclick: (event) => {
+        event.stopPropagation();
+        state.openMenu = false;
+        render();
+        if (onclick) onclick();
+      },
+    }, text);
+  }
+
+  function collectItem(identity) {
+    const { pipeline, task, running, queued } = collectState();
+    if (queued) {
+      return menuItem({
+        testid: 'run-collect', disabled: true, text: t('run.queued'),
+        title: task.waitingFor ? t('run.waiting_for', { identity: task.waitingFor }) : t('run.queued_hint'),
+      });
+    }
+    if (running) return menuItem({ testid: 'run-collect', disabled: true, text: collectingText(pipeline) });
+    if (identity && identity.active === false) {
+      return menuItem({ testid: 'run-collect', disabled: true, text: t('run.collect'), title: t('run.inactive') });
+    }
+    // Another identity's run holds the shared base: this one queues behind
+    // it (main/tasks.js).
+    return menuItem({
+      testid: 'run-collect', text: t('run.collect'), onclick: startCollect,
+      title: pipeline.busyWith ? t('run.busy_other', { identity: pipeline.busyWith }) : null,
+    });
+  }
+
+  // "Review feedback (N)" starts nothing: the review runs from an agent
+  // session, and the item says how.
+  function feedbackItem(pending) {
+    return el('div', { class: 'menu-item inert', role: 'menuitem', 'aria-disabled': 'true' },
+      el('span', { testid: 'run-feedback' }, t('run.feedback', { n: pending })),
+      el('span', { class: 'menu-tip', testid: 'run-feedback-tip' }, t('run.feedback_hint', { identity: state.active })));
+  }
+
+  function renderMenu(identity, pending) {
+    const open = Boolean(state.openMenu);
+    // "Stop" stops what the app started; a run started elsewhere is shown, not stopped
+    const { task } = collectState();
+    const running = Boolean(task && task.state === 'running');
+    const button = el('button', {
+      class: 'menu-button', testid: 'menu-button', type: 'button',
+      'aria-haspopup': 'menu', 'aria-expanded': open ? 'true' : 'false',
+      onclick: (event) => {
+        event.stopPropagation();
+        state.openMenu = !open;
+        render();
+      },
+    }, el('span', { class: 'menu-icon', 'aria-hidden': 'true' }, '\u2630'), t('menu.button'));
+    const menu = open && el('div', {
+      class: 'commands-menu', role: 'menu', testid: 'menu', onclick: (event) => event.stopPropagation(),
     },
-    el('span', { class: 'spinner', testid: 'collect-indicator' }),
-    pipeline.stage ? t('run.collecting_stage', { stage: pipeline.stage }) : t('run.collecting'));
+    collectItem(identity),
+    running && menuItem({ testid: 'run-stop', text: t('run.stop'), onclick: stopCollect }),
+    feedbackItem(pending),
+    menuItem({ testid: 'cleanup', text: t('cleanup.button'), title: t('cleanup.hint'), onclick: openCleanup }),
+    menuItem({ testid: 'open-identities', text: t('menu.identities'), onclick: openIdentities }));
+    return el('span', { class: 'commands' }, button, menu);
+  }
+
+  function closeMenu() {
+    if (!state.openMenu) return;
+    state.openMenu = false;
+    render();
+  }
+
+  // --- "Identities": which ones are collected (the owner, 2026-10-20) ---------
+  // A switch per identity. One turned off is not collected: the app refuses
+  // to queue it and tools/pipeline.py skips it. Its vacancies stay.
+
+  function openIdentities() {
+    state.identitiesPopup = { busy: null, error: null };
+    render();
+  }
+
+  function closeIdentities() {
+    state.identitiesPopup = null;
+    render();
+  }
+
+  async function setIdentityActive(prefix, active) {
+    const p = state.identitiesPopup;
+    p.busy = prefix;
+    p.error = null;
+    render();
+    try {
+      const now = await api.setIdentityActive(prefix, active);
+      const entry = state.identities.find((i) => i.prefix === prefix);
+      if (entry) entry.active = now;
+    } catch (error) {
+      p.error = error.message || String(error);
+    } finally {
+      p.busy = null;
+      render();
+    }
+  }
+
+  function renderIdentities() {
+    const p = state.identitiesPopup;
+    if (!p) return null;
+    const rows = state.identities.map((identity) => {
+      const active = identity.active !== false;
+      return el('li', {
+        class: active ? 'identity-row' : 'identity-row inactive', testid: `identity-row-${identity.prefix}`,
+      },
+      el('label', { class: 'identity-switch' },
+        el('input', {
+          type: 'checkbox', testid: `identity-active-${identity.prefix}`, checked: active,
+          disabled: p.busy === identity.prefix || !identity.hasDatabase,
+          title: identity.hasDatabase ? null : t('identities.no_base'),
+          onchange: (event) => setIdentityActive(identity.prefix, event.target.checked),
+        }),
+        el('span', { class: 'identity-prefix' }, identity.prefix),
+        el('span', { class: 'muted' }, identity.displayName || '')),
+      el('span', { class: 'muted identity-state', testid: `identity-state-${identity.prefix}` },
+        t(active ? 'identities.active' : 'identities.inactive')));
+    });
+    return el('div', {
+      class: 'overlay', testid: 'identities-overlay',
+      onclick: (event) => { if (event.target === event.currentTarget) closeIdentities(); },
+    },
+    el('div', { class: 'popup identities', role: 'dialog', 'aria-modal': 'true', testid: 'identities-dialog' },
+      el('h2', {}, t('identities.title')),
+      el('p', { class: 'muted' }, t('identities.explain')),
+      el('ul', { class: 'identity-list' }, rows),
+      p.error && el('p', { class: 'cleanup-error', testid: 'identities-error' }, p.error),
+      el('div', { class: 'reason-actions' },
+        el('button', { testid: 'identities-close', onclick: closeIdentities }, t('identities.close')))));
   }
 
   function renderToolbar(identity, info) {
-    const task = findTask(state.active, 'collect');
-    const running = Boolean(task && task.state === 'running');
     const pending = info.pending ? info.pending.bugged + info.pending.rejected : 0;
     const selection = info.selection;
     return el('div', { class: 'toolbar' },
@@ -1012,11 +1159,9 @@
             date: String(selection.created_at || '').slice(0, 16).replace('T', ' '),
           }) + (selection.kind === 'rebuild' ? ` · ${t('selection.rebuild')}` : ''))),
       el('div', { class: 'actions' },
+        runStatus(),
         el('button', { testid: 'refresh', title: t('app.refresh_hint'), onclick: refresh }, t('app.refresh')),
-        el('button', { testid: 'cleanup', title: t('cleanup.hint'), onclick: openCleanup }, t('cleanup.button')),
-        collectButton(),
-        feedbackHint(pending),
-        running && el('button', { class: 'danger', testid: 'run-stop', onclick: stopCollect }, t('run.stop'))));
+        renderMenu(identity, pending)));
   }
 
   // --- "Clean up": vacancies deleted for good (tools/cleanup.py) ----------------
@@ -1125,19 +1270,6 @@
   // the person opens, where they follow and steer it (the owner, 2026-10-07).
   // The count stays, and hovering or clicking says where to go. Not
   // `disabled`: a disabled button gets no clicks, and the click must show it.
-  function feedbackHint(pending) {
-    const hint = el('span', { class: 'feedback-hint', onmouseleave: () => hint.classList.remove('open') },
-      el('button', {
-        class: 'inert', testid: 'run-feedback', type: 'button', 'aria-disabled': 'true',
-        'aria-describedby': 'feedback-hint-tip',
-        onclick: (event) => { event.stopPropagation(); hint.classList.add('open'); },
-        onblur: () => hint.classList.remove('open'),
-      }, t('run.feedback', { n: pending })),
-      el('span', { class: 'tip', id: 'feedback-hint-tip', role: 'tooltip', testid: 'run-feedback-tip' },
-        t('run.feedback_hint', { identity: state.active })));
-    return hint;
-  }
-
   // --- the filters' drop-downs ---------------------------------------------------
   // An outlined box with its name on the top edge (Material's outlined field),
   // all four the same width. Not a <select>: a native list cannot wrap a long

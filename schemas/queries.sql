@@ -379,6 +379,15 @@ SET feedback_status = :status, feedback_at = :at,
     started_comment = :started_comment, started_at = :started_at
 WHERE identity_id = :identity AND vacancy_id = :id;
 
+-- name: set_identity_active
+-- The "Identities" window's switch: 0 turns the identity off, and nothing
+-- collects for it (tools/identity.py skip_if_inactive).
+INSERT INTO identities (id, display_name, created_at, active) VALUES (:identity, NULL, :at, :active)
+ON CONFLICT(id) DO UPDATE SET active = excluded.active;
+
+-- name: identity_active
+SELECT active FROM identities WHERE id = :identity;
+
 -- name: pending_feedback_counts
 -- Feedback is pending review until feedback.py marks it reviewed AFTER it was
 -- last changed: a person may change their mind about a vacancy already

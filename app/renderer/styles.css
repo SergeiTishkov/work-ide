@@ -125,6 +125,8 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 10px 14px; }
 .tab.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+/* an identity turned off in "Identities": not collected, still readable */
+.tab.inactive { opacity: .5; font-style: italic; }
 .identity-tabs .tab { font-size: 15px; }
 
 .error { background: var(--danger); color: #fff; padding: 8px 16px; }
@@ -136,17 +138,38 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .identity-heading h1 { font-size: 18px; margin: 0 0 2px; }
 .selection-caption { display: block; margin: 4px 0; }
 .actions { display: flex; gap: 8px; }
-/* "Review feedback (N)": looks disabled, yet takes hover and clicks to show
-   its tooltip (app.js, feedbackHint). The tip opens below, right-aligned:
-   the button sits at the toolbar's right edge. */
-.feedback-hint { position: relative; display: inline-flex; }
-.feedback-hint .inert { opacity: .5; cursor: default; }
-.feedback-hint .tip {
-  display: none; position: absolute; right: 0; top: calc(100% + 6px); width: 280px;
-  background: var(--surface); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 6px 10px; font-size: 12px; line-height: 1.4; z-index: 10;
+.actions { align-items: center; }
+/* The commands menu (app.js, renderMenu): Collect, Stop, Review feedback,
+   Clean up, Identities. Opens under its button, right-aligned: the button
+   sits at the toolbar's right edge. */
+.commands { position: relative; display: inline-flex; }
+.menu-button { display: inline-flex; align-items: center; gap: 6px; }
+.menu-button[aria-expanded="true"] { border-color: var(--accent); }
+.commands-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 260px; max-width: 340px;
+  display: flex; flex-direction: column; padding: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
 }
-.feedback-hint:hover .tip, .feedback-hint.open .tip, .feedback-hint .inert:focus-visible + .tip { display: block; }
+.menu-item {
+  display: block; width: 100%; text-align: left; border: none; border-radius: 4px;
+  background: none; padding: 7px 10px;
+}
+.menu-item:hover:not(:disabled):not(.inert) { background: var(--accent-soft); }
+.menu-item.inert { opacity: .6; cursor: default; }
+.menu-tip { display: block; font-size: 11.5px; line-height: 1.35; color: var(--muted); margin-top: 2px; }
+/* a collection going (spinner and stage) or queued, beside the menu */
+.run-status {
+  display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 6px;
+  background: var(--accent); color: #fff; cursor: progress; white-space: nowrap;
+}
+.run-status.queued { background: var(--accent-soft); color: var(--text); cursor: default; }
+/* "Identities": a switch per identity */
+.identity-list { list-style: none; margin: 10px 0; padding: 0; }
+.identity-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.identity-row.inactive .identity-prefix { opacity: .6; font-style: italic; }
+.identity-switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.identity-prefix { font-weight: 600; min-width: 80px; }
 
 /* The filters: Material's outlined field — the name sits on the box's top
    edge, over the chosen value. The label's background is split at its middle:

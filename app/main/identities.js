@@ -15,6 +15,8 @@ function parse(text) {
     // the identity's own folder: insights, state, feedback packages, run logs
     dataDir: e.data_dir || null,
     hasDatabase: Boolean(e.has_database),
+    // false: turned off in the "Identities" window, not collected
+    active: e.active !== false,
   }));
 }
 

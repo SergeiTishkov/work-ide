@@ -39,7 +39,11 @@ CREATE TABLE IF NOT EXISTS identities (
   id           TEXT PRIMARY KEY,
   -- What the search is about, in the identity's own words: its tab's caption.
   display_name TEXT,
-  created_at   TEXT NOT NULL
+  created_at   TEXT NOT NULL,
+  -- 0: the person turned the identity off in the app's "Identities" window
+  -- (the owner, 2026-10-20). Nothing collects for it: tools/pipeline.py and
+  -- the single-source fetchers skip it; its vacancies stay readable.
+  active       INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS vacancies (

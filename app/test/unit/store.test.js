@@ -576,3 +576,14 @@ test('words: each one typed must be in the title, company, board or link, any ca
   assert.equal(store.sources('test', { ...all, text: 'backend' }).reduce((a, s) => a + s.total, 0), 1);
   store.closeAll();
 });
+
+test('an identity turned off and on again: the base keeps it, a new one gets its row', () => {
+  const { store, file } = setup();
+  assert.equal(store.setIdentityActive('test', false), false);
+  assert.equal(store.setIdentityActive('test', true), true);
+  assert.equal(store.setIdentityActive('test', false), false);
+  store.closeAll();
+  const db = new DatabaseSync(file);
+  assert.equal(db.prepare("SELECT active FROM identities WHERE id = 'test'").get().active, 0);
+  db.close();
+});

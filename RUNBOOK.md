@@ -51,6 +51,11 @@ vacancies first"): `--top` does the top classes in about an hour (the app's
 "Collect" runs it through `/top`), `--rest` does the whole base afterwards
 (the app queues it). Without a flag the command is the full cycle.
 
+An identity turned off (the app's Menu → Identities, or `python
+tools/identity.py set-active --identity <p> off`) is not collected: every mode
+prints `SKIPPED: identity '<p>' is inactive` and stops with success. Say so in
+the summary; do not turn it on to get round it.
+
 How far back it collects is decided at the start (docs/ARCHITECTURE.md, "How
 far back a collection reaches"): LinkedIn, the one source with a date filter,
 is asked for the days since the last collection, both included — yesterday

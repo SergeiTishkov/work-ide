@@ -187,7 +187,12 @@ function enqueueTask(request) {
   if (!TASK_KINDS.has(r.kind)) throw new Error(`unknown task kind: ${r.kind}`);
   if (!IDENTITY_PATTERN.test(String(r.identity))) throw new Error(`invalid identity: ${r.identity}`);
   const text = (value, limit) => String(value == null ? '' : value).slice(0, limit);
-  if (r.kind === 'collect' || r.kind === 'rest') return tasks.enqueue({ kind: r.kind, identity: r.identity });
+  if (r.kind === 'collect' || r.kind === 'rest') {
+    // the pipeline would skip it too (tools/identity.py skip_if_inactive)
+    const entry = identities.find((e) => e.prefix === r.identity);
+    if (entry && entry.active === false) throw new Error(`${r.identity} is inactive: it is not collected`);
+    return tasks.enqueue({ kind: r.kind, identity: r.identity });
+  }
   if (r.kind === 'reputation') {
     vacancyDir('x', r.identity, r.vacancyId);   // validates the id
     return tasks.enqueue({
@@ -220,7 +225,14 @@ function handle(channel, fn) {
 function registerIpc(window) {
   handle('identities', async () => {
     identities = await listIdentities({ root });
-    return identities.map(({ prefix, displayName, hasDatabase }) => ({ prefix, displayName, hasDatabase }));
+    return identities.map(({ prefix, displayName, hasDatabase, active }) => ({ prefix, displayName, hasDatabase, active }));
+  });
+  handle('set-identity-active', async (identity, active) => {
+    if (!IDENTITY_PATTERN.test(String(identity))) throw new Error(`invalid identity: ${identity}`);
+    const now = await data.call('setIdentityActive', identity, Boolean(active));
+    const entry = identities.find((e) => e.prefix === identity);
+    if (entry) entry.active = now;
+    return now;
   });
   handle('segments', (identity) => data.call('segments', identity));
   handle('listing', (identity, view, page) => data.call('listing', identity, view || {}, page || {}));

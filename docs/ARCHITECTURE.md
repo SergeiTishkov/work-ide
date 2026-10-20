@@ -950,6 +950,32 @@ still makes a write wait for its lock (busy_timeout 60 s): the confirmation
 is the write itself.
 
 
+### An identity turned off, and the commands in one menu (2026-10-20)
+
+The owner, 2026-10-20: an identity can be inactive, and an inactive one is
+not collected. The flag is `identities.active` in the shared base (schema
+version 11), not a line in the identity's folder: the app already writes the
+base, and both sides read it. The "Identities" window in the app's menu
+switches it (`store.setIdentityActive`, query `set_identity_active`);
+`python tools/identity.py set-active --identity <p> on|off` does the same by
+hand.
+
+The block sits where collecting starts, so every path through it is covered:
+`tools/pipeline.py` (`--top`, `--rest`, the full cycle) and the single-source
+fetchers (`identity.standalone_main`) return at once, exit 0, with a
+`SKIPPED: identity '<p>' is inactive` line (`identity.skip_if_inactive`). A
+skip, not a failure: a queue of runs goes on to the next. The app also
+refuses to queue a collection for one (`main.js`, `enqueueTask`) and greys out
+"Collect" with the reason. The flag is read read-only, without upgrading the
+base (`identity.inactive_identities`): a test that lists the identities must
+not migrate the real base. An inactive identity keeps its tab, dimmed, and
+its vacancies.
+
+The same day the toolbar's commands moved into one menu beside "Refresh":
+Collect (and Stop, for a collection the app started), Review feedback with the
+way to start it, Clean up, Identities. A collection going or queued shows
+beside the menu with its stage, so it is seen with the menu closed.
+
 ### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)
 
 When eligibility became its own axis, sections were sorted by it first and by

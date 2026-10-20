@@ -12,6 +12,8 @@ async function call(channel, ...args) {
 
 contextBridge.exposeInMainWorld('api', {
   listIdentities: () => call('identities'),
+  // false turns the identity off: nothing collects for it
+  setIdentityActive: (identity, active) => call('set-identity-active', identity, Boolean(active)),
   loadSegments: (identity) => call('segments', identity),
   // view: { segments, statuses, fresh, sources, fits, companies, ages, text } (store.viewParams);
   // page: { shown: { class: rows }, expanded: [class] }

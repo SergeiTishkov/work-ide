@@ -69,6 +69,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     db.close();
     expect({ ...row }).toEqual({ feedback_status: 'bugged', bugged_reason: 'onsite in fact' });
 
+    await window.getByTestId('menu-button').click();
     await window.getByTestId('run-collect').click();
     await expect(window.getByTestId('task-1')).toHaveAttribute('data-state', 'done', { timeout: 15000 });
     // a collection that ends well queues the rest of the base: the panel
@@ -78,7 +79,7 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await window.getByTestId('task-1').click();
     await expect(window.getByTestId('task-log')).toContainText('fake run: /top sharp');
     await expect(window.getByTestId('task-log-title')).toContainText(ru['task.state.done']);
-    await expect(window.getByTestId('run-collect')).toBeEnabled();
+    await expect(window.getByTestId('run-status')).toHaveCount(0);
     expect(fs.readdirSync(path.join(repo.root, 'data', 'identities', 'sharp', 'runs'))).toHaveLength(1);
 
     // The indicator reads tools/runstate.py's row: a live one (this test's own
@@ -89,11 +90,10 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
       "INSERT INTO pipeline_runs (identity_id, started_at, heartbeat_at, status, stage, pid, host) "
       + "VALUES ('sharp', ?, ?, 'running', 'check links', ?, ?)").run(now, now, process.pid, os.hostname());
     await expect(window.getByTestId('collect-indicator')).toBeVisible({ timeout: 10000 });
-    await expect(window.getByTestId('run-collect')).toContainText('check links');
+    await expect(window.getByTestId('run-status')).toContainText('check links');
     runs.prepare("UPDATE pipeline_runs SET status = 'finished' WHERE id = ?").run(lastInsertRowid);
     runs.close();
     await expect(window.getByTestId('collect-indicator')).toHaveCount(0, { timeout: 10000 });
-    await expect(window.getByTestId('run-collect')).toBeEnabled();
 
     // Refresh through the real IPC: the main process's code has not changed
     // since start, so the page reloads, keeps the view and works. One click:
@@ -105,6 +105,16 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     await expect.poll(() => window.evaluate(() => window.__beforeRefresh)).toBeUndefined();
     await expect(window.getByTestId('filter-option-earlier')).toHaveAttribute('data-state', 'on');
     await expect(window.getByTestId('error')).toBeHidden();
+
+    // "Identities" through the real IPC: the switch lands in the base
+    await window.getByTestId('menu-button').click();
+    await window.getByTestId('open-identities').click();
+    await window.getByTestId('identity-active-partsharp').uncheck();
+    await expect(window.getByTestId('identity-tab-partsharp')).toHaveClass(/inactive/);
+    const flags = new DatabaseSync(repo.database);
+    expect(flags.prepare("SELECT active FROM identities WHERE id = 'partsharp'").get().active).toBe(0);
+    flags.close();
+    await window.getByTestId('identities-close').click();
 
     await window.getByTestId('identity-tab-partsharp').click();
     await expect(window.getByTestId('never-collected')).toBeVisible();

@@ -39,7 +39,7 @@ import common  # noqa: E402
 
 # 8: one base for every identity. The per-identity files of versions 1-7 are
 # not upgraded in place: tools/merge_shared_base.py merged them once.
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 SCHEMA_PATH = common.ROOT / "schemas" / "db.sql"
 
 # How long a writer waits for another writer's transaction before giving up.
@@ -113,9 +113,17 @@ def _to_10(conn: sqlite3.Connection) -> None:
             ((selection_id, slug) for selection_id, (slug, _) in chosen.items()))
 
 
+def _to_11(conn: sqlite3.Connection) -> None:
+    """An identity can be turned off (2026-10-20): identities.active."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(identities)")}
+    if "active" not in columns:
+        with conn:
+            conn.execute("ALTER TABLE identities ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
+
+
 # version reached -> the step that reaches it. Version 8 started the shared
 # base afresh.
-MIGRATIONS: dict = {9: _to_9, 10: _to_10}
+MIGRATIONS: dict = {9: _to_9, 10: _to_10, 11: _to_11}
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
@@ -200,6 +208,14 @@ def ensure_identity(conn: sqlite3.Connection, prefix: Optional[str] = None,
         conn.execute("UPDATE identities SET display_name = ? WHERE id = ?",
                      (display_name, prefix))
     return prefix
+
+
+def set_identity_active(conn: sqlite3.Connection, prefix: str, active: bool) -> None:
+    """identities.active: nothing collects for an identity turned off
+    (identity.skip_if_inactive)."""
+    from selections import load_queries   # the app's own statement, one text for both
+    conn.execute(load_queries()["set_identity_active"],
+                 {"identity": prefix, "at": now_iso(), "active": 1 if active else 0})
 
 
 # --- Vacancies and companies ------------------------------------------------

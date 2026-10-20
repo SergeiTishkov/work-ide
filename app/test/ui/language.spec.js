@@ -25,7 +25,7 @@ async function flagOf(locator) {
 
 test('Russian by default; the button shows its flag and the menu is closed', async ({ page }) => {
   await open(page);
-  await expect(page.getByTestId('run-collect')).toHaveText(ru['run.collect']);
+  await expect(page.getByTestId('menu-button')).toContainText(ru['menu.button']);
   await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
   const button = page.getByTestId('language-button');
   await expect(button).toHaveAttribute('title', ru['language.choose']);
@@ -55,7 +55,7 @@ test('choosing English re-draws the whole interface in English', async ({ page }
   await expect(page.getByTestId('language-menu')).toHaveCount(0);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   expect(await flagOf(page.getByTestId('language-button'))).toEqual({ src: 'flags/en.svg', loaded: true });
-  await expect(page.getByTestId('run-collect')).toHaveText(en['run.collect']);
+  await expect(page.getByTestId('menu-button')).toContainText(en['menu.button']);
   await expect(page.getByTestId('refresh')).toHaveText(en['app.refresh']);
   await expect(page.getByTestId('filter-label')).toHaveText(en['filter.legend']);
   await expect(page.locator('[data-testid^="vacancy-"]').first().getByTestId('btn-applied'))
@@ -69,11 +69,11 @@ test('the choice survives a reload, and Russian comes back the same way', async 
   await page.getByTestId('language-button').click();
   await page.getByTestId('language-option-en').click();
   await page.reload();
-  await expect(page.getByTestId('run-collect')).toHaveText(en['run.collect']);
+  await expect(page.getByTestId('menu-button')).toContainText(en['menu.button']);
 
   await page.getByTestId('language-button').click();
   await page.getByTestId('language-option-ru').click();
-  await expect(page.getByTestId('run-collect')).toHaveText(ru['run.collect']);
+  await expect(page.getByTestId('menu-button')).toContainText(ru['menu.button']);
   await expect(page.getByTestId('posted-on').first()).toContainText(/\d{2}\.\d{2}\.\d{4}/);
 });
 
@@ -85,7 +85,7 @@ test('a click elsewhere or Escape closes the drop-down without a change', async 
   await page.getByTestId('language-button').click();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('language-menu')).toHaveCount(0);
-  await expect(page.getByTestId('run-collect')).toHaveText(ru['run.collect']);
+  await expect(page.getByTestId('menu-button')).toContainText(ru['menu.button']);
 });
 
 test("a vacancy's own lines follow the language, a row without them keeps its one", async ({ page }) => {

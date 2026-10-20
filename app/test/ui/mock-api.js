@@ -246,6 +246,13 @@ function installMockApi(fixture) {
       if (data.failIdentities) throw new Error('listIdentities failed');
       return data.identities;
     },
+    async setIdentityActive(identity, active) {
+      record('setIdentityActive', [identity, active]);
+      const entry = data.identities.find((i) => i.prefix === identity);
+      if (!entry || !entry.hasDatabase) throw new Error(`no base yet for ${identity}`);
+      entry.active = Boolean(active);
+      return entry.active;
+    },
     async loadSegments(identity) {
       record('loadSegments', [identity]);
       return data.segments[identity] || { selection: null, displayName: null, segments: [] };

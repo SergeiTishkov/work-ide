@@ -44,7 +44,7 @@ function createDatabase(file, {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(fs.readFileSync(path.join(SCHEMA_DIR, 'db.sql'), 'utf8'));
-  db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', '10')").run();
+  db.prepare("INSERT INTO meta (key, value) VALUES ('schema_version', '11')").run();
   db.prepare("INSERT INTO identities (id, display_name, created_at) VALUES (?, ?, '2026-09-01')")
     .run(identity, displayName);
   const classOrder = ['hot_lead', 'worth_a_look', 'long_shot',

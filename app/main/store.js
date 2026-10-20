@@ -13,7 +13,7 @@ const { loadQueries } = require('./queries');
 const { addFold } = require('./fold');
 const funnel = require('../renderer/funnel.js');
 
-const SCHEMA_VERSION = '10';
+const SCHEMA_VERSION = '11';
 // The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
 // beaten for this long is gone, whatever its row still says.
 const STALE_AFTER_MS = 45000;
@@ -403,6 +403,15 @@ class Store {
     if (!db) return { bugged: 0, rejected: 0 };
     const row = db.prepare(this.queries.pending_feedback_counts).get({ identity });
     return { bugged: row.bugged, rejected: row.rejected };
+  }
+
+  // identities.active (schemas/db.sql): an identity turned off in the
+  // "Identities" window is not collected (the owner, 2026-10-20).
+  setIdentityActive(identity, active) {
+    const db = this.connection(identity);
+    if (!db) throw new Error(`no base yet for ${identity}: collect it once first`);
+    db.prepare(this.queries.set_identity_active).run({ identity, active: active ? 1 : 0, at: this.clock() });
+    return db.prepare(this.queries.identity_active).get({ identity }).active === 1;
   }
 
   // Before a run: the agent may rebuild the database, so let go of it.

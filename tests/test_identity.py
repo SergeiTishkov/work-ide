@@ -546,3 +546,33 @@ def test_tabs_follow_tab_position_then_the_alphabet(monkeypatch):
     monkeypatch.setattr(templates, "local_manifest",
                         lambda prefix: {"tab_position": positions[prefix]} if prefix in positions else {})
     assert [e["prefix"] for e in identity.identities_for_app()] == ["sharp", "partsharp", "abc"]
+
+
+def test_an_identity_turned_off_is_skipped_by_every_collecting_entry_point(isolated_data_dir, monkeypatch,
+                                                                             capsys):
+    """The owner, 2026-10-20: an inactive identity is not collected — a skip
+    with success, so a queue of runs goes on, not a failure."""
+    import sys
+    import pipeline
+
+    prefix = common.ACTIVE_IDENTITY
+    assert identity.inactive_identities() == set()   # no base yet: everything active
+    identity.set_active(prefix, False)
+    assert identity.inactive_identities() == {prefix}
+    assert not identity.is_active(prefix)
+
+    monkeypatch.setattr(sys, "argv", ["pipeline.py", "--identity", prefix, "--top"])
+    monkeypatch.setattr(identity, "activate_or_exit", lambda value=None, quiet=False: prefix)
+    monkeypatch.setattr(pipeline, "run_top", lambda **_: pytest.fail("an inactive identity was collected"))
+    pipeline.main()
+    assert f"SKIPPED: identity '{prefix}' is inactive" in capsys.readouterr().out
+
+    fetched = []
+    monkeypatch.setattr(sys, "argv", ["fetch_x.py", "--identity", prefix])
+    identity.standalone_main(lambda: fetched.append(1) or ([], None), "x")
+    assert fetched == []
+
+    identity.set_active(prefix, True)
+    assert identity.is_active(prefix)
+    identity.standalone_main(lambda: fetched.append(1) or ([], None), "x")
+    assert fetched == [1]

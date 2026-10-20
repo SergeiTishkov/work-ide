@@ -258,3 +258,20 @@ def test_dump_gives_the_shortlist_with_full_descriptions(isolated_data_dir, caps
 
     kb.cmd_dump(argparse.Namespace(id=None, min_class="hot_lead"))
     assert [r["id"] for r in yaml.safe_load(capsys.readouterr().out)] == ["h"]
+
+
+def test_version_11_gives_every_identity_the_active_flag_on(isolated_data_dir):
+    kb.save_vacancies({"a1": _vacancy("a1")})
+    with db.session() as conn:
+        # The table as version 10 made it.
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("ALTER TABLE identities RENAME TO identities_new")
+        conn.execute("CREATE TABLE identities (id TEXT PRIMARY KEY, display_name TEXT, "
+                     "created_at TEXT NOT NULL)")
+        conn.execute("INSERT INTO identities SELECT id, display_name, created_at FROM identities_new")
+        conn.execute("DROP TABLE identities_new")
+        conn.execute("UPDATE meta SET value = '10' WHERE key = 'schema_version'")
+    kb.load_vacancies()
+    with db.session() as conn:
+        rows = conn.execute("SELECT id, active FROM identities").fetchall()
+    assert rows == [(db.identity(), 1)]

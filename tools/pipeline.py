@@ -799,7 +799,9 @@ def main() -> None:
     mode.add_argument("--rest", action="store_true",
                       help="what the top run left: the whole base (see run_rest)")
     args = parser.parse_args()
-    identity_mod.activate_or_exit(args.identity)
+    prefix = identity_mod.activate_or_exit(args.identity)
+    if identity_mod.skip_if_inactive(prefix):
+        return
 
     # Mirrored into a file, so a run started by the agent or the app can be
     # followed from outside: tail -f data/identities/<prefix>/runs/pipeline_<time>.log
