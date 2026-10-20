@@ -324,8 +324,10 @@
   async function loadIdentities() {
     state.identities = await api.listIdentities();
     state.booted = true;
-    if (!state.identities.some((i) => i.prefix === state.active)) {
-      state.active = state.identities.length ? state.identities[0].prefix : null;
+    const on = state.identities.filter((i) => i.active !== false);
+    const chosen = state.identities.find((i) => i.prefix === state.active);
+    if (!chosen || (chosen.active === false && on.length)) {
+      state.active = (on[0] || state.identities[0] || {}).prefix || null;
     }
     if (state.active) await loadIdentity(state.active);
   }
@@ -915,9 +917,13 @@
     }
   });
 
+  // An identity turned off in "Identities" has no tab (the owner,
+  // 2026-10-20: "hide the ones that exist but are not active"), unless it is
+  // the one shown: turned off while open, it stays until another is chosen.
   function renderIdentityTabs() {
     const nav = document.querySelector('[data-testid="identity-tabs"]');
-    nav.replaceChildren(...state.identities.map((identity) => {
+    const tabs = state.identities.filter((identity) => identity.active !== false || identity.prefix === state.active);
+    nav.replaceChildren(...tabs.map((identity) => {
       const collecting = (state.pipelines[identity.prefix] || {}).running;
       const inactive = identity.active === false;
       return el('button', {
