@@ -342,6 +342,7 @@ button.cv.done { color: var(--applied); border-color: var(--applied); }
 }
 .badge.fresh { color: var(--fresh); }
 .badge.review { color: var(--rejected); }
+.badge.stretch { color: var(--accent); }
 .badge.status.applied { color: var(--applied); }
 .badge.status.rejected { color: var(--rejected); }
 .badge.status.bugged { color: var(--bugged); }

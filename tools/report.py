@@ -520,7 +520,19 @@ def vacancy_view(v: dict) -> dict:
         # What the screening model said (tools/ai_screen.py): {verdict,
         # reason, quote, ...}, or null when it has not read this text.
         "ai_screen": bd.get("ai_screen") or None,
+        # Off the stack or level and let through by the model's read against
+        # the CV (score.py, criteria stretch_roles): {fit, work_kind, reason},
+        # or null. The card's "a stretch for the CV" mark.
+        "stretch": _stretch_mark(bd),
     }
+
+
+def _stretch_mark(bd: dict):
+    stretch = bd.get("stretch_roles") or {}
+    if stretch.get("fit") not in ("fits", "stretch"):
+        return None
+    return {"fit": stretch["fit"], "work_kind": stretch.get("work_kind"),
+            "reason": (bd.get("ai_screen") or {}).get("reason")}
 
 
 def vacancy_views(v: dict) -> dict:

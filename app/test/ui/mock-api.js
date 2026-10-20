@@ -473,6 +473,8 @@ function row(id, { cls = 'hot_lead', score = 60, fresh = true, status = 'new', s
       hiring_country: 'United Kingdom', company_age: null, note: null,
       posted_on: id === 'a2r' ? null : '2026-09-20', first_seen_on: '2026-09-28',
       needs_manual_review: id.endsWith('r'),
+      stretch: id === 'b1' ? { fit: 'stretch', work_kind: 'applied_ai', reason: 'RAG on model APIs; the backend carries' }
+        : id === 'a2r' ? { fit: 'fits', work_kind: 'software', reason: 'Node backend, as on the CV' } : null,
       source,
     },
     feedback: { status, at: null, rejectedReason: null, buggedReason: null, interviewComments: [], interviewAt: [] },

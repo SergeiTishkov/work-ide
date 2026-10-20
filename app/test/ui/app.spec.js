@@ -495,6 +495,15 @@ test('badges: fresh and needs a manual check', async ({ page }) => {
   await expect(byId(page, 'a1').getByTestId('badge-review')).toHaveCount(0);
 });
 
+test('a role off the stack the model let through is marked, with its reason on hover', async ({ page }) => {
+  await open(page);
+  const stretch = byId(page, 'b1').getByTestId('badge-stretch');
+  await expect(stretch).toHaveText(en['badge.stretch']);
+  await expect(stretch).toHaveAttribute('title', 'RAG on model APIs; the backend carries');
+  await expect(byId(page, 'a2r').getByTestId('badge-stretch')).toHaveText(en['badge.off_stack']);
+  await expect(byId(page, 'a1').getByTestId('badge-stretch')).toHaveCount(0);
+});
+
 test('a missing claude is explained', async ({ page }) => {
   const fixture = standardFixture();
   fixture.collectReply = { ok: false, error: 'claude_not_found' };

@@ -1860,7 +1860,12 @@
         el('span', { class: 'company' }, view.company || ''),
         item.fresh && el('span', { class: 'badge fresh', testid: 'badge-fresh' }, t('badge.fresh')),
         view.needs_manual_review && el('span', { class: 'badge review', testid: 'badge-review' },
-          t('badge.manual_review'))),
+          t('badge.manual_review')),
+        // off the stack or level, let through by the screening model's read
+        // against the CV (criteria stretch_roles, the owner, 2026-10-20)
+        view.stretch && el('span', {
+          class: 'badge stretch', testid: 'badge-stretch', title: view.stretch.reason || null,
+        }, t(view.stretch.fit === 'stretch' ? 'badge.stretch' : 'badge.off_stack'))),
       el('div', { class: 'row-facts' },
         view.hiring_country && md('span', `${t('row.hiring_country')}: ${view.hiring_country}`),
         view.salary && md('span', `${t('row.salary')}: ${view.salary}`)),
@@ -1931,7 +1936,7 @@
     compensation: 'score.part.compensation', contractor: 'score.part.contractor',
     reputation: 'score.part.reputation', company_age: 'score.part.company_age',
     market: 'score.part.market', tech: 'score.part.tech', title: 'score.part.title',
-    exporter: 'score.part.exporter',
+    exporter: 'score.part.exporter', stretch: 'score.part.stretch',
   };
 
   function renderScoreParts(parts) {

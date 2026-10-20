@@ -207,6 +207,7 @@
   'score.part.tech': 'Предпочтительные технологии',
   'score.part.title': 'Название позиции',
   'score.part.exporter': 'Рынок, экспортирующий разработчиков',
+  'score.part.stretch': 'Натяжка для CV',
   'row.posted_on': '📅 Опубликована: {date}',
   'row.first_seen_on': '📥 Скачана: {date}',
   'row.date_unknown': 'не указано',
@@ -222,6 +223,8 @@
 
   'badge.fresh': 'свежая',
   'badge.manual_review': 'нужна ручная проверка',
+  'badge.stretch': 'натяжка для CV',
+  'badge.off_stack': 'другой стек, CV подходит',
 
   'action.open': '🔗 Открыть ссылку на вакансию',
   'action.copy_url': 'Копировать URL',
