@@ -895,8 +895,9 @@ test('choosing a source lists only its vacancies, and the filter counts follow i
   await expect(page.getByTestId('filter-option-new')).toContainText('(1)');   // b1
 });
 
-test('"Identities" turns one off: its tab dims, it cannot be collected, and on again it can', async ({ page }) => {
+test('"Identities" turns one off: it cannot be collected, its tab goes once another is open, on again it is back', async ({ page }) => {
   await open(page);
+  await page.getByTestId('identity-tab-partsharp').click();
   await (await command(page, 'open-identities')).click();
   const dialog = page.getByTestId('identities-dialog');
   await expect(dialog).toBeVisible();
@@ -908,22 +909,38 @@ test('"Identities" turns one off: its tab dims, it cannot be collected, and on a
   await page.getByTestId('identity-active-partsharp').uncheck();
   expect(await calls(page, 'setIdentityActive')).toEqual([['partsharp', false]]);
   await expect(page.getByTestId('identity-state-partsharp')).toHaveText(en['identities.inactive']);
-  await expect(page.getByTestId('identity-tab-partsharp')).toHaveClass(/inactive/);
   await page.getByTestId('identities-close').click();
   await expect(dialog).toHaveCount(0);
 
-  await page.getByTestId('identity-tab-partsharp').click();
+  // the one open keeps its tab, dimmed, and cannot be collected
+  await expect(page.getByTestId('identity-tab-partsharp')).toHaveClass(/inactive/);
   const collect = await command(page, 'run-collect');
   await expect(collect).toBeDisabled();
   await expect(collect).toHaveAttribute('title', en['run.inactive']);
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('menu')).toHaveCount(0);
 
+  await page.getByTestId('identity-tab-sharp').click();
+  await expect(page.getByTestId('identity-tab-partsharp')).toHaveCount(0);
+
   await (await command(page, 'open-identities')).click();
   await page.getByTestId('identity-active-partsharp').check();
   await page.getByTestId('identities-close').click();
   await expect(page.getByTestId('identity-tab-partsharp')).not.toHaveClass(/inactive/);
+  await page.getByTestId('identity-tab-partsharp').click();
   await expect(await command(page, 'run-collect')).toBeEnabled();
+});
+
+test('an inactive identity has no tab, and the app opens on an active one', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.identities[1].active = false;   // partsharp
+  await page.addInitScript(() => {
+    localStorage.setItem('work-ide-view', JSON.stringify({ active: 'partsharp', views: {} }));
+  });
+  await open(page, fixture);
+  await expect(page.getByTestId('identity-tab-sharp')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('identity-tab-partsharp')).toHaveCount(0);
+  await expect(page.getByTestId('identity-tab-newbie')).toBeVisible();   // no base yet, not turned off
 });
 
 test('the menu closes on a click elsewhere', async ({ page }) => {
