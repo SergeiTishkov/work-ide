@@ -24,5 +24,5 @@ reputation slot to carry.
 
 ## Items
 - DONE - Plan (2026-10-21, with the owner)
-- TO DO - The switch, defaulting to on; sharp turns it off (template version, CHANGELOG)
-- TO DO - App and scoring follow it; tests
+- DONE - The switch, defaulting to on; sharp turns it off (template version, CHANGELOG)
+- DONE - App and scoring follow it; tests

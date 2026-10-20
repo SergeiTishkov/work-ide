@@ -52,6 +52,15 @@ def test_salary_info_shows_no_data_when_nothing_found():
     assert "no data" in text
 
 
+def test_reputation_off_offers_no_lookup_and_prints_nothing():
+    view_bd = {"company_reputation_signal": {"has_data": False, "off": True}}
+    assert report._fmt_reputation(view_bd["company_reputation_signal"]) == ""
+    v = {"id": "r1", "title": "Dev", "company": "Acme", "url": "https://x/1",
+         "computed": {"classification": "hot_lead", "score_breakdown": view_bd}}
+    view = report.vacancy_view(v)
+    assert view["reputation_collected"] is True and not view["reputation"]
+
+
 def test_a_vacancy_without_a_salary_says_so():
     vacancy = {
         "title": "Senior .NET Developer",

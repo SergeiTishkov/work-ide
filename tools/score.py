@@ -2478,6 +2478,12 @@ def _score_red_flags(flags: list, profile: dict):
     return total, detail
 
 
+def reputation_enabled(criteria: dict) -> bool:
+    """Whether the identity scores and collects employer reputation; on unless
+    `company_reputation_signal.enabled` is false."""
+    return (criteria.get("company_reputation_signal") or {}).get("enabled", True) is not False
+
+
 def _score_company_reputation(vacancy: dict, criteria: dict, profile: dict = None):
     """Employer reputation from external sources (Glassdoor and similar),
     gathered by the agent by hand and stored at company level.
@@ -2487,6 +2493,11 @@ def _score_company_reputation(vacancy: dict, criteria: dict, profile: dict = Non
     strength of pay and career growth while grinding people down, and this
     search wants exactly the opposite."""
     cfg = criteria.get("company_reputation_signal")
+    # An identity can turn reputation off (`enabled: false`): no points, no
+    # manual-review mark, and the app offers no lookup (the owner,
+    # 2026-10-21, for SHARP). A reputation recorded earlier stays in the base.
+    if not reputation_enabled(criteria):
+        return 0, {"has_data": False, "off": True}, False
     rep = vacancy.get("_company_reputation")
     if not cfg or not rep:
         return (cfg or {}).get("no_data_points", 0), {"has_data": False}, False
@@ -2814,6 +2825,9 @@ def score_parts(points: dict, breakdown: dict, criteria: dict, profile: dict) ->
     add("contractor", points.get("contractor"), 0, (criteria.get("contractor_friendliness") or {}).get("cap") or 0)
     rep = criteria.get("company_reputation_signal") or {}
     overall, wlb = rep.get("overall_rating") or {}, rep.get("work_life_balance") or {}
+    if not reputation_enabled(criteria):
+        overall, wlb = {}, {}
+        rep = {**rep, "red_flag_penalty_cap": 0}
     add("reputation", points.get("reputation"),
         (overall.get("poor_points") or 0) + (wlb.get("poor_points") or 0) + (rep.get("red_flag_penalty_cap") or 0),
         (overall.get("excellent_points") or 0) + (wlb.get("excellent_points") or 0))

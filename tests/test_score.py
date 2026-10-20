@@ -770,6 +770,25 @@ def test_company_reputation_no_data_is_neutral():
     assert r2["score"] > baseline
 
 
+def test_reputation_turned_off_gives_no_points_and_no_review():
+    """SHARP turned reputation off (the owner, 2026-10-21): a recorded
+    reputation, even an alarming one, changes neither the score nor the
+    manual-review mark."""
+    off = {**CRITERIA, "company_reputation_signal": {**CRITERIA["company_reputation_signal"], "enabled": False}}
+    plain = make_vacancy(location_raw="Anywhere in the World",
+                         description_text="C# TypeScript React developer role.")
+    alarming = dict(plain, _company_reputation={"overall_rating": 2.1, "work_life_balance": 2.0,
+                                                "source": "Glassdoor", "red_flags": ["toxic"]})
+    r_plain, r_alarming = score.score_vacancy(plain, off, PROFILE), score.score_vacancy(alarming, off, PROFILE)
+    assert r_alarming["score"] == r_plain["score"]
+    assert r_alarming["needs_manual_review"] == r_plain["needs_manual_review"]
+    assert r_alarming["score_breakdown"]["company_reputation_signal"] == {"has_data": False, "off": True}
+    parts = {p["key"]: p for p in r_alarming["score_parts"]}
+    assert "reputation" not in parts or (parts["reputation"]["min"], parts["reputation"]["max"]) == (0, 0)
+    # company age lives in the same section and still counts
+    assert score.reputation_enabled(off) is False and score.reputation_enabled(CRITERIA) is True
+
+
 def test_good_work_life_balance_outweighs_mediocre_overall_rating():
     # For this project work-life balance matters more than the overall rating: a
     # company can be "good" on pay and career while squeezing its people dry.

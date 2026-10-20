@@ -6,6 +6,18 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V29 — no employer reputation, 2026-10-21
+
+**Changed** (`sharp_criteria.yaml` → `company_reputation_signal.enabled: false`):
+employer reputation is off for this search. A reputation recorded earlier
+gives no points and no manual-review mark, and the app shows no "Collect
+reputation" button. Remote worldwide vacancies turned out rare enough that
+reviews do not change whether to apply, and reviews were found for few
+companies. Company age still counts. To keep reputation, set
+`company_reputation_signal: {enabled: true}` in your local criteria.
+
+**New in the machinery:** `company_reputation_signal.enabled` (default true).
+
 ## V28 — roles a developer can move into, 2026-10-20
 
 **Added** (`sharp_criteria.yaml` → `role_relevance_signal.stretch_discipline_title_patterns`):

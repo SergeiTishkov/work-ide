@@ -1846,6 +1846,13 @@ compensation_signal:
     - {at_least: 0, points: -18}
 
 company_reputation_signal:
+  # Off for this search (the owner, 2026-10-21): remote worldwide vacancies
+  # turned out rare enough that their reviews do not change whether to apply,
+  # and reviews were found for few companies. No points, no manual-review
+  # mark, no "Collect reputation" in the app. The settings below stay for
+  # anyone who turns it back on locally. Company age (company_age, below) is
+  # not reputation and still counts.
+  enabled: false
   # The cost of a red flag in points, not only a "check by hand" mark.
   # A real case, 2026-08-05: a platform whose reviews say "late payments" and
   # "unpredictable work availability" collected +14 for a 3.5 rating and 4.0

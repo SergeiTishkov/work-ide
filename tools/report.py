@@ -91,6 +91,8 @@ def _fmt_reputation(rep_bd: dict, classification: str = "") -> str:
     # checked" read as "no data exists" while it actually meant "we never even
     # tried". The first is a property of the company, the second a defect in
     # the process, and which of the two a person is looking at matters.
+    if rep_bd.get("off"):
+        return ""
     if rep_bd.get("verdict") == "insufficient_sources":
         when = (rep_bd.get("checked_at") or "")[:10]
         where = rep_bd.get("searched") or "Glassdoor, Indeed, Trustpilot, web search"
@@ -451,8 +453,10 @@ def vacancy_view(v: dict) -> dict:
                                       c.get("classification", "")),
         # The app shows "Collect reputation" while this is false: found and
         # "too few sources" are both results (tools/reputation_lookup.py).
+        # An identity with reputation off has nothing to collect.
         "reputation_collected": bool(
             (bd.get("company_reputation_signal") or {}).get("has_data")
+            or (bd.get("company_reputation_signal") or {}).get("off")
             or (bd.get("company_reputation_signal") or {}).get("verdict") == "insufficient_sources"),
         "hiring_country": _hiring_country_text(v, bd),
         "company_age": company_age,
