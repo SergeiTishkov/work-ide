@@ -31,7 +31,7 @@ frozen:
   identity.kind: >
     The marker of a test fixture. If it could be overridden locally, the
     fixture would turn into a live identity and start writing into the real
-    reports/ and data/ — exactly the litter the safety net in
+    data/ — exactly the litter the safety net in
     tests/conftest.py exists to prevent.
 
   privacy.allow_personal_data_in_git: >

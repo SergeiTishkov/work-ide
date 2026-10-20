@@ -103,15 +103,13 @@ python tools/pipeline.py           # the search cycle
 yet, and the system will not search on behalf of "somebody". The refusal
 explains what to do next.
 
-The result is `reports/<prefix>_latest.md` — and, if the identity asks for it,
-one file per market beside it (`<prefix>_uk_latest.md`,
-`<prefix>_worldwide_latest.md`, …). A person reads one shortlist at a time and
-decides where to spend an evening; splitting them is configuration, not code,
-and an identity that says nothing gets the single file it always got. See
-`tools/segments.py`. The `reports/` folder sits at the
-repository root: the report is opened by hand, and hunting for it in a tree of
-accumulated data is a nuisance. It is not in git and not in a fresh clone — the
-tools create it themselves on the first run.
+The result is the shortlist in the desktop app (below) — and, if the identity
+asks for it, one list per market (UK, worldwide, …). A person reads one
+shortlist at a time and decides where to spend an evening; splitting them is
+configuration, not code, and an identity that says nothing gets one undivided
+list. See `tools/segments.py`. Every run records its shortlist in the shared
+base (`data/workide.sqlite`, see `tools/selections.py`); no file is written for
+reading by hand.
 
 ## The desktop app
 
@@ -266,12 +264,6 @@ local-identities/      OUTSIDE GIT: YOUR searches. Anything goes here.
     <prefix>_profile.yaml  your DIFFERENCES from the template, layered on top
     documents/             your CVs, under their own names
     CHANGELOG.md           a log of your changes
-
-reports/               OUTSIDE GIT: finished shortlists, created automatically
-  <prefix>_latest.md     each identity's latest shortlist — this is what to open
-  <prefix>_<market>_latest.md   the same shortlist split by market, when the
-                         identity asks for it (worldwide, uk, eu, canada, …)
-  archive/<prefix>/      history: 2026-07-31.md, 2026-08-01.md, …
 
 data/                  OUTSIDE GIT, created automatically
   workide.sqlite         the vacancy base, shared: a vacancy once, its score per identity

@@ -1,9 +1,9 @@
 """
 A smoke test of the full pipeline WITHOUT network: every fetcher is replaced by
 a fake function with data prepared in advance. What is checked is that the whole
-fetch -> normalize -> score -> merge -> rescore -> companies -> report
+fetch -> normalize -> score -> merge -> rescore -> companies -> selection
 cycle runs from end to end, does not fall over on one broken source, and really
-does produce a report with meaningful content.
+does list what passed.
 """
 import json
 
@@ -109,26 +109,23 @@ def test_full_pipeline_smoke(isolated_data_dir, monkeypatch):
     assert state["sources"]["weworkremotely"]["consecutive_failures"] == 1
     assert state["sources"]["arbeitnow"]["consecutive_failures"] == 0
 
-    report_path = common.REPORTS_DIR / f"{common.FILE_PREFIX}latest.md"
-    assert report_path.exists()
-    report_text = report_path.read_text(encoding="utf-8")
-
-    # The dated copy goes into the archive so that the root of reports/ does not
-    # grow into a hundred files to search by eye for the latest one.
-    # In the archive the file name is just a date: reports/archive/<prefix>/
-    # already belongs to the identity, so repeating the prefix buys nothing.
-    archived = list(common.REPORTS_ARCHIVE_DIR.glob("*.md"))
-    assert len(archived) == 1, "the dated report should be in reports/archive/<prefix>/"
-    assert archived[0].name[:2] == "20", f"an archived report is named by date, not {archived[0].name}"
-    assert common.REPORTS_ARCHIVE_DIR.name == common.ACTIVE_IDENTITY
-    assert not list(common.REPORTS_DIR.glob("2*.md")), (
-        "there must be no dated reports at the root of reports/ — only latest"
-    )
-    assert legacy_title in report_text
-    assert "Old Reliable Insurance Co" in report_text
+    # What the app lists: the run's selection holds the vacancy that passed.
+    assert _listed_titles(result["selection_id"]) == {legacy_title}
 
     companies = kb.load_companies()
     assert any(c["name"] == "Old Reliable Insurance Co" for c in companies.values())
+
+
+def _listed_titles(selection_id: int) -> set:
+    """The titles a selection lists — what the app shows for that run."""
+    import db
+
+    with db.session() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT json_extract(v.data, '$.title') FROM selection_items s "
+            "JOIN vacancies v ON v.id = s.vacancy_id "
+            "WHERE s.selection_id = ?", (selection_id,)).fetchall()
+    return {row[0] for row in rows}
 
 
 def test_pipeline_is_idempotent_and_preserves_manual_status(isolated_data_dir, monkeypatch):
@@ -181,7 +178,7 @@ def test_pipeline_is_idempotent_and_preserves_manual_status(isolated_data_dir, m
                             (db.identity(), vid)).fetchone()[0] == "applied"
 
 
-def test_ingest_manual_merges_into_same_kb_and_reruns_report(isolated_data_dir, monkeypatch):
+def test_ingest_manual_merges_into_same_kb_and_selects_again(isolated_data_dir, monkeypatch):
     _disable_real_link_check(monkeypatch)
     import ingest_manual
 
@@ -191,7 +188,7 @@ def test_ingest_manual_merges_into_same_kb_and_reruns_report(isolated_data_dir, 
         "weworkremotely": fake_ok_source([]),
         "hn_whoishiring": fake_ok_source([]),
     })
-    pipeline.run_pipeline()  # the database is empty, but state and report are created
+    pipeline.run_pipeline()  # the database is empty, but state and a selection are created
 
     manual_records = [{
         "title": "Legacy VB.NET Maintenance Engineer",
@@ -216,8 +213,7 @@ def test_ingest_manual_merges_into_same_kb_and_reruns_report(isolated_data_dir, 
     assert v["source"] == "linkedin"
     assert v["computed"]["classification"] in ("hot_lead", "worth_a_look")
 
-    report_text = (common.REPORTS_DIR / f"{common.FILE_PREFIX}latest.md").read_text(encoding="utf-8")
-    assert "Big Slow Bank" in report_text
+    assert _listed_titles(result["selection_id"]) == {"Legacy VB.NET Maintenance Engineer"}
 
 
 def test_company_enrichment_runs_for_the_shortlist(isolated_data_dir, monkeypatch):
@@ -253,7 +249,7 @@ def test_company_enrichment_runs_for_the_shortlist(isolated_data_dir, monkeypatc
                            "score_breakdown": {}, "dealbreakers": ["role: no"],
                            "needs_manual_review": False}},
     }
-    pipeline.finalize_and_report(vacancies, {}, {})
+    pipeline.finalize(vacancies, {}, {})
 
     assert called["names"] == {"Shortlisted Co"}, (
         "only the visible part of the shortlist is enriched: the rest are filtered "
@@ -405,7 +401,7 @@ def test_the_top_run_end_to_end(isolated_data_dir, monkeypatch):
     assert "linkedin_covered_to" not in state, "the top run leaves LinkedIn's window alone"
     assert state["last_run_stats"]["linkedin_days"] is None
     assert "error" in state["last_ai_screen"], "no model in tests: the AI check is skipped, the run goes on"
-    assert (common.REPORTS_DIR / f"{common.FILE_PREFIX}latest.md").exists()
+    assert _listed_titles(result["selection_id"]) == {"Senior .NET Developer"}
 
 
 def _linkedin_card(n):
@@ -503,6 +499,6 @@ def test_the_rest_run_fetches_nothing(isolated_data_dir, monkeypatch):
     monkeypatch.setattr(pipeline, "FETCHERS", {"linkedin": lambda **_: pytest.fail("fetched")})
     monkeypatch.setattr(pipeline, "load_sources_config", lambda: [{"name": "linkedin"}])
     common.save_json_atomic(common.STATE_PATH, {"sources": {}, "linkedin_gap": True})
-    monkeypatch.setattr(pipeline, "finalize_and_report", lambda *_a, **_k: "report.md")
+    monkeypatch.setattr(pipeline, "finalize", lambda *_a, **_k: 1)
     assert pipeline.run_rest()["new_vacancies"] == 0
 

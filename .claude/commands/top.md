@@ -29,7 +29,7 @@ Identity: `$ARGUMENTS` (empty means: establish it in step 1).
    - the AI check of the top classes (`tools/ai_screen.py`, with the brief of
      `tools/ai_brief.py`), then a rescore;
    - links, direct application channels and company facts of the top;
-   - selection and report.
+   - selection.
    If it prints `SKIPPED: identity '<p>' is inactive`, the person turned the
    identity off: stop here and say so; do not turn it on.
 5. A short summary: **what was collected** (the pipeline's `collected` line,

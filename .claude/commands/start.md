@@ -49,7 +49,7 @@ from reality and folders cannot.
    not ask: they asked to "set up a job search". Two different kinds of work
    means two identities, because their criteria are opposites, and blending a
    second goal into tuned criteria makes both shortlists worse in a way the
-   report does not show.
+   shortlist does not show.
 
 4. **Offer two or three prefixes** with expansions and let them choose. Then:
 

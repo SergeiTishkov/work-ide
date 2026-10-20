@@ -54,11 +54,6 @@ def isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(common, "RAW_DIR", data_root / "raw")
     monkeypatch.setattr(common, "DATA_DIR", data_dir)
     monkeypatch.setattr(common, "KNOWLEDGE_DIR", knowledge_dir)
-    # Reports live apart from data: a shared reports/ folder, with the archive
-    # inside it split per identity (see common.activate_identity).
-    reports_dir = tmp_path / "reports"
-    monkeypatch.setattr(common, "REPORTS_DIR", reports_dir)
-    monkeypatch.setattr(common, "REPORTS_ARCHIVE_DIR", reports_dir / "archive" / TEST_IDENTITY)
     monkeypatch.setattr(common, "STATE_PATH", data_dir / f"{prefix}state.json")
     monkeypatch.setattr(common, "INSIGHTS_PATH", knowledge_dir / f"{prefix}insights.md")
     common.ensure_dirs()
@@ -83,21 +78,21 @@ def _no_model_calls(monkeypatch):
 
 @pytest.fixture(autouse=True, scope="session")
 def _no_test_writes_into_real_folders():
-    """A safety net against tests writing into the REAL data and report folders.
+    """A safety net against tests writing into the REAL data folder.
 
-    It catches a whole class of mistakes rather than one case: a test isolates
-    its data and forgets to isolate reports (or the other way round), and litter
-    appears exactly where a person looks. That is how the empty `aaaa` and `bbbb`
-    folders from the isolation tests turned up in reports/archive/ (2026-08-04).
+    It catches a whole class of mistakes rather than one case: a test forgets
+    to isolate its data, and litter appears exactly where a person's work is.
+    That is how empty `aaaa` and `bbbb` folders from the isolation tests turned
+    up in the real folders (2026-08-04).
 
     The folder contents are compared before and after the run; an ordinary pytest
     run is known not to touch them at all.
     """
     def snapshot():
         result = {}
-        for root in (common.REPORTS_ROOT, common.DATA_ROOT):
+        for root in (common.DATA_ROOT,):
             result[root] = sorted(p.name for p in root.iterdir()) if root.exists() else None
-            for inner in ("archive", "identities"):
+            for inner in ("identities",):
                 if (root / inner).exists():
                     result[root / inner] = sorted(p.name for p in (root / inner).iterdir())
         return result
@@ -130,8 +125,8 @@ def _no_test_writes_into_real_folders():
     # Clear the fixture's traces FIRST, then complain.
     #
     # Detection turned out not to be enough. On 2026-08-04 this net honestly
-    # failed the run, I fixed the cause — and ftf_latest.md itself simply stayed
-    # in the reports folder, where a person found it a day later. Litter in the
+    # failed the run, I fixed the cause — and the fixture's file itself simply
+    # stayed in the real folder, where a person found it a day later. Litter in the
     # one place a person actually looks is unacceptable, warning or no warning.
     cleaned = []
     try:
@@ -146,7 +141,7 @@ def _no_test_writes_into_real_folders():
         "the tests created, in the real folders: "
         + ", ".join(f"{name} in {path}" for path, name in appeared_all)
         + (f". Cleared automatically: {cleaned}." if cleaned else ".")
-        + " Isolate both DATA_ROOT and REPORTS_ROOT — see tests/test_identity_isolation.py"
+        + " Isolate DATA_ROOT — see tests/test_identity_isolation.py"
     )
 
 

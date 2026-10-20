@@ -7,7 +7,7 @@ python tools/pipeline.py            -> the full cycle: fetch from every enabled
                                        (not only new records, so that
                                        improvements to criteria.yaml apply
                                        retroactively) -> rebuild companies.json
-                                       -> report.
+                                       -> the selection the app lists.
 
 python tools/pipeline.py --top      -> the top vacancies first (the owner,
                                        2026-10-17): fetch every source but
@@ -15,8 +15,8 @@ python tools/pipeline.py --top      -> the top vacancies first (the owner,
                                        descriptions the remote check needs ->
                                        the AI check of the top classes ->
                                        links, application channels, company
-                                       facts for the top only -> selection
-                                       and report.
+                                       facts for the top only -> the
+                                       selection the app lists.
 python tools/pipeline.py --linkedin -> LinkedIn, beside any other run (the
                                        owner, 2026-10-20): fetch its window
                                        without holding the base, then wait
@@ -24,13 +24,13 @@ python tools/pipeline.py --linkedin -> LinkedIn, beside any other run (the
                                        run's steps on what it brought.
 python tools/pipeline.py --rest     -> everything the top run left: the whole
                                        base rescored, links, descriptions,
-                                       salary benchmark, the AI check of what
-                                       rose to the top; a "rebuild" selection.
+                                       the AI check of what rose to the top;
+                                       a "rebuild" selection.
                                        remote_unconfirmed gets nothing more.
 
 It never fails wholesale because one source failed: each source is wrapped in
-try/except, the error lands in data/state.json and in the report, and the
-pipeline carries on.
+try/except, the error lands in the identity's state file, and the pipeline
+carries on.
 """
 from __future__ import annotations
 
@@ -74,8 +74,6 @@ import ai_brief  # noqa: E402
 import ai_screen  # noqa: E402
 import link_check  # noqa: E402
 import normalize  # noqa: E402
-import report  # noqa: E402
-import salary_benchmark  # noqa: E402
 import score  # noqa: E402
 import progress  # noqa: E402
 import runstate  # noqa: E402
@@ -353,11 +351,11 @@ def ai_check_stage(vacancies: dict, state: dict, limit: Optional[int] = None) ->
     return bool(stats.get("screened"))
 
 
-def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
-                        selection_kind: str = "run",
-                        description_classes=enrich_descriptions.HEAD_CLASSES) -> str:
+def finalize(vacancies: dict, prev_companies: dict, state: dict,
+             selection_kind: str = "run",
+             description_classes=enrich_descriptions.HEAD_CLASSES) -> int:
     """The shared tail of the cycle: recompute companies, save KB and state,
-    record the selection, generate the report. Returns the path to the report.
+    record the selection. Returns the selection's id.
 
     selection_kind is "run" for a fetch cycle and "rebuild" otherwise (see
     tools/selections.py): only a real run moves the baseline of what counts as
@@ -408,20 +406,6 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
         with progress.stage(f"rescore the top, with the AI check ({progress.number(len(top))} vacancies)"):
             rescore_all(top, criteria, profile, prev_companies)
 
-    # What the UK market pays for this stack — a yardstick shown beside the
-    # shortlist, never written onto a vacancy and never scored. Six-month
-    # rolling medians, so it refetches monthly rather than every run.
-    try:
-        import score as score_mod
-
-        with progress.stage("salary benchmark (refreshed monthly)") as st:
-            state["last_salary_benchmark"] = salary_benchmark.refresh_if_stale(
-                salary_benchmark.technologies_from_profile(score_mod.load_profile())
-            ).get("collected_at")
-            st.note = f"collected {state['last_salary_benchmark']}"
-    except Exception as exc:  # noqa: BLE001 — a yardstick must not kill the cycle
-        state["last_salary_benchmark"] = f"{type(exc).__name__}: {exc}"
-
     # Where a person can apply without going through the board. Last of the
     # enrichment steps and deliberately so: it needs the FINAL classification,
     # since it only spends requests on the top of the shortlist. See
@@ -437,9 +421,10 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
 
     # Enriching shortlist companies with Wikidata facts (year founded, size).
     #
-    # This module used to exist, be documented and be mentioned in the report —
-    # and be called from nowhere. Audit 2026-08-04: of 1083 companies, 22 had a
-    # known age, and all of them got there through manual runs. Meanwhile the
+    # This module used to exist, be documented and be mentioned in the
+    # Markdown report — and be called from nowhere. Audit 2026-08-04: of 1083
+    # companies, 22 had a known age, and all of them got there through manual
+    # runs. Meanwhile the
     # trait "mature company, 10+ years" is written into ideal_company_traits
     # outright — the system was asking for what it did not collect.
     #
@@ -465,12 +450,12 @@ def finalize_and_report(vacancies: dict, prev_companies: dict, state: dict,
         # Rescore after enrichment: company age takes part in the score.
         _rescore_stage(vacancies, criteria, profile, companies, "with company facts")
 
-    return _save_and_report(vacancies, companies, state, selection_kind)
+    return _save_and_select(vacancies, companies, state, selection_kind)
 
 
-def _save_and_report(vacancies: dict, companies: dict, state: dict, selection_kind: str) -> str:
-    """Saves the base and the state, records the selection, writes the
-    reports. Returns the path to the main report."""
+def _save_and_select(vacancies: dict, companies: dict, state: dict, selection_kind: str) -> int:
+    """Saves the base and the state, records the selection. Returns the
+    selection's id."""
     with progress.stage("save the knowledge base"):
         kb.save_vacancies(vacancies)
         kb.save_companies(companies)
@@ -486,19 +471,10 @@ def _save_and_report(vacancies: dict, companies: dict, state: dict, selection_ki
         common.INSIGHTS_PATH.write_text(
             "# Insights — accumulated patterns about the market\n\n"
             "_This file is maintained by hand, by the agent or the owner, from "
-            "the analysis of reports. The pipeline never overwrites it._\n",
+            "the analysis of runs and feedback. The pipeline never overwrites it._\n",
             encoding="utf-8",
         )
-
-    # Every shortlist this identity is configured to produce. An identity that
-    # has said nothing about markets gets exactly one file, at the historical
-    # path — see tools/segments.py.
-    with progress.stage("write the reports") as st:
-        written = report.write_segmented_reports(vacancies, companies, state)
-        st.note = f"{len(written)} files"
-    state["last_reports"] = {slug or "latest": str(path)
-                             for slug, path in written.items()}
-    return str(written.get("") or next(iter(written.values())))
+    return selection_id
 
 
 def check_source_contracts(names: list) -> dict:
@@ -659,13 +635,13 @@ def run_pipeline(include_manual_placeholder_note: bool = True,
         "linkedin_days": days if "linkedin" in names else None,
     }
 
-    report_path = finalize_and_report(vacancies, prev_companies, state)
+    selection_id = finalize(vacancies, prev_companies, state)
 
     return {
         "new_vacancies": new_count,
         "updated_vacancies": updated_count,
         "total_in_kb": len(vacancies),
-        "report_path": report_path,
+        "selection_id": selection_id,
         "collected": collected_text(state, days if "linkedin" in names else None),
         "source_contracts": {name: r["status"] for name, r in contracts.items()},
     }
@@ -694,7 +670,7 @@ def run_top(check_contracts: bool = False) -> dict:
     fetch every source but LinkedIn -> the remote check by script (the pages
     of the top classes and of what this run brought) -> the AI check of the
     top -> links, application channels and company facts of the top ->
-    selection and report. LinkedIn is its own run (run_linkedin), beside this
+    the selection. LinkedIn is its own run (run_linkedin), beside this
     one; the whole base is rescored by the rest run (run_rest)."""
     sources_cfg = load_sources_config()
     criteria = score.load_criteria()
@@ -721,12 +697,12 @@ def run_top(check_contracts: bool = False) -> dict:
         "total_skipped_this_run": counts["skipped"],
         "linkedin_days": None,
     }
-    report_path = _save_and_report(vacancies, companies, state, "run")
+    selection_id = _save_and_select(vacancies, companies, state, "run")
     return {
         "new_vacancies": counts["new"],
         "updated_vacancies": counts["updated"],
         "total_in_kb": len(vacancies),
-        "report_path": report_path,
+        "selection_id": selection_id,
         "collected": collected_text(state, None, linkedin_apart=True),
         "source_contracts": {name: r["status"] for name, r in contracts.items()},
     }
@@ -862,15 +838,15 @@ def merge_linkedin(staged: dict) -> dict:
     state["last_linkedin_run_at"] = kb.now_iso()
     state["last_linkedin_stats"] = {"new_vacancies": counts["new"], "updated_vacancies": counts["updated"],
                                     "total_fetched_this_run": counts["fetched"], "linkedin_days": days}
-    report_path = _save_and_report(vacancies, companies, state, "rebuild")
+    selection_id = _save_and_select(vacancies, companies, state, "rebuild")
     linkedin_staged_path().unlink(missing_ok=True)
     return {"new_vacancies": counts["new"], "updated_vacancies": counts["updated"],
-            "total_in_kb": len(vacancies), "report_path": report_path,
+            "total_in_kb": len(vacancies), "selection_id": selection_id,
             "collected": collected_text(state, days)}
 
 
 def run_rest() -> dict:
-    """What the top run left: the full tail (finalize_and_report) — the whole
+    """What the top run left: the full tail (finalize) — the whole
     base rescored, every link, the pages of the top classes
     (remote_unconfirmed no more), the AI check of what rose to the top. A
     "rebuild" selection, so what the top run marked fresh stays fresh.
@@ -879,10 +855,10 @@ def run_rest() -> dict:
     LinkedIn has its own run since, and a failed one leaves the coverage
     where it was, so the next asks for those days (note_linkedin_window)."""
     vacancies, prev_companies, state = _load()
-    report_path = finalize_and_report(
+    selection_id = finalize(
         vacancies, prev_companies, state, selection_kind="rebuild",
         description_classes=tuple(c for c in enrich_descriptions.HEAD_CLASSES if c != "remote_unconfirmed"))
-    return {"new_vacancies": 0, "total_in_kb": len(vacancies), "report_path": report_path,
+    return {"new_vacancies": 0, "total_in_kb": len(vacancies), "selection_id": selection_id,
             "collected": "nothing: the rest run fetches nothing"}
 
 

@@ -208,7 +208,7 @@ def test_the_shipped_sharp_segmentation_is_valid_and_complete():
         "the group where geography is not an obstacle is meant to be read first")
     assert sum(1 for s in parsed if s.rest) == 1, "exactly one catch-all"
     assert sum(1 for s in parsed if s.default) == 1, (
-        "exactly one segment may claim <prefix>_latest.md")
+        "exactly one main segment")
 
     # Every group in the catalogue reaches a file.
     buckets = segments.split(

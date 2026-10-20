@@ -40,12 +40,12 @@ What is the identity's alone lives in `data/identities/<prefix>/`: insights,
 state, feedback packages, run logs. Raw source responses are the sources', in
 `data/raw/`.
 
-`state.json` stays JSON (small, one writer), Markdown stays for reports and
+`state.json` stays JSON (small, one writer), Markdown stays for
 `<prefix>_insights.md`, YAML for configuration.
 
 ### Selections: what each run showed
 Every run records a selection (`tools/selections.py`): the shortlist split by
-market exactly as the report splits it, every listed vacancy with its class and
+market (`tools/segments.py`), every listed vacancy with its class and
 score at that moment. The app lists vacancies with queries over it
 (`schemas/queries.sql`) rather than from files, so marking a vacancy frees its
 place in the top at once. Selections are never changed, only added: feedback
@@ -118,7 +118,7 @@ old renderer on 400 real vacancies.
 The app's interface has a language switch, so the pipeline stores the row in
 every language it can render (`report.vacancy_views()` → `vacancies.views`,
 via `i18n.speaking()`); `vacancies.view` keeps the identity's own language
-for the report and the feedback package. The app shows the one picked and
+for the feedback package. The app shows the one picked and
 falls back to `view` for a row recorded before `views` existed.
 
 ### Boring, minimal dependencies
@@ -375,13 +375,12 @@ drifts, and the drift is invisible — the vacancy is simply in no file at all.
 `rest` is everything no other segment claimed, so adding a market shrinks it by
 itself. There is a test asserting that every vacancy reaches at least one file.
 
-**Why `<prefix>_latest.md` still exists and still means everything.** It is
-what RUNBOOK.md, the archive and a person's habit all point at. One segment
-carries `default: true` and is additionally written there.
-
-**The cost.** Eight files instead of one, and a person who opens only the UK
-file could miss the worldwide one. Paid for by a banner in every file naming
-the shortlist and linking to the others.
+**Markdown files, then the app (2026-10-20).** Until this date every segment
+was also written as `reports/<prefix>_<slug>_latest.md`, with a dated archive.
+The owner reads the shortlist only in the app, so the files and the folder
+were removed (task 0052); the segments are recorded in the selection and the
+app lists them. `default: true` still marks one segment in the configuration
+and is recorded as `is_default`; nothing reads it today.
 
 **Worldwide means the location names no place (2026-10-06).** Not "the report
 found no country". The country index was the 35 countries of

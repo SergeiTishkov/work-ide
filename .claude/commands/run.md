@@ -41,7 +41,7 @@ the skeleton, plus the parts most often skipped.
    - `unreachable` — today's network; carry on.
 
 4. `python tools/pipeline.py --identity <p> --skip-contracts` — collection,
-   scoring, report. (Without `--skip-contracts` the pipeline checks the
+   scoring, selection. (Without `--skip-contracts` the pipeline checks the
    contracts itself; it is skipped only because step 3 just did.)
 5. **Work through `docs/VACANCY_CHECKLIST.md` for every candidate at long_shot
    and above — this is a mandatory step, not a recommendation.** Read the full

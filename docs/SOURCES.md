@@ -71,7 +71,9 @@ contract slug is fetched too: that inventory is invisible to the plain search.
 ## A yardstick for pay: IT Jobs Watch
 
 Not a source of vacancies — it publishes none. It publishes six-month rolling
-medians per technology, and the report shows them beside the UK shortlist:
+medians per technology (`tools/salary_benchmark.py`). The Markdown report
+showed them beside the UK shortlist; since it was removed (2026-10-20) nothing
+refreshes or shows them — a triage task (0053) decides where they go:
 
     .NET      £60,000/year permanent (-4.0%)   £525/day contract (+6.6%)
     ASP.NET   £55,000/year (-4.3%)             £475/day (-11.6%)

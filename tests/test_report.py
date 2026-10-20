@@ -52,7 +52,7 @@ def test_salary_info_shows_no_data_when_nothing_found():
     assert "no data" in text
 
 
-def test_vacancy_line_always_includes_salary_sub_line():
+def test_a_vacancy_without_a_salary_says_so():
     vacancy = {
         "title": "Senior .NET Developer",
         "company": "Acme Corp",
@@ -64,33 +64,7 @@ def test_vacancy_line_always_includes_salary_sub_line():
             "needs_manual_review": False,
         },
     }
-    line = report._fmt_vacancy_line(vacancy)
-    assert "💰 salary:" in line
-    assert "not stated" in line
-
-
-def test_scoring_philosophy_comes_from_the_identity_profile(monkeypatch):
-    """The explanation of the scale used to be hard-coded into shared machinery
-    and printed into every identity's report — including one looking for onsite
-    work at a startup."""
-    import report
-
-    monkeypatch.setattr(
-        common, "load_profile",
-        lambda *a, **k: {"identity": {"scoring_philosophy": "This identity's own philosophy."}},
-    )
-    assert report._scoring_philosophy() == "This identity's own philosophy."
-
-
-def test_scoring_philosophy_falls_back_to_a_neutral_line(monkeypatch):
-    import report
-
-    monkeypatch.setattr(common, "load_profile", lambda *a, **k: {"identity": {}})
-    text = report._scoring_philosophy()
-    assert "identity's profile" in text
-    assert "legacy" not in text, (
-        "a neutral default must not impose one profile's philosophy on every identity"
-    )
+    assert "not stated" in report.vacancy_view(vacancy)["salary"]
 
 
 def test_hiring_country_prefers_the_office_that_posted_over_company_hq():

@@ -100,8 +100,8 @@ in different folders, and that will be a silent mistake. `sharp_notes.md` and
 in any context: in a project-wide search, in an editor tab, in `grep` output.
 
 The rule extends to the data:
-`data/identities/sharp/knowledge/sharp_insights.md`, `reports/sharp_latest.md`. A report
-opened in its own tab or forwarded to somebody has to identify itself.
+`data/identities/sharp/knowledge/sharp_insights.md`. A file opened in its own
+tab or forwarded to somebody has to identify itself.
 
 Checked automatically: `python tools/identity.py validate`.
 
@@ -111,19 +111,8 @@ The precise statement of the rule: a prefix is mandatory where files of
 **different** identities share a folder. When the folder itself belongs to one
 identity, repeating the prefix in every name buys nothing.
 
-Hence the layout of the report archive:
-
-```
-reports/
-  sharp_latest.md            # shared folder -> prefix mandatory
-  jvst_latest.md
-  archive/
-    sharp/
-      2026-07-31.md          # the folder is already sharp -> just the date
-      2026-08-01.md
-    jvst/
-      2026-08-01.md
-```
+Hence `data/identities/sharp/runs/pipeline_<time>.log`: the folder is already
+sharp, so the file name carries only the time.
 
 The "a file identifies itself" property is preserved another way: every report
 starts with the line `# Work IDE [sharp] — report of …`. Even if the file is
@@ -292,35 +281,6 @@ In addition, `data/identities/<prefix>/.identity` records who owns the folder. I
 folder was moved or renamed by hand, the mismatch is detected on the first
 access rather than after somebody else's data has been written.
 
-## The `reports/` folder
-
-The one folder in the project a person opens by hand. So it sits **at the
-repository root**, beside `tools/` and `docs/`, rather than inside
-`data/`: hunting for a finished shortlist in a tree of accumulated data
-is a nuisance, especially with several identities.
-
-```
-reports/
-  <prefix>_latest.md            the latest shortlist — this is what gets read
-  archive/<prefix>/<date>.md    the history of runs
-```
-
-| Property | How it is | Why |
-|---|---|---|
-| In git | **No**, `reports/` is in `.gitignore` | It is the result of one person's search — the same reason as `data/` |
-| In a fresh clone | **No** | Follows from the above |
-| Creation | **Automatic**, on the very first run | `report.write_report()` calls `mkdir(parents=True, exist_ok=True)` for both folders. A missing `reports/` is a normal state rather than breakage: nothing to fix by hand, just run the pipeline |
-| Shared or personal | The folder is shared across identities; the files are not | The latest shortlist of each of your searches sits side by side; there is no overlap, see the prefix rule above |
-
-This is the one deliberate exception to "two identities' paths do not intersect".
-It is safe because only the *folder* intersects: file names differ by prefix, and
-the archives are split into subfolders. The test
-`test_reports_folder_is_shared_but_files_are_not` pins both, so the exception
-does not spread.
-
-If you need to keep reports outside the repository (a shared folder, a cloud
-drive), the path is overridden by `WORK_IDE_REPORTS_ROOT`.
-
 ## The test fixture
 
 `tests/fixtures/ftf-frozen-test-fixture/` is not an example identity but a
@@ -329,8 +289,7 @@ fixture` forbids activation outside the tests.
 
 ### The fixture leaves no traces
 
-A test run must end with `reports/` and `data/` holding exactly what they held
-at the start. The safety net in `tests/conftest.py` sees to that: it compares
+A test run must end with `data/` holding exactly what it held at the start. The safety net in `tests/conftest.py` sees to that: it compares
 the folder contents before and after, **clears** the fixture's traces and
 **fails** the run, so that the defect in the test is visible.
 
@@ -341,8 +300,8 @@ python tools/clean_fixture_artifacts.py --dry-run   # look
 python tools/clean_fixture_artifacts.py             # clear
 ```
 
-The tool deletes exactly three paths, and only for an identity with `kind:
-fixture`: `reports/<p>_latest.md`, `reports/archive/<p>/` and `data/identities/<p>/`. It
+The tool deletes exactly one path, and only for an identity with `kind:
+fixture`: `data/identities/<p>/`. It
 will not touch a live identity even if you pass its prefix explicitly — mixing
 up a flag is easier than restoring an accumulated base.
 

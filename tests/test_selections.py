@@ -1,7 +1,7 @@
 """Selections in the database (tools/selections.py) and the queries the app
 lists them with (schemas/queries.sql): markets, the per-class limit, the view
 (several markets, statuses, freshness, boards and classes at once), freshness
-across runs, and the row view shared with the report."""
+across runs, and the row view."""
 import json
 
 import pytest
@@ -110,7 +110,7 @@ def test_vacancy_lands_in_every_market_that_holds_it(isolated_data_dir):
     assert json.loads(rows[1][2]) == {"en": "United Kingdom"}
 
 
-def test_only_what_the_report_would_list_is_recorded(isolated_data_dir):
+def test_only_the_listed_classes_are_recorded(isolated_data_dir):
     sel = _store({
         "ok": _vacancy("ok"),
         "rej": _vacancy("rej", classification="rejected"),
@@ -128,7 +128,7 @@ def test_a_new_selection_leaves_the_old_one_untouched(isolated_data_dir):
     assert {r["vacancy_id"]: r["score"] for r in _listing(second, filter_name="all")} == {"a": 80, "b": 60}
 
 
-def test_classes_in_report_order_then_by_score(isolated_data_dir):
+def test_classes_in_order_then_by_score(isolated_data_dir):
     sel = _store({
         "ls": _vacancy("ls", score=90, classification="long_shot"),
         "h1": _vacancy("h1", score=40),
@@ -136,6 +136,20 @@ def test_classes_in_report_order_then_by_score(isolated_data_dir):
         "w": _vacancy("w", score=99, classification="worth_a_look"),
     })
     assert _ids(_listing(sel, filter_name="all")) == ["h2", "h1", "w", "ls"]
+
+
+def test_score_decides_and_reachability_only_breaks_a_tie(isolated_data_dir):
+    """The owner, 2026-09-13, reading the UK hot leads "46, 40, then 60": they
+    were ordered by reachability first, and an order a person cannot see the
+    reason for reads as no order at all. Score first; reachability breaks a tie."""
+    def v(vid, score, eligibility):
+        vacancy = _vacancy(vid, score=score)
+        vacancy["computed"]["residency_eligibility"] = eligibility
+        return vacancy
+
+    sel = _store({"a": v("a", 46, "likely"), "b": v("b", 40, "likely"), "c": v("c", 60, "unknown"),
+                  "t1": v("t1", 50, "unknown"), "t2": v("t2", 50, "confirmed")})
+    assert _ids(_listing(sel, filter_name="all")) == ["c", "t2", "t1", "a", "b"]
 
 
 def test_marked_vacancy_leaves_the_top_and_the_next_one_moves_up(isolated_data_dir):
@@ -318,7 +332,7 @@ def test_fit_narrows_the_listing_counts_and_sources_to_one_class(isolated_data_d
                                                    fit="worth_a_look")) == []
 
 
-def test_row_view_is_the_one_the_report_renders(isolated_data_dir):
+def test_row_view_is_the_vacancy_view(isolated_data_dir):
     v = _vacancy("a", "London, United Kingdom")
     sel = _store({"a": v})
     view = json.loads(_listing(sel)[0]["view"])
@@ -327,8 +341,6 @@ def test_row_view_is_the_one_the_report_renders(isolated_data_dir):
                 "salary", "to_confirm", "eligibility", "apply_channels", "technologies",
                 "reputation", "hiring_country", "needs_manual_review"):
         assert key in view, key
-    line = report._fmt_vacancy_line(v)
-    assert view["salary"] in line and view["hiring_country"] in line
 
 
 def test_display_name_is_recorded_for_the_app(isolated_data_dir):

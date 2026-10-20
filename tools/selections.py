@@ -2,7 +2,7 @@
 Selections: what one run showed, recorded in the database.
 
 A selection is the shortlist of one identity's run, split by market (segment)
-exactly as the Markdown report splits it. The desktop app reads its lists from here with
+(tools/segments.py). The desktop app reads its lists from here with
 the queries in schemas/queries.sql, instead of from files.
 
 WHY RECORDED, NOT RECOMPUTED BY THE APP
@@ -39,8 +39,8 @@ KINDS = ("run", "rebuild")
 
 
 def listed_vacancies(vacancies: dict) -> list:
-    """The vacancies a shortlist can show: the same cut the Markdown report
-    makes (no near-duplicates, no confirmed dead links, a listed class)."""
+    """The vacancies a shortlist can show: no near-duplicates, no confirmed
+    dead links, a listed class."""
     import report
 
     return [
@@ -85,13 +85,13 @@ def refresh_views(vacancies: dict) -> int:
 
 def _configured_segments() -> list:
     """The identity's markets; an identity that configured none gets one
-    segment holding everything — the same fallback the report uses."""
+    segment holding everything."""
     import segments as segments_mod
 
     try:
         configured = segments_mod.load_segments()
-    except Exception as exc:  # noqa: BLE001 — same policy as report.write_segmented_reports
-        common.eprint(f"[selections] cannot read the report segmentation ({exc}); "
+    except Exception as exc:  # noqa: BLE001 — a broken file must not lose the run's shortlist
+        common.eprint(f"[selections] cannot read the market segmentation ({exc}); "
                       "recording one undivided selection instead")
         configured = []
     return configured or [segments_mod.Segment(

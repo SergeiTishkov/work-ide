@@ -18,11 +18,8 @@
 # --- (every identity), data/raw/, data/identities/<prefix>/...
 /data/
 
-# --- Reports. They sit at the root (they are opened by hand rather than hunted
-# --- for in a data tree), but stay out of git for exactly the same reason as
-# --- data/: they are the result of one person's search. Layout:
-# ---   reports/<prefix>_latest.md
-# ---   reports/archive/<prefix>/<date>.md
+# --- Markdown reports, written until 2026-10-20 (task 0052) and no longer.
+# --- Still ignored, so an old checkout's folder never reaches git.
 /reports/
 
 # --- CVs and other personal documents. Their place is inside a local identity

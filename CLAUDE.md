@@ -96,9 +96,10 @@ distributed across two layers, split along the git boundary:
 
 Accumulated data lives in `data/` — the vacancy base every identity shares
 (`data/workide.sqlite`) and each identity's own files
-(`data/identities/<prefix>/`) — finished shortlists in `reports/`.
-Both folders are outside git and both are created by the tools automatically: a
-fresh clone does not have them, and that is a normal state rather than breakage.
+(`data/identities/<prefix>/`); the finished shortlists are recorded in the
+base too, and the desktop app shows them. The folder is outside git and is
+created by the tools automatically: a fresh clone does not have it, and that is
+a normal state rather than breakage.
 
 A local identity holds a **verbatim copy of the template** in `template/`, and
 personal settings sit beside it as separate files layered on top. Three
@@ -135,9 +136,8 @@ provenance are in `tools/settings.py` and `docs/OVERRIDES.md`.
    (`<prefix>_criteria.yaml`) and explain the score to a person.
 3. Accumulate structured knowledge about companies, vacancies and market
    patterns — so that each run is more accurate than the last.
-4. Produce, on every run, a digest a person can actually read
-   (`reports/<prefix>_latest.md`) with the top candidates and an explanation of
-   "why".
+4. Produce, on every run, a shortlist a person can actually read (the desktop
+   app) with the top candidates and an explanation of "why".
 5. Be genuinely autonomous: the owner should be able to ask the agent to "run
    the usual cycle" in the evening and explain nothing further.
 
@@ -189,7 +189,7 @@ The project is succeeding if:
   `tools/ingest_manual.py`.
 - **A test fixture leaves no trace in the real folders.** The tests run under a
   frozen fixture, and a test that forgets to isolate its paths writes into the
-  real `reports/` and `data/` — the only places a person actually looks. Such
+  real `data/` — where a person's whole search lives. Such
   litter is unacceptable even when harmless: it looks like a result and forces
   somebody to work out where it came from.
   Guaranteed by code rather than by memory: the safety net in `tests/conftest.py`
@@ -324,7 +324,7 @@ file under "Rejected approaches", so the same ground is not covered twice.
 - One module, one reason to change (fetch ≠ normalize ≠ score ≠ report ≠
   storage).
 - Errors are not swallowed silently: at minimum a line in the log or
-  `state.json`, visible in the report ("source X unavailable, N days running").
+  `state.json`, visible to a person ("source X unavailable, N days running").
 - No secrets or tokens in the repository. Every source used is public and needs
   no API key. If a paid API is ever needed, the key lives outside the repository
   (an environment variable), never in git.

@@ -76,31 +76,27 @@ stderr and in `data/identities/<p>/runs/pipeline_<time>.log` (the desktop app sh
 file live). It:
 - collects vacancies from the sources enabled in `<p>_sources.yaml`;
 - never fails wholesale, even when one source is unavailable — watch the output
-  and the "Source health" section of the report;
+  (every source with its counts and its error) and each source's `last_error`
+  in `data/identities/<p>/<p>_state.json`;
 - rescores **the whole database** rather than only the new records, so that if
   you improved `<p>_criteria.yaml`, the old vacancies get the current verdict
   too;
-- checks the links (`tools/link_check.py`) and removes from the report any
-  vacancy with a confirmed broken link (404/410) — see the "🔗 Link check"
-  section of the report;
+- checks the links (`tools/link_check.py`) and removes from the shortlist any
+  vacancy with a confirmed broken link (404/410) — the counts are in the run
+  log and in `last_link_check` of the state file;
 - fetches the vacancy page for anything in the shortlist that arrived without a
   description (`tools/enrich_descriptions.py`), which also picks up the stated
   salary, whether the posting still accepts applications, and whether the
   employer declares the role remote;
-- refreshes the UK market salary medians once a month
-  (`tools/salary_benchmark.py`) and shows them beside the UK shortlist — a
-  yardstick for judging a stated salary, never written onto a vacancy and
-  never scored;
 - looks for somewhere to apply that is not the board
   (`tools/apply_channels.py`) — the exact vacancy on the employer's own
   applicant-tracking system, their board, or an address they wrote into the
   posting. Only for the top of the shortlist, and "nothing found" is recorded
   as a fact with a date rather than left silent;
-- updates the shared base (`data/workide.sqlite`) and generates the shortlist —
-  `reports/<p>_latest.md`, plus one file per market if the identity configured
-  any (`<p>_reports.yaml`; see `tools/segments.py`). Every file gets a dated
-  copy in `reports/archive/<p>/`. The folders are created automatically if
-  absent.
+- updates the shared base (`data/workide.sqlite`) and records the shortlist
+  there as a selection (`tools/selections.py`), split by market if the
+  identity configured any (`<p>_reports.yaml`; see `tools/segments.py`). The
+  desktop app shows it; the folders are created automatically if absent.
 
   Each vacancy also carries an eligibility verdict — CONFIRMED, LIKELY, NOT
   STATED, NO — answering whether somebody contracting from this person's
@@ -119,7 +115,7 @@ the final word.** For every vacancy at `long_shot` and above (including
 1. Read its **full** `description_text` —
    `python tools/kb.py --identity <p> dump --min-class long_shot` prints every
    such vacancy with its description (locally, no network) — not only the
-   `score_breakdown` and highlights in the report.
+   `score_breakdown` and highlights the app shows.
 2. Work through [docs/VACANCY_CHECKLIST.md](docs/VACANCY_CHECKLIST.md) point by
    point, recording each result explicitly rather than by eye.
 3. If a genuine inconsistency turns up — something obvious to a person but not
@@ -136,8 +132,9 @@ The fetchers do not read Indeed, Dice and Glassdoor (see
 [docs/SOURCES.md](docs/SOURCES.md)). Here the agent works itself, with its own
 tools (WebSearch/WebFetch):
 
-1. Read `reports/<p>_latest.md` — the "🔎 Needs a manual check" section. For
-   each such vacancy: resolve the ambiguity (is "Georgia" the country or the US
+1. Take the vacancies marked "needs a manual check" — the badge in the app;
+   `python tools/kb.py --identity <p> dump --min-class long_shot` prints them
+   too (`needs_manual_review` in the record). For each such vacancy: resolve the ambiguity (is "Georgia" the country or the US
    state?) and update the record:
    ```bash
    python tools/feedback.py --identity <p> reject --id <id> --reason "why it does not fit"
@@ -156,8 +153,8 @@ tools (WebSearch/WebFetch):
    ```bash
    python tools/ingest_manual.py --identity <p> --file <path-to-file.json> --source-name linkedin
    ```
-   That puts the finds through the same normalize + score + report path as the
-   automatic sources, and regenerates the report.
+   That puts the finds through the same normalize + score + selection path as
+   the automatic sources, and records a new selection the app shows.
 
 3. Employer reputation is **not** a step of the cycle any more (the owner,
    2026-10-17: not worth the time of every collection). The app's

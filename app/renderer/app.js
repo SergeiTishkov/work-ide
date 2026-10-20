@@ -2372,7 +2372,7 @@
     load: 'step.load', fetch: 'step.fetch', rescore: 'step.rescore', duplicates: 'step.duplicates',
     links: 'step.links', companies: 'step.companies', descriptions: 'step.descriptions',
     benchmark: 'step.benchmark', channels: 'step.channels', wikidata: 'step.wikidata', save: 'step.save',
-    selection: 'step.selection', reports: 'step.reports', contracts: 'step.contracts',
+    selection: 'step.selection', contracts: 'step.contracts',
   };
   const TASK_STATE_KEYS = {
     queued: 'task.state.queued', running: 'task.state.running', done: 'task.state.done',

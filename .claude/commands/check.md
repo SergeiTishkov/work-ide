@@ -17,17 +17,16 @@ python -m pytest -q                       # the tests
   `/start`.
 - **An identity that is not filled in** — also a normal stage. The message lists
   what is missing; offer to finish it.
-- **No `data/` or `reports/` folder** — normal: the tools create them on the
-  first run.
+- **No `data/` folder** — normal: the tools create it on the first run.
 - **A source is unreachable** — a warning, not an error. The pipeline survives
   any source failing and carries on with the rest.
 - **A test failed** — now that is a real problem; get to the bottom of it.
 
 ## Separately: the cleanliness of the real folders
 
-After a test run, `reports/` and `data/` must hold exactly what they held
-before. The tests run under the `ftf` fixture, and forgotten path isolation
-leaves `ftf_latest.md`, `archive/ftf/` and `data/ftf/` behind.
+After a test run, `data/` must hold exactly what it held before. The tests run
+under the `ftf` fixture, and forgotten path isolation leaves
+`data/identities/ftf/` behind.
 
 The safety net in `tests/conftest.py` catches that and clears it itself, but if
 something is left over from old runs:

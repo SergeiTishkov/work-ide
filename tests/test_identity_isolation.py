@@ -55,11 +55,6 @@ def two_identities(tmp_path, monkeypatch):
     # they have to go, or ftf would end up in the sandbox as well.
     monkeypatch.setattr(common, "FIXTURES_DIR", tmp_path / "no-fixtures")
     monkeypatch.setattr(common, "DATA_ROOT", tmp_path / "data")
-    # And REPORTS_ROOT too. A real case, 2026-08-04: only DATA_ROOT was replaced,
-    # and the test created reports/archive/aaaa and .../bbbb right inside the
-    # person's actual reports folder. Empty folders, but they sat there for
-    # months in the one place a person really looks.
-    monkeypatch.setattr(common, "REPORTS_ROOT", tmp_path / "reports")
     yield tmp_path
     # Return the process to the state the other tests expect
     monkeypatch.undo()
@@ -87,7 +82,6 @@ def _identity_paths() -> dict:
         "data": common.DATA_DIR,
         "state": common.STATE_PATH,
         "insights": common.INSIGHTS_PATH,
-        "reports_archive": common.REPORTS_ARCHIVE_DIR,
     }
 
 
@@ -103,33 +97,6 @@ def test_paths_of_two_identities_share_no_components(two_identities):
         assert a_paths[key] != b_paths[key], f"path '{key}' matched for two identities"
         assert "aaaa" not in str(b_paths[key]), f"A's prefix leaked into B's path '{key}'"
     assert (common.DB_PATH, common.RAW_DIR) == a_shared, "the base and raw/ are shared"
-
-
-def test_reports_folder_is_shared_but_files_are_not(two_identities):
-    """The one deliberate exception to path isolation.
-
-    The `reports/` folder is shared: a person opens it by hand and wants the
-    latest shortlists of all their identities side by side. There is no overlap
-    even so — the files differ by prefix, and the archive is split into subfolders.
-    """
-    common.activate_identity("aaaa", allow_fixture=True)
-    a_dir, a_latest, a_archive = (
-        common.REPORTS_DIR,
-        common.REPORTS_DIR / f"{common.FILE_PREFIX}latest.md",
-        common.REPORTS_ARCHIVE_DIR,
-    )
-
-    common.activate_identity("bbbb", allow_fixture=True)
-    b_dir, b_latest, b_archive = (
-        common.REPORTS_DIR,
-        common.REPORTS_DIR / f"{common.FILE_PREFIX}latest.md",
-        common.REPORTS_ARCHIVE_DIR,
-    )
-
-    assert a_dir == b_dir, "the reports folder is shared deliberately"
-    assert a_latest != b_latest, "but the files themselves must differ by prefix"
-    assert a_archive != b_archive, "archives are split per identity"
-    assert a_archive.name == "aaaa" and b_archive.name == "bbbb"
 
 
 def test_a_remote_only_board_is_the_same_fact_for_every_identity(two_identities):

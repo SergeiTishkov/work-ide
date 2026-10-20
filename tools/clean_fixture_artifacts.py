@@ -1,12 +1,12 @@
 """
-Clearing test-fixture traces out of the real data and report folders.
+Clearing test-fixture traces out of the real data folder.
 
 WHY THIS EXISTS
 --------------------
 The tests run under a frozen fixture (`ftf`). If a test forgets to isolate its
-paths, it writes into the REAL `reports/` and `data/` — the very folders a
-person looks at. That is how `ftf_latest.md` and `reports/archive/ftf/` turned
-up among the reports, and before them empty `aaaa` and `bbbb` from isolation tests.
+paths, it writes into the REAL `data/`. That is how `ftf_latest.md` and
+`reports/archive/ftf/` turned up among the Markdown reports (written until
+2026-10-20), and before them empty `aaaa` and `bbbb` from isolation tests.
 
 The safety net in `tests/conftest.py` DETECTS such writes and fails the run.
 Practice showed that is not enough: on 2026-08-04 the net did its job, I fixed
@@ -18,8 +18,7 @@ THE SAFETY PRINCIPLE
 This module deletes only what is certainly a fixture's trace:
 
   * the prefix must belong to an identity with `kind: fixture`;
-  * EXACTLY two paths are removed: `reports/<p>_latest.md` and
-    `reports/archive/<p>/`, plus `data/identities/<p>/` if it appeared;
+  * EXACTLY one path is removed: `data/identities/<p>/`, if it appeared;
   * nothing under any other name is touched under any circumstances.
 
 Live identities (`kind: personal`) are never deleted, even if their prefix is
@@ -46,11 +45,7 @@ def fixture_prefixes() -> List[str]:
 
 def artifact_paths(prefix: str) -> List[Path]:
     """Paths a fixture may create in the real folders."""
-    return [
-        common.REPORTS_ROOT / f"{prefix}_latest.md",
-        common.REPORTS_ROOT / "archive" / prefix,
-        common.identity_data_dir(prefix),
-    ]
+    return [common.identity_data_dir(prefix)]
 
 
 def clean(prefixes: List[str] = None, dry_run: bool = False) -> List[str]:
@@ -86,7 +81,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Clear test-fixture traces out of reports/ and data/"
+        description="Clear test-fixture traces out of data/"
     )
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be deleted, touching nothing")

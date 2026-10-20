@@ -1,11 +1,11 @@
 """
-Report language.
+The language of a vacancy's lines (tools/report.vacancy_view).
 
 WHY THIS EXISTS
 ---------------
-The repository is written in English so that anyone can read it. The report is
-different: it is the one file the owner opens by hand every morning, and it
-should speak the language they speak to the agent in.
+The repository is written in English so that anyone can read it. The lines a
+person reads on a vacancy are different: they should speak the language the
+person picked (the app renders every language it offers, report.vacancy_views).
 
 So the language is a property of the person, not of the project. It lives in
 the local identity (`preferences.language`), outside git, and defaults to the
@@ -51,36 +51,16 @@ DYNAMIC_KEYS = {
 }
 
 
-# Languages the report can be rendered in. A language absent here is not an
-# error: the report falls back to English and says so nowhere, because English
+# Languages the vacancy lines can be rendered in. A language absent here is not
+# an error: the lines fall back to English and say so nowhere, because English
 # is the source text rather than a fallback locale.
 CATALOGUES = {
     "ru": {
-        # --- report skeleton ---------------------------------------------
-        "Hot leads — look at these first": "Hot leads — смотреть в первую очередь",
-        "Worth a look": "Worth a look",
-        "Long shot (low priority, but not impossible)":
-            "Long shot (низкий приоритет, но не исключено)",
+        # --- eligibility, application, confirmation ------------------------
         "eligibility: confirmed": "допуск подтверждён работодателем",
         "eligibility: likely": "допуск вероятен",
         "eligibility: not stated": "про допуск ничего не сказано",
         "eligibility: no": "допуск исключён",
-        "Markets inside": "Рынки внутри",
-        "What the UK market pays for this stack":
-            "Сколько британский рынок платит за этот стек",
-        "A yardstick, not an offer. These are market medians over the last "
-        "six months — they say whether a stated salary is generous or poor, "
-        "and they are never written onto a vacancy or into a score.":
-            "Линейка, а не предложение. Это медианы рынка за последние полгода: "
-            "они говорят, щедрая указанная зарплата или скромная, и никогда не "
-            "проставляются в вакансию и не влияют на оценку.",
-        "technology": "технология",
-        "permanent, per year": "в штате, за год",
-        "contract, per day": "контракт, за день",
-        "This shortlist": "Эта выборка",
-        "vacancies": "вакансий",
-        "Other shortlists from this search":
-            "Другие выборки этого поиска",
         "apply directly": "подать напрямую",
         "the company hires through": "компания нанимает через",
         "this vacancy is not on the board — possibly placed through an agency":
@@ -89,69 +69,17 @@ CATALOGUES = {
         "the board sends applications to": "площадка отправляет отклик на",
         "no direct way to apply found — only through the board":
             "прямого способа подать заявку не нашлось — только через площадку",
-        "Work arrangement not confirmed — check by hand":
-            "Формат работы не подтверждён — проверить руками",
-        "Nobody ever called these remote — neither the employer nor the "
-        "board. That is not the same as knowing they are onsite, so they are "
-        "not thrown away, and their score is NOT reduced: a 70 here is the "
-        "same 70 it would have been above. What is missing is the "
-        "confirmation, not the quality.":
-            "Удалёнными их не назвал никто — ни работодатель, ни площадка. "
-            "Это не то же самое, что знать, что они в офисе, поэтому они не "
-            "выброшены, и оценка им НЕ снижена: 70 здесь — те же самые 70, "
-            "что были бы выше. Не хватает подтверждения, а не качества.",
-        "The reason this class exists: LinkedIn's guest search ignores its "
-        "own remote filter, measured 2026-08-11 — the same vacancy comes back "
-        "under 'on-site', 'remote' and 'hybrid' alike. Where an employer does "
-        "say 'hybrid' or 'on-site', the vacancy is rejected outright and is "
-        "not here.":
-            "Откуда взялся этот класс: гостевой поиск LinkedIn игнорирует "
-            "собственный фильтр удалёнки — замерено 11.08.2026, одна и та же "
-            "вакансия возвращается и под «on-site», и под «remote», и под "
-            "«hybrid». Там, где работодатель сам пишет «гибрид» или «в "
-            "офисе», вакансия отклоняется совсем и сюда не попадает.",
-        "Hours not confirmed — check by hand":
-            "Занятость не подтверждена — проверить руками",
-        "Remote and a good fit, but nobody said whether this is part-time "
-        "or full-time — and full-time is the default most employers never "
-        "write down. Where the employer or the board does say full-time, "
-        "the vacancy is rejected and is not here. The score is not "
-        "reduced: what is missing is the confirmation, not the quality.":
-            "Удалённые и подходящие, но никто не сказал, частичная это "
-            "занятость или полная — а полную большинство работодателей не "
-            "пишет, она подразумевается. Там, где работодатель или площадка "
-            "прямо пишут full-time, вакансия отклонена и сюда не попала. "
-            "Оценка не снижена: не хватает подтверждения, а не качества.",
         "engagement confirmed": "занятость подтверждена",
         "the core stack is required": "основной стек обязателен",
-        "requires exclusivity": "требует эксклюзивности",
-        "left to confirm": "осталось подтвердить",
         "that it is remote": "что это удалёнка",
         "the hours (part-time, freelance)": "занятость (part-time, фриланс)",
-        "Needs a manual check by the agent or the owner":
-            "Требуют ручной проверки агентом/владельцем",
-        "Class statistics": "Статистика по классам",
-        "Source health": "Здоровье источников",
-        "Source usefulness": "Польза источников",
-        "Link check": "Проверка ссылок",
-        "How to read this report": "Как читать этот отчёт",
-        "What next": "Дальше",
-        "Empty for now.": "_Пока пусто._",
-        "no data": "нет данных",
 
         # --- vacancy line ------------------------------------------------
-        "link": "ссылка",
-        "salary": "ЗП",
-        "technologies": "технологии",
-        "reputation": "репутация",
-        "hiring country": "страна найма",
-        "company": "компания",
-        "company site (apply directly)": "сайт компании (отклик напрямую)",
         "note": "заметка",
         "low intensity": "низкая нагрузка",
         "looks like a complex/R&D role, not a simple one":
             "похоже на сложную/R&D роль, не «простую»",
-        "needs a manual check (see below)": "требует ручной проверки (см. ниже)",
+        "needs a manual check": "требует ручной проверки",
         "the link could not be verified conclusively":
             "ссылку не удалось однозначно проверить",
         "employees": "сотрудников",
@@ -194,50 +122,9 @@ CATALOGUES = {
         "the board said": "площадка указала",
         "company home country": "штаб-квартира компании",
 
-        "and one more": "и ещё",
-        'report of': 'отчёт от',
-        'Search identity': 'Идентичность поиска',
-        'Run': 'Запуск',
-        'Vacancies shown': 'Показано вакансий',
-        'collapsed': 'схлопнуто',
-        'near-duplicates': 'почти-дублей',
-        'removed': 'убрано',
-        'with a confirmed dead link': 'с подтверждённо нерабочей ссылкой',
-        'New on this run': 'Новых на этом запуске',
-        'Companies in the database': 'Компаний в базе',
-        'look at these first': 'смотреть в первую очередь',
-        'Full score breakdown for any vacancy': 'Полная разбивка score по вакансии',
-        'Showing': 'Показано',
-        'best of': 'лучших из',
-        'These are vacancies the automation is unsure about — most often ':
-            'Это вакансии, где автоматика не уверена в оценке — чаще всего ',
-        'or it is unclear whether the company will hire someone from your country. Worth re-checking with a web search and, if needed, updating the record through `tools/kb.py`.':
-            'либо непонятно, готова ли компания нанять человека из вашей страны. Стоит перепроверить веб-поиском и, если нужно, обновить запись через `tools/kb.py`.',
-        'Volume and usefulness are different things. A source bringing thousands of records and zero candidates costs only run time.':
-            'Объём и польза — разные вещи. Источник, приносящий тысячи записей и ноль кандидатов, стоит только времени прогона.',
-        'Source': 'Источник',
-        'Records': 'Записей',
-        'In shortlist': 'В выдаче',
-        'Per 100 records': 'На 100 записей',
-        'records on the last run': 'записей на последнем запуске',
-        'consecutive failures': 'подряд неудач',
-        'checked on this run': 'Проверено на этом запуске',
-        'skipped — recently checked or duplicates':
-            'пропущено — недавно проверенные или дубли',
-        'alive': 'живые',
-        'removed as dead (404/410)': 'убраны как мёртвые (404/410)',
-        'could not be verified conclusively (kept visible)':
-            'не удалось однозначно проверить (не скрыты)',
-        'first run after link checking was added':
-            'первый запуск после добавления проверки ссылок',
-        'an ambiguous place name': 'неоднозначная гео-локация',
-        'for example': 'например',
         'source': 'источник',
         'found manually on a third-party site': 'найдено вручную на стороннем сайте',
         'unknown third-party source': 'неизвестный сторонний источник',
-        'Accumulated market findings': 'Накопленные закономерности о рынке',
-        'Full vacancy database': 'Полная база вакансий',
-        'Archive of past reports': 'Архив прошлых отчётов',
     },
 }
 

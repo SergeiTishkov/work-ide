@@ -8,7 +8,7 @@ technology — "summary statistics and salary benchmarking for jobs requiring
 .NET skills" — and there is nothing on it to apply to.
 
 What it fills is a different gap. CLAUDE.md section 5 defines three levels of
-trust in a salary, and the report today shows the first (stated in the vacancy)
+trust in a salary, and a vacancy shows the first (stated in the vacancy)
 and the third (nothing known) while the middle one is filled in by hand, a few
 companies at a time. A person reading "£55,000 - £60,000" has no way of telling
 whether that is generous or poor. With the market median beside it, they do.
@@ -23,7 +23,9 @@ direction ("do not confuse no data with bad pay").
 **It must not touch the score.** Every UK .NET vacancy would gain the same
 points, changing no ordering and making the number less honest.
 
-So it is one block of context in the report, and nothing else reads it.
+So it was one block of context in the Markdown report, and nothing else read
+it. The report was removed on 2026-10-20 (task 0052); until triage task 0053
+decides where the medians go, nothing calls this module.
 
 A REAL LIMIT
 ------------

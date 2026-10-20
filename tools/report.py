@@ -1,9 +1,13 @@
 """
-Generates the human-readable Markdown report from the current knowledge base.
+The shortlist as the desktop app shows it: one vacancy row as data
+(vacancy_view), the market a vacancy is listed under, and the order inside a
+class. tools/selections.py records it; the app reads it from the database.
 
-The report is the owner's main interface: over ten minutes of morning coffee
-they should be able to look through the top vacancies and decide where to
-apply.
+Until 2026-10-20 this module also wrote a Markdown report per market into
+reports/. The owner reads and answers the shortlist only in the app, so the
+files went (tasks/3-done/0052-no-markdown-reports.md).
+
+  python tools/report.py --identity <p>     record a selection without fetching
 """
 from __future__ import annotations
 
@@ -28,7 +32,7 @@ t = i18n.translate
 TOP_N_PER_SECTION = 10
 
 # The classes a person actually reads. Everything else is in the database for
-# the record, not in the report for a decision.
+# the record, not in the shortlist for a decision.
 LISTED_CLASSES = ("hot_lead", "worth_a_look", "long_shot",
                   "remote_unconfirmed", "engagement_unconfirmed")
 
@@ -43,7 +47,7 @@ def _fmt_salary_info(vacancy: dict, comp_bd: dict) -> str:
     """Always returns a pay line that names its source. Confirmed explicitly by
     the owner (2026-07-30): whether the salary is stated in the vacancy itself,
     was found by the agent on an external site (Glassdoor and the like), or is
-    absent altogether has to be visible in the report rather than only
+    absent altogether has to be visible on the vacancy rather than only
     affecting the score."""
     if comp_bd.get("explicit"):
         raw = vacancy.get("salary_raw")
@@ -144,7 +148,7 @@ def expected_technologies(vacancy: dict, limit: int = 24) -> list:
 
     Separate from stack_fit: that shows overlaps with a particular person's
     stack, whereas what is wanted here is the project's composition as it is.
-    Seeing an unfamiliar technology in the report is no less useful than a
+    Seeing an unfamiliar technology on the card is no less useful than a
     familiar one: it tells you straight away whether the vacancy fits, without
     opening the link.
     """
@@ -204,7 +208,7 @@ def hiring_country(vacancy: dict):
 
     The countries are every country (config/derivation/countries.yaml), not
     only the markets of market_tiers.yaml as until 2026-10-06: "Bucharest,
-    Romania" named no country the report knew, and was listed as worldwide.
+    Romania" named no country the code knew, and was listed as worldwide.
     """
     import places
 
@@ -266,56 +270,6 @@ def _eligibility_parts(v: dict) -> Optional[dict]:
     }.get(verdict, verdict)
     return {"level": verdict, "label": label,
             "reason": c.get("residency_eligibility_reason")}
-
-
-def _salary_benchmark_block(segment) -> list:
-    """What the UK market pays for this stack, beside the shortlist.
-
-    Rendered only where UK vacancies appear. The source is British: putting
-    British medians at the top of the Canada file would be noise dressed as
-    information.
-
-    Nothing else reads this. It is context for a person, never a component of
-    a score and never a salary written onto a vacancy — see
-    tools/salary_benchmark.py for why both would be wrong.
-    """
-    import salary_benchmark
-    import segments as segments_mod
-
-    if segment is not None:
-        claimed = segments_mod._claimed_groups([segment])
-        if not segment.holds("united_kingdom", claimed):
-            return []
-
-    data = salary_benchmark.load()
-    rows = (data or {}).get("technologies") or {}
-    if not rows:
-        return []
-
-    lines = [
-        f"## 💷 {t('What the UK market pays for this stack')}",
-        "",
-        t("A yardstick, not an offer. These are market medians over the last "
-          "six months — they say whether a stated salary is generous or poor, "
-          "and they are never written onto a vacancy or into a score.") +
-        f" _({data.get('source')}, {(data.get('collected_at') or '?')[:10]})_",
-        "",
-        f"| {t('technology')} | {t('permanent, per year')} | {t('contract, per day')} |",
-        "|---|---|---|",
-    ]
-    for name, entry in rows.items():
-        permanent = entry.get("permanent") or {}
-        contract = entry.get("contract") or {}
-
-        def cell(item):
-            if not item.get("median"):
-                return "—"
-            change = item.get("year_on_year")
-            return item["median"] + (f" _({change})_" if change else "")
-
-        lines.append(f"| {name} | {cell(permanent)} | {cell(contract)} |")
-    lines.append("")
-    return lines
 
 
 def _apply_channel_items(v: dict) -> list:
@@ -404,15 +358,11 @@ def calendar_date(value) -> Optional[str]:
 
 
 def vacancy_view(v: dict) -> dict:
-    """Everything one vacancy row shows, as data.
+    """Everything one vacancy row shows, as data. The desktop app reads it
+    from the selection rows in the database.
 
-    The single source for both renderings of a vacancy: the Markdown report
-    (_fmt_vacancy_line) and the desktop app, which reads it from
-    vacancies.view in the database. Two renderers built from one dict cannot
-    drift apart the way two copies of the formatting logic would.
-
-    Texts are already in the identity's report language and may carry the
-    light Markdown the report always used (_italic_, **bold**, `code`).
+    Texts are already in the identity's language and may carry light Markdown
+    (_italic_, **bold**, `code`), which the app renders.
     """
     c = v.get("computed", {})
     bd = c.get("score_breakdown", {})
@@ -448,7 +398,7 @@ def vacancy_view(v: dict) -> dict:
     if complexity.get("gate_triggered"):
         highlights.append("⚠ " + t("looks like a complex/R&D role, not a simple one"))
     if c.get("needs_manual_review"):
-        highlights.append("🔎 " + t("needs a manual check (see below)"))
+        highlights.append("🔎 " + t("needs a manual check"))
     link_status = v.get("link_check", {}).get("status")
     if link_status == "unknown":
         highlights.append("🔗 " + t("the link could not be verified conclusively"))
@@ -538,7 +488,7 @@ def _stretch_mark(bd: dict):
 def vacancy_views(v: dict) -> dict:
     """vacancy_view() in every language the app's interface offers, keyed by
     language: the app shows the lines in whichever the person picked, while
-    vacancies.view keeps the identity's own for the report and feedback."""
+    vacancies.view keeps the identity's own for feedback."""
     views = {}
     for lang in i18n.LANGUAGES:
         with i18n.speaking(lang):
@@ -546,510 +496,21 @@ def vacancy_views(v: dict) -> dict:
     return views
 
 
-def _fmt_vacancy_line(v: dict) -> str:
-    view = vacancy_view(v)
-    highlights = view["highlights"]
-    highlight_str = f" — _{'; '.join(highlights)}_" if highlights else ""
-    lines = [
-        f"- **[{view['score']}] {view['title']}** @ {view['company']} — "
-        f"[{t('link')}]({view['url']}){highlight_str}",
-        f"  - 💰 {t('salary')}: {view['salary']}",
-    ]
-    if view["to_confirm"]:
-        lines.append(f"  - ❓ {t('left to confirm')}: {', '.join(view['to_confirm'])}")
-    if view["exclusivity"]:
-        lines.append(f"  - ⚠ {t('requires exclusivity')}: {', '.join(view['exclusivity'])}")
-    if view["company_url"]:
-        lines.append(f"  - 🏢 {t('company site (apply directly)')}: {view['company_url']}")
-    eligibility = view["eligibility"]
-    if eligibility is not None:
-        reason = eligibility["reason"]
-        lines.append(f"  - {eligibility['label']}" + (f" — _{reason}_" if reason else ""))
-    lines.extend(f"  - {item}" for item in view["apply_channels"])
-    if view["technologies"]:
-        lines.append(f"  - 🧰 {t('technologies')}: {', '.join(view['technologies'])}")
-    lines.append("  - ⭐ " + t("reputation") + ": " + view["reputation"])
-    lines.append(f"  - 🌍 {t('hiring country')}: {view['hiring_country']}")
-    if view["company_age"]:
-        lines.append(f"  - 🏛 {t('company')}: {view['company_age']}")
-    return "\n".join(lines)
-
-
-# How many vacancies a section of parked ones (remote or hours not confirmed)
-# shows. There are hundreds; the point is to show the best of them, not to
-# page through all of it.
-PARKED_SECTION_LIMIT = 25
-
-
-def _section(title: str, items: list) -> str:
-    if not items:
-        return f"### {title}\n\n_{t('Empty for now.')}_\n"
-    body = "\n".join(_fmt_vacancy_line(v) for v in items[:TOP_N_PER_SECTION])
-    extra = len(items) - TOP_N_PER_SECTION
-    footer = (f"\n\n_({t('and one more')} {extra} — `python tools/kb.py list`)_"
-              if extra > 0 else "")
-    return f"### {title} ({len(items)})\n\n{body}{footer}\n"
-
-
-def _rel(path: Optional[Path]) -> str:
-    """A path relative to the repository root — easier to copy that way."""
-    if path is None:
-        return "?"
-    try:
-        return str(path.relative_to(common.ROOT)).replace("\\", "/")
-    except ValueError:
-        return str(path)
-
-
-_DEFAULT_PHILOSOPHY = (
-    "The higher the score (0-100), the closer the vacancy is to this "
-    "identity's profile."
-)
-
-
-def _scoring_philosophy() -> str:
-    """The explanation of the score scale — different for every identity.
-
-    This used to be a hard-coded line about a "boring, legacy, well-paid"
-    vacancy. It was printed in the report of EVERY identity, including one
-    looking for onsite work at a startup — that is, shared machinery imposing
-    one search profile's philosophy on everybody. An artefact of the days when
-    there was only one profile.
-    """
-    try:
-        philosophy = ((common.load_profile().get("identity") or {})
-                      .get("scoring_philosophy") or "").strip()
-        return philosophy or _DEFAULT_PHILOSOPHY
-    except Exception:  # noqa: BLE001 — a caption must not bring the report down
-        return _DEFAULT_PHILOSOPHY
-
-
-def _identity_display_name() -> str:
-    try:
-        import identity as identity_mod
-
-        return identity_mod.describe(common.ACTIVE_IDENTITY)
-    except Exception:  # noqa: BLE001 - a caption must not bring the report down
-        return common.ACTIVE_IDENTITY or t("not determined")
-
-
-def _ambiguous_places_hint(criteria: Optional[dict]) -> str:
-    """The hint about ambiguous place names — taken from the active identity's
-    settings rather than hard-coded. Everyone has their own trap: for one
-    person it is Georgia (the country vs the state), for another Cambridge
-    (UK vs Massachusetts)."""
-    rules = ((criteria or {}).get("remote_location_fit") or {}).get("ambiguous_place_names") or []
-    names = [r.get("name") for r in rules if r.get("name")]
-    if not names:
-        return t("an ambiguous place name")
-    quoted = ", ".join(f'"{n}"' for n in names[:3])
-    return f"{t('an ambiguous place name')} ({t('for example')} {quoted})"
-
-
-def _format_link_check_stats(stats: Optional[dict]) -> str:
-    if not stats:
-        return f"_{t('no data')} ({t('first run after link checking was added')})_"
-    return (
-        f"{t('checked on this run')}: {stats.get('checked', 0)} "
-        f"({t('skipped — recently checked or duplicates')}: "
-        f"{stats.get('skipped_recent_or_duplicate', 0)}). "
-        f"{t('alive')}: {stats.get('ok', 0)}, "
-        f"{t('removed as dead (404/410)')}: {stats.get('dead', 0)}, "
-        f"{t('could not be verified conclusively (kept visible)')}: "
-        f"{stats.get('unknown', 0)}."
-    )
-
-
-def _source_usefulness(vacancies: dict) -> str:
-    """How many records a source brought in, and how many reached the shortlist.
-
-    WHY. The source registry stores VOLUME, and by volume the sources look
-    nothing like what they are. Measured 2026-08-05: devitjobs produced 4033
-    records and ZERO in the shortlist, while weworkremotely, with its 251,
-    produced more than half of all candidates. Volume with no yield is only run
-    time and a bloated database.
-
-    So what is counted is "yield per 100 records". A source with zero yield is
-    not disabled automatically: rare sources deliver in bursts, and deciding on
-    one run would be hasty. But the number has to be in front of you.
-    """
-    stats = {}
-    for v in vacancies.values():
-        if v.get("duplicate_of"):
-            continue
-        src = v.get("source") or "?"
-        entry = stats.setdefault(src, {"total": 0, "shortlist": 0})
-        entry["total"] += 1
-        if (v.get("computed") or {}).get("classification") in (
-                "hot_lead", "worth_a_look", "long_shot"):
-            entry["shortlist"] += 1
-
-    if not stats:
-        return f"_{t('no data')}_"
-
-    rows = sorted(stats.items(), key=lambda kv: -kv[1]["shortlist"])
-    lines = [f"| {t('Source')} | {t('Records')} | {t('In shortlist')} | "
-             f"{t('Per 100 records')} |", "|---|---:|---:|---:|"]
-    for name, s in rows:
-        rate = (100.0 * s["shortlist"] / s["total"]) if s["total"] else 0.0
-        lines.append(f"| {name} | {s['total']} | {s['shortlist']} | {rate:.1f} |")
-    return chr(10).join(lines)
-
-
-def segment_filename(slug: str, prefix: Optional[str] = None) -> str:
-    """The file one segment is written to.
-
-    An empty slug is the whole shortlist and keeps the historical name, because
-    `reports/<prefix>_latest.md` is what RUNBOOK.md, the archive and a person's
-    habit all point at.
-    """
-    prefix = prefix if prefix is not None else (common.FILE_PREFIX or "")
-    return f"{prefix}{slug}_latest.md" if slug else f"{prefix}latest.md"
-
-
-def _segment_banner(segment, siblings, shown: int, listed=()) -> str:
-    """Which shortlist this is, and where the others are.
-
-    Without this, splitting the report would quietly hide work: a person
-    opening the UK file has no way of knowing that the worldwide one — the one
-    where geography is not in the way at all — exists at all.
-    """
-    if segment is None:
-        return ""
-    others = [s for s in (siblings or []) if s.slug != segment.slug]
-    links = ", ".join(
-        f"[{s.title(i18n.language())}]({segment_filename(s.slug)})" for s in others)
-    line = (f"**{t('This shortlist')}: {segment.title(i18n.language())}** — "
-            f"{shown} {t('vacancies')}.")
-
-    # A segment holding several markets — `rest` above all — is otherwise a
-    # bag: 338 vacancies with no way of telling that two thirds of them are
-    # Singapore. The breakdown makes it legible without another file, and
-    # shows a person whether one is worth asking for.
-    if segment.rest or segment.everything:
-        import segments as segments_mod
-
-        tally = segments_mod.counts_by_group(
-            listed, lambda v: hiring_country(v)[0])
-        if len(tally) > 1:
-            parts = ", ".join(
-                f"{segments_mod.group_name(key)} {n}"
-                for key, n in sorted(tally.items(), key=lambda kv: -kv[1]))
-            line += f"\n\n_{t('Markets inside')}: {parts}._"
-
-    if links:
-        line += f"\n\n_{t('Other shortlists from this search')}: {links}._"
-    return line + "\n"
-
-
-def build_report_markdown(vacancies: dict, companies: dict, state: dict,
-                          criteria: Optional[dict] = None,
-                          segment=None, siblings=None) -> str:
-    """The shortlist as Markdown.
-
-    `segment` (tools/segments.Segment) narrows it to one market group; without
-    one the report covers everything, exactly as it did before splitting
-    existed. `siblings` are the other segments, so each file can point at the
-    others — a person who opens the UK shortlist should not have to remember
-    that a worldwide one exists.
-    """
-    import score
-
-    now = datetime.now(timezone.utc)
-    # Report text that depends on settings (the ambiguous-place-names hint, for
-    # one) comes from the active identity.
-    if criteria is None:
-        try:
-            criteria = score.load_criteria()
-        except Exception:  # noqa: BLE001 - a hint must not break the report
-            criteria = {}
-    live = [v for v in vacancies.values() if not v.get("duplicate_of")]
-    dead_link_count = sum(1 for v in live if v.get("link_check", {}).get("status") == "dead")
-    items = [v for v in live if v.get("link_check", {}).get("status") != "dead"]
-    duplicate_count = len(vacancies) - len(live)
-
-    # One market group's worth of the same shortlist. The counts above stay
-    # global on purpose: "collapsed N duplicates" is a fact about the run, and
-    # restating it per file would make eight different numbers for one thing.
-    # What the banner counts. NOT len(items): that includes everything the
-    # gates rejected, which in a segment banner reads as "this market has ten
-    # thousand vacancies for you" when it has eleven.
-    def _listed(candidates):
-        return sum(1 for v in candidates
-                   if (v.get("computed") or {}).get("classification") in LISTED_CLASSES)
-
-    segment_total = _listed(items)
-    if segment is not None:
-        import segments as segments_mod
-
-        claimed = segments_mod._claimed_groups(list(siblings or [segment]))
-        items = [v for v in items
-                 if segment.holds(market_group(v), claimed)]
-        segment_total = _listed(items)
-
-    def by_class(cls):
-        matching = [v for v in items if v.get("computed", {}).get("classification") == cls]
-        # Score first; reachability only breaks a tie.
-        #
-        # From 2026-08-12 this was the other way round — reachability first,
-        # score second — and on 2026-09-13 the owner opened his UK shortlist
-        # and read "46, 40, then 60" in the hot leads: "they must be sorted".
-        # The grouping was real but invisible, and an order a person cannot
-        # see the reason for reads as no order at all.
-        #
-        # Reachability is not lost by this. It is printed on every vacancy,
-        # and the file split puts the worldwide shortlist — the one where
-        # geography is not in the way — first (see <prefix>_reports.yaml).
-        matching.sort(key=lambda v: (
-            -v.get("computed", {}).get("score", 0), _eligibility_rank(v)))
-        return matching
-
-    hot = by_class("hot_lead")
-    worth = by_class("worth_a_look")
-    long_shot = by_class("long_shot")
-    # Vacancies whose only objection is that nobody ever said they were
-    # remote. Their own section, their own decision — and their score
-    # untouched, at the owner's explicit direction (2026-08-11).
-    unconfirmed = by_class("remote_unconfirmed")[:PARKED_SECTION_LIMIT]
-    # The same for the hours, in a search that has an engagement gate at all
-    # (score._check_engagement). A search that does not care about hours never
-    # sees the section: an empty heading in every report would be noise.
-    all_engagement_unconfirmed = by_class("engagement_unconfirmed")
-    engagement_unconfirmed = all_engagement_unconfirmed[:PARKED_SECTION_LIMIT]
-    engagement_block = []
-    if (criteria or {}).get("engagement_fit") or engagement_unconfirmed:
-        engagement_block = [
-            f"## ⏱️ {t('Hours not confirmed — check by hand')}",
-            "",
-            t("Remote and a good fit, but nobody said whether this is part-time "
-              "or full-time — and full-time is the default most employers never "
-              "write down. Where the employer or the board does say full-time, "
-              "the vacancy is rejected and is not here. The score is not "
-              "reduced: what is missing is the confirmation, not the quality.")
-            + " " + f"{t('Showing')} {len(engagement_unconfirmed)} {t('best of')} "
-            f"{len(all_engagement_unconfirmed)}.",
-            "",
-            _section("engagement_unconfirmed", engagement_unconfirmed),
-        ]
-    # Only vacancies whose fate is still undecided need manual review.
-    #
-    # An actual complaint from the owner, 2026-08-05: this section contained
-    # Sales Manager, Business Partner Analyst, Patient Outreach Specialist and
-    # Data Entry — all of them REJECTED. The "needs review" flag is set
-    # independently of classification, so the section gathered the discarded
-    # along with the doubtful. There is nothing to review in a rejected
-    # vacancy: the gate has already decided, and the person spends attention on
-    # rubbish in the one place they actually look.
-    visible = {"hot_lead", "worth_a_look", "long_shot"}
-    review_items = [v for v in items
-                    if v.get("computed", {}).get("needs_manual_review")
-                    and v.get("computed", {}).get("classification") in visible]
-    review_items.sort(key=lambda v: -v.get("computed", {}).get("score", 0))
-
-    class_counts = {}
-    for v in items:
-        cls = v.get("computed", {}).get("classification", "unknown")
-        class_counts[cls] = class_counts.get(cls, 0) + 1
-
-    source_lines = []
-    for name, info in sorted((state.get("sources") or {}).items()):
-        status = "OK" if not info.get("last_error") else f"ERROR: {info['last_error']}"
-        source_lines.append(
-            f"- **{name}**: {info.get('fetched_count', 0)} "
-            f"{t('records on the last run')}, "
-            f"{status}, {t('consecutive failures')}: "
-            f"{info.get('consecutive_failures', 0)}"
-        )
-
-    run_stats = state.get("last_run_stats", {})
-
-    parts = [
-        # The identity goes in the title: a report is often opened in its own
-        # tab or forwarded, and it has to identify itself without context.
-        f"# Work IDE [{common.ACTIVE_IDENTITY or '?'}] — {t('report of')} "
-        f"{now.strftime('%Y-%m-%d %H:%M UTC')}",
-        "",
-        f"_{t('Search identity')}: {_identity_display_name()}_",
-        "",
-        _segment_banner(segment, siblings, segment_total,
-                        [v for v in items
-                         if (v.get('computed') or {}).get('classification')
-                         in LISTED_CLASSES]),
-        f"{t('Run')} #{state.get('run_count', '?')}. "
-        f"{t('Vacancies shown')}: {len(items)} "
-        f"({t('collapsed')} {duplicate_count} {t('near-duplicates')}, "
-        f"{t('removed')} {dead_link_count} "
-        f"{t('with a confirmed dead link')} — `python tools/kb.py stats`). "
-        f"{t('New on this run')}: {run_stats.get('new_vacancies', '?')}. "
-        f"{t('Companies in the database')}: {len(companies)}.",
-        "",
-        f"## {t('How to read this report')}",
-        "",
-        f"{_scoring_philosophy()} "
-        f"`hot_lead` — {t('look at these first')}. "
-        f"{t('Full score breakdown for any vacancy')}: "
-        "`python tools/kb.py show --id <id>`.",
-        "",
-        f"## 🔥 {t('Hot leads — look at these first')}",
-        "",
-        _section("hot_lead", hot),
-        f"## 👀 {t('Worth a look')}",
-        "",
-        _section("worth_a_look", worth),
-        f"## 🕰️ {t('Long shot (low priority, but not impossible)')}",
-        "",
-        _section("long_shot", long_shot),
-        f"## 🏢 {t('Work arrangement not confirmed — check by hand')}",
-        "",
-        t("Nobody ever called these remote — neither the employer nor the "
-        "board. That is not the same as knowing they are onsite, so they are "
-        "not thrown away, and their score is NOT reduced: a 70 here is the "
-        "same 70 it would have been above. What is missing is the "
-        "confirmation, not the quality.") + " " +
-        t("The reason this class exists: LinkedIn's guest search ignores its "
-        "own remote filter, measured 2026-08-11 — the same vacancy comes back "
-        "under 'on-site', 'remote' and 'hybrid' alike. Where an employer does "
-        "say 'hybrid' or 'on-site', the vacancy is rejected outright and is "
-        "not here.") + " " +
-        f"{t('Showing')} {len(unconfirmed)} {t('best of')} "
-        f"{class_counts.get('remote_unconfirmed', 0)}.",
-        "",
-        _section("remote_unconfirmed", unconfirmed),
-        *engagement_block,
-        f"## 🔎 {t('Needs a manual check by the agent or the owner')}",
-        "",
-        t("These are vacancies the automation is unsure about — most often ") +
-        f"{_ambiguous_places_hint(criteria)}, " +
-        t("or it is unclear whether the company will hire someone from your "
-        "country. Worth re-checking with a web search and, if needed, "
-        "updating the record through `tools/kb.py`."),
-        "",
-        _section("needs_manual_review", review_items),
-        *_salary_benchmark_block(segment),
-        f"## 📊 {t('Class statistics')}",
-        "",
-        "\n".join(f"- {cls}: {n}" for cls, n in sorted(class_counts.items(), key=lambda kv: -kv[1])) or f"_{t('no data')}_",
-        "",
-        f"## 📡 {t('Source health')}",
-        "",
-        "\n".join(source_lines) or f"_{t('no data')}_",
-        "",
-        f"## 📈 {t('Source usefulness')}",
-        "",
-        t("Volume and usefulness are different things. A source bringing "
-        "thousands of records and zero candidates costs only run time."),
-        "",
-        _source_usefulness(vacancies),
-        "",
-        f"## 🔗 {t('Link check')}",
-        "",
-        _format_link_check_stats(state.get("last_link_check")),
-        "",
-        f"## {t('What next')}",
-        "",
-        f"- {t('Accumulated market findings')}: `{_rel(common.INSIGHTS_PATH)}`",
-        f"- {t('Full vacancy database')}: `{_rel(common.DB_PATH)}` "
-        f"(or `python tools/kb.py list --identity {common.ACTIVE_IDENTITY}`)",
-        f"- {t('Archive of past reports')}: `{_rel(common.REPORTS_ARCHIVE_DIR)}`",
-        "",
-    ]
-    return "\n".join(parts)
-
-
-def write_segmented_reports(vacancies: dict, companies: dict, state: dict,
-                            criteria: Optional[dict] = None,
-                            run_date: Optional[str] = None) -> dict:
-    """Every shortlist this identity is configured to produce.
-
-    Returns {slug: path}, in configured order. An identity that has said
-    nothing about markets gets exactly one file, at the historical path — the
-    split is opt-in and costs nothing to ignore.
-
-    A broken `reports` document must not cost somebody their whole run: the
-    report is the last step of a cycle that has already done all the work, so a
-    configuration mistake falls back to the single undivided shortlist and says
-    so loudly.
-    """
-    import segments as segments_mod
-
-    try:
-        configured = segments_mod.load_segments()
-    except Exception as exc:  # noqa: BLE001 — see the docstring
-        common.eprint(f"[report] cannot read the report segmentation ({exc}); "
-                      "writing the single undivided shortlist instead")
-        configured = []
-    if not configured:
-        return {"": write_report(
-            build_report_markdown(vacancies, companies, state, criteria),
-            run_date)}
-
-    written = {}
-    for segment in configured:
-        markdown = build_report_markdown(
-            vacancies, companies, state, criteria,
-            segment=segment, siblings=configured)
-        written[segment.slug] = write_report(markdown, run_date, slug=segment.slug)
-        if segment.default and segment.slug:
-            # The same text at the historical path as well. Written rather than
-            # linked: a symlink would not survive being copied out of the
-            # repository, and this file gets forwarded.
-            written[""] = write_report(markdown, run_date)
-    return written
-
-
-def write_report(markdown_text: str, run_date: Optional[str] = None,
-                 slug: str = "") -> Path:
-    """Writes the latest report and files a dated copy in the archive.
-
-    The layout (at the owner's direct request; an improvement for everyone):
-        reports/<prefix>_latest.md          — the latest shortlist of each identity
-        reports/archive/<prefix>/<date>.md  — history, split per identity
-
-    Two separate decisions, each with its own reason:
-      * `reports/` sits at the repository ROOT rather than inside
-        `data/`. The report is the one file a person opens by hand,
-        and hunting for it in a tree of accumulated data is a nuisance.
-      * latest is kept apart from the dated copies. Otherwise, after a couple
-        of months, the folder becomes a hundred files to search by eye for the
-        newest.
-    """
-    common.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    common.REPORTS_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
-
-    run_date = run_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    prefix = common.FILE_PREFIX or ""
-
-    latest_path = common.REPORTS_DIR / segment_filename(slug, prefix)
-    # No prefix is needed in the archive: the folder already belongs to the
-    # identity. The slug is, so that a day's several shortlists do not
-    # overwrite one another.
-    archived_path = common.REPORTS_ARCHIVE_DIR / (
-        f"{run_date}_{slug}.md" if slug else f"{run_date}.md")
-
-    latest_path.write_text(markdown_text, encoding="utf-8")
-    archived_path.write_text(markdown_text, encoding="utf-8")
-    return latest_path
-
-
 def main() -> None:
     import identity as identity_mod
 
     parser = argparse.ArgumentParser(
-        description="Rebuild the report from the current knowledge base")
+        description="Record a selection from the current knowledge base, without fetching")
     identity_mod.add_identity_arg(parser)
     args = parser.parse_args()
     identity_mod.activate_or_exit(args.identity)
 
     vacancies = kb.load_vacancies()
-    companies = kb.load_companies()
     state = common.load_json(common.STATE_PATH, default={})
     import selections
 
     selection_id = selections.record(vacancies, state, kind="rebuild")
     print(f"Selection #{selection_id} recorded (what the desktop app lists).")
-    written = write_segmented_reports(vacancies, companies, state)
-    for slug, path in written.items():
-        print(f"Report saved: {path}" + (f"  [{slug}]" if slug else ""))
 
 
 if __name__ == "__main__":
