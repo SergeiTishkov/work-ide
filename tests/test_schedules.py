@@ -245,3 +245,22 @@ def test_the_command_line(isolated_data_dir, capsys):
     assert "minute" in capsys.readouterr().err
     assert taskq.main(["schedule", "remove", str(made["id"])]) == 0
     assert taskq.main(["schedule", "remove", str(made["id"])]) == 1
+
+
+def test_end_to_end_a_schedule_queues_its_task_the_worker_runs_it_and_the_schedule_shows_the_result(
+        isolated_data_dir):
+    with taskq.session() as c:
+        made = schedules.add(c, "rest", "ftf", "* * * * *", at=taskq.now() - timedelta(minutes=2))
+    said = []
+    worker = taskd.Worker("background", ("ai",), start=taskd.FakeRun, kill=lambda pid: None,
+                          awake=lambda on: None, holder=lambda: None, alive=lambda pid: True, say=said.append)
+    worker.register()
+    worker.tick()       # due: queued, claimed, started
+    worker.tick()       # ended
+    with taskq.session() as c:
+        task = taskq.tasks(c)[0]
+        assert (task["kind"], task["identity"], task["origin"], task["state"]) == ("rest", "ftf", "schedule", "done")
+        shown = schedules.get(c, made["id"])
+        assert shown["last_tasks"] == [task["id"]] and shown["last_result"] == "done"
+        assert shown["last_note"].endswith(f"queued #{task['id']}")
+    assert any(line.startswith(f"schedule #{made['id']}") for line in said)

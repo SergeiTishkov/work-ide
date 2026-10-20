@@ -23,9 +23,13 @@ const ACTIVE = new Set(['queued', 'running']);
 const LOG_LIMIT = 3000;
 // The first read of a long log: its tail is what the panel shows, the whole
 // of it is what the step list needs (a collection logs a few MB at most).
-const STEP_KINDS = { collect: true, rest: false, linkedin: false, pipeline: false };
+const STEP_KINDS = { collect: true, rest: false, linkedin: false, pipeline: false, links: false };
 const PROGRESS_LINE = /^\[\d\d:\d\d:\d\d\] /;
-const KINDS = new Set(['collect', 'rest', 'linkedin', 'clean', 'cv', 'letter', 'cv_batch', 'reputation']);
+const KINDS = new Set(['collect', 'rest', 'linkedin', 'clean', 'cv', 'letter', 'cv_batch', 'reputation', 'links']);
+// What a schedule can start (tools/schedules.py WHAT), and the rest of its fields
+const SCHEDULE_WHAT = new Set(['collect', 'linkedin', 'rest', 'clean', 'cv_batch', 'links']);
+const SCHEDULE_MISSED = new Set(['catch_up', 'skip']);
+const CRON_PATTERN = /^[@A-Za-z0-9*,\/ -]{1,100}$/;
 const IDENTITY_PATTERN = /^[a-z][a-z0-9]{2,9}$/;
 const VACANCY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 // The person's instructions for one CV go on the command line, whose limit on
@@ -315,6 +319,53 @@ class QueueClient {
   async clearFinished() {
     await this.taskq(['hide', '--json']);
     return { ok: true };
+  }
+
+  // --- schedules (task 0061): tools/schedules.py through taskq.py ------------
+
+  async schedules() {
+    return this.runTaskq(['schedule', 'list', '--json']).then((out) => parseJson(String(out).trim(), []));
+  }
+
+  // schedule: { id?, what, identities: ['all'] | [prefix...], cron, missed,
+  // args?, name?, enabled? } -> the schedule as saved
+  async saveSchedule(schedule) {
+    const s = schedule || {};
+    const id = s.id == null ? null : Number(s.id);
+    if (id !== null && !Number.isInteger(id)) throw new Error(`invalid schedule id: ${s.id}`);
+    if (!SCHEDULE_WHAT.has(s.what)) throw new Error(`unknown schedule kind: ${s.what}`);
+    if (!SCHEDULE_MISSED.has(s.missed)) throw new Error(`missed runs: ${s.missed}`);
+    if (!CRON_PATTERN.test(String(s.cron || '').trim())) throw new Error(`invalid cron line: ${s.cron}`);
+    const identities = Array.isArray(s.identities) && s.identities.length ? s.identities : ['all'];
+    for (const prefix of identities) {
+      if (prefix !== 'all' && !IDENTITY_PATTERN.test(String(prefix))) throw new Error(`invalid identity: ${prefix}`);
+    }
+    const args = id === null ? ['schedule', 'add', s.what] : ['schedule', 'set', String(id), '--what', s.what];
+    args.push('--identities', identities.join(','), '--cron', String(s.cron).trim(), '--missed', s.missed,
+      '--args', JSON.stringify(s.args && typeof s.args === 'object' ? s.args : {}),
+      '--name', String(s.name || '').slice(0, 120));
+    const saved = await this.runTaskq(args).then((out) => parseJson(String(out).trim(), null));
+    if (!saved) throw new Error('tools/taskq.py did not answer with the schedule');
+    if (s.enabled === false && saved.enabled) return this.enableSchedule(saved.id, false);
+    return saved;
+  }
+
+  async enableSchedule(id, on) {
+    const out = await this.runTaskq(['schedule', on ? 'on' : 'off', String(Number(id))]);
+    return parseJson(String(out).trim(), null);
+  }
+
+  async removeSchedule(id) {
+    const out = await this.runTaskq(['schedule', 'remove', String(Number(id))]);
+    return parseJson(String(out).trim(), { removed: false });
+  }
+
+  // The next runs of a cron line, as ISO times; a wrong line throws its error.
+  async nextRuns(cron) {
+    const line = String(cron || '').trim();
+    if (!CRON_PATTERN.test(line)) throw new Error(`invalid cron line: ${cron}`);
+    const out = await this.runTaskq(['schedule', 'next', line, '-n', '3']);
+    return parseJson(String(out).trim(), []);
   }
 
   // A file the renderer asks to open must be one a task produced.

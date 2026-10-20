@@ -130,6 +130,8 @@
     identities: [],
     settings: readSettings(),
     settingsOpen: false,
+    // "Task scheduler...": { list, error, form } while open
+    scheduler: null,
     // the task the panel's cross asks about: { id, label }
     confirmStop: null,
     panelFolded: false,
@@ -838,7 +840,6 @@
     renderIdentityTabs();
     renderPanel();
     renderTaskPanel();
-    renderModals();
     watchScroll();
   }
 
@@ -1111,6 +1112,7 @@
     feedbackItem(pending),
     menuItem({ testid: 'cleanup', text: t('cleanup.button'), title: t('cleanup.hint'), onclick: openCleanup }),
     menuItem({ testid: 'open-identities', text: t('menu.identities'), onclick: openIdentities }),
+    menuItem({ testid: 'open-scheduler', text: t('menu.scheduler'), onclick: openScheduler }),
     menuItem({ testid: 'open-settings', text: t('menu.settings'), onclick: openSettings }));
     return el('span', { class: 'commands' }, button, menu);
   }
@@ -1238,6 +1240,337 @@
         el('button', { testid: 'settings-close', onclick: closeSettings }, t('settings.close')))));
   }
 
+  // --- "Task scheduler...": work on a timetable (task 0061) -------------------
+  // The schedules live in the queue's file (tools/schedules.py); the workers
+  // queue a schedule's tasks when it is due, and they show in the panel like
+  // any other. The time is a preset or a raw cron line; the next three runs
+  // are shown before saving, as tools/schedules.py counts them.
+  const SCHEDULE_WHAT_KEYS = {
+    collect: 'scheduler.what.collect', linkedin: 'scheduler.what.linkedin', rest: 'scheduler.what.rest',
+    clean: 'scheduler.what.clean', cv_batch: 'scheduler.what.cv_batch', links: 'scheduler.what.links',
+  };
+  const SCHEDULE_WHAT = Object.keys(SCHEDULE_WHAT_KEYS);
+  const SCHEDULE_PRESET_KEYS = {
+    daily: 'scheduler.preset.daily', hours: 'scheduler.preset.hours', weekly: 'scheduler.preset.weekly',
+    cron: 'scheduler.preset.cron',
+  };
+  const SCHEDULE_PRESETS = Object.keys(SCHEDULE_PRESET_KEYS);
+  const SCHEDULE_MISSED_KEYS = { catch_up: 'scheduler.missed.catch_up', skip: 'scheduler.missed.skip' };
+  // cron's day numbers -> their names, shown from Monday
+  const WEEKDAY_KEYS = {
+    1: 'scheduler.day.1', 2: 'scheduler.day.2', 3: 'scheduler.day.3', 4: 'scheduler.day.4',
+    5: 'scheduler.day.5', 6: 'scheduler.day.6', 0: 'scheduler.day.0',
+  };
+  const WEEK = [1, 2, 3, 4, 5, 6, 0];
+  const SCHEDULE_RESULT_KEYS = {
+    running: 'task.state.running', queued: 'task.state.queued', done: 'task.state.done',
+    failed: 'task.state.failed', stopped: 'task.state.stopped',
+  };
+
+  function openScheduler() {
+    state.scheduler = { list: null, error: null, form: null };
+    renderModals();
+    loadSchedules();
+  }
+
+  function closeScheduler() {
+    state.scheduler = null;
+    renderModals();
+  }
+
+  async function loadSchedules() {
+    const s = state.scheduler;
+    if (!s) return;
+    try {
+      s.list = await api.listSchedules();
+      s.error = null;
+    } catch (error) {
+      s.error = error.message || String(error);
+    }
+    if (state.scheduler === s) renderModals();
+  }
+
+  function pad(n) {
+    return String(n).padStart(2, '0');
+  }
+
+  // An ISO time -> "2026-10-22 07:00" on this computer's clock
+  function localTime(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso || '');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  // A cron line -> the preset that writes it, or "cron"
+  function presetOf(cron) {
+    const line = String(cron || '').trim();
+    let m = /^(\d{1,2}) (\d{1,2}) \* \* \*$/.exec(line);
+    if (m && Number(m[1]) < 60 && Number(m[2]) < 24) return { preset: 'daily', time: `${pad(m[2])}:${pad(m[1])}` };
+    m = /^0 \*\/(\d{1,2}) \* \* \*$/.exec(line);
+    if (m && Number(m[1]) >= 1 && Number(m[1]) <= 23) return { preset: 'hours', hours: Number(m[1]) };
+    m = /^(\d{1,2}) (\d{1,2}) \* \* ([0-6](?:,[0-6])*)$/.exec(line);
+    if (m && Number(m[1]) < 60 && Number(m[2]) < 24) {
+      return { preset: 'weekly', time: `${pad(m[2])}:${pad(m[1])}`, days: m[3].split(',').map(Number) };
+    }
+    return { preset: 'cron' };
+  }
+
+  function cronOf(form) {
+    const [h, m] = String(form.time || '07:00').split(':').map((v) => Number(v) || 0);
+    if (form.preset === 'daily') return `${m} ${h} * * *`;
+    if (form.preset === 'hours') return `0 */${form.hours} * * *`;
+    if (form.preset === 'weekly') {
+      return form.days.length ? `${m} ${h} * * ${[...form.days].sort((a, b) => a - b).join(',')}` : '';
+    }
+    return String(form.cron || '').trim();
+  }
+
+  function whenText(cron) {
+    const p = presetOf(cron);
+    if (p.preset === 'daily') return t('scheduler.daily_at', { time: p.time });
+    if (p.preset === 'hours') return t('scheduler.every_hours', { n: p.hours });
+    if (p.preset === 'weekly') {
+      const days = WEEK.filter((d) => p.days.includes(d)).map((d) => t(WEEKDAY_KEYS[d])).join(', ');
+      return t('scheduler.weekly_at', { days, time: p.time });
+    }
+    return cron;
+  }
+
+  function scheduleForm(schedule) {
+    const cron = schedule ? schedule.cron : '0 7 * * *';
+    const identities = schedule ? schedule.identities : ['all'];
+    const args = (schedule && schedule.args) || {};
+    return {
+      id: schedule ? schedule.id : null,
+      what: schedule ? schedule.what : 'collect',
+      all: identities.includes('all'),
+      identities: identities.filter((p) => p !== 'all'),
+      preset: 'daily', time: '07:00', hours: 6, days: [1, 2, 3, 4, 5], cron,
+      ...presetOf(cron),
+      missed: schedule ? schedule.missed : 'catch_up',
+      name: schedule ? schedule.name : '',
+      filters: { ages: args.ages || ['older'], statuses: args.statuses || [], classes: args.classes || [] },
+      enabled: schedule ? schedule.enabled : true,
+      next: null, error: null, busy: false,
+    };
+  }
+
+  function editSchedule(schedule) {
+    state.scheduler.form = scheduleForm(schedule);
+    renderModals();
+    previewRuns();
+  }
+
+  let previewTimer = null;
+
+  // The next runs of the form's line, asked a moment after the last change.
+  function previewRuns() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(async () => {
+      const s = state.scheduler;
+      const form = s && s.form;
+      if (!form) return;
+      const cron = cronOf(form);
+      if (form.next && form.next.cron === cron) return;
+      let next;
+      try {
+        next = cron ? { cron, runs: await api.nextRuns(cron) } : { cron, error: t('scheduler.no_days') };
+      } catch (error) {
+        next = { cron, error: String(error.message || error).replace(/^.*?taskq schedule: /, '') };
+      }
+      if (state.scheduler !== s || s.form !== form || cronOf(form) !== cron) return;
+      form.next = next;
+      renderModals();
+    }, 250);
+  }
+
+  function changeForm(change) {
+    Object.assign(state.scheduler.form, change, { error: null });
+    renderModals();
+    previewRuns();
+  }
+
+  function formProblem(form) {
+    if (!form.all && !form.identities.length) return t('scheduler.no_identity');
+    if (form.what === 'clean' && !(form.filters.ages.length + form.filters.statuses.length + form.filters.classes.length)) {
+      return t('scheduler.clean_needs_one');
+    }
+    if (!form.next || form.next.error || !form.next.runs.length) return t('scheduler.no_runs');
+    return null;
+  }
+
+  async function saveSchedule() {
+    const s = state.scheduler;
+    const form = s.form;
+    form.busy = true;
+    renderModals();
+    try {
+      await api.saveSchedule({
+        id: form.id, what: form.what, identities: form.all ? ['all'] : form.identities,
+        cron: cronOf(form), missed: form.missed, name: form.name.trim(), enabled: form.enabled,
+        args: form.what === 'clean' ? form.filters : {},
+      });
+      s.form = null;
+      await loadSchedules();
+    } catch (error) {
+      form.error = error.message || String(error);
+      form.busy = false;
+      renderModals();
+    }
+  }
+
+  async function scheduleAction(action) {
+    const s = state.scheduler;
+    try {
+      await action();
+    } catch (error) {
+      s.error = error.message || String(error);
+    }
+    await loadSchedules();
+  }
+
+  function renderScheduleRow(schedule) {
+    const who = schedule.identities.includes('all') ? t('scheduler.all') : schedule.identities.join(', ');
+    const last = schedule.last_run_at
+      ? t('scheduler.last', { time: localTime(schedule.last_run_at),
+        result: schedule.last_result ? t(SCHEDULE_RESULT_KEYS[schedule.last_result]) : '—' })
+      : t('scheduler.never');
+    return el('li', { class: schedule.enabled ? 'schedule-row' : 'schedule-row off', testid: `schedule-${schedule.id}` },
+      el('input', {
+        type: 'checkbox', testid: `schedule-on-${schedule.id}`, checked: schedule.enabled, title: t('scheduler.on'),
+        onchange: (event) => scheduleAction(() => api.enableSchedule(schedule.id, event.target.checked)),
+      }),
+      el('div', { class: 'schedule-text' },
+        el('div', { class: 'schedule-title' },
+          schedule.name ? el('b', {}, `${schedule.name} · `) : null,
+          `${t(SCHEDULE_WHAT_KEYS[schedule.what])} · ${who}`),
+        el('div', { class: 'muted schedule-when', testid: `schedule-when-${schedule.id}` },
+          [whenText(schedule.cron),
+            schedule.next_at && t('scheduler.next', { time: localTime(schedule.next_at) }),
+            t(SCHEDULE_MISSED_KEYS[schedule.missed])].filter(Boolean).join(' · ')),
+        el('div', { class: 'muted schedule-last', testid: `schedule-last-${schedule.id}`, title: schedule.last_note || null },
+          last)),
+      el('button', { class: 'link', testid: `schedule-edit-${schedule.id}`, onclick: () => editSchedule(schedule) },
+        t('scheduler.edit')),
+      el('button', {
+        class: 'link', testid: `schedule-remove-${schedule.id}`,
+        onclick: () => scheduleAction(() => api.removeSchedule(schedule.id)),
+      }, t('scheduler.remove')));
+  }
+
+  function renderScheduleForm(form) {
+    const field = (label, ...body) => el('div', { class: 'schedule-field' },
+      el('div', { class: 'schedule-label' }, label), el('div', { class: 'schedule-input' }, ...body));
+    const checkbox = (testid, checked, onchange, text, disabled = false) => el('label', { class: 'schedule-option' },
+      el('input', { type: 'checkbox', testid, checked, disabled, onchange: (event) => onchange(event.target.checked) }),
+      ` ${text}`);
+    const toggle = (list, value, on) => (on ? [...list, value] : list.filter((v) => v !== value));
+    const time = () => el('input', {
+      type: 'time', testid: 'schedule-time', value: form.time,
+      onchange: (event) => changeForm({ time: event.target.value || '07:00' }),
+    });
+    let when = null;
+    if (form.preset === 'daily') when = time();
+    else if (form.preset === 'hours') {
+      when = el('span', {}, el('input', {
+        type: 'number', min: 1, max: 23, testid: 'schedule-hours', value: form.hours, class: 'schedule-hours',
+        onchange: (event) => changeForm({ hours: Math.min(23, Math.max(1, Number(event.target.value) || 1)) }),
+      }), ` ${t('scheduler.hours_unit')}`);
+    } else if (form.preset === 'weekly') {
+      when = el('span', { class: 'schedule-days' }, WEEK.map((d) => checkbox(`schedule-day-${d}`, form.days.includes(d),
+        (on) => changeForm({ days: toggle(form.days, d, on) }), t(WEEKDAY_KEYS[d]))), ' ', time());
+    } else {
+      when = el('input', {
+        type: 'text', testid: 'schedule-cron', value: form.cron, class: 'schedule-cron', placeholder: t('scheduler.cron_hint'),
+        spellcheck: 'false',
+        oninput: (event) => { form.cron = event.target.value; form.error = null; previewRuns(); },
+      });
+    }
+    const next = form.next;
+    const runs = !next ? el('span', { class: 'spinner small' })
+      : next.error ? el('span', { class: 'cleanup-error' }, next.error)
+        : next.runs.length ? t('scheduler.next_runs', { list: next.runs.map(localTime).join(' · ') })
+          : t('scheduler.no_runs');
+    const group = (key, values, label) => el('div', { class: 'schedule-filter' },
+      el('span', { class: 'muted' }, `${t(CLEANUP_LEGENDS[key])}: `),
+      values.map((value) => checkbox(`schedule-${key}-${value}`, form.filters[key].includes(value),
+        (on) => changeForm({ filters: { ...form.filters, [key]: toggle(form.filters[key], value, on) } }), label(value))));
+    const problem = formProblem(form);
+    return el('div', { class: 'schedule-form', testid: 'schedule-form' },
+      el('h3', {}, form.id == null ? t('scheduler.add') : t('scheduler.edit_title')),
+      field(t('scheduler.what'), el('select', {
+        testid: 'schedule-what', onchange: (event) => changeForm({ what: event.target.value }),
+      }, SCHEDULE_WHAT.map((what) => el('option', { value: what, selected: what === form.what },
+        t(SCHEDULE_WHAT_KEYS[what]))))),
+      form.what === 'clean' && field(t('scheduler.clean_filters'),
+        group('ages', CLEANUP_AGES, (a) => t(AGE_KEYS[a])),
+        group('statuses', Object.keys(CLEANUP_STATUS_KEYS), (v) => t(CLEANUP_STATUS_KEYS[v])),
+        group('classes', Object.keys(CLEANUP_CLASS_KEYS), (v) => t(CLEANUP_CLASS_KEYS[v]))),
+      field(t('scheduler.identities'),
+        checkbox('schedule-all', form.all, (on) => changeForm({ all: on }), t('scheduler.all')),
+        state.identities.map((identity) => checkbox(`schedule-identity-${identity.prefix}`,
+          form.all || form.identities.includes(identity.prefix),
+          (on) => changeForm({ identities: toggle(form.identities, identity.prefix, on) }), identity.prefix, form.all))),
+      field(t('scheduler.when'),
+        el('select', {
+          testid: 'schedule-preset',
+          onchange: (event) => {
+            const preset = event.target.value;
+            // the raw line starts from what the preset wrote
+            changeForm(preset === 'cron' ? { preset, cron: cronOf(form) } : { preset });
+          },
+        }, SCHEDULE_PRESETS.map((p) => el('option', { value: p, selected: p === form.preset }, t(SCHEDULE_PRESET_KEYS[p])))),
+        ' ', when,
+        el('div', { class: 'muted schedule-next', testid: 'schedule-next' }, runs)),
+      field(t('scheduler.missed'),
+        ['catch_up', 'skip'].map((value) => el('label', { class: 'schedule-option' },
+          el('input', {
+            type: 'radio', name: 'schedule-missed', testid: `schedule-missed-${value}`, checked: form.missed === value,
+            onchange: () => changeForm({ missed: value }),
+          }), ` ${t(SCHEDULE_MISSED_KEYS[value])}`))),
+      field(t('scheduler.name'), el('input', {
+        type: 'text', testid: 'schedule-name', value: form.name, class: 'schedule-name', maxlength: 120,
+        oninput: (event) => { form.name = event.target.value; },
+      })),
+      form.error && el('p', { class: 'cleanup-error', testid: 'schedule-error' }, form.error),
+      el('div', { class: 'popup-actions' },
+        problem && next && el('span', { class: 'muted', testid: 'schedule-problem' }, problem),
+        form.busy && el('span', { class: 'spinner' }),
+        el('button', {
+          class: 'primary', testid: 'schedule-save', disabled: form.busy || Boolean(problem), onclick: saveSchedule,
+        }, t('scheduler.save')),
+        el('button', {
+          testid: 'schedule-cancel', disabled: form.busy,
+          onclick: () => { state.scheduler.form = null; renderModals(); },
+        }, t('scheduler.cancel'))));
+  }
+
+  function renderScheduler() {
+    const s = state.scheduler;
+    if (!s) return null;
+    let body;
+    if (s.form) body = renderScheduleForm(s.form);
+    else if (s.list === null && !s.error) body = el('div', { class: 'loading' }, el('span', { class: 'spinner' }));
+    else {
+      body = el('div', {},
+        s.list && s.list.length
+          ? el('ul', { class: 'schedule-list', testid: 'schedule-list' }, s.list.map(renderScheduleRow))
+          : el('p', { class: 'muted', testid: 'schedule-empty' }, t('scheduler.empty')),
+        el('div', { class: 'popup-actions' },
+          el('button', { class: 'primary', testid: 'schedule-add', onclick: () => editSchedule(null) }, t('scheduler.add')),
+          el('button', { testid: 'scheduler-close', onclick: closeScheduler }, t('scheduler.close'))));
+    }
+    return el('div', {
+      class: 'overlay', testid: 'scheduler-overlay',
+      onclick: (event) => { if (event.target === event.currentTarget && !(s.form && s.form.busy)) closeScheduler(); },
+    },
+    el('div', { class: 'popup scheduler', role: 'dialog', 'aria-modal': 'true', testid: 'scheduler-dialog' },
+      el('h2', {}, t('scheduler.title')),
+      el('p', { class: 'muted' }, t('scheduler.explain')),
+      s.error && el('p', { class: 'cleanup-error', testid: 'scheduler-error' }, s.error),
+      body));
+  }
+
   // --- the stop confirmation: the panel's cross (the owner, 2026-10-21) -------
 
   function askStop(task) {
@@ -1267,15 +1600,31 @@
         el('button', { testid: 'stop-no', onclick: () => answerStop(false) }, t('task.stop_no')))));
   }
 
+  // Drawn again only when one of them changes, not with the page: a field
+  // being typed in keeps its focus and caret.
   function renderModals() {
-    document.querySelector('[data-testid="modal-host"]').replaceChildren(
-      ...[renderSettings(), renderStopConfirm()].filter(Boolean));
+    const focused = document.activeElement;
+    const testid = focused && focused.closest && focused.closest('[data-testid="modal-host"]')
+      ? focused.dataset.testid : null;
+    const caret = testid && typeof focused.selectionStart === 'number'
+      ? [focused.selectionStart, focused.selectionEnd] : null;
+    const host = document.querySelector('[data-testid="modal-host"]');
+    host.replaceChildren(...[renderScheduler(), renderSettings(), renderStopConfirm()].filter(Boolean));
+    const again = testid && host.querySelector(`[data-testid="${testid}"]`);
+    if (again) {
+      again.focus();
+      if (caret) again.setSelectionRange(...caret);
+    }
   }
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
     if (state.confirmStop) answerStop(false);
     else if (state.settingsOpen) closeSettings();
+    else if (state.scheduler && state.scheduler.form && !state.scheduler.form.busy) {
+      state.scheduler.form = null;
+      renderModals();
+    } else if (state.scheduler) closeScheduler();
   });
 
   function renderToolbar(identity, info) {
@@ -2476,11 +2825,11 @@
     pending: '○',
   };
   // the tasks that run the pipeline: an identity's base changes when they end
-  const PIPELINE_KINDS = new Set(['collect', 'rest', 'linkedin', 'pipeline', 'clean']);
+  const PIPELINE_KINDS = new Set(['collect', 'rest', 'linkedin', 'pipeline', 'clean', 'links']);
   const TASK_KIND_KEYS = {
     collect: 'task.kind.collect', rest: 'task.kind.rest', linkedin: 'task.kind.linkedin', cv: 'task.kind.cv',
     letter: 'task.kind.letter', reputation: 'task.kind.reputation', batch: 'task.kind.batch',
-    pipeline: 'task.kind.pipeline', clean: 'task.kind.clean',
+    pipeline: 'task.kind.pipeline', clean: 'task.kind.clean', links: 'task.kind.links',
   };
   // who added a task, when not this app (tools/taskq.py ORIGINS)
   const TASK_ORIGIN_KEYS = {

@@ -1770,7 +1770,7 @@ test('the menu holds Collect, Review feedback, Clean up, Identities, Settings; "
   await command(page, 'cleanup');
   const items = await page.getByTestId('menu').locator('[role="menuitem"]')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.querySelector('[data-testid]').dataset.testid));
-  expect(items).toEqual(['run-collect', 'run-feedback', 'cleanup', 'open-identities', 'open-settings']);
+  expect(items).toEqual(['run-collect', 'run-feedback', 'cleanup', 'open-identities', 'open-scheduler', 'open-settings']);
   await page.getByTestId('cleanup').click();
   const dialog = page.getByTestId('cleanup-dialog');
   await expect(dialog).toBeVisible();
@@ -1820,3 +1820,128 @@ test('the menu button spins while a clean-up counts', async ({ page }) => {
   await expect(page.getByTestId('menu-busy')).toHaveCount(0);
 });
 
+
+test.describe('"Task scheduler…"', () => {
+  test.use({ timezoneId: 'UTC' });
+
+  const SCHEDULES = [
+    { id: 1, name: '', what: 'collect', identities: ['all'], args: {}, cron: '0 7 * * *', enabled: true,
+      missed: 'catch_up', next_at: '2026-10-22T07:00:00+00:00', last_run_at: '2026-10-21T07:00:05+00:00',
+      last_tasks: [12, 13], last_result: 'done', last_note: 'schedule #1 (collect), the run of 2026-10-21 07:00: queued #12, #13' },
+    { id: 2, name: 'weekend', what: 'clean', identities: ['sharp'], args: { ages: ['older'] }, cron: '30 9 * * 0,6',
+      enabled: false, missed: 'skip', next_at: null, last_run_at: null, last_tasks: [], last_result: null, last_note: null },
+  ];
+
+  async function openScheduler(page, schedules = SCHEDULES) {
+    await open(page, { ...standardFixture(), schedules });
+    await (await command(page, 'open-scheduler')).click();
+    await expect(page.getByTestId('scheduler-dialog')).toBeVisible();
+  }
+
+  test('lists the schedules: what, for whom, when, the next and the last run; on/off and delete', async ({ page }) => {
+    await openScheduler(page);
+    const first = page.getByTestId('schedule-1');
+    await expect(first).toContainText(`${en['scheduler.what.collect']} · ${en['scheduler.all']}`);
+    await expect(page.getByTestId('schedule-when-1')).toHaveText(
+      `every day at 07:00 · next 2026-10-22 07:00 · ${en['scheduler.missed.catch_up']}`);
+    await expect(page.getByTestId('schedule-last-1')).toHaveText(`last run 2026-10-21 07:00: ${en['task.state.done']}`);
+    await expect(page.getByTestId('schedule-last-1')).toHaveAttribute('title', /queued #12, #13/);
+    await expect(page.getByTestId('schedule-2')).toContainText(`weekend · ${en['scheduler.what.clean']} · sharp`);
+    await expect(page.getByTestId('schedule-when-2')).toHaveText(`Sat, Sun at 09:30 · ${en['scheduler.missed.skip']}`);
+    await expect(page.getByTestId('schedule-last-2')).toHaveText(en['scheduler.never']);
+    await expect(page.getByTestId('schedule-on-2')).not.toBeChecked();
+    await page.getByTestId('schedule-on-2').check();
+    expect(await calls(page, 'enableSchedule')).toEqual([[2, true]]);
+    await expect(page.getByTestId('schedule-when-2')).toContainText('next 2026-10-22 07:00');
+    await page.getByTestId('schedule-remove-1').click();
+    expect(await calls(page, 'removeSchedule')).toEqual([[1]]);
+    await expect(page.getByTestId('schedule-1')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('scheduler-dialog')).toHaveCount(0);
+  });
+
+  test('a new schedule: the time as a preset or a cron line, the next runs before saving', async ({ page }) => {
+    await openScheduler(page, []);
+    await expect(page.getByTestId('schedule-empty')).toHaveText(en['scheduler.empty']);
+    await page.getByTestId('schedule-add').click();
+    const next = page.getByTestId('schedule-next');
+    await expect(next).toHaveText('Next runs: 2026-10-22 07:00 · 2026-10-23 07:00 · 2026-10-24 07:00');
+    await page.getByTestId('schedule-time').fill('06:30');
+    await expect(next).toContainText('2026-10-22 06:30');
+
+    await page.getByTestId('schedule-preset').selectOption('weekly');
+    for (const day of [1, 2, 3, 4, 5]) await page.getByTestId(`schedule-day-${day}`).uncheck();
+    await expect(next).toHaveText(en['scheduler.no_days']);
+    await expect(page.getByTestId('schedule-save')).toBeDisabled();
+    await page.getByTestId('schedule-day-1').check();
+    await page.getByTestId('schedule-preset').selectOption('cron');
+    const cron = page.getByTestId('schedule-cron');
+    await expect(cron).toHaveValue('30 6 * * 1');   // what the preset wrote
+
+    await cron.fill('0 7 * *');
+    await expect(next).toContainText('a cron line has 5 fields');
+    await expect(page.getByTestId('schedule-save')).toBeDisabled();
+    await cron.fill('15 8 * *');
+    await cron.press('End');
+    await page.keyboard.type(' *');   // the popup redraws with the preview; the field keeps its caret
+    await expect(next).toContainText('2026-10-22 08:15');
+    await expect(cron).toBeFocused();
+    await expect(cron).toHaveValue('15 8 * * *');
+
+    await page.getByTestId('schedule-all').uncheck();
+    await expect(page.getByTestId('schedule-problem')).toHaveText(en['scheduler.no_identity']);
+    await page.getByTestId('schedule-identity-sharp').check();
+    await page.getByTestId('schedule-missed-skip').check();
+    await page.getByTestId('schedule-name').fill('mornings');
+    await page.getByTestId('schedule-save').click();
+    expect(await calls(page, 'saveSchedule')).toEqual([[{
+      id: null, what: 'collect', identities: ['sharp'], cron: '15 8 * * *', missed: 'skip', name: 'mornings',
+      enabled: true, args: {},
+    }]]);
+    await expect(page.getByTestId('schedule-1')).toContainText(`mornings · ${en['scheduler.what.collect']} · sharp`);
+    await expect(page.getByTestId('schedule-when-1')).toContainText('every day at 08:15');
+  });
+
+  test('a clean-up keeps its filters and needs one; a change keeps the schedule off', async ({ page }) => {
+    await openScheduler(page);
+    await page.getByTestId('schedule-edit-2').click();
+    await expect(page.getByTestId('schedule-what')).toHaveValue('clean');
+    await expect(page.getByTestId('schedule-preset')).toHaveValue('weekly');
+    await expect(page.getByTestId('schedule-day-6')).toBeChecked();
+    await expect(page.getByTestId('schedule-day-0')).toBeChecked();
+    await expect(page.getByTestId('schedule-day-1')).not.toBeChecked();
+    await expect(page.getByTestId('schedule-time')).toHaveValue('09:30');
+    await expect(page.getByTestId('schedule-missed-skip')).toBeChecked();
+    await expect(page.getByTestId('schedule-identity-sharp')).toBeChecked();
+    await expect(page.getByTestId('schedule-ages-older')).toBeChecked();
+    await page.getByTestId('schedule-ages-older').uncheck();
+    await expect(page.getByTestId('schedule-problem')).toHaveText(en['scheduler.clean_needs_one']);
+    await expect(page.getByTestId('schedule-save')).toBeDisabled();
+    await page.getByTestId('schedule-statuses-expired').check();
+    await page.getByTestId('schedule-save').click();
+    expect(await calls(page, 'saveSchedule')).toEqual([[{
+      id: 2, what: 'clean', identities: ['sharp'], cron: '30 9 * * 0,6', missed: 'skip', name: 'weekend',
+      enabled: false, args: { ages: [], statuses: ['expired'], classes: [] },
+    }]]);
+    await expect(page.getByTestId('schedule-on-2')).not.toBeChecked();
+    // Cancel and Escape leave a form without saving
+    await page.getByTestId('schedule-edit-1').click();
+    await page.getByTestId('schedule-cancel').click();
+    await page.getByTestId('schedule-edit-1').click();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('schedule-list')).toBeVisible();
+    expect((await calls(page, 'saveSchedule')).length).toBe(1);
+  });
+
+  test('a save the queue refuses says why, and the form stays', async ({ page }) => {
+    await openScheduler(page, []);
+    await page.evaluate(() => {
+      window.api.saveSchedule = async () => { throw new Error('tools/taskq.py: taskq schedule: invalid identity: X'); };
+    });
+    await page.getByTestId('schedule-add').click();
+    await expect(page.getByTestId('schedule-next')).toContainText('2026-10-22');
+    await page.getByTestId('schedule-save').click();
+    await expect(page.getByTestId('schedule-error')).toContainText('invalid identity');
+    await expect(page.getByTestId('schedule-form')).toBeVisible();
+  });
+});

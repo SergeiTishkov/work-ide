@@ -48,5 +48,5 @@ Docs: ARCHITECTURE "Schedules: the queue's work on a timetable", README
 - DONE - Schedules in the queue's file; cron parsing; due, skip-while-running, catch-up or skip; tests with a fake clock (`tools/schedules.py`, the `schedules` table, the workers look every 20 s; `tests/test_schedules.py`)
 - DONE - The re-check of the shortlist's links as a task: `pipeline.py --links`, the kind `links`
 - DONE - `tools/taskq.py schedule add/list/remove` for the agent (also `set`, `on`, `off`, `next`, `due`; the run-task skill)
-- TO DO - "Task scheduler…" popup: list, add, edit, on/off, next runs; UI tests
-- TO DO - End-to-end: a schedule adds its task, the task runs and ends, the schedule shows the result
+- DONE - "Task scheduler…" popup: list, add, edit, on/off, next runs; UI tests (the menu item; presets every day at, every N hours, the days of the week at, or a cron line; the next three runs from `taskq.py schedule next`; a clean-up's filters; the app's calls go through `taskq.py schedule`, checked in `app/main/queue.js` first)
+- DONE - End-to-end: a schedule adds its task, the task runs and ends, the schedule shows the result (`tests/test_schedules.py`, a real worker with the fake runner)

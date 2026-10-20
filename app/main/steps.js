@@ -65,6 +65,7 @@ const OUTLINES = {
   rest: ['load', 'rescore', 'duplicates', 'links', 'companies', 'descriptions', 'rescore', 'ai_brief',
     'ai_check', 'rescore_top', 'channels', 'wikidata', 'rescore', 'save', 'selection'],
   linkedin: ['fetch', 'wait_base', 'load', 'merge_linkedin', 'save', 'selection'],
+  links: ['load', 'links', 'save', 'selection'],
 };
 
 function stageKey(name) {

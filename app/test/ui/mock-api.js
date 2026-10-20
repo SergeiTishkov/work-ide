@@ -27,6 +27,8 @@ function installMockApi(fixture) {
   const logs = {};
   let nextTaskId = 1;
   const copy = (value) => JSON.parse(JSON.stringify(value));
+  const schedules = copy(data.schedules || []);
+  let nextSchedule = schedules.reduce((most, s) => Math.max(most, s.id), 0) + 1;
   const laneOf = (kind) => (kind === 'collect' ? 'collect' : kind === 'reputation' ? 'reputation' : 'documents');
   // The CV/CL batch (main/batch.js): window.__setBatch(task, lines) sets it
   // as the status file would, null removes it; it is listed after the tasks.
@@ -427,6 +429,51 @@ function installMockApi(fixture) {
       }
       tasksChanged();
       return { ok: true };
+    },
+    // Schedules (task 0061). data.schedules: the rows tools/taskq.py
+    // `schedule list --json` prints. The next runs are made up from the
+    // line: a daily line runs on 22, 23 and 24 October 2026 (UTC); a line of
+    // the wrong length fails as tools/schedules.py says it.
+    async listSchedules() {
+      record('listSchedules', []);
+      return copy(schedules);
+    },
+    async saveSchedule(schedule) {
+      record('saveSchedule', [copy(schedule)]);
+      const saved = {
+        last_run_at: null, last_tasks: [], last_result: null, last_note: null,
+        ...(schedules.find((s) => s.id === schedule.id) || {}),
+        ...copy(schedule), id: schedule.id == null ? nextSchedule++ : schedule.id,
+        next_at: schedule.enabled === false ? null : '2026-10-22T07:00:00+00:00',
+      };
+      saved.enabled = schedule.enabled !== false;
+      const at = schedules.findIndex((s) => s.id === saved.id);
+      if (at >= 0) schedules[at] = saved; else schedules.push(saved);
+      return copy(saved);
+    },
+    async enableSchedule(id, on) {
+      record('enableSchedule', [id, on]);
+      const s = schedules.find((x) => x.id === id);
+      s.enabled = on;
+      s.next_at = on ? '2026-10-22T07:00:00+00:00' : null;
+      return copy(s);
+    },
+    async removeSchedule(id) {
+      record('removeSchedule', [id]);
+      const at = schedules.findIndex((s) => s.id === id);
+      if (at >= 0) schedules.splice(at, 1);
+      return { removed: at >= 0 };
+    },
+    async nextRuns(cron) {
+      record('nextRuns', [cron]);
+      const fields = String(cron).trim().split(/\s+/);
+      if (fields.length !== 5) {
+        throw new Error(`tools/taskq.py: taskq schedule: a cron line has 5 fields (minute hour day month weekday), not ${fields.length}: '${cron}'`);
+      }
+      if (cron === '0 0 30 2 *') return [];
+      const daily = /^(\d+) (\d+) \* \* \*$/.exec(cron);
+      const time = daily ? `${daily[2].padStart(2, '0')}:${daily[1].padStart(2, '0')}` : '00:00';
+      return [22, 23, 24].map((day) => `2026-10-${day}T${time}:00+00:00`);
     },
     onTaskEvent(listener) {
       taskListeners.push(listener);

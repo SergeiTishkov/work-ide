@@ -42,6 +42,12 @@ contextBridge.exposeInMainWorld('api', {
   cancelTask: (id) => call('cancel-task', id),
   cancelQueued: (identity) => call('cancel-queued', identity ?? null),
   clearTasks: () => call('clear-tasks'),
+  // Schedules (tools/schedules.py, task 0061)
+  listSchedules: () => call('schedules'),
+  saveSchedule: (schedule) => call('save-schedule', schedule),
+  enableSchedule: (id, on) => call('enable-schedule', id, on),
+  removeSchedule: (id) => call('remove-schedule', id),
+  nextRuns: (cron) => call('next-runs', cron),
   // { type: 'tasks', tasks } | { type: 'log', id, text } | { type: 'finished', task }
   onTaskEvent: (listener) => {
     const wrapped = (_event, payload) => listener(payload);

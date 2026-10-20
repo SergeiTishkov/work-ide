@@ -214,3 +214,36 @@ test('cancel queued stops each queued task of the identity, and only those', asy
     f.done();
   }
 });
+
+test('a schedule is saved through taskq.py with every field, and a wrong one is refused here first', async () => {
+  const f = fixture();
+  try {
+    f.answer((args) => JSON.stringify(args[1] === 'off' ? { id: 4, enabled: false } : { id: 4, enabled: true }));
+    const saved = await f.client.saveSchedule({
+      what: 'clean', identities: ['sharp', 'partsharp'], cron: ' 0 9 * * 0 ', missed: 'skip',
+      args: { ages: ['older'] }, name: 'Sundays', enabled: false,
+    });
+    assert.deepEqual(f.calls[0], ['schedule', 'add', 'clean', '--identities', 'sharp,partsharp', '--cron', '0 9 * * 0',
+      '--missed', 'skip', '--args', '{"ages":["older"]}', '--name', 'Sundays']);
+    assert.deepEqual(f.calls[1], ['schedule', 'off', '4'], 'saved off: turned off after the add');
+    assert.equal(saved.enabled, false);
+    await f.client.saveSchedule({ id: 4, what: 'collect', identities: [], cron: '@daily', missed: 'catch_up' });
+    assert.deepEqual(f.calls[2].slice(0, 6), ['schedule', 'set', '4', '--what', 'collect', '--identities']);
+    assert.equal(f.calls[2][6], 'all');
+    for (const wrong of [
+      { what: 'dance', cron: '0 7 * * *', missed: 'skip' },
+      { what: 'rest', cron: '0 7 * * *', missed: 'never' },
+      { what: 'rest', cron: '0 7 * * *; rm', missed: 'skip' },
+      { what: 'rest', cron: '0 7 * * *', missed: 'skip', identities: ['../x'] },
+      { id: 'x', what: 'rest', cron: '0 7 * * *', missed: 'skip' },
+    ]) {
+      await assert.rejects(f.client.saveSchedule(wrong));
+    }
+    assert.equal(f.calls.length, 3, 'nothing wrong reached taskq.py');
+    f.answer(() => '["2026-10-22T07:00:00+04:00"]');
+    assert.deepEqual(await f.client.nextRuns('0 7 * * *'), ['2026-10-22T07:00:00+04:00']);
+    assert.deepEqual(f.calls[3], ['schedule', 'next', '0 7 * * *', '-n', '3']);
+  } finally {
+    f.done();
+  }
+});

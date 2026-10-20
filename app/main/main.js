@@ -97,7 +97,7 @@ const workers = new WorkerKeeper({
 // A run that ended may have created the database, recorded a selection or
 // changed the base: the connections open again on the next read.
 tasks.onEvent((event) => {
-  if (event.type === 'finished' && ['collect', 'rest', 'linkedin', 'pipeline', 'clean'].includes(event.task.kind)) {
+  if (event.type === 'finished' && ['collect', 'rest', 'linkedin', 'pipeline', 'clean', 'links'].includes(event.task.kind)) {
     store.closeAll();
     data.call('closeAll').catch(() => {});
   }
@@ -170,6 +170,11 @@ function registerIpc(window) {
   handle('cancel-task', (id) => tasks.cancel(Number(id)));
   handle('cancel-queued', (identity) => tasks.cancelQueued(identity || null));
   handle('clear-tasks', () => tasks.clearFinished());
+  handle('schedules', () => tasks.schedules());
+  handle('save-schedule', (schedule) => tasks.saveSchedule(schedule));
+  handle('enable-schedule', (id, on) => tasks.enableSchedule(id, Boolean(on)));
+  handle('remove-schedule', (id) => tasks.removeSchedule(id));
+  handle('next-runs', (cron) => tasks.nextRuns(cron));
   handle('documents-state', async (identity, ids) =>
     documentsState(await documentsRoot(), identity, Array.isArray(ids) ? ids.slice(0, 5000) : []));
   handle('open-documents-dir', async (identity, vacancyId) => {
