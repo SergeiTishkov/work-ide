@@ -113,6 +113,7 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
   width: 38px; height: 30px; padding: 0;
 }
 .theme-icon { display: inline-flex; color: var(--text); }
+.refresh-icon { display: inline-flex; color: var(--text); font-size: 18px; line-height: 1; }
 .flag { display: block; width: 21px; height: 14px; border-radius: 2px; box-shadow: 0 0 0 1px var(--border); }
 .picker-menu {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 10; margin: 0; padding: 4px;
@@ -342,6 +343,7 @@ button.cv.done { color: var(--applied); border-color: var(--applied); }
 }
 .badge.fresh { color: var(--fresh); }
 .badge.review { color: var(--rejected); }
+.badge.stretch { color: var(--accent); }
 .badge.status.applied { color: var(--applied); }
 .badge.status.rejected { color: var(--rejected); }
 .badge.status.bugged { color: var(--bugged); }

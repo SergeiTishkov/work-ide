@@ -1,27 +1,26 @@
-# How an identity's shortlist is split into report files. Shared defaults.
+# How an identity's shortlist is split by market. Shared defaults.
+# (The file name is historical: each segment used to be a Markdown report file.)
 #
-# The default is ONE file, exactly as it was before splitting existed: an
-# identity that has said nothing about markets gets the report it always got.
+# The default is ONE undivided list, exactly as it was before splitting existed:
+# an identity that has said nothing about markets gets what it always got.
 # Splitting is a decision about a particular search, so it belongs in
 # <prefix>_reports.yaml (see docs/OVERRIDES.md for the layering).
 #
-# A segment is one file, written to reports/<prefix>_<slug>_latest.md, with a
-# dated copy under reports/archive/<prefix>/. It is one of three kinds:
+# A segment is one list in the app (selection_segments). It is one of three
+# kinds:
 #
 #   groups: [...]   the named market groups from
 #                   config/derivation/market_groups.yaml
 #   rest: true      everything no other segment claimed. Computed rather than
 #                   listed, so adding a segment can never silently leave a
-#                   market out of every file
+#                   market out of every list
 #   everything: true  the whole shortlist
 #
-# `default: true` additionally writes the file to reports/<prefix>_latest.md —
-# the path RUNBOOK.md and a person's habit both point at. Exactly one segment
-# should carry it.
+# `default: true` marks the main segment (recorded as is_default; nothing reads
+# it today). Exactly one segment should carry it.
 #
 # `name` is English, the source text. `translations: {ru: "..."}` gives it in
-# other languages: the report shows the one in preferences.language, the app
-# the one of its interface, and English where none is given. A selection keeps
+# other languages: the app shows the one of its interface, and English where none is given. A selection keeps
 # the names it was made with (selection_segments.names, schema version 9).
 
 segments:

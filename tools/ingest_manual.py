@@ -88,14 +88,14 @@ def ingest(records: list, source_name: str = "manual") -> dict:
 
     # A rebuild, not a run: vacancies from the run this ingest follows must stay
     # fresh until a person has had a chance to see them.
-    report_path = pipeline.finalize_and_report(vacancies, prev_companies, state,
-                                               selection_kind="rebuild")
+    selection_id = pipeline.finalize(vacancies, prev_companies, state,
+                                     selection_kind="rebuild")
 
     return {
         "new_vacancies": new_count,
         "updated_vacancies": updated_count,
         "skipped_records": skipped,
-        "report_path": report_path,
+        "selection_id": selection_id,
     }
 
 

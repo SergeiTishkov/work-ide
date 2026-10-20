@@ -128,15 +128,35 @@ def run_offline_tests() -> Tuple[bool, str]:
     return proc.returncode == 0, tail
 
 
-def publish(source: str, message: str, check_contract=None, run_tests=run_offline_tests) -> dict:
+def task_path(number: str) -> Optional[str]:
+    """The task file with this number, relative to the repository, or None."""
+    for path in sorted((common.ROOT / "tasks").glob(f"*/{number}-*.md")):
+        return path.relative_to(common.ROOT).as_posix()
+    return None
+
+
+def publish(source: str, message: str, task: str, check_contract=None,
+            run_tests=run_offline_tests) -> dict:
     patterns = scope(source)
     changed = changed_paths()
     mine = [p for p in changed if in_scope(p, patterns)]
-    others = [p for p in changed if p not in mine]
-    outcome = {"source": source, "files": mine, "left_untouched": others}
+    outcome = {"source": source, "files": mine,
+               "left_untouched": [p for p in changed if p not in mine]}
 
     if not mine:
         return dict(outcome, outcome=NOTHING, reason="no file in this source's scope has changed")
+    # Every commit names its task and changes it (CLAUDE.md §12, "Tasks").
+    task_file = task_path(task)
+    if task_file is None:
+        return dict(outcome, outcome=REFUSED, reason=f"there is no task {task} in tasks/")
+    if task_file not in changed:
+        return dict(outcome, outcome=REFUSED,
+                    reason=f"{task_file} is unchanged: write the repair into the task first")
+    mine = mine + [task_file]
+    outcome = dict(outcome, files=mine,
+                   left_untouched=[p for p in changed if p not in mine])
+    if f"Task: {task}" not in message.splitlines():
+        message = f"{message.rstrip()}\n\nTask: {task}"
 
     maintainer, why = who_runs()
     if not maintainer:
@@ -184,6 +204,7 @@ def main() -> None:
     p_pub = sub.add_parser("publish", help="commit and push a repair, if this is a maintainer")
     p_pub.add_argument("source")
     p_pub.add_argument("-m", "--message", required=True)
+    p_pub.add_argument("--task", required=True, help="the task of the repair, NNNN (tasks/)")
     args = parser.parse_args()
 
     if args.command == "scope":
@@ -195,7 +216,7 @@ def main() -> None:
         print(f"push target: {where}")
         sys.exit(0 if maintainer and branch else 1)
     else:
-        result = publish(args.source, args.message)
+        result = publish(args.source, args.message, args.task)
         print(f"{result['outcome']}: {result['reason']}")
         for path in result["files"]:
             print(f"   fix:  {path}")

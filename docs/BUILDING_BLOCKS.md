@@ -71,7 +71,7 @@ A board token can be checked with one request:
 | `company_intel.py` | Company age and size from Wikidata | Automatically inside the pipeline, for shortlist companies |
 | `company_kinds.py` | Which companies are freelance marketplaces, agencies or reposters (`config/company_kinds.yaml`), for the app's "Company" drop-down; `--scan` lists them, `--write` stores them in the base | Automatically with every selection; by hand after editing the YAML |
 | `link_check.py` | Checking that links are alive | Automatically inside the pipeline |
-| `report.py` | Rebuild the report without collecting again | After editing the criteria |
+| `report.py` | Record a new selection without collecting again; the app shows it | After editing the criteria |
 | `textclean.py` | Strip email addresses and links out of text | Inside scoring; also useful by hand when debugging a match |
 
 ## Manual enrichment of the base
@@ -115,4 +115,4 @@ every new filter risks cutting too much.
 A sensible sequence: enable all the `remote_only` boards, add `ats` and fill its
 company list to suit you, and keep `manual` on always. Connect narrow sources
 deliberately, measuring their yield after a couple of runs (`python tools/kb.py
-stats` and the "Source health" section of the report).
+stats`; source health and usefulness in the app are triage task 0054).

@@ -219,13 +219,6 @@ def test_activation_binds_all_paths(tmp_path):
         assert common.DB_PATH == tmp_path / "workide.sqlite"
         assert common.RAW_DIR == tmp_path / "raw"
         assert common.STATE_PATH.name == "ftf_state.json"
-        # Reports live separately from accumulated data: a shared reports/
-        # folder, with the archive inside it split per identity. On an isolated
-        # run (data_root passed) the whole layout moves inside it — otherwise
-        # the test would write reports into the real repository folder, over a
-        # live shortlist.
-        assert common.REPORTS_DIR == tmp_path / "reports"
-        assert common.REPORTS_ARCHIVE_DIR == tmp_path / "reports" / "archive" / "ftf"
         assert common.USER_AGENT and "WorkIdeJobResearchBot" in common.USER_AGENT
     finally:
         common.activate_identity("ftf", allow_fixture=True)

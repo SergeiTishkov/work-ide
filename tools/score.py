@@ -420,6 +420,12 @@ TEXT_READ_MIN_CHARS = 600
 # rescore that follows decides on what the employer actually wrote.
 STACK_UNREAD = "stack: no description yet, and the title names no technology"
 
+# Off the person's stack or level, and not read by the screening model yet
+# (criteria `stretch_roles`, the owner, 2026-10-20: "remote outranks the
+# technology"). A refusal until the model reads the posting against the CV:
+# "fits" or "stretch" lifts the stack and level objections, "no" rejects it.
+STRETCH_UNREAD = "stretch: off the stack or level; waits for the AI read against the CV"
+
 # Can a contractor sitting where this person sits actually take the work?
 #
 # A SEPARATE AXIS FROM THE SCORE, and the separation is the point. A vacancy
@@ -1695,6 +1701,13 @@ def _score_role_relevance(text: str, title: str, criteria: dict,
         p for p in cfg.get("wrong_discipline_title_patterns", [])
         if re.search(p, search_area, re.IGNORECASE)
     ]
+    # The disciplines a developer can move into (data, ML, forward deployed):
+    # the same gate, but with `stretch_roles` on, the screening model may
+    # lift it (score_vacancy). The owner, 2026-10-20.
+    stretch_hits = [
+        p for p in cfg.get("stretch_discipline_title_patterns", [])
+        if re.search(p, search_area, re.IGNORECASE)
+    ]
     # Two ways a discipline title can still be this person's work.
     #
     # The second one is not a guess: the owner confirmed on 2026-07-30 that
@@ -1707,7 +1720,7 @@ def _score_role_relevance(text: str, title: str, criteria: dict,
     wanted_anyway = (core_stack_named
                      or bool(stack_bd.get("data_pipeline_exception_applied"))
                      or len(stack_bd.get("data_pipeline_context_hits") or []) >= 2)
-    discipline_gate = bool(discipline_hits) and not wanted_anyway
+    discipline_gate = bool(discipline_hits or stretch_hits) and not wanted_anyway
 
     soft_gate = bool(wrong_profession_hits) and not developer_override_hits and not tech_agnostic_hits
     gate_triggered = soft_gate or bool(hard_wrong_hits) or discipline_gate
@@ -1715,10 +1728,14 @@ def _score_role_relevance(text: str, title: str, criteria: dict,
         "gate_triggered": gate_triggered,
         "wrong_profession_hits": wrong_profession_hits + hard_wrong_hits,
         "hard_wrong_profession_hits": hard_wrong_hits,
-        "wrong_discipline_hits": discipline_hits,
+        "wrong_discipline_hits": discipline_hits + stretch_hits,
         "wrong_discipline_gate": discipline_gate,
-        "wrong_discipline_exempted": wanted_anyway and bool(discipline_hits),
+        "wrong_discipline_exempted": wanted_anyway and bool(discipline_hits or stretch_hits),
         "developer_override_hits": developer_override_hits,
+        # only a discipline a developer can move into fired: stretch_roles
+        # may let the screening model decide
+        "stretch_only": (gate_triggered and not soft_gate and not hard_wrong_hits
+                         and not discipline_hits),
     }
 
 
@@ -2641,6 +2658,7 @@ def _score_title_role_penalty(title: str, criteria: dict):
 
     hits = []
     rejects = []
+    stretch = []
     points = 0
     for rule in cfg.get("rules", []):
         pattern = rule.get("pattern")
@@ -2653,7 +2671,14 @@ def _score_title_role_penalty(title: str, criteria: dict):
         # on front-end and junior titles: "I'm not a front end engineer",
         # "I'm not Junior, they won't hire me").
         if rule.get("reject"):
-            rejects.append(rule.get("label") or pattern)
+            # `stretch_if`: with one of these in the title too, the refusal is
+            # one the screening model may lift (stretch_roles). The owner,
+            # 2026-10-20: "junior is fine unless it is a junior developer — a
+            # junior forward deployed engineer at $90k, yes".
+            if any(re.search(x, title_norm, re.IGNORECASE) for x in rule.get("stretch_if") or []):
+                stretch.append(rule.get("label") or pattern)
+            else:
+                rejects.append(rule.get("label") or pattern)
             continue
         hits.append(rule.get("label") or pattern)
         points += rule.get("points", 0)
@@ -2661,6 +2686,8 @@ def _score_title_role_penalty(title: str, criteria: dict):
     bd = {"points": points, "hits": hits} if hits else {}
     if rejects:
         bd["rejects"] = rejects
+    if stretch:
+        bd["stretch"] = stretch
     return points, bd
 
 
@@ -2807,6 +2834,9 @@ def score_parts(points: dict, breakdown: dict, criteria: dict, profile: dict) ->
     exporter = rl.get("net_exporter_penalty")
     add("exporter", points.get("exporter"),
         (exporter or {}).get("points", -10) if exporter else 0, 0)
+    stretch = criteria.get("stretch_roles") or {}
+    add("stretch", points.get("stretch"),
+        min(0, int(stretch.get("stretch_points") or 0)) if stretch.get("enabled") else 0, 0)
     # most positive first: what it earned, then what it could have
     parts.sort(key=lambda p: (-p["points"], -p["max"], p["min"]))
     return parts
@@ -2847,12 +2877,21 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     title_mismatch, title_stack_bd = _check_title_stack(
         vacancy.get("title") or "", criteria, profile
     )
+    # Objections the screening model may lift (criteria `stretch_roles`, the
+    # owner, 2026-10-20): "remote outranks the technology". A remote role on
+    # another stack, a data or ML title, a junior forward deployed engineer
+    # is read against the CV instead of being refused by keyword; ML research
+    # and data-heavy roles the CV cannot honestly cover are the model's "no".
+    # Without the section, each is a refusal, as before.
+    stretch_cfg = criteria.get("stretch_roles") or {}
+    stretch_on = bool(stretch_cfg.get("enabled"))
+    stretchable = []
     if not stack_relevant:
         if _stack_unread(vacancy, criteria):
             dealbreakers.append(STACK_UNREAD)
         else:
             stack_label = (criteria.get("stack_fit") or {}).get("stack_label") or "target-stack"
-            dealbreakers.append(
+            (stretchable if stretch_on else dealbreakers).append(
                 f"stack: not a {stack_label} developer role (and no tech-agnostic signal)"
             )
     stack_bd.update(stack_relevance_bd)
@@ -2866,7 +2905,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         # "Machine Learning Engineer".
         named = (role_relevance_bd["wrong_profession_hits"]
                  or role_relevance_bd.get("wrong_discipline_hits") or [])
-        dealbreakers.append(
+        (stretchable if stretch_on and role_relevance_bd.get("stretch_only") else dealbreakers).append(
             f"role: title suggests non-developer profession ({', '.join(named)})"
         )
 
@@ -2875,7 +2914,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     # Data pipelines are a documented exception: Scala or Java in the title,
     # in a Spark/Databricks/ETL context, remains a welcome variant.
     if title_mismatch and not stack_bd.get("data_pipeline_exception_applied"):
-        dealbreakers.append(
+        (stretchable if stretch_on else dealbreakers).append(
             "stack: title names technology outside the core/strong stack "
             f"({', '.join(title_stack_bd['named_technologies'][:3])})"
         )
@@ -2976,10 +3015,29 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
 
     for label in title_penalty_bd.get("rejects") or ():
         dealbreakers.append(f"title: {label}")
+    for label in title_penalty_bd.get("stretch") or ():
+        (stretchable if stretch_on else dealbreakers).append(f"title: {label}")
 
     screen = ai_screen.current(vacancy)
-    if screen and screen.get("verdict") == "reject":
+    rejected_by_model = bool(screen and screen.get("verdict") == "reject")
+    if rejected_by_model:
         dealbreakers.append(f"ai: {(screen.get('reason') or 'the screening model turned it down').strip()}")
+
+    # The model's read of a stretch: "fits" or "stretch" lifts the objections
+    # ("stretch" at a cost in points), anything else leaves the vacancy
+    # waiting for a read (an answer from before 2026-10-20 has no cv_fit).
+    stretch_bd = {}
+    stretch_points = 0
+    if stretchable:
+        fit = (screen or {}).get("cv_fit")
+        stretch_bd = {"objections": stretchable}
+        if rejected_by_model:
+            stretch_bd["fit"] = fit or "no"
+        elif screen and fit in ("fits", "stretch"):
+            stretch_points = int(stretch_cfg.get("stretch_points") or 0) if fit == "stretch" else 0
+            stretch_bd.update({"fit": fit, "points": stretch_points, "work_kind": screen.get("work_kind")})
+        else:
+            dealbreakers.append(STRETCH_UNREAD)
 
     # Reachability as points: see residency_eligibility.points in the
     # criteria. Decided here rather than after the classification, because the
@@ -3006,6 +3064,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         + tech_points
         + title_penalty
         + exporter_penalty
+        + stretch_points
     )
     total = max(0, min(100, round(raw_total)))
 
@@ -3067,7 +3126,9 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
                           else "engagement_unconfirmed")
     elif dealbreakers:
         classification = "rejected"
-    elif complexity_gate:
+    elif complexity_gate and not stretch_bd.get("fit"):
+        # A stretch the model has read against the CV is past this gate: its
+        # "no" covers ML research, which is what the gate's titles catch.
         classification = "low_priority"
     elif total >= thresholds["hot_lead"]:
         classification = "hot_lead"
@@ -3106,8 +3167,10 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "personal_tech_bonus": tech_bd,
         "title_role_penalty": title_penalty_bd,
         "reachability_bonus": {"points": reach_points, "eligibility": eligibility},
+        "stretch_roles": stretch_bd,
         "ai_screen": ({k: screen.get(k) for k in ("verdict", "reason", "quote", "work_arrangement",
-                                                   "location_ok", "role_fit", "is_job_posting")}
+                                                   "location_ok", "role_fit", "is_job_posting",
+                                                   "cv_fit", "work_kind")}
                       if screen else {}),
         "raw_total_before_clamp": raw_total,
     }
@@ -3118,16 +3181,24 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     # where they get settled too.
     description_wanted = (
         STACK_UNREAD in dealbreakers
-        and all(d in (STACK_UNREAD, REMOTE_UNCONFIRMED, ENGAGEMENT_UNCONFIRMED)
+        and all(d in (STACK_UNREAD, REMOTE_UNCONFIRMED, ENGAGEMENT_UNCONFIRMED, STRETCH_UNREAD)
                 for d in dealbreakers)
         and bool(role_relevance_bd.get("developer_override_hits")))
+    # The model reads a vacancy outside the top classes when nothing but the
+    # model stands in the way: a stretch waiting for its read, or a refusal
+    # the model gave (asked again only when the brief or the text changed —
+    # on 2026-10-20 a new prompt had to reach the Cloud9 "Forward Engineer"
+    # it had refused as "Node, not .NET"). Remote comes first (the owner,
+    # 2026-10-20): a stretch whose remote is not confirmed waits for its text.
+    screen_wanted = bool(dealbreakers) and all(
+        d == STRETCH_UNREAD or d.startswith("ai: ") for d in dealbreakers)
 
     parts = score_parts({
         "remote_location": rl_points, "reachability": reach_points, "stack": stack_points,
         "legacy": legacy_points, "intensity": intensity_points, "compensation": comp_points,
         "contractor": contractor_points, "reputation": reputation_points, "company_age": age_points,
         "market": market_points, "tech": tech_points, "title": title_penalty,
-        "exporter": exporter_penalty,
+        "exporter": exporter_penalty, "stretch": stretch_points,
     }, breakdown, criteria, profile)
 
     return {
@@ -3145,4 +3216,6 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "residency_eligibility_reason": eligibility_reason,
         # enrich_descriptions fetches the text of these whatever their class.
         "description_wanted": description_wanted,
+        # ai_screen reads these whatever their class (stretch_roles).
+        "screen_wanted": screen_wanted,
     }

@@ -96,9 +96,10 @@ distributed across two layers, split along the git boundary:
 
 Accumulated data lives in `data/` — the vacancy base every identity shares
 (`data/workide.sqlite`) and each identity's own files
-(`data/identities/<prefix>/`) — finished shortlists in `reports/`.
-Both folders are outside git and both are created by the tools automatically: a
-fresh clone does not have them, and that is a normal state rather than breakage.
+(`data/identities/<prefix>/`); the finished shortlists are recorded in the
+base too, and the desktop app shows them. The folder is outside git and is
+created by the tools automatically: a fresh clone does not have it, and that is
+a normal state rather than breakage.
 
 A local identity holds a **verbatim copy of the template** in `template/`, and
 personal settings sit beside it as separate files layered on top. Three
@@ -135,9 +136,8 @@ provenance are in `tools/settings.py` and `docs/OVERRIDES.md`.
    (`<prefix>_criteria.yaml`) and explain the score to a person.
 3. Accumulate structured knowledge about companies, vacancies and market
    patterns — so that each run is more accurate than the last.
-4. Produce, on every run, a digest a person can actually read
-   (`reports/<prefix>_latest.md`) with the top candidates and an explanation of
-   "why".
+4. Produce, on every run, a shortlist a person can actually read (the desktop
+   app) with the top candidates and an explanation of "why".
 5. Be genuinely autonomous: the owner should be able to ask the agent to "run
    the usual cycle" in the evening and explain nothing further.
 
@@ -189,7 +189,7 @@ The project is succeeding if:
   `tools/ingest_manual.py`.
 - **A test fixture leaves no trace in the real folders.** The tests run under a
   frozen fixture, and a test that forgets to isolate its paths writes into the
-  real `reports/` and `data/` — the only places a person actually looks. Such
+  real `data/` — where a person's whole search lives. Such
   litter is unacceptable even when harmless: it looks like a result and forces
   somebody to work out where it came from.
   Guaranteed by code rather than by memory: the safety net in `tests/conftest.py`
@@ -324,7 +324,7 @@ file under "Rejected approaches", so the same ground is not covered twice.
 - One module, one reason to change (fetch ≠ normalize ≠ score ≠ report ≠
   storage).
 - Errors are not swallowed silently: at minimum a line in the log or
-  `state.json`, visible in the report ("source X unavailable, N days running").
+  `state.json`, visible to a person ("source X unavailable, N days running").
 - No secrets or tokens in the repository. Every source used is public and needs
   no API key. If a paid API is ever needed, the key lives outside the repository
   (an environment variable), never in git.
@@ -424,6 +424,8 @@ history.
   something": it dissects the class of mistake that has recurred here more often
   than any other.
 - `docs/VACANCY_CHECKLIST.md` — the mandatory manual checklist for candidates.
+- `tasks/` — the list of work: one file per task, the folder its stage
+  (`1-triage`, `2-to-do`, `3-done`). The format is `tasks/README.md`.
 
 **Identity-level documents** (in its folder, with its prefix):
 
@@ -445,6 +447,36 @@ it carries: what changed for the person and the app (features, behaviour,
 scoring rules, filters, labels, prompts, commands, schema versions), not only
 the latest one. The history is read to find when and why a behaviour
 changed; a change missing from the message is lost to that search.
+
+**Tasks** (the owner, 2026-10-20). Work is tracked in `tasks/`, and the rule
+has no exceptions for size: **every change is a task, every commit names its
+task.** The procedure is the `task` skill (`.claude/skills/task/SKILL.md`);
+use it before the first edit of any change and before every commit.
+
+- A task is for work that ends in a commit. Purely local work — checking or
+  fixing local data, running a collection, answering a question — has none.
+  A task that turned out to need no commit is deleted (`git rm`, a commit of
+  task files only); history is not rewritten, and its number is not reused.
+- Before starting, find the task the work belongs to
+  (`python tools/tasks.py find <words>`). Work the owner asks for that has no
+  task gets one in `tasks/2-to-do/` first, a one-line fix included; an idea
+  of the agent's own goes to `tasks/1-triage/` and waits for the owner. A
+  fix to what a done task delivered is a new task, not a reopened one.
+- Every commit carries a `Task: NNNN` line and changes that task's file in
+  the same commit: the items it finishes marked DONE, the work it does added
+  as items, the file moved to `tasks/3-done/` with its last item. A task in
+  `1-triage/` covers no work outside `tasks/`.
+- The one kind of commit with no task: one that changes task files only
+  (writing, planning, moving tasks). A change to the task system itself —
+  `tasks/README.md`, the hook, its tests, `tools/tasks.py` — has a task.
+- `.githooks/commit-msg` refuses a commit that breaks this
+  (`git config core.hooksPath .githooks`, once per clone;
+  `tests/test_commit_hook.py` fails while it is off). Never `--no-verify`.
+
+Numbers are four digits, unique, never reused; tasks are written in English,
+business first. Every task from 0052 on names its scope on a `Scope:` line:
+`identity:<prefix>`, `tools`, `app`, `config`, `rules`, `docs`, `tasks` or
+`other`, several allowed (`tasks/README.md`, "Scope").
 
 ## 13. Where to put a change
 

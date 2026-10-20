@@ -95,12 +95,6 @@ FIXTURES_DIR = ROOT / "tests" / "fixtures"
 # case where data lives outside the repository (on another drive, say).
 DATA_ROOT = Path(os.environ.get("WORK_IDE_DATA_ROOT") or (ROOT / "data"))
 
-# Reports deliberately live SEPARATELY from accumulated data, at the repository
-# root. The reason is simple and practical: the report is the one file a person
-# opens by hand, and hunting for it under data/<prefix>/reports/ is a nuisance.
-# Here the latest shortlist of every identity sits side by side.
-REPORTS_ROOT = Path(os.environ.get("WORK_IDE_REPORTS_ROOT") or (ROOT / "reports"))
-
 # --- Shared data (the same for every identity) ------------------------------
 # The knowledge base: one file for every identity (tools/db.py, schemas/db.sql),
 # and the sources' raw responses. A vacancy is the same posting whoever
@@ -124,8 +118,6 @@ FILE_PREFIX: Optional[str] = None
 # run logs.
 DATA_DIR: Optional[Path] = None
 KNOWLEDGE_DIR: Optional[Path] = None
-REPORTS_DIR: Optional[Path] = None
-REPORTS_ARCHIVE_DIR: Optional[Path] = None
 STATE_PATH: Optional[Path] = None
 INSIGHTS_PATH: Optional[Path] = None
 
@@ -166,19 +158,12 @@ def require_identity() -> None:
 
 
 def activate_identity(prefix: str, *, allow_fixture: bool = False,
-                      data_root: Optional[Path] = None,
-                      reports_root: Optional[Path] = None) -> None:
+                      data_root: Optional[Path] = None) -> None:
     """Activates an identity: validates it and rebinds every path.
 
     allow_fixture — test identities (kind: fixture) deliberately cannot be
     activated during normal work, so that nobody searches for jobs against a
     fixture.
-
-    reports_root defaults to the shared `reports/` folder at the repository
-    root. IMPORTANT: when data_root is passed (an isolated run, tests), reports
-    move inside it. Otherwise a test that isolated its data would still write
-    reports into the real repository folder and overwrite a person's live
-    shortlist.
     """
     import identity as identity_mod  # local import: identity.py imports common
 
@@ -203,7 +188,7 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
 
     # Scaffolding is not yet an identity. Found for real on a fresh-clone run,
     # 2026-08-04: `identity.py new` plus `pipeline.py` ran to completion and
-    # wrote a report covering 1734 vacancies — with a placeholder in the title
+    # wrote a shortlist of 1734 vacancies — with a placeholder in the title
     # and scoring against an empty stack. Rule zero checked that an identity
     # EXISTED but not that it was FILLED IN, and the person got plausible
     # rubbish. That is exactly the quiet wrong answer this whole architecture
@@ -221,7 +206,7 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
             )
 
     global ACTIVE_IDENTITY, IDENTITY_DIR, FILE_PREFIX
-    global DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, REPORTS_ARCHIVE_DIR, STATE_PATH
+    global DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, STATE_PATH
     global DB_PATH, INSIGHTS_PATH, USER_AGENT
 
     root = Path(data_root) if data_root else DATA_ROOT
@@ -235,22 +220,6 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
     DATA_DIR = identity_data_dir(prefix, root)
     KNOWLEDGE_DIR = DATA_DIR / "knowledge"
 
-    # REPORTS_DIR is shared by every identity: the latest shortlist of each sits
-    # there, distinguished by the prefix in its name (sharp_latest.md,
-    # jvst_latest.md). The archive, by contrast, is split per identity —
-    # reports/archive/<prefix>/ — and inside it file names are just dates. The
-    # single-prefix rule applies where files of DIFFERENT identities share a
-    # folder; when the folder itself belongs to one identity, a prefix on every
-    # name is redundant. The report identifies itself on its first line anyway:
-    # "# Work IDE [sharp] — …".
-    if reports_root is not None:
-        reports_base = Path(reports_root)
-    elif data_root is not None:
-        reports_base = root / "reports"
-    else:
-        reports_base = REPORTS_ROOT
-    REPORTS_DIR = reports_base
-    REPORTS_ARCHIVE_DIR = reports_base / "archive" / prefix
     STATE_PATH = DATA_DIR / f"{FILE_PREFIX}state.json"
     INSIGHTS_PATH = KNOWLEDGE_DIR / f"{FILE_PREFIX}insights.md"
 
@@ -263,11 +232,11 @@ def activate_identity(prefix: str, *, allow_fixture: bool = False,
 def deactivate_identity() -> None:
     """Clears the active identity. Needed by tests that check the refusal."""
     global ACTIVE_IDENTITY, IDENTITY_DIR, FILE_PREFIX
-    global DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, REPORTS_ARCHIVE_DIR, STATE_PATH
+    global DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, STATE_PATH
     global DB_PATH, INSIGHTS_PATH, USER_AGENT
 
     ACTIVE_IDENTITY = IDENTITY_DIR = FILE_PREFIX = None
-    DATA_DIR = KNOWLEDGE_DIR = REPORTS_DIR = REPORTS_ARCHIVE_DIR = STATE_PATH = None
+    DATA_DIR = KNOWLEDGE_DIR = STATE_PATH = None
     INSIGHTS_PATH = None
     DB_PATH = DATA_ROOT / DB_NAME
     RAW_DIR = DATA_ROOT / "raw"
@@ -399,7 +368,7 @@ def source_sites() -> dict:
 
 def ensure_dirs() -> None:
     require_identity()
-    for d in (DATA_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, REPORTS_ARCHIVE_DIR):
+    for d in (DATA_DIR, KNOWLEDGE_DIR, RAW_DIR):
         d.mkdir(parents=True, exist_ok=True)
     _ensure_identity_marker()
 

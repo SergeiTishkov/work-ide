@@ -57,6 +57,20 @@ def test_the_worklist_is_the_top_classes_without_a_current_answer():
     assert "done" in ai_screen.worklist(vacancies, stored, digest), "a new text asks again"
 
 
+def test_stretches_waiting_for_a_read_follow_the_top_within_their_own_budget():
+    def stretch(vid, score_):
+        record = _record(vid, "rejected", score_=score_)
+        record["computed"]["screen_wanted"] = True
+        return record
+
+    vacancies = {"hot": _record("hot", "hot_lead", score_=60), "s1": stretch("s1", 20),
+                 "s2": stretch("s2", 35), "s3": stretch("s3", 10), "out": _record("out", "rejected")}
+    digest = "b" * 16
+    assert ai_screen.worklist(vacancies, {}, digest, stretch_limit=2) == ["hot", "s2", "s1"]
+    assert ai_screen.worklist(vacancies, {}, digest, limit=1, stretch_limit=None) == ["hot", "s2", "s1", "s3"]
+    assert ai_screen.worklist(vacancies, {}, digest, classes=(), stretch_limit=0) == []
+
+
 def test_answers_are_stored_attached_and_valid_only_for_their_text(isolated_data_dir):
     with db.session():
         pass
@@ -124,3 +138,18 @@ def test_a_reject_is_a_dealbreaker_and_a_keep_changes_nothing():
 
     stale = {**rejected, "_ai_screen": {**rejected["_ai_screen"], "text_hash": "0" * 16}}
     assert score.score_vacancy(stale, criteria, profile)["classification"] == plain["classification"]
+
+
+def test_the_scorers_time_zone_window_is_sent_to_the_model_outside_the_hash():
+    """On 2026-10-20 Haiku read "CET ±3 hours" as excluding UTC+4 in 3 of 4
+    postings; the scorer's arithmetic goes with the posting instead."""
+    text = ("Fully remote. C# and .NET. Located in CET timezone (+/- 3 hours), "
+            "we are unable to consider applications from candidates in other time zones.")
+    record = _record(text=text)
+    plain_hash = ai_screen.text_hash(record)
+    record["computed"] = score.score_vacancy(record, score.load_criteria(), score.load_profile())
+    sent = ai_screen.model_message(record)
+    assert sent.startswith("time-zone window, checked by a program: CET ±3h")
+    assert "is inside it" in sent.splitlines()[0]
+    assert ai_screen.text_hash(record) == plain_hash
+    assert ai_screen.model_message(_record()) == ai_screen.message(_record())

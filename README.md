@@ -85,6 +85,7 @@ Activating the environment depends on your system:
 
 ```bash
 python -m pip install -r requirements.txt
+git config core.hooksPath .githooks   # every commit names its task (tasks/README.md)
 python -m pytest -q          # optional, but it shows everything is intact
 ```
 
@@ -102,15 +103,13 @@ python tools/pipeline.py           # the search cycle
 yet, and the system will not search on behalf of "somebody". The refusal
 explains what to do next.
 
-The result is `reports/<prefix>_latest.md` — and, if the identity asks for it,
-one file per market beside it (`<prefix>_uk_latest.md`,
-`<prefix>_worldwide_latest.md`, …). A person reads one shortlist at a time and
-decides where to spend an evening; splitting them is configuration, not code,
-and an identity that says nothing gets the single file it always got. See
-`tools/segments.py`. The `reports/` folder sits at the
-repository root: the report is opened by hand, and hunting for it in a tree of
-accumulated data is a nuisance. It is not in git and not in a fresh clone — the
-tools create it themselves on the first run.
+The result is the shortlist in the desktop app (below) — and, if the identity
+asks for it, one list per market (UK, worldwide, …). A person reads one
+shortlist at a time and decides where to spend an evening; splitting them is
+configuration, not code, and an identity that says nothing gets one undivided
+list. See `tools/segments.py`. Every run records its shortlist in the shared
+base (`data/workide.sqlite`, see `tools/selections.py`); no file is written for
+reading by hand.
 
 ## The desktop app
 
@@ -155,8 +154,9 @@ It opens a window over the knowledge base:
   (`tools/feedback.py`), fixes the filter and marks them reviewed;
 - the collect button shows when a run of that identity is going, and at what
   stage — whoever started it (the app, the agent, a terminal); a dot marks the
-  identity's tab. **Refresh** re-reads everything and reloads the interface
-  itself (markup, styles, code), keeping the tab and the drop-downs' choice.
+  identity's tab. **Refresh** (⟳ in the top bar, left of the theme and the
+  language) re-reads everything and reloads the interface itself (markup,
+  styles, code), keeping the tab and the drop-downs' choice.
 - **Generate CV** on a vacancy writes a CV tailored to it — `.docx` and `.pdf`
   under the name of your own CV, in the vacancy's folder (`<folder>/<prefix>/
   <vacancy id>/`, the folder chosen at onboarding; older versions go to
@@ -266,12 +266,6 @@ local-identities/      OUTSIDE GIT: YOUR searches. Anything goes here.
     documents/             your CVs, under their own names
     CHANGELOG.md           a log of your changes
 
-reports/               OUTSIDE GIT: finished shortlists, created automatically
-  <prefix>_latest.md     each identity's latest shortlist — this is what to open
-  <prefix>_<market>_latest.md   the same shortlist split by market, when the
-                         identity asks for it (worldwide, uk, eu, canada, …)
-  archive/<prefix>/      history: 2026-07-31.md, 2026-08-01.md, …
-
 data/                  OUTSIDE GIT, created automatically
   workide.sqlite         the vacancy base, shared: a vacancy once, its score per identity
   raw/                   the sources' raw responses, by day
@@ -304,6 +298,7 @@ texts — your own settings sit elsewhere and cannot be lost.
 | [docs/VACANCY_CHECKLIST.md](docs/VACANCY_CHECKLIST.md) | The mandatory manual check on candidates |
 | [docs/SOURCES.md](docs/SOURCES.md) | The sources, with measured response codes |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Decisions and rejected alternatives |
+| [tasks/README.md](tasks/README.md) | The list of work: triage, to do, done |
 
 ## Language
 

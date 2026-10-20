@@ -58,7 +58,7 @@ test('choosing Russian re-draws the whole interface in Russian', async ({ page }
   expect(await flagOf(page.getByTestId('language-button'))).toEqual({ src: 'flags/ru.svg', loaded: true });
   await expect(page.getByTestId('menu-button')).toContainText(ru['menu.button']);
   await page.getByTestId('menu-button').click();
-  await expect(page.getByTestId('refresh')).toHaveText(ru['app.refresh']);
+  await expect(page.getByTestId('refresh')).toHaveAttribute('aria-label', ru['app.refresh']);
   await expect(page.getByTestId('filter-label')).toHaveText(ru['filter.legend']);
   await expect(page.locator('[data-testid^="vacancy-"]').first().getByTestId('btn-applied'))
     .toHaveText(ru['action.applied']);

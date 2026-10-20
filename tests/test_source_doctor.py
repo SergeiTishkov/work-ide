@@ -25,11 +25,14 @@ def test_unknown_source_has_no_scope():
         source_doctor.scope("no-such-board")
 
 
+TASK = "tasks/2-to-do/0099-linkedin-pages.md"
+
+
 @pytest.fixture
 def repo(monkeypatch):
     """A fake repository: changed files, who runs it, and every git call."""
     state = {"changed": ["tools/fetch_linkedin.py", "tests/test_fetch_linkedin.py",
-                         "tools/score.py"],
+                         "tools/score.py", TASK],
              "email": "tishkovsergei92@gmail.com", "branch": "app-v1",
              "upstream": "origin/app-v1", "push_fails": False, "calls": []}
 
@@ -47,12 +50,13 @@ def repo(monkeypatch):
 
     monkeypatch.setattr(source_doctor, "git", fake_git)
     monkeypatch.setattr(source_doctor, "changed_paths", lambda: list(state["changed"]))
+    monkeypatch.setattr(source_doctor, "task_path", lambda number: TASK if number == "0099" else None)
     return state
 
 
-def _publish(contract="ok", green=True):
+def _publish(contract="ok", green=True, task="0099"):
     return source_doctor.publish(
-        "linkedin", "LinkedIn pages are ten cards long",
+        "linkedin", "LinkedIn pages are ten cards long", task,
         check_contract=lambda source: {"status": contract, "detail": "x"},
         run_tests=lambda: (green, "1 failed"))
 
@@ -69,6 +73,25 @@ def test_a_maintainer_publishes_only_the_sources_files(repo):
     assert "tools/score.py" not in commit, "somebody's other work is left alone"
     assert result["left_untouched"] == ["tools/score.py"]
     assert ("push",) in repo["calls"]
+
+
+def test_the_repair_is_committed_with_its_task(repo):
+    _publish()
+    commit = _committed(repo)[0]
+    assert TASK in commit
+    assert commit[2].endswith("\n\nTask: 0099")
+
+
+def test_a_task_that_does_not_exist_is_refused(repo):
+    result = _publish(task="0098")
+    assert result["outcome"] == "refused" and not _committed(repo)
+
+
+def test_a_task_left_unchanged_is_refused(repo):
+    repo["changed"].remove(TASK)
+    result = _publish()
+    assert result["outcome"] == "refused" and "unchanged" in result["reason"]
+    assert not _committed(repo)
 
 
 def test_anybody_else_keeps_the_fix_and_nothing_fails(repo):

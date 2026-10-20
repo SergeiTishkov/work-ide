@@ -1286,18 +1286,30 @@ role_relevance_signal:
     - "\\bsirt\\b|incident response"
     - "\\bappsec\\b|application security|penetration test"
     # data and analytics
-    - "data engineer"
-    - "analytics engineer"
-    - "data scientist|data analyst"
+    - "data analyst"
     - "business intelligence|\\bbi developer\\b"
-    # machine learning as a profession, not as a buzzword in a stack list
-    - "\\b(ml|ai|machine learning)\\s+(systems\\s+)?engineer\\b"
+    # research as a profession
     - "research (scientist|engineer)"
     # hardware-adjacent
     - "embedded (software )?engineer|\\bfirmware\\b|\\bfpga\\b|\\blabview\\b"
     # customer-facing engineering
-    - "forward deployed"
     - "(implementation|technical support|field|demo) engineer"
+  # The disciplines a developer can move into. The same gate as the list
+  # above, with one difference: where the identity turns on `stretch_roles`,
+  # the screening model reads the posting against the CV and may lift it.
+  # The owner, 2026-10-20: a junior data or ML engineer role open to people
+  # from development, a forward deployed engineer building on model APIs —
+  # yes; ML research and data-heavy roles the CV cannot cover — no. Measured
+  # that day: 347 of the base's 350 "forward engineer" vacancies were refused,
+  # 244 of them by this title rule; the Cloud9 "Forward Engineer" the owner
+  # applied to was refused by the screening model as "Node, not .NET".
+  stretch_discipline_title_patterns:
+    - "data engineer"
+    - "analytics engineer"
+    - "data scientist"
+    # machine learning as a profession, not as a buzzword in a stack list
+    - "\\b(ml|ai|machine learning)\\s+(systems\\s+)?engineer\\b"
+    - "forward[ -]deploy(ed|ment)|forward engineer"
   hard_wrong_profession_title_patterns:
     # Not a professional engagement at all. Found 2026-09-13 by a part-time
     # search, where a board's "part-time" label put interns, a Werkstudent and

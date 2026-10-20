@@ -8,7 +8,8 @@
 #
 #  So ALL THREE outcomes are recorded here, not only the successes:
 #    implemented — connected, a fetcher exists
-#    pending     — usable, but not connected yet
+#    pending     — usable, but not connected yet; whether to connect it is a
+#                  ticket in tasks/1-triage/ (named by `task:`)
 #    rejected    — checked and unusable, with the reason and the response code
 #
 #  Shared by every identity: whether a source is reachable does not depend on
@@ -173,16 +174,16 @@ sources:
     measured: "HTTP 200, RSS 13 KB"
 
   - name: ats_workable
-    status: pending
-    priority: 2
+    status: implemented
+    implemented_at: "2026-08-04"
     kind: json
     endpoint: "https://apply.workable.com/api/v1/widget/accounts/<account>"
     measured: "HTTP 200, keys name/description/jobs"
     note: "The lever for Israel: Workable is the de facto standard there."
 
   - name: ats_smartrecruiters
-    status: pending
-    priority: 3
+    status: implemented
+    implemented_at: "2026-08-04"
     kind: json
     endpoint: "https://api.smartrecruiters.com/v1/companies/<company>/postings"
     measured: "HTTP 200, it has totalFound and pagination"
@@ -203,7 +204,7 @@ sources:
 
   - name: arc_dev
     status: pending
-    priority: 2
+    task: "tasks/1-triage/0044-arc-dev.md"
     kind: html_next_data
     endpoint: "https://arc.dev/remote-jobs"
     measured: >
@@ -215,6 +216,11 @@ sources:
       Lemon.io, which yield disproportionately well (3 of 18, from two companies
       out of a thousand in the base). Parsing embedded JSON rather than markup
       is safer than HTML, but still depends on somebody else's structure.
+    checked_again: >
+      2026-09-13: Next.js page data with arcJobs and externalJobs (9031),
+      jobType permanent/contract, but the path filter is ignored:
+      /remote-jobs/part-time, /freelance and /part-time/.net return the same
+      thirty. Needs its search parameters worked out before a fetcher.
 
   - name: gun_io
     status: rejected
@@ -326,11 +332,33 @@ sources:
       authentication. An agency worth following individually belongs in
       <prefix>_ats_targets.yaml, one line each.
 
+  # --- Queued: one employer's own career site, named by the owner ------------
+
+  - name: dataart
+    status: pending
+    task: "tasks/1-triage/0043-dataart-careers.md"
+    kind: unknown
+    endpoint: "https://www.dataart.team/en/vacancies?locations=5770"
+    checked: "not yet: no request has been made"
+    seen_by_the_owner: >
+      2026-10-20, a screenshot: the location filter "Remote.Georgia" (id 5770
+      in the URL) lists 26 vacancies of 117, in categories AI, Backend, Data &
+      Analytics, DevOps & SRE and others. Every vacancy names the countries it
+      hires from (e.g. "Armenia, Bulgaria, Cyprus, Georgia, ...").
+    note: >
+      The owner, 2026-10-20: "add it, let it be; not urgent". An Eastern
+      European outsourcing company; the owner's estimate of pay: $4-5k a month
+      for a developer, $5-7k for a team lead. A location filter for the
+      owner's own country is why it is worth having. To check: whether the
+      page loads its list from a JSON endpoint and whether that endpoint
+      takes the location id.
+
   # --- Not a vacancy source, but wanted for something else -------------------
 
   - name: itjobswatch_salary_benchmark
-    status: pending
-    priority: 6
+    status: implemented
+    implemented_at: "2026-09-08"
+    implemented_as: "tools/salary_benchmark.py, beside the UK report, outside the score"
     kind: html
     endpoint: "https://www.itjobswatch.co.uk/jobs/uk/.net.do"
     measured: "200 (2026-09-08)"
@@ -472,6 +500,7 @@ sources:
       GET, with a `type` field — 29 of 30 remote engineering postings
       "Full-time", and "US citizen/visa only" is common. Interesting companies,
       the wrong engagement. Reconsider for a full-time startup search.
+    task: "tasks/1-triage/0046-yc-jobs-full-time.md"
 
   - name: fractionaljobs_io
     status: rejected
@@ -487,46 +516,33 @@ sources:
       The job pages are rendered in the browser; the HTML holds marketing copy
       and no postings. A talent network: you apply once and are matched.
 
-  - name: arc_dev
-    status: pending
-    priority: 7
-    kind: html_page_data
-    checked: "2026-09-13"
-    reason_for_low_priority: >
-      Next.js page data with arcJobs and externalJobs (9031), jobType
-      permanent/contract — but the path filter is ignored: /remote-jobs/part-time,
-      /freelance and /part-time/.net return the same thirty. Needs its search
-      parameters worked out before it is worth a fetcher.
-
   - name: aijobs_ai
     status: pending
-    priority: 8
+    task: "tasks/1-triage/0045-aijobs-ai.md"
     kind: html
     checked: "2026-09-13"
-    reason_for_low_priority: >
+    measured: >
       21 job links on the remote page, a JobPosting on each job page, a job-type
       filter in the UI. Mostly machine-learning roles, which a .NET CV does not
-      reach; worth it only for a search that does.
+      reach; reconsidered since stretch roles (2026-10-20).
 
-  # --- Need a free key: lowest priority --------------------------------------
+  # --- Rejected 2026-10-20: a key is needed, and the results only repeat ------
+  # --- boards already fetched ------------------------------------------------
 
   - name: adzuna
-    status: pending
-    priority: 9
+    status: rejected
     kind: json
-    reason_for_low_priority: >
+    reason: >
       Alive, with broad EU coverage, but it needs registration (app_id plus
       app_key) and returns aggregated results duplicating other boards. A key
       goes in an environment variable only, never in the repository (CLAUDE.md §7).
 
   - name: jooble
-    status: pending
-    priority: 9
+    status: rejected
     kind: json
-    reason_for_low_priority: "The same: a key is needed and the results are aggregated."
+    reason: "The same: a key is needed and the results are aggregated."
 
   - name: careerjet
-    status: pending
-    priority: 9
+    status: rejected
     kind: json
-    reason_for_low_priority: "The same: an affid is needed."
+    reason: "The same: an affid is needed, and the results are aggregated."

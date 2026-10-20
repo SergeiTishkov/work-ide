@@ -834,7 +834,9 @@
 
   // --- the top bar's pickers: theme and language --------------------------------
   // Each is a button showing the current choice — an icon, a flag, no arrow —
-  // that opens a short list under it. One open at a time.
+  // that opens a short list under it. One open at a time. Refresh stands to
+  // their left, a button of the same size (the owner, 2026-10-20: out of the
+  // menu, the same ring-arrow icon).
 
   function flag(language) {
     return el('img', { class: 'flag', src: `flags/${language}.svg`, alt: '', width: 21, height: 14 });
@@ -880,7 +882,16 @@
     host.replaceChildren(button, menu || '');
   }
 
+  function renderRefreshButton() {
+    const host = document.querySelector('[data-testid="refresh-slot"]');
+    host.replaceChildren(el('button', {
+      class: 'picker-button', testid: 'refresh', type: 'button',
+      title: t('app.refresh_hint'), 'aria-label': t('app.refresh'), onclick: refresh,
+    }, el('span', { class: 'refresh-icon', 'aria-hidden': 'true' }, '\u27F3')));
+  }
+
   function renderPickers() {
+    renderRefreshButton();
     renderPicker('theme', {
       title: t('theme.choose'),
       current: Theme.theme(),
@@ -981,8 +992,8 @@
   }
 
   // --- the commands menu (the owner, 2026-10-20) ----------------------------
-  // Refresh, Collect, Stop, Review feedback, Clean up and the identities live
-  // in one menu. Collect shows its spinner and stage in the menu; the menu's
+  // Collect, Stop, Review feedback, Clean up and the identities live in one
+  // menu; Refresh is a button of its own in the top bar. Collect shows its spinner and stage in the menu; the menu's
   // own button spins while anything runs (busyWith), so it is seen with the
   // menu closed.
 
@@ -1085,7 +1096,6 @@
     const menu = open && el('div', {
       class: 'commands-menu', role: 'menu', testid: 'menu', onclick: (event) => event.stopPropagation(),
     },
-    menuItem({ testid: 'refresh', text: t('app.refresh'), title: t('app.refresh_hint'), onclick: refresh }),
     collectItem(identity),
     running && menuItem({ testid: 'run-stop', text: t('run.stop'), onclick: stopCollect }),
     feedbackItem(pending),
@@ -1874,7 +1884,12 @@
         el('span', { class: 'company' }, view.company || ''),
         item.fresh && el('span', { class: 'badge fresh', testid: 'badge-fresh' }, t('badge.fresh')),
         view.needs_manual_review && el('span', { class: 'badge review', testid: 'badge-review' },
-          t('badge.manual_review'))),
+          t('badge.manual_review')),
+        // off the stack or level, let through by the screening model's read
+        // against the CV (criteria stretch_roles, the owner, 2026-10-20)
+        view.stretch && el('span', {
+          class: 'badge stretch', testid: 'badge-stretch', title: view.stretch.reason || null,
+        }, t(view.stretch.fit === 'stretch' ? 'badge.stretch' : 'badge.off_stack'))),
       el('div', { class: 'row-facts' },
         view.hiring_country && md('span', `${t('row.hiring_country')}: ${view.hiring_country}`),
         view.salary && md('span', `${t('row.salary')}: ${view.salary}`)),
@@ -1945,7 +1960,7 @@
     compensation: 'score.part.compensation', contractor: 'score.part.contractor',
     reputation: 'score.part.reputation', company_age: 'score.part.company_age',
     market: 'score.part.market', tech: 'score.part.tech', title: 'score.part.title',
-    exporter: 'score.part.exporter',
+    exporter: 'score.part.exporter', stretch: 'score.part.stretch',
   };
 
   function renderScoreParts(parts) {
@@ -2367,7 +2382,7 @@
     load: 'step.load', fetch: 'step.fetch', rescore: 'step.rescore', duplicates: 'step.duplicates',
     links: 'step.links', companies: 'step.companies', descriptions: 'step.descriptions',
     benchmark: 'step.benchmark', channels: 'step.channels', wikidata: 'step.wikidata', save: 'step.save',
-    selection: 'step.selection', reports: 'step.reports', contracts: 'step.contracts',
+    selection: 'step.selection', contracts: 'step.contracts',
   };
   const TASK_STATE_KEYS = {
     queued: 'task.state.queued', running: 'task.state.running', done: 'task.state.done',

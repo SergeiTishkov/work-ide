@@ -114,12 +114,15 @@ texts. Your own file holds only the differences.
 | Pay graded by rate rather than "stated or not" | — | `compensation_signal.hourly_equivalent_tiers` | — |
 | Any scoring weight and any list | — | `<p>_criteria.yaml` in full | yes |
 
-### Template text that reaches the REPORT
+### Template text a person reads
 
 One row of the table above is easy to miss, and it was found by regenerating the
-report after the repository was translated: `identity.scoring_philosophy` is a
-template value, so it is written in English like everything else in git — and it
-is printed at the head of every report, which follows the person's language.
+Markdown report after the repository was translated: `identity.scoring_philosophy`
+is a template value, so it is written in English like everything else in git —
+and it was printed at the head of every report, which followed the person's
+language. (The Markdown report was removed on 2026-10-20, task 0052; nothing
+prints `scoring_philosophy` today. The rule below stands for any template text
+that reaches a person.)
 
 So the line came out English in an otherwise Russian report.
 
@@ -127,10 +130,10 @@ The fix is an override rather than an edit to the template: the identity's own
 file sets `identity.scoring_philosophy` in the person's language, and the layer
 order does the rest. The general rule follows:
 
-> Template text that reaches the REPORT is English in git, and is translated by
+> Template text that reaches a person is English in git, and is translated by
 > an override in the personal layer — never by editing the template.
 
-`tools/i18n.py` handles the report's own fixed strings; this is for the ones
+`tools/i18n.py` handles the vacancy lines' own fixed strings; this is for the ones
 that come from configuration and are therefore different for every identity.
 
 ### Changing the sign is a legitimate case

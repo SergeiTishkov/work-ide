@@ -43,12 +43,10 @@ const STAGE_KEYS = [
   [/^mark near-duplicates/, 'duplicates'],
   [/^check links/, 'links'],
   [/^rebuild companies/, 'companies'],
-  [/^salary benchmark/, 'benchmark'],
   [/^find direct application channels/, 'channels'],
   [/^company facts from Wikidata/, 'wikidata'],
   [/^save the knowledge base/, 'save'],
   [/^record the selection/, 'selection'],
-  [/^write the reports/, 'reports'],
   [/^check source contracts/, 'contracts'],
 ];
 

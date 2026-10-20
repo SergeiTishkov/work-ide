@@ -8,6 +8,11 @@ day were of this kind. So every vacancy in the top classes is read by a cheap
 model (Haiku) that has the screening brief (tools/ai_brief.py) as its system
 prompt, and answers in a fixed schema.
 
+So is every remote role the scripts found off the person's stack or level
+(score.STRETCH_UNREAD, the owner, 2026-10-20: "remote outranks the
+technology"): its `cv_fit` decides it. "fits" and "stretch" lift the stack
+objections in score.py, "no" rejects it.
+
 The answer only ever REMOVES: a "reject" becomes the dealbreaker
 "ai: <reason>" in score.py; a "keep" changes nothing. remote_unconfirmed and
 the classes below are never sent: the owner, 2026-10-17, "after the remote
@@ -48,6 +53,12 @@ TEXT_LIMIT = 12000
 # The classes worth a model's reading: what the scripts kept as remote and
 # fitting. The rest are either out already or parked for a person.
 SCREENED_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "engagement_unconfirmed")
+# Besides them, the stretches (score.STRETCH_UNREAD, `screen_wanted`): remote
+# roles off the stack or level that only the model's read against the CV
+# decides. A budget of their own per run, highest score first, so a backlog
+# (about 1 500 the first time, 2026-10-20) is read over a few runs and does
+# not hold one up; $0.006 a read.
+STRETCH_LIMIT = 400
 
 SCHEMA = {
     "type": "object",
@@ -56,11 +67,14 @@ SCHEMA = {
         "work_arrangement": {"type": "string", "enum": ["remote", "hybrid", "onsite", "unclear"]},
         "location_ok": {"type": "string", "enum": ["yes", "no", "unclear"]},
         "role_fit": {"type": "string", "enum": ["good", "partial", "poor"]},
+        "cv_fit": {"type": "string", "enum": ["fits", "stretch", "no"]},
+        "work_kind": {"type": "string", "enum": ["software", "applied_ai", "ml_research", "data_heavy", "other"]},
         "verdict": {"type": "string", "enum": ["keep", "reject"]},
         "reason": {"type": "string"},
         "quote": {"type": "string"},
     },
-    "required": ["is_job_posting", "work_arrangement", "location_ok", "role_fit", "verdict", "reason"],
+    "required": ["is_job_posting", "work_arrangement", "location_ok", "role_fit", "cv_fit", "work_kind",
+                 "verdict", "reason"],
     "additionalProperties": False,
 }
 
@@ -88,6 +102,32 @@ def message(record: dict) -> str:
     lines = [f"{k}: {v}" for k, v in facts.items() if v not in (None, "", [])]
     text = _text(record)
     return "\n".join(lines) + "\n\ntext:\n" + (text or "(the board gave no text)")
+
+
+def time_zone_fact(record: dict) -> Optional[str]:
+    """The scorer's arithmetic on an explicit time-zone window ("CET +/- 3
+    hours"), for the model to take as given. On 2026-10-20 Haiku read "CET ±3
+    hours" as excluding UTC+4 in 3 of 4 Proxify postings, also after the
+    prompt spelled the window out."""
+    breakdown = (record.get("computed") or {}).get("score_breakdown") or {}
+    tz = (breakdown.get("remote_location_fit") or {}).get("timezone_requirement") or {}
+    if tz.get("verdict") not in ("fits", "outside"):
+        return None
+    if "range_utc" in tz:
+        window = "UTC{:+d}..UTC{:+d}".format(*tz["range_utc"])
+    else:
+        window = f"{tz['zone']} ±{tz['window_hours']}h (daylight saving included)"
+    where = "inside" if tz["verdict"] == "fits" else "outside"
+    return f"{window}: the person at UTC{tz['my_utc_offset']:+d} is {where} it"
+
+
+def model_message(record: dict) -> str:
+    """What is sent: the posting plus facts a program worked out from it.
+    The hash stays on `message`, the posting alone."""
+    fact = time_zone_fact(record)
+    if not fact:
+        return message(record)
+    return f"time-zone window, checked by a program: {fact}\n" + message(record)
 
 
 def text_hash(record: dict) -> str:
@@ -150,25 +190,33 @@ def call_model(system_prompt: Path, text: str, *, model: str = MODEL, claude: st
 
 
 def worklist(vacancies: dict, stored: dict, brief_digest: str, classes=SCREENED_CLASSES,
-             limit: Optional[int] = None) -> list:
+             limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT) -> list:
     """Top-class vacancies with no answer for their current text and brief,
-    highest score first."""
-    todo = []
+    highest score first; then the stretches waiting for a read, up to
+    `stretch_limit`."""
+    todo, stretches = [], []
     for vid, record in vacancies.items():
         computed = record.get("computed") or {}
-        if computed.get("classification") not in classes or record.get("duplicate_of"):
+        if record.get("duplicate_of"):
+            continue
+        top = computed.get("classification") in classes
+        if not top and not computed.get("screen_wanted"):
             continue
         answer = stored.get(vid)
         if answer and answer.get("text_hash") == text_hash(record) and answer.get("brief_hash") == brief_digest:
             continue
-        todo.append((computed.get("score") or 0, vid))
+        (todo if top else stretches).append((computed.get("score") or 0, vid))
     todo.sort(reverse=True)
+    stretches.sort(reverse=True)
     keys = [vid for _, vid in todo]
-    return keys[:limit] if limit else keys
+    keys = keys[:limit] if limit else keys
+    extra = [vid for _, vid in stretches]
+    return keys + (extra[:stretch_limit] if stretch_limit is not None else extra)
 
 
 def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES,
-           limit: Optional[int] = None, workers: int = WORKERS, call=None) -> dict:
+           limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT,
+           workers: int = WORKERS, call=None) -> dict:
     """Screens what needs it and attaches every answer as `_ai_screen`.
     Mutates `vacancies` in place; never raises for one posting. `call`
     stands in for call_model (tests)."""
@@ -182,7 +230,7 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
     digest = brief_hash(brief)
     with db.session() as conn:
         stored = load(conn, prefix)
-    keys = worklist(vacancies, stored, digest, classes, limit)
+    keys = worklist(vacancies, stored, digest, classes, limit, stretch_limit)
     stats["considered"] = len(keys)
     lock = threading.Lock()
     tick = progress.Progress(len(keys), "ai screen")
@@ -193,7 +241,7 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
         def one(vid):
             record = vacancies[vid]
             try:
-                answer, cost = call(system_prompt, message(record), workdir=workdir)
+                answer, cost = call(system_prompt, model_message(record), workdir=workdir)
             except Exception as exc:  # noqa: BLE001 — one posting must not stop the rest
                 with lock:
                     stats["errors"] += 1

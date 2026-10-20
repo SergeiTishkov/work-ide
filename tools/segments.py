@@ -107,16 +107,16 @@ def group_name(key: str) -> str:
 
 
 class Segment:
-    """One report file: which groups it holds, and what it is called.
+    """One market list: which groups it holds, and what it is called.
 
     Three kinds, and they are exclusive:
       * `groups`     — the named market groups;
       * `rest`       — whatever no other segment claimed. Computed from the
                        rest of the configuration rather than listed, so that
                        adding a segment can never silently leave a market out
-                       of every file;
-      * `everything` — the whole shortlist: the report as it was before any of
-                       this existed.
+                       of every list;
+      * `everything` — the whole shortlist, as it was before any of this
+                       existed.
     """
 
     def __init__(self, slug: str, name: str, groups=(), rest: bool = False,
@@ -125,17 +125,16 @@ class Segment:
         self.slug = slug
         # `name` is the English source text, as everywhere in the project;
         # `translations` gives it in other languages ({"ru": "..."}), for the
-        # report and the app (2026-10-06: the app's region list stayed English
+        # app (2026-10-06: the app's region list stayed English
         # in Russian).
         self.name = name
         self.translations = dict(translations or {})
         self.groups = tuple(groups)
         self.rest = rest
         self.everything = everything
-        # Additionally written to <prefix>_latest.md. Exactly one segment
-        # should set it: that path is what RUNBOOK.md, the archive and a
-        # person's muscle memory all point at, and it has to keep meaning
-        # something.
+        # The main segment; it was also written to <prefix>_latest.md until
+        # the Markdown reports were removed (2026-10-20, task 0052). Recorded
+        # as is_default; nothing reads it today. Exactly one segment sets it.
         self.default = default
 
     def __repr__(self):  # pragma: no cover - debugging aid

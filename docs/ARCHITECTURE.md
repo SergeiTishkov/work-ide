@@ -40,12 +40,12 @@ What is the identity's alone lives in `data/identities/<prefix>/`: insights,
 state, feedback packages, run logs. Raw source responses are the sources', in
 `data/raw/`.
 
-`state.json` stays JSON (small, one writer), Markdown stays for reports and
+`state.json` stays JSON (small, one writer), Markdown stays for
 `<prefix>_insights.md`, YAML for configuration.
 
 ### Selections: what each run showed
 Every run records a selection (`tools/selections.py`): the shortlist split by
-market exactly as the report splits it, every listed vacancy with its class and
+market (`tools/segments.py`), every listed vacancy with its class and
 score at that moment. The app lists vacancies with queries over it
 (`schemas/queries.sql`) rather than from files, so marking a vacancy frees its
 place in the top at once. Selections are never changed, only added: feedback
@@ -118,7 +118,7 @@ old renderer on 400 real vacancies.
 The app's interface has a language switch, so the pipeline stores the row in
 every language it can render (`report.vacancy_views()` → `vacancies.views`,
 via `i18n.speaking()`); `vacancies.view` keeps the identity's own language
-for the report and the feedback package. The app shows the one picked and
+for the feedback package. The app shows the one picked and
 falls back to `view` for a row recorded before `views` existed.
 
 ### Boring, minimal dependencies
@@ -375,13 +375,12 @@ drifts, and the drift is invisible — the vacancy is simply in no file at all.
 `rest` is everything no other segment claimed, so adding a market shrinks it by
 itself. There is a test asserting that every vacancy reaches at least one file.
 
-**Why `<prefix>_latest.md` still exists and still means everything.** It is
-what RUNBOOK.md, the archive and a person's habit all point at. One segment
-carries `default: true` and is additionally written there.
-
-**The cost.** Eight files instead of one, and a person who opens only the UK
-file could miss the worldwide one. Paid for by a banner in every file naming
-the shortlist and linking to the others.
+**Markdown files, then the app (2026-10-20).** Until this date every segment
+was also written as `reports/<prefix>_<slug>_latest.md`, with a dated archive.
+The owner reads the shortlist only in the app, so the files and the folder
+were removed (task 0052); the segments are recorded in the selection and the
+app lists them. `default: true` still marks one segment in the configuration
+and is recorded as `is_default`; nothing reads it today.
 
 **Worldwide means the location names no place (2026-10-06).** Not "the report
 found no country". The country index was the 35 countries of
@@ -909,9 +908,10 @@ strong model, kept in the local identity and rewritten when the CV changes.
   posting, arrangement, location, role fit, verdict, reason, quote). Answers
   are stored per identity in `ai_screens` with the hash of the text read and
   of the brief; a new text or brief asks again.
-- It only removes: `score.py` turns a "reject" into the dealbreaker
-  `ai: <reason>`; a "keep" changes nothing. The reason and the quote show in
-  the app's Details.
+- On the top classes it only removes: `score.py` turns a "reject" into the
+  dealbreaker `ai: <reason>`; a "keep" changes nothing. The reason and the
+  quote show in the app's Details. A stretch role is the one place a "keep"
+  lets a vacancy in (see "Remote outranks the technology" below).
 - Through the `claude` CLI (`-p`, no tools, an empty working folder, so no
   project instructions in its context), with `MAX_THINKING_TOKENS=0`:
   measured on one posting, $0.018 and 2566 output tokens with thinking,
@@ -927,12 +927,58 @@ strong model, kept in the local identity and rewritten when the CV changes.
   employer of record is not "no"; asked again, both were kept and three
   rejects from the control sample stayed rejected. The prompt is part of
   `brief_hash`, so a prompt change reads the top again.
+- 2026-10-20, the same misreading again: "CET ±3 hours" taken to exclude
+  UTC+4 in 3 of 4 Proxify postings, both with the rule above and with the
+  window spelled out as "UTC−2 to UTC+4". Now `ai_screen.model_message` puts
+  the scorer's own reading of the window (`timezone_requirement` in the
+  breakdown) above the posting as a line "time-zone window, checked by a
+  program"; the same 4 asked again: 3 read the location as fitting, the 4th
+  was rejected for asking 5+ years of Python. The line is not part of
+  `text_hash`, which stays on the posting alone.
 
 Two script rules came from the same feedback, as personal settings:
 `remote_location_fit.unstated_remote_after_reading: reject` (a text of 600+
 characters that never says remote is rejected; 99 of 107 wrong picks in
 remote_unconfirmed had their text read), and `reject: true` on
 `title_role_penalty` rules (sharp: front-end, UI and junior titles).
+
+### Remote outranks the technology: stretch roles (2026-10-20)
+
+The owner, 2026-10-20, after applying to Cloud9's "Forward Engineer" (a Node
+role the screening model had refused as "not .NET"): remote comes first; a
+remote role the real CV can reach is wanted whatever its stack; Node, Go,
+Python and applied AI are a plus, .NET is good too; pay ranks above the
+technology. Not wanted: ML research, training models, data-heavy roles the
+CV cannot cover without inventing experience; junior is fine unless it is a
+junior developer.
+
+Measured that day on SHARP's base: 2 506 vacancies were refused only for
+their stack or title with no location objection, 1 450 of them posted in
+October; 347 of the 350 "forward engineer" ones were refused (244 by the
+title rule "forward deployed is not a developer").
+
+- `stretch_roles: {enabled, stretch_points}` in criteria (SHARP sets it in the
+  personal layer). With it, the stack relevance gate, the title stack gate,
+  a title in `stretch_discipline_title_patterns` (data, ML/AI, forward
+  deployed) and a `title_role_penalty` rule's `stretch_if` stop refusing on
+  their own: the vacancy waits with STRETCH_UNREAD and `screen_wanted`.
+- Remote first: only a vacancy whose sole objection is that wait is sent to
+  the model; one whose remote is unconfirmed waits for its description.
+- The model answers `cv_fit` (fits / stretch / no) and `work_kind` (software,
+  applied_ai, ml_research, data_heavy, other). "fits" lifts the objections,
+  "stretch" lifts them at `stretch_points`, "no" is a reject. A stretch the
+  model read is past the role complexity gate: its "no" covers ML research,
+  which is what that gate's titles catch.
+- A vacancy held only by a model's reject is `screen_wanted` too, so a new
+  prompt or brief reads it again (before, a reject left the top classes and
+  was never asked again).
+- `ai_screen.STRETCH_LIMIT` (400 a run, highest score first) after the top
+  classes: about 1 100 were waiting the first time, $0.006 a read.
+- The card shows "a stretch for the CV" or "another stack, fits the CV", with
+  the model's reason on hover (`stretch` in the row view).
+- The brief prompt now says the description of the search wins over older
+  reasons: the owner's earlier "Go role", "Node only" refusals would
+  otherwise have written "Go, Node: reject" next to "Go, Node: a stretch".
 
 ### Reputation on request, not in every collection (2026-10-17)
 
@@ -1023,7 +1069,9 @@ menu's own button spins while anything runs — a task of the app, a pipeline
 run of any identity started anywhere, a clean-up — and its tooltip names
 what (`busyWith`), so it is seen with the menu closed. Until the owner's
 second request that day, Refresh and the collection's status stood beside
-the menu.
+the menu. Later that day Refresh left the menu again (task 0058): a button of
+its own in the top bar, left of the theme and language pickers and the same
+size, with the same ring-arrow icon.
 
 ### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)
 
@@ -1149,18 +1197,12 @@ The objection to mutable global state — concurrency — does not apply here: t
 tools are single-threaded and single-session, and one active identity per
 process is exactly the constraint wanted.
 
-## Further development (candidates for the next cycle)
+## Further development
 
-- Add Dice.com as a source (RSS or public search), if a usable endpoint exists.
-- ~~A gate for "not a simple" role (Principal Scientist/Agentic/R&D)~~ — done
-  2026-07-30, see `role_complexity_signal` above.
-- ~~A hard regional tie as a dealbreaker~~ — done 2026-07-30, see
-  `restrictive_region_signal` above. The region list is incomplete in principle;
-  extend it as new wordings turn up ("remote DACH only" and the like) that it
-  does not yet catch.
-- Smarter geographic deduplication (see "Rejected approaches" above) — if enough
-  data accumulates, it is worth comparing (company, title-without-city).
-- `link_check.py` treats only 404/410 as "dead" and deliberately does not try to
-  detect "200 OK, but the page says 'vacancy closed'" (that would need brittle
-  per-site content sniffing). If it becomes a frequent problem, collect concrete
-  examples and consider narrow per-domain rules rather than a general solution.
+The list of work, done and waiting, is `tasks/` (format in `tasks/README.md`):
+ideas nobody has agreed to yet are in `tasks/1-triage/`, agreed work in
+`tasks/2-to-do/`. The candidates this section listed until 2026-10-20 were
+either done (the role-complexity gate, the regional dealbreaker) or dropped:
+Dice.com answers 403 (`docs/SOURCES.md`); the region list is extended as
+wordings turn up, not as a task; near-duplicates are already merged; closed
+pages are recognised per board where a board needs it.
