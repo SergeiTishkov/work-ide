@@ -326,6 +326,27 @@ sources:
       authentication. An agency worth following individually belongs in
       <prefix>_ats_targets.yaml, one line each.
 
+  # --- Queued: one employer's own career site, named by the owner ------------
+
+  - name: dataart
+    status: pending
+    priority: 5
+    kind: unknown
+    endpoint: "https://www.dataart.team/en/vacancies?locations=5770"
+    checked: "not yet: no request has been made"
+    seen_by_the_owner: >
+      2026-10-20, a screenshot: the location filter "Remote.Georgia" (id 5770
+      in the URL) lists 26 vacancies of 117, in categories AI, Backend, Data &
+      Analytics, DevOps & SRE and others. Every vacancy names the countries it
+      hires from (e.g. "Armenia, Bulgaria, Cyprus, Georgia, ...").
+    note: >
+      The owner, 2026-10-20: "add it, let it be; not urgent". An Eastern
+      European outsourcing company; the owner's estimate of pay: $4-5k a month
+      for a developer, $5-7k for a team lead. A location filter for the
+      owner's own country is why it is worth having. To check: whether the
+      page loads its list from a JSON endpoint and whether that endpoint
+      takes the location id.
+
   # --- Not a vacancy source, but wanted for something else -------------------
 
   - name: itjobswatch_salary_benchmark
