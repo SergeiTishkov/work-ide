@@ -32,9 +32,12 @@ code of its own.
 
 In the app, the agent run (`runner.js`) and the Python lanes end with that
 reason in the task panel, and queued tasks that need AI wait for the reset
-time instead of starting and failing one after another. Whether the queue
-picks up by itself after the reset or waits for the owner is the owner's
-call.
+time instead of starting and failing one after another.
+
+The queue resumes by itself (the owner, 2026-10-21): the task service
+(0056) checks whether the limit has reset, at the reset time the answer
+gave and otherwise every 8 hours, with one minimal `claude -p` call; when
+it has, the waiting tasks start again from where they stopped.
 
 ## Items
 - TO DO - Capture what `claude -p --output-format json` and `stream-json` return at the usage limit (fields, text, reset time, exit code) and write it here
@@ -42,5 +45,6 @@ call.
 - TO DO - One recogniser and one error for the limit in `tools/`; every `call_model` uses it
 - TO DO - The stage that meets the limit stops at once and keeps what it finished; the pipeline ends with the reason, the reset time and its own exit code
 - TO DO - The app: a task stopped by the limit says so; queued AI tasks wait for the reset
-- TO DO - Ask the owner: after the reset, the queue resumes by itself or waits for a click
+- DONE - Ask the owner: the queue resumes by itself; the check runs every 8 hours (2026-10-21)
+- TO DO - The task service checks for the reset (reset time, else every 8 hours) and resumes the waiting tasks
 - TO DO - Tests with a fake `claude` that answers with the limit: one refused call stops the screen, no further calls are sent

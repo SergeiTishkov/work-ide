@@ -1,54 +1,102 @@
-# 0056 A collection keeps going when another Windows user is active, and through sleep where it can
+# 0056 A task service: every task runs outside the app, listed in one queue
 
 Source: the owner, 2026-10-20 ("when the active Windows user changes, my
 long-running collection scripts started under the first user stop working;
 make them able to work while another user is active, or even while the
-system sleeps, if that is possible at all")
-Scope: app, tools
+system sleeps, if that is possible at all"); the design agreed 2026-10-21
+("a backend service registered in Windows"; "through Task Scheduler, as you
+recommend"; "tasks the agent starts are registered in the list too")
+Scope: tools, app, rules, docs
 
 ## Business
 The owner starts a collection, then another person signs in to the same
-laptop with Fast User Switching. The collection started under the owner
-stops. A collection takes hours (the LinkedIn walk alone six hours and more,
-task 0050), so a switch in the middle loses most of a run.
+laptop with Fast User Switching, and the collection stops. A collection
+takes hours (the LinkedIn walk alone six hours and more, task 0050).
 
-What is known so far, checked 2026-10-20 on the owner's laptop:
-- Windows does not pause the processes of a session that was switched
-  away from: they keep their CPU time. Something in the chain stops for
-  another reason, and nobody has seen the logs of a run that stopped yet.
-- The chain is not "background scripts only": the Electron app's task
-  queue (`app/main/tasks.js`) starts every collection. It spawns
-  `claude -p /top <p>` (`app/main/runner.js`), which runs the Python
-  pipeline; LinkedIn, the rest of the base and reputation are separate
-  lanes of the same queue. The queue lives in the app's memory.
-- The laptop has S3 sleep (no Modern Standby). Plugged in it never sleeps
-  (Balanced plan); on battery it sleeps after 30 minutes without input,
-  and a switch to the sign-in screen with nobody touching it counts as no
-  input. In S3 no process runs at all: "working while asleep" can only
-  mean not letting the laptop fall asleep during a run, waking it up for a
-  run, or carrying on after waking.
+Today the queue lives in the memory of the app's window
+(`app/main/tasks.js`): closing the window stops every task
+(`window-all-closed` -> `stopAll`), and a run started by the agent or from
+a terminal never appears in the bottom panel. The panel showed one old CV
+batch for weeks and nothing else (the owner, 2026-10-21).
+
+What the owner wants:
+- Tasks run in a service of their own, not in the app: closing or
+  collapsing the app stops nothing; another user being active stops
+  nothing; after a reboot the service starts without anybody signing in.
+- Every task is in the list, whoever started it: the app, the agent, a
+  terminal, a schedule (task 0061). It is queued, runs, ends as done,
+  failed or stopped, and the list shows exactly that.
+- Only LinkedIn runs beside the other collection work; the rest of a
+  collection queues. CVs and cover letters run in parallel to collections.
+- A task that needs something the machine does not have right now (Word
+  needs a signed-in desktop; AI needs the usage limit, task 0057) waits
+  with the reason shown, and starts by itself when it is there.
+
+Other operating systems are not needed now (the owner, 2026-10-21).
 
 ## Implementation
-Not decided; the cause comes first. Candidates, to be weighed against
-what the logs show:
-- The run does not depend on the app's session: a standalone runner
-  started by Task Scheduler with "Run whether user is logged on or not",
-  reading the queue from the base; the app shows and controls it instead
-  of being its parent. Word documents (the `documents` lane, Word COM)
-  need a signed-in desktop and stay in the app.
-- Chromium throttling in a disconnected session, if the app's own timers
-  (queue retries, log followers) turn out to be the part that stops:
-  `powerSaveBlocker`, background-throttling switches.
-- Windows 11 power throttling (EcoQoS) of background processes, if the run
-  slows down rather than stops: `powercfg /powerthrottling disable` for
-  python.exe and claude, or a process-level opt-out.
-- Sleep: keep the system awake while a task runs
-  (`SetThreadExecutionState` / `powerSaveBlocker('prevent-app-suspension')`);
-  a scheduled collection may wake the laptop ("Wake the computer to run
-  this task" and wake timers in the power plan); a run cut by sleep resumes
-  from its last finished stage rather than from the start.
+**The queue is SQLite, a file of its own** (`data/tasks.sqlite`, WAL): the
+tasks, their steps, their state and who runs them; logs are files beside
+it. Separate from `data/workide.sqlite`, so a 30-second save of the
+vacancy base never holds up a task's state, and so the queue survives a
+broken base.
+
+**Workers, not one daemon** (`tools/taskd.py`), each claiming the tasks it
+can run, in a transaction:
+- the background worker: a Task Scheduler task at system start, "run
+  whether the user is logged on or not" (S4U, no stored password, if `claude`
+  works there; otherwise with the stored password, or AI tasks move to the
+  desktop worker). Runs collections, LinkedIn, the rest of the base,
+  clean-ups.
+- the desktop worker: a Task Scheduler task at the owner's logon, in the
+  owner's session. Runs what needs the desktop: CVs and cover letters
+  (Word COM). Keeps running while another user is active.
+
+Slots: one collection slot (collect, rest, clean-up, ...), one LinkedIn
+slot, one documents slot. A task names what it needs (`desktop`, `ai`);
+a worker that lacks it leaves the task queued with the reason.
+
+**Reliability:** Task Scheduler restarts a worker that exits with an error
+(every minute, without limit) and starts it at boot and logon; one worker
+of each kind (a lock in the queue's file); each writes a heartbeat. A task
+whose worker died (heartbeat stale, pid gone) is marked interrupted and
+queued again at the step it can restart from. While a task runs the worker
+keeps the system awake (`SetThreadExecutionState`). The app checks the
+heartbeats and, if a worker is gone, starts its scheduled task
+(`schtasks /run`) and says so.
+
+**One collection is a group of tasks**, each a row in the panel:
+- collect the top (the agent's `/top` run; its pipeline stages shown inside
+  the row as a checklist, task 0062);
+- LinkedIn (`pipeline.py --linkedin`), in its own slot, at the same time;
+- the rest of the base, after both;
+- the CV/CL batch for what they brought, in the documents slot.
+The dependencies are rows of the queue ("after #12 and #13"), not code in
+the app.
+
+**The app is a client**: it adds tasks, lists them, stops them (a flag the
+worker acts on); it never runs one. `app/main/tasks.js` becomes a reader of
+the queue; its rules (lanes, "rest after LinkedIn", the batch) move into
+`tools/taskd.py`.
+
+**Runs started outside the queue are listed too**: `pipeline.py` started
+directly registers itself as a task (kind and identity, state, log), so a
+terminal run is visible; the agent uses the queue instead (below).
+
+**The agent**: `tools/taskq.py` (`add`, `list`, `show`, `log`, `stop`,
+`wait`); a skill `run-task` and a CLAUDE.md rule: long work (collections,
+LinkedIn, the rest, clean-ups, CV/CL batches) is added to the queue, never
+started as a process of the agent's own. Checked by subagents given only the
+rules and a request ("collect for <fixture identity>"), on the test fixture:
+the task must appear in the queue and run there.
 
 ## Items
-- TO DO - Reproduce: start a collection, switch user, come back; record which process stopped (app, the `claude -p` agent, python, a fetcher), when, and what the run logs in `data/identities/<p>/runs/` say
-- TO DO - The same with the laptop on battery, past the 30-minute sleep
-- TO DO - Work out the plan from what was found and write it here as the next items
+- DONE - Plan (2026-10-21, with the owner)
+- TO DO - Queue schema in `data/tasks.sqlite`, `tools/taskq.py`, tests (add, claim, depend, stop, interrupted, slots)
+- TO DO - `tools/taskd.py` workers: claim by slot and capability, run, log, steps, heartbeat, keep-awake; the collection group; tests with fake runners
+- TO DO - Task Scheduler registration (`tools/taskd.py install/uninstall/status`): background at start (check `claude` under S4U first), desktop at logon, restart on failure
+- TO DO - Direct `pipeline.py` runs register themselves in the queue
+- TO DO - The app reads and controls the queue; `tasks.js` keeps no work of its own; closing the window stops nothing
+- TO DO - Agent infrastructure: `run-task` skill, CLAUDE.md and RUNBOOK rules, commands (`/run`, `/top`) use the queue; subagent check on the fixture
+- TO DO - End-to-end check: tasks from the app, the agent, a terminal and a schedule all appear, run, and end with the right state
+- TO DO - Reproduce the user switch and the 30-minute battery sleep with the service; record what happens
