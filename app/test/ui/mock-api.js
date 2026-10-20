@@ -61,7 +61,7 @@ function installMockApi(fixture) {
       if (!next) continue;
       // the batch's document goes first; the batch pauses after it (holding)
       if (lane === 'documents' && batch && batch.state === 'running' && !batch.holding) {
-        next.waitingFor = 'batch';
+        next.waitingFor = '#batch to end';
         continue;
       }
       next.waitingFor = null;
@@ -380,7 +380,7 @@ function installMockApi(fixture) {
       const task = {
         id: nextTaskId++, kind: request.kind, identity: request.identity, vacancyId: request.vacancyId || null,
         title: request.title || '', company: request.company || '', instructions: request.instructions || '',
-        origin: 'manual', state: 'queued', waitingFor: null, result: null, error: null,
+        origin: 'app', state: 'queued', waitingFor: null, result: null, error: null,
       };
       tasks.push(task);
       pumpTasks();

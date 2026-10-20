@@ -23,6 +23,20 @@ function fixtureRepo() {
   return { root, database, identities };
 }
 
+function stopWorkers(root) {
+  const file = path.join(root, 'data', 'tasks.sqlite');
+  if (!fs.existsSync(file)) return;
+  const db = new DatabaseSync(file);
+  for (const { pid } of db.prepare('SELECT pid FROM workers').all()) {
+    try {
+      process.kill(pid);
+    } catch {
+      // already gone
+    }
+  }
+  db.close();
+}
+
 // Editors built on Electron (VS Code among them) export ELECTRON_RUN_AS_NODE
 // to their child processes; inherited, it would start Electron as plain Node.
 function cleanEnv() {
@@ -34,8 +48,9 @@ function cleanEnv() {
 test('the real window lists, records feedback, and runs the (fake) agent', async () => {
   // A click in the hidden window takes about 2 s (Playwright waits for frames
   // the hidden window seldom draws); the run took 20 s alone and over 30 s
-  // beside the UI tests once the filters became clicks (2026-10-06).
-  test.setTimeout(60000);
+  // beside the UI tests once the filters became clicks (2026-10-06), about
+  // 45 s once a worker process ran the collection (2026-10-21).
+  test.setTimeout(90000);
   const repo = fixtureRepo();
   const app = await electron.launch({
     args: [path.join(__dirname, '..', '..')],
@@ -70,17 +85,21 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     expect({ ...row }).toEqual({ feedback_status: 'bugged', bugged_reason: 'onsite in fact' });
 
     await window.getByTestId('menu-button').click();
+    // "Collect" adds a collection to the task queue (tools/taskq.py): the
+    // top, LinkedIn, the rest of the base after both, a CV/CL batch after
+    // each. No worker is registered here, so the app starts one itself
+    // (tools/taskd.py, fake runs), and the panel follows the queue's rows.
     await window.getByTestId('run-collect').click();
-    await expect(window.getByTestId('task-1')).toHaveAttribute('data-state', 'done', { timeout: 15000 });
-    // a collection that ends well queues the rest of the base: the panel
-    // goes on to its log, the collection's is a click away
-    await expect(window.getByTestId('task-2')).toHaveAttribute('data-state', 'done', { timeout: 15000 });
+    await expect(window.getByTestId('task-1')).toHaveAttribute('data-state', 'done', { timeout: 30000 });
+    await expect(window.getByTestId('task-3')).toHaveAttribute('data-state', 'done', { timeout: 30000 });
+    await expect(window.getByTestId('task-5')).toHaveAttribute('data-state', 'done', { timeout: 30000 });
+    await window.getByTestId('task-3').click();
     await expect(window.getByTestId('task-log')).toContainText('fake rest: sharp');
     await window.getByTestId('task-1').click();
     await expect(window.getByTestId('task-log')).toContainText('fake run: /top sharp');
     await expect(window.getByTestId('task-log-title')).toContainText(en['task.state.done']);
     await expect(window.getByTestId('menu-busy')).toHaveCount(0);
-    expect(fs.readdirSync(path.join(repo.root, 'data', 'identities', 'sharp', 'runs'))).toHaveLength(1);
+    expect(fs.existsSync(path.join(repo.root, 'data', 'tasks', '1.log'))).toBe(true);
 
     // The indicator reads tools/runstate.py's row: a live one (this test's own
     // pid, fresh heartbeat) shows, a finished one clears within a poll.
@@ -110,16 +129,21 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     // "Identities" through the real IPC: the switch lands in the base
     await window.getByTestId('menu-button').click();
     await window.getByTestId('open-identities').click();
+    // an identity turned off has no tab; turned on, it is back
     await window.getByTestId('identity-active-partsharp').uncheck();
-    await expect(window.getByTestId('identity-tab-partsharp')).toHaveClass(/inactive/);
+    await expect(window.getByTestId('identity-tab-partsharp')).toHaveCount(0);
     const flags = new DatabaseSync(repo.database);
     expect(flags.prepare("SELECT active FROM identities WHERE id = 'partsharp'").get().active).toBe(0);
     flags.close();
+    await window.getByTestId('identity-active-partsharp').check();
+    await expect(window.getByTestId('identity-tab-partsharp')).toBeVisible();
     await window.getByTestId('identities-close').click();
 
     await window.getByTestId('identity-tab-partsharp').click();
     await expect(window.getByTestId('never-collected')).toBeVisible();
   } finally {
     await app.close();
+    // the worker the app started outlives it, as it should: end it here
+    stopWorkers(repo.root);
   }
 });

@@ -1380,7 +1380,7 @@ test('documents the app queued itself show on their cards and in the panel, mark
   const row = byId(page, 'a1');
   await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.generating_cv']);
   await expect(row.getByTestId('btn-generate-letter')).toHaveText(en['action.queued']);
-  await expect(page.getByTestId('task-1')).toContainText(en['task.auto']);
+  await expect(page.getByTestId('task-1')).toContainText(en['task.origin.auto']);
   await page.getByTestId('tasks-cancel-queued').click();
   expect(await calls(page, 'cancelQueued')).toEqual([[null]]);
   await expect(row.getByTestId('btn-generate-letter')).toHaveText(en['action.generate_letter']);
@@ -1546,7 +1546,7 @@ test("a document asked for while the batch runs says it waits for the batch's cu
   fixture.holdCv = true;
   await open(page, fixture);
   await page.evaluate(() => window.__setBatch({ progress: { index: 1, total: 3, made: 0, failed: 0, gone: 0 } }));
-  await page.evaluate(() => window.__addTask({ kind: 'cv', identity: 'sharp', vacancyId: 'b1', origin: 'manual' }));
+  await page.evaluate(() => window.__addTask({ kind: 'cv', identity: 'sharp', vacancyId: 'b1', origin: 'app' }));
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'queued');
   await expect(page.getByTestId('task-1')).toHaveAttribute('title', en['task.waiting_batch']);
   await page.evaluate(() => window.__setBatch({ holding: true, progress: { index: 1, total: 3, made: 1, failed: 0, gone: 0 } }));

@@ -1,6 +1,7 @@
 """tools/taskd.py: the workers that run the queue (task 0056) — with fake
 processes for the queue rules, and real ones for the process handling."""
 import json
+import os
 import subprocess
 import sys
 import time
@@ -348,6 +349,27 @@ def test_the_pipeline_log_is_followed_during_a_collection(isolated_data_dir, tmp
 
 
 # --- the machine and Task Scheduler --------------------------------------------------
+
+def test_a_worker_started_for_the_app_returns_at_once_and_holds_no_pipe_of_its_caller(tmp_path):
+    """`taskd.py start` returns while the worker it started goes on: had the
+    worker inherited the caller's stdout, `subprocess.run` would wait for it."""
+    env = {**os.environ, "WORK_IDE_DATA_ROOT": str(tmp_path), "WORK_IDE_FAKE_RUNNER": "1",
+           "PYTHONIOENCODING": "utf-8"}
+    env.pop(taskq.TASK_ENV, None)
+    since = time.monotonic()
+    done = subprocess.run([sys.executable, str(Path(taskd.__file__)), "start", "--role", "desktop",
+                           "--idle-exit", "60"], capture_output=True, text=True, env=env, timeout=50)
+    assert done.returncode == 0, done.stderr
+    assert time.monotonic() - since < 30
+    pid = json.loads(done.stdout)["pid"]
+    log = tmp_path / "tasks" / "worker_desktop.log"
+    try:
+        while "desktop worker started" not in (log.read_text(encoding="utf-8") if log.exists() else ""):
+            assert time.monotonic() - since < 40, "the worker did not start"
+            time.sleep(0.2)
+    finally:
+        taskd.kill_tree(pid)
+
 
 def test_the_scheduled_tasks_store_no_password_and_restart():
     root, py = Path("C:/repo"), "C:/repo/.venv/Scripts/python.exe"

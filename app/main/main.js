@@ -4,17 +4,14 @@
 // renderer only asks.
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFile } = require('node:child_process');
 const { app, BrowserWindow, clipboard, ipcMain, shell } = require('electron');
 const { repoRoot, schemaDir, pythonExecutable } = require('./paths');
 const { runCleanup } = require('./cleanup');
 const { Store } = require('./store');
 const { StoreThread } = require('./store-thread');
-const { Runner, killTree } = require('./runner');
-const { startRest: spawnRest, startLinkedIn: spawnLinkedIn } = require('./rest');
-const { startReputation: spawnReputation } = require('./reputation');
-const { CvGenerator, INSTRUCTIONS_LIMIT } = require('./cv');
-const { TaskQueue, EXTERNAL } = require('./tasks');
-const { BatchWatch, startBatch, stopBatch, holdBatch } = require('./batch');
+const { QueueClient } = require('./queue');
+const { WorkerKeeper } = require('./workers');
 const { documentsState, resolveRoot, vacancyDir } = require('./documents');
 const { listIdentities } = require('./identities');
 const { codeStamp, refreshAction } = require('./code-stamp');
@@ -58,170 +55,67 @@ function documentsRoot() {
   return documentsRootPromise;
 }
 
-let cvGenerator = null;
-function cv() {
-  if (!cvGenerator) {
-    cvGenerator = new CvGenerator({ root, python: pythonExecutable(root), documentsDir: documentsRoot });
-  }
-  return cvGenerator;
+// The task queue (task 0056): tools/taskq.py adds and stops, the workers
+// (tools/taskd.py) run, the app reads (queue.js). The tools are always the
+// app's own repository's: in the smoke test the data is a fixture's
+// (WORK_IDE_ROOT, WORK_IDE_DATA_ROOT), the code is not.
+const dataRoot = process.env.WORK_IDE_DATA_ROOT || path.join(root, 'data');
+const toolsRoot = path.resolve(__dirname, '..', '..');
+const toolsPython = pythonExecutable(toolsRoot);
+const toolsEnv = { ...process.env, PYTHONIOENCODING: 'utf-8', WORK_IDE_DATA_ROOT: dataRoot };
+
+function runTaskq(args) {
+  return new Promise((resolve, reject) => {
+    execFile(toolsPython, [path.join('tools', 'taskq.py'), ...args], {
+      cwd: toolsRoot, env: toolsEnv, windowsHide: true, maxBuffer: 4 << 20,
+    }, (error, stdout, stderr) => {
+      if (error && !String(stdout).trim()) {
+        reject(new Error(`tools/taskq.py: ${String(stderr || error.message).trim().split(/\r?\n/).pop()}`));
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
 }
 
-const fake = process.env.WORK_IDE_FAKE_RUNNER === '1' ? require('./fake-runner') : null;
-const runner = new Runner({
-  root,
-  logDirOf: (prefix) => {
-    const entry = identities.find((e) => e.prefix === prefix);
-    return path.join(entry ? entry.dataDir : path.join(root, 'data', 'identities', prefix), 'runs');
-  },
-  ...(fake ? { spawn: fake.fakeSpawn, kill: fake.fakeKill } : {}),
+function readBatch() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dataRoot, 'cv_batch.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+const tasks = new QueueClient({ dataRoot, schemaDir: schemaDir(root), runTaskq, readBatch });
+const workers = new WorkerKeeper({
+  root: toolsRoot, python: toolsPython, dataRoot,
+  live: () => tasks.liveWorkers(),
+  pending: () => tasks.list().some((task) => task.state === 'queued'),
+  log: (line) => console.log(`workers: ${line}`),
 });
 
-// A collection as a task: the runner's lines go to the task's log, its exit
-// ends the task.
-let collectSink = null;
-function startCollect(task, onLine) {
-  // The agent may create or rebuild the database; do not hold it open.
-  store.closeAll();
-  data.call('closeAll').catch(() => {});
-  let resolve;
-  const done = new Promise((r) => { resolve = r; });
-  collectSink = { onLine, resolve };
-  const reply = runner.start('collect', task.identity);
-  if (!reply.ok) {
-    collectSink = null;
-    return { done: Promise.resolve({ ok: false, error: reply.error }), stop() {} };
-  }
-  return { done, stop: () => runner.stop() };
-}
-
-runner.onEvent((event) => {
-  if (event.type === 'exit') {
+// A run that ended may have created the database, recorded a selection or
+// changed the base: the connections open again on the next read.
+tasks.onEvent((event) => {
+  if (event.type === 'finished' && ['collect', 'rest', 'linkedin', 'pipeline', 'clean'].includes(event.task.kind)) {
     store.closeAll();
     data.call('closeAll').catch(() => {});
   }
-  if (!collectSink) return;
-  if (event.type === 'output') collectSink.onLine(event.text);
-  if (event.type === 'exit') {
-    const sink = collectSink;
-    collectSink = null;
-    sink.resolve(event.error ? { ok: false, error: event.error } : { ok: event.code === 0, code: event.code });
-  }
 });
 
-// The CVs and cover letters after a collection: one batch, a process of its
-// own (tools/cv_batch.py, main/batch.js), which picks what the identity's
-// cv.auto filters match. A batch already running takes the identity on.
-const dataRoot = process.env.WORK_IDE_DATA_ROOT || path.join(root, 'data');
-
-async function startAuto(identity) {
-  if (fake) return 'CV/CL batch: not started (fake runner)';
-  const pid = startBatch({ root, python: pythonExecutable(root), identity });
-  return `CV/CL batch started for ${identity} (pid ${pid}): see the task "CV/CL batch"`;
-}
-
-// The rest of the base after a collection, and LinkedIn's own run beside
-// it (rest.js): the pipeline alone.
-function startRest(task, onLine) {
-  return startPipeline(task, onLine, spawnRest);
-}
-
-function startLinkedIn(task, onLine) {
-  return startPipeline(task, onLine, spawnLinkedIn);
-}
-
-function startPipeline(task, onLine, spawn) {
-  if (fake) {
-    onLine(`fake ${task.kind}: ${task.identity}`);
-    return { done: Promise.resolve({ ok: true, code: 0 }), stop() {} };
-  }
-  store.closeAll();
-  data.call('closeAll').catch(() => {});
-  const handle = spawn({ root, python: pythonExecutable(root), identity: task.identity, onLine, kill: killTree });
-  return {
-    done: handle.done.then((result) => {
-      store.closeAll();
-      data.call('closeAll').catch(() => {});
-      return result;
-    }),
-    stop: handle.stop,
-  };
-}
-
-// A vacancy's "Collect reputation" (reputation.js). It only writes rows of
-// the shared base, which a running collection allows: the connections stay.
-function startReputation(task, onLine) {
-  if (fake) {
-    onLine(`reputation of ${task.company || task.vacancyId}: not looked up (fake runner)`);
-    return { done: Promise.resolve({ ok: true, code: 0 }), stop() {} };
-  }
-  return spawnReputation({
-    root, python: pythonExecutable(root), identity: task.identity, vacancyId: task.vacancyId,
-    onLine, kill: killTree,
-  });
-}
-
-const tasks = new TaskQueue({
-  startCollect,
-  startRest,
-  startLinkedIn,
-  startReputation,
-  startDocument: (task, onLine) => cv().start(task.identity, task.vacancyId, task.instructions, task.kind, onLine),
-  startAuto,
-  // A pipeline run started anywhere else holds the shared base: the next
-  // collection waits for it.
-  externalBusy: async (identity) => {
-    const status = store.pipelineStatus(identity);
-    return status.running ? identity : status.busyWith || null;
-  },
-  stopExternal: () => stopBatch(dataRoot),
-  holdExternal: (on) => {
-    try {
-      holdBatch(dataRoot, on);
-    } catch (error) {
-      console.warn(`cv_batch hold: ${error.message}`);
-    }
-  },
-});
-
-const batchWatch = new BatchWatch({ dataRoot, onChange: (change) => tasks.setExternal(change) });
-batchWatch.poll();
-
-// A task id from the renderer: a number, or the batch's.
-const taskId = (id) => (id === EXTERNAL ? EXTERNAL : Number(id));
-
-const TASK_KINDS = new Set(['collect', 'rest', 'linkedin', 'cv', 'letter', 'reputation']);
 const IDENTITY_PATTERN = /^[a-z][a-z0-9]{2,9}$/;
 
-function enqueueTask(request) {
+async function enqueueTask(request) {
   const r = request || {};
-  if (!TASK_KINDS.has(r.kind)) throw new Error(`unknown task kind: ${r.kind}`);
-  if (!IDENTITY_PATTERN.test(String(r.identity))) throw new Error(`invalid identity: ${r.identity}`);
-  const text = (value, limit) => String(value == null ? '' : value).slice(0, limit);
-  if (r.kind === 'collect' || r.kind === 'rest' || r.kind === 'linkedin') {
+  if (['collect', 'rest', 'linkedin'].includes(r.kind)) {
     // the pipeline would skip it too (tools/identity.py skip_if_inactive)
     const entry = identities.find((e) => e.prefix === r.identity);
     if (entry && entry.active === false) throw new Error(`${r.identity} is inactive: it is not collected`);
-    const queued = tasks.enqueue({ kind: r.kind, identity: r.identity });
-    // "Collect": the other sources and LinkedIn, side by side (tasks.js)
-    if (r.kind === 'collect') tasks.enqueue({ kind: 'linkedin', identity: r.identity });
-    return queued;
   }
-  if (r.kind === 'reputation') {
-    vacancyDir('x', r.identity, r.vacancyId);   // validates the id
-    return tasks.enqueue({
-      kind: r.kind, identity: r.identity, vacancyId: r.vacancyId,
-      title: text(r.title, 300), company: text(r.company, 300),
-    });
-  }
-  if (r.instructions != null && typeof r.instructions !== 'string') throw new Error('instructions must be text');
-  if ((r.instructions || '').trim().length > INSTRUCTIONS_LIMIT) {
-    throw new Error(`the instructions are longer than ${INSTRUCTIONS_LIMIT} characters`);
-  }
-  vacancyDir('x', r.identity, r.vacancyId);   // validates the id
-  return tasks.enqueue({
-    kind: r.kind, identity: r.identity, vacancyId: r.vacancyId,
-    title: text(r.title, 300), company: text(r.company, 300), instructions: r.instructions || '',
-  });
+  if (['cv', 'letter', 'reputation'].includes(r.kind)) vacancyDir('x', r.identity, r.vacancyId);   // validates the id
+  const reply = await tasks.enqueue(r);
+  workers.check().catch(() => {});
+  return reply;
 }
 
 // Errors cross IPC as values, not exceptions: the renderer shows them.
@@ -271,9 +165,9 @@ function registerIpc(window) {
   handle('pending-feedback', (identity) => data.call('pendingFeedback', identity));
   handle('pipeline-status', (identity) => store.pipelineStatus(identity));
   handle('tasks', () => tasks.list());
-  handle('task-log', (id) => tasks.log(taskId(id)));
+  handle('task-log', (id) => tasks.log(Number(id)));
   handle('enqueue-task', (request) => enqueueTask(request));
-  handle('cancel-task', (id) => tasks.cancel(taskId(id)));
+  handle('cancel-task', (id) => tasks.cancel(Number(id)));
   handle('cancel-queued', (identity) => tasks.cancelQueued(identity || null));
   handle('clear-tasks', () => tasks.clearFinished());
   handle('documents-state', async (identity, ids) =>
@@ -285,11 +179,11 @@ function registerIpc(window) {
     if (problem) throw new Error(problem);
   });
   // "Refresh": the page reloads itself; when the main process's own code
-  // changed since start, the whole app restarts instead — unless an agent run
-  // started from here is going, which a restart would cut off.
+  // changed since start, the whole app restarts instead. The tasks run in
+  // the queue's workers (task 0056), so a restart cuts nothing off.
   handle('refresh', () => {
     const action = refreshAction({
-      startedWith: startedWithCode, now: codeStamp(), agentRunning: tasks.active(),
+      startedWith: startedWithCode, now: codeStamp(), agentRunning: false,
     });
     if (action !== 'relaunch') return action;
     setTimeout(() => {
@@ -306,10 +200,10 @@ function registerIpc(window) {
     clipboard.writeText(String(text));
   });
   handle('open-cv-file', async (file) => {
-    const problem = await shell.openPath(cv().checkProduced(file));
+    const problem = await shell.openPath(tasks.checkProduced(file));
     if (problem) throw new Error(problem);
   });
-  handle('show-cv-file', (file) => shell.showItemInFolder(cv().checkProduced(file)));
+  handle('show-cv-file', (file) => shell.showItemInFolder(tasks.checkProduced(file)));
 
   tasks.onEvent((event) => {
     if (!window.isDestroyed()) window.webContents.send('task-event', event);
@@ -344,10 +238,15 @@ function createWindow() {
   return window;
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  tasks.start();
+  workers.start();
+  createWindow();
+});
+// Closing the window stops no task: they run in the queue's workers.
 app.on('window-all-closed', () => {
-  tasks.stopAll();
-  batchWatch.stop();
+  workers.stop();
+  tasks.close();
   store.closeAll();
   data.close();
   app.quit();

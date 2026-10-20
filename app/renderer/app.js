@@ -779,7 +779,7 @@
       render();
       return;
     }
-    if (task.kind === 'collect' || task.kind === 'rest' || task.kind === 'linkedin') {
+    if (PIPELINE_KINDS.has(task.kind)) {
       const problem = task.result && task.result.error === 'claude_not_found' ? t('run.claude_not_found') : null;
       // A run may have created the database, recorded a selection or changed
       // the feedback: what it touched is reloaded. The reload clears the
@@ -813,7 +813,7 @@
     // a CV or a cover letter: the buttons follow the folder; a generation
     // asked for from a card shows its result there
     const key = `${task.identity}/${task.vacancyId}/${task.kind}`;
-    if (task.origin === 'manual' && task.state !== 'stopped') {
+    if (task.origin === 'app' && task.state !== 'stopped') {
       const result = task.result || {};
       state.cvResults.set(key, result.ok ? result : { ok: false, error: task.error || result.error || '?' });
     }
@@ -1044,7 +1044,7 @@
     if (queued) {
       return menuItem({
         testid: 'run-collect', disabled: true, text: t('run.queued'),
-        title: task.waitingFor ? t('run.waiting_for', { identity: task.waitingFor }) : t('run.queued_hint'),
+        title: task.waitingFor ? waitText(task.waitingFor) : t('run.queued_hint'),
       });
     }
     if (running) {
@@ -2367,10 +2367,20 @@
   // running one until a click chooses another. It shows while there are
   // tasks. Its height and the split are dragged by their sashes and kept.
 
-  const TASK_STATE_ICONS = { queued: '○', running: null, done: '✓', failed: '✕', stopped: '■' };
+  const TASK_STATE_ICONS = {
+    queued: '○', running: null, done: '✓', failed: '✕', stopped: '■', skipped: '–', interrupted: '■',
+  };
+  // the tasks that run the pipeline: an identity's base changes when they end
+  const PIPELINE_KINDS = new Set(['collect', 'rest', 'linkedin', 'pipeline', 'clean']);
   const TASK_KIND_KEYS = {
     collect: 'task.kind.collect', rest: 'task.kind.rest', linkedin: 'task.kind.linkedin', cv: 'task.kind.cv',
     letter: 'task.kind.letter', reputation: 'task.kind.reputation', batch: 'task.kind.batch',
+    pipeline: 'task.kind.pipeline', clean: 'task.kind.clean',
+  };
+  // who added a task, when not this app (tools/taskq.py ORIGINS)
+  const TASK_ORIGIN_KEYS = {
+    agent: 'task.origin.agent', terminal: 'task.origin.terminal', schedule: 'task.origin.schedule',
+    auto: 'task.origin.auto',
   };
   // a collection's steps (main/steps.js); a stage the app has no name for
   // shows as the pipeline wrote it
@@ -2386,15 +2396,16 @@
   };
   const TASK_STATE_KEYS = {
     queued: 'task.state.queued', running: 'task.state.running', done: 'task.state.done',
-    failed: 'task.state.failed', stopped: 'task.state.stopped',
+    failed: 'task.state.failed', stopped: 'task.state.stopped', skipped: 'task.state.skipped',
+    interrupted: 'task.state.interrupted',
   };
 
   function taskLabel(task) {
-    const what = t(TASK_KIND_KEYS[task.kind]);
-    if (task.kind === 'collect' || task.kind === 'rest' || task.kind === 'linkedin') return `${what} · ${task.identity}`;
+    const what = t(TASK_KIND_KEYS[task.kind] || 'task.kind.other', { kind: task.kind });
+    if (PIPELINE_KINDS.has(task.kind)) return [what, task.identity].filter(Boolean).join(' · ');
     if (task.kind === 'batch') {
-      const p = task.progress || {};
-      return `${what} · ${task.identity} · ${p.index || 0}/${p.total || 0}`;
+      const p = task.progress;
+      return [what, task.identity, p && `${p.index || 0}/${p.total || 0}`].filter(Boolean).join(' · ');
     }
     const vacancy = [task.title, task.company].filter(Boolean).join(' — ') || task.vacancyId;
     return `${what} · ${vacancy} · ${task.identity}`;
@@ -2402,15 +2413,33 @@
 
   function taskStateText(task) {
     if (task.kind === 'batch') return batchStateText(task);
-    if (task.state === 'queued' && task.waitingFor === 'batch') return t('task.waiting_batch');
-    if (task.state === 'queued' && task.waitingFor) return t('run.waiting_for', { identity: task.waitingFor });
+    if (task.state === 'queued' && task.waitingFor) return waitText(task.waitingFor);
     if (task.state === 'failed' && task.error) return `${t('task.state.failed')}: ${task.error}`;
     return t(TASK_STATE_KEYS[task.state]);
   }
 
+  // Why a task waits, as the queue's workers write it (tools/taskq.py plan).
+  function waitText(reason) {
+    const after = /^#(\w+) to end$/.exec(reason);
+    if (after) {
+      const other = state.tasks.find((task) => String(task.id) === after[1]);
+      if (other && other.kind === 'batch') return t('task.waiting_batch');
+      return t('task.wait.after', { task: other ? taskLabel(other) : `#${after[1]}` });
+    }
+    const limit = /^the AI usage limit; tried again at (.+)$/.exec(reason);
+    if (limit) return t('task.wait.ai_limit', { time: limit[1] });
+    const base = /^the base: (.+)$/.exec(reason);
+    if (base) return t('task.wait.base', { holder: base[1] });
+    if (reason.startsWith("the owner's sign-in: Word")) return t('task.wait.signin_desktop');
+    if (reason.startsWith("the owner's sign-in: AI")) return t('task.wait.signin_ai');
+    if (reason.startsWith('no worker is running')) return t('task.wait.no_worker');
+    if (reason === 'the documents the app asked for') return t('task.wait.app_documents');
+    return t('task.wait.other', { reason });
+  }
+
   function batchStateText(task) {
-    const p = task.progress || {};
-    const summary = t('batch.summary', { made: p.made || 0, gone: p.gone || 0, failed: p.failed || 0 });
+    const p = task.progress;
+    const summary = p ? t('batch.summary', { made: p.made || 0, gone: p.gone || 0, failed: p.failed || 0 }) : '';
     if (task.state === 'running') {
       if (task.stopping) return `${t('batch.stopping')} · ${summary}`;
       if (task.holding) return `${t('batch.holding')} · ${summary}`;
@@ -2418,8 +2447,9 @@
       const now = c ? `${t(TASK_KIND_KEYS[c.kind])} · ${[c.title, c.company].filter(Boolean).join(' — ') || c.vacancyId}` : '';
       return [t('task.state.running'), now, summary].filter(Boolean).join(' · ');
     }
+    if (task.state === 'queued' && task.waitingFor) return waitText(task.waitingFor);
     const state = task.state === 'failed' && task.error ? `${t('task.state.failed')}: ${task.error}` : t(TASK_STATE_KEYS[task.state]);
-    return `${state} · ${summary}`;
+    return [state, summary].filter(Boolean).join(' · ');
   }
 
   function stepName(step) {
@@ -2529,7 +2559,7 @@
     el('span', { class: 'task-icon' }, task.state === 'running'
       ? el('span', { class: 'spinner small' }) : TASK_STATE_ICONS[task.state]),
     el('span', { class: 'task-label' }, taskLabel(task),
-      task.origin === 'auto' && el('span', { class: 'task-auto' }, t('task.auto')),
+      TASK_ORIGIN_KEYS[task.origin] && el('span', { class: 'task-auto' }, t(TASK_ORIGIN_KEYS[task.origin])),
       task.kind === 'batch' && el('span', { class: 'step-detail' }, batchStateText(task))),
     ACTIVE_TASK.has(task.state) && !task.stopping && el('button', {
       class: 'link task-cancel', testid: 'task-cancel',

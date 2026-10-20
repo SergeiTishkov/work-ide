@@ -365,6 +365,33 @@ class Process:
         return "failed", error or f"exit {code}", result
 
 
+class FakeRun:
+    """WORK_IDE_FAKE_RUNNER=1: a task that prints a line and ends done, for
+    the app's smoke test (no agent, no tokens, no Word)."""
+
+    def __init__(self, task: dict, on_line: Callable[[str], None]) -> None:
+        self.task, self.pid = task, None
+        what = f"/top {task['identity']}" if task["kind"] == "collect" else task["identity"] or ""
+        on_line(f"fake {'run' if task['kind'] == 'collect' else task['kind']}: {what}")
+        self.stopped = False
+
+    def poll(self) -> Optional[int]:
+        return 0
+
+    def stop(self) -> None:
+        self.stopped = True
+
+    def force(self) -> None:
+        self.stopped = True
+
+    def outcome(self, code: int) -> tuple:
+        return ("stopped", "stopped", None) if self.stopped else ("done", None, {"ok": True})
+
+
+def fake_runner() -> bool:
+    return os.environ.get("WORK_IDE_FAKE_RUNNER") == "1"
+
+
 # --- the machine ----------------------------------------------------------------------
 
 def keep_awake(on: bool) -> None:
@@ -445,7 +472,9 @@ class Worker:
         if role not in ROLES:
             raise ValueError(f"unknown role: {role}")
         self.role, self.capabilities, self.note = role, list(capabilities), note
-        self.start = start or (lambda task, on_line: Process(task, command(task), on_line, kill=kill))
+        if start is None:
+            start = FakeRun if fake_runner() else (lambda task, on_line: Process(task, command(task), on_line, kill=kill))
+        self.start = start
         self.kill, self.awake, self.holder, self.alive = kill, awake, holder, alive
         self.say = say or (lambda text: print(text, flush=True))
         self.wall = wall
@@ -605,6 +634,8 @@ def _say_into(role: str) -> Callable[[str], None]:
 
 
 def capabilities_of(role: str, say: Callable[[str], None]) -> tuple:
+    if fake_runner():
+        return (["desktop", "ai"] if role == "desktop" else ["ai"]), "fake runner"
     if role == "desktop":
         claude = claude_executable()
         return (["desktop", "ai"] if claude else ["desktop"]), ("" if claude else "the `claude` command was not found")
@@ -613,7 +644,13 @@ def capabilities_of(role: str, say: Callable[[str], None]) -> tuple:
     return (["ai"] if works else []), note
 
 
-def run(role: str) -> int:
+def idle(conn) -> bool:
+    return conn.execute("SELECT 1 FROM tasks WHERE state IN ('queued', 'running') LIMIT 1").fetchone() is None
+
+
+def run(role: str, idle_exit: Optional[float] = None) -> int:
+    """idle_exit: end after this many seconds with nothing queued or going
+    (a worker the app started itself, while Task Scheduler has none)."""
     say = _say_into(role)
     caps, note = capabilities_of(role, say)
     worker = Worker(role, caps, note=note, say=say)
@@ -624,9 +661,19 @@ def run(role: str) -> int:
         return 0
     say(f"{role} worker started: pid {worker.pid}, session {session_id()}, can: {', '.join(caps) or 'nothing'}")
     reprobe_at = time.time() + 3600
+    idle_since = time.monotonic()
     try:
         while True:
             worker.tick()
+            if idle_exit is not None:
+                with taskq.session() as conn:
+                    nothing = idle(conn) and not worker.running
+                if not nothing:
+                    idle_since = time.monotonic()
+                elif time.monotonic() - idle_since > idle_exit:
+                    worker.unregister()
+                    say(f"{role} worker ends: nothing to do for {int(idle_exit)} s")
+                    return 0
             if role == "background" and "ai" not in worker.capabilities and time.time() > reprobe_at:
                 reprobe_at = time.time() + 3600
                 works, note = probe_ai()
@@ -646,6 +693,31 @@ def run(role: str) -> int:
         say(f"{role} worker failed: {type(exc).__name__}: {exc}")
         worker.stop_all(f"its {role} worker failed; queued again")
         return 1
+
+
+def start(role: str, idle_exit: Optional[float] = None) -> int:
+    """Starts a worker apart from the caller and returns its pid at once (the
+    app does this while Task Scheduler has no worker registered).
+
+    The worker inherits no handle of the caller. Node starts a child with
+    every inheritable handle of its parent, the pipes of Electron's own
+    stdio among them: a worker spawned straight from the app held those
+    pipes, and whoever waited on them (a terminal after `npm start`,
+    Playwright closing the app) waited for the worker's end, up to ten
+    minutes (2026-10-21). Here the worker gets only its null stdio."""
+    pythonw = Path(sys.executable).with_name("pythonw.exe")
+    exe = str(pythonw) if os.name == "nt" and pythonw.exists() else sys.executable
+    argv = [exe, str(Path(__file__).resolve()), "run", "--role", role]
+    if idle_exit is not None:
+        argv += ["--idle-exit", str(idle_exit)]
+    if os.name == "nt":
+        apart = {"creationflags": subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP}
+    else:
+        apart = {"start_new_session": True}
+    process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, close_fds=True, cwd=str(common.ROOT), **apart)
+    print(json.dumps({"pid": process.pid}))
+    return 0
 
 
 # --- Task Scheduler ------------------------------------------------------------------------
@@ -768,6 +840,12 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("run", help="run a worker (Task Scheduler starts these)")
     p.add_argument("--role", choices=ROLES, required=True)
+    p.add_argument("--idle-exit", type=float, default=None, metavar="SECONDS",
+                   help="end after this long with nothing to do (a worker the app started)")
+    p = sub.add_parser("start", help="start a worker apart from this process and return at once")
+    p.add_argument("--role", choices=ROLES, required=True)
+    p.add_argument("--idle-exit", type=float, default=None, metavar="SECONDS",
+                   help="end after this long with nothing to do")
     p = sub.add_parser("install", help="register the workers with Task Scheduler")
     p.add_argument("--role", choices=ROLES, action="append")
     p = sub.add_parser("uninstall", help="remove the workers from Task Scheduler")
@@ -776,7 +854,9 @@ def main(argv=None) -> int:
     sub.add_parser("probe", help="does `claude` answer in this session?")
     args = parser.parse_args(argv)
     if args.command == "run":
-        return run(args.role)
+        return run(args.role, args.idle_exit)
+    if args.command == "start":
+        return start(args.role, args.idle_exit)
     if args.command == "install":
         return install(args.role or list(ROLES))
     if args.command == "uninstall":
