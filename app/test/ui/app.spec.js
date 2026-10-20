@@ -346,7 +346,7 @@ test('the keyboard: Enter or Space checks the row under the cursor and keeps the
   await page.keyboard.press('ArrowDown');   // the master row, then "Hot leads"
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveAttribute('data-state', 'off');
-  expect(await lastListing(page)).toEqual(['sharp', view({ fits: ['worth_a_look'] })]);
+  expect(await lastListing(page)).toEqual(['sharp', view({ fits: ['worth_a_look', 'long_shot', 'remote_unconfirmed'] })]);
   await expect(page.getByTestId('fit-filter-menu')).toBeVisible();
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveClass(/cursor/);
   await page.keyboard.press(' ');
@@ -714,6 +714,23 @@ test('"Fit" narrows the list to one class, and the other filters count within it
 
   await (await command(page, 'refresh')).click();
   await expect(page.getByTestId('fit-filter-value')).toHaveText(en['class.hot_lead']);
+});
+
+test('a class with nothing left stays listed and keeps its tick', async ({ page }) => {
+  await open(page);
+  await choose(page, 'source-filter', 'devitjobs');   // b1, worth a look, alone
+  await expect(page.getByTestId('fit-option-hot_lead')).toHaveText(`${en['class.hot_lead']} (0)`);
+  await expect(page.getByTestId('fit-option-long_shot')).toHaveText(`${en['class.long_shot']} (0)`);
+  await expect(page.getByTestId('fit-option-remote_unconfirmed'))
+    .toHaveText(`${en['class.remote_unconfirmed']} (0)`);
+  await expect(page.getByTestId('fit-option-engagement_unconfirmed')).toHaveCount(0);
+
+  await check(page, 'fit-filter', ['hot_lead', 'worth_a_look', 'long_shot']);
+  // the empty hot leads stay chosen
+  expect((await lastListing(page))[1].fits).toEqual(['hot_lead', 'worth_a_look', 'long_shot']);
+  await page.getByTestId('fit-filter').click();
+  await expect(page.getByTestId('fit-option-hot_lead')).toHaveAttribute('data-state', 'on');
+  await expect(page.getByTestId('fit-option-remote_unconfirmed')).toHaveAttribute('data-state', 'off');
 });
 
 test('one class chosen: the scroll brings ten more at a time', async ({ page }) => {
