@@ -93,7 +93,7 @@ the task must appear in the queue and run there.
 
 ## Items
 - DONE - Plan (2026-10-21, with the owner)
-- TO DO - Queue schema in `data/tasks.sqlite`, `tools/taskq.py`, tests (add, claim, depend, stop, interrupted, slots)
+- DONE - Queue schema in `data/tasks.sqlite` (`schemas/tasks.sql`), `tools/taskq.py`, tests (add, claim, depend, stop, interrupted, slots); a run started by hand registers itself with `taskq.Registered`
 - TO DO - `tools/taskd.py` workers: claim by slot and capability, run, log, steps, heartbeat, keep-awake; the collection group; tests with fake runners
 - TO DO - Task Scheduler registration (`tools/taskd.py install/uninstall/status`): background at start (check `claude` under S4U first), desktop at logon, restart on failure
 - TO DO - Direct `pipeline.py` runs register themselves in the queue
