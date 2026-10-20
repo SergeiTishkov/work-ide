@@ -50,6 +50,8 @@
     remote_unconfirmed: 'class.remote_unconfirmed',
     engagement_unconfirmed: 'class.engagement_unconfirmed',
   };
+  // Listed in "Category" whether they hold any or not.
+  const STABLE_CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'remote_unconfirmed'];
   const FILTER_KEYS = {
     fresh: 'filter.fresh',
     earlier: 'filter.earlier',
@@ -1573,13 +1575,19 @@
   }
 
   // The classes ("Hot leads", "Worth a look", ...) under the other three
-  // drop-downs, each with how many; a chosen one stays even when empty.
+  // drop-downs, each with how many. The classes of every selection are
+  // always listed, with 0 too (the owner, 2026-10-20: "a stable filter is
+  // neither hidden nor switched off when it empties"): until then an empty
+  // class left the list, a click on another row left it out of the view,
+  // and its vacancies stayed hidden once they came back. Another class
+  // (engagement_unconfirmed, the part-time search's) while it holds any or
+  // is chosen.
   function renderFitFilter(view) {
     const chosen = view.fits;
     const totals = state.classTotals;
     const order = Object.keys(CLASS_KEYS);
     const classes = [...order, ...Object.keys(totals).filter((cls) => !order.includes(cls))]
-      .filter((cls) => totals[cls] || (chosen && chosen.includes(cls)));
+      .filter((cls) => STABLE_CLASSES.includes(cls) || totals[cls] || (chosen && chosen.includes(cls)));
     const all = Object.values(totals).reduce((sum, n) => sum + n, 0);
     const options = classes.map((cls) => {
       const name = CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls;
