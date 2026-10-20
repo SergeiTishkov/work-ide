@@ -110,3 +110,43 @@ def test_a_rebuild_is_marked_as_a_run_and_refused_while_another_is_alive(isolate
         with pytest.raises(SystemExit) as stop:
             ingest_manual.main()
     assert stop.value.code == 2
+
+
+def test_a_waiting_run_starts_when_the_base_is_free(isolated_data_dir, monkeypatch):
+    import threading
+
+    monkeypatch.setattr(runstate, "WAIT_POLL_SECONDS", 0.05)
+    first = runstate.PipelineRun()
+    first.__enter__()
+    entered = threading.Event()
+
+    def second():
+        with runstate.PipelineRun(wait=True):
+            entered.set()
+    worker = threading.Thread(target=second)
+    worker.start()
+    time.sleep(0.3)
+    assert not entered.is_set(), "it waits while the base is held"
+    first.__exit__(None, None, None)
+    worker.join(timeout=5)
+    assert entered.is_set()
+    assert [r[0] for r in _rows()] == ["finished", "finished"]
+
+
+def test_one_linkedin_fetch_at_a_time_and_a_dead_ones_lock_is_taken_over(isolated_data_dir, monkeypatch):
+    import os
+
+    with runstate.LinkedInFetch() as held:
+        assert held.path.parent == isolated_data_dir, "beside the shared base: every identity's"
+        with pytest.raises(runstate.AlreadyRunningError, match="LinkedIn fetch of"):
+            with runstate.LinkedInFetch(wait=False):
+                pass
+    assert not held.path.exists(), "released at the end"
+
+    # a killed fetch leaves its file, and its time stops moving
+    held.path.write_text("{}", encoding="utf-8")
+    old = time.time() - runstate.STALE_AFTER_SECONDS - 5
+    os.utime(held.path, (old, old))
+    with runstate.LinkedInFetch(wait=False):
+        pass
+

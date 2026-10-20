@@ -1,7 +1,8 @@
 'use strict';
 // The rest of the base after a fast collection (the owner, 2026-10-17: the
 // top vacancies first, the rest afterwards). Python alone, no agent:
-// `tools/pipeline.py --identity <p> --rest`. Its progress lines
+// `tools/pipeline.py --identity <p> --rest`. LinkedIn's own run (the owner,
+// 2026-10-20), `--linkedin`, starts the same way. Their progress lines
 // ("[04:14:11] >> check links") are prefixed the way runner.js prefixes the
 // pipeline's log during a collection, so steps.js reads both alike.
 
@@ -11,10 +12,13 @@ const path = require('node:path');
 const IDENTITY_PATTERN = /^[a-z][a-z0-9]{2,9}$/;
 const PROGRESS_LINE = /^\[\d\d:\d\d:\d\d\] /;
 
-function restArgs(identity) {
+function pipelineArgs(identity, mode) {
   if (!IDENTITY_PATTERN.test(String(identity))) throw new Error(`invalid identity: ${identity}`);
-  return [path.join('tools', 'pipeline.py'), '--identity', identity, '--rest'];
+  return [path.join('tools', 'pipeline.py'), '--identity', identity, mode];
 }
+
+const restArgs = (identity) => pipelineArgs(identity, '--rest');
+const linkedinArgs = (identity) => pipelineArgs(identity, '--linkedin');
 
 function restLine(line) {
   return PROGRESS_LINE.test(line) ? `  | ${line}` : line;
@@ -50,4 +54,8 @@ function startRest({ identity, ...options }) {
   return startPython({ ...options, args: restArgs(identity) });
 }
 
-module.exports = { startRest, startPython, restArgs, restLine, IDENTITY_PATTERN };
+function startLinkedIn({ identity, ...options }) {
+  return startPython({ ...options, args: linkedinArgs(identity) });
+}
+
+module.exports = { startRest, startLinkedIn, startPython, restArgs, linkedinArgs, restLine, IDENTITY_PATTERN };

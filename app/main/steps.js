@@ -17,7 +17,8 @@
 // The agent's step "reputation" went on 2026-10-17: a lookup is the
 // vacancy's "Collect reputation" button (reputation.js).
 //
-// The rest of the base (rest.js) is the pipeline alone: no agent steps.
+// The rest of the base and LinkedIn's run (rest.js) are the pipeline alone:
+// no agent steps.
 //
 // The CVs and cover letters after it are a task of their own (batch.js).
 
@@ -31,7 +32,8 @@ const PIPELINE_COMMAND = /^> \w+: .*pipeline\.py/;
 const STAGE_KEYS = [
   [/^load the knowledge base/, 'load'],
   [/^fetch missing descriptions/, 'descriptions'],
-  [/^fetch LinkedIn's missed days/, 'backfill'],
+  [/^wait for the base/, 'wait_base'],
+  [/^merge LinkedIn/, 'merge_linkedin'],
   [/^fetch\b/, 'fetch'],
   [/^rescore the base/, 'rescore'],
   [/^rescore the top/, 'rescore_top'],

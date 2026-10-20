@@ -775,7 +775,7 @@
       render();
       return;
     }
-    if (task.kind === 'collect' || task.kind === 'rest') {
+    if (task.kind === 'collect' || task.kind === 'rest' || task.kind === 'linkedin') {
       const problem = task.result && task.result.error === 'claude_not_found' ? t('run.claude_not_found') : null;
       // A run may have created the database, recorded a selection or changed
       // the feedback: what it touched is reloaded. The reload clears the
@@ -2333,14 +2333,15 @@
 
   const TASK_STATE_ICONS = { queued: '○', running: null, done: '✓', failed: '✕', stopped: '■' };
   const TASK_KIND_KEYS = {
-    collect: 'task.kind.collect', rest: 'task.kind.rest', cv: 'task.kind.cv', letter: 'task.kind.letter',
-    reputation: 'task.kind.reputation', batch: 'task.kind.batch',
+    collect: 'task.kind.collect', rest: 'task.kind.rest', linkedin: 'task.kind.linkedin', cv: 'task.kind.cv',
+    letter: 'task.kind.letter', reputation: 'task.kind.reputation', batch: 'task.kind.batch',
   };
   // a collection's steps (main/steps.js); a stage the app has no name for
   // shows as the pipeline wrote it
   const RUN_STEP_KEYS = {
     prepare: 'step.prepare', checklist: 'step.checklist', summary: 'step.summary',
-    backfill: 'step.backfill', rescore_top: 'step.rescore_top', remote_check: 'step.remote_check',
+    wait_base: 'step.wait_base', merge_linkedin: 'step.merge_linkedin',
+    rescore_top: 'step.rescore_top', remote_check: 'step.remote_check',
     ai_brief: 'step.ai_brief', ai_check: 'step.ai_check',
     load: 'step.load', fetch: 'step.fetch', rescore: 'step.rescore', duplicates: 'step.duplicates',
     links: 'step.links', companies: 'step.companies', descriptions: 'step.descriptions',
@@ -2354,7 +2355,7 @@
 
   function taskLabel(task) {
     const what = t(TASK_KIND_KEYS[task.kind]);
-    if (task.kind === 'collect' || task.kind === 'rest') return `${what} · ${task.identity}`;
+    if (task.kind === 'collect' || task.kind === 'rest' || task.kind === 'linkedin') return `${what} · ${task.identity}`;
     if (task.kind === 'batch') {
       const p = task.progress || {};
       return `${what} · ${task.identity} · ${p.index || 0}/${p.total || 0}`;

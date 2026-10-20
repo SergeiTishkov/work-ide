@@ -28,10 +28,12 @@ Nothing here depends on the operating system: a timestamp in a database file.
 """
 from __future__ import annotations
 
+import json
 import os
 import socket
 import sys
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -46,6 +48,10 @@ HEARTBEAT_SECONDS = 10
 # long enough that one slow write (saving the base holds the lock for seconds)
 # does not make a live run look dead.
 STALE_AFTER_SECONDS = 45
+# How often a run that waits for the base (PipelineRun(wait=True)) or for
+# LinkedIn (LinkedInFetch) asks again, and how often it says it is waiting.
+WAIT_POLL_SECONDS = 15
+WAIT_LOG_SECONDS = 600
 
 
 class AlreadyRunningError(RuntimeError):
@@ -82,17 +88,43 @@ def current() -> Optional[dict]:
                     row))
 
 
-class PipelineRun:
-    """`with PipelineRun(log_path=...):` around a whole pipeline run."""
+def _wait(what: str, exc: Exception, since: float, told: Optional[float]) -> float:
+    """One poll of a wait: says so now and then, sleeps. Returns when it last
+    said so."""
+    now = time.monotonic()
+    if told is None or now - told >= WAIT_LOG_SECONDS:
+        waited = progress.duration(now - since)
+        progress.log(f"   waiting for {what} ({waited} so far): {exc}")
+        told = now
+    time.sleep(WAIT_POLL_SECONDS)
+    return told
 
-    def __init__(self, log_path: Optional[Path] = None) -> None:
+
+class PipelineRun:
+    """`with PipelineRun(log_path=...):` around a whole pipeline run.
+    wait=True: while another run holds the base, wait for it rather than
+    raise AlreadyRunningError (the LinkedIn run's merge, pipeline.py
+    --linkedin)."""
+
+    def __init__(self, log_path: Optional[Path] = None, wait: bool = False) -> None:
         self.log_path = str(log_path) if log_path else None
+        self.wait = wait
         self.run_id: Optional[int] = None
         self.stage: Optional[str] = None
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
     def __enter__(self) -> "PipelineRun":
+        since, told = time.monotonic(), None
+        while True:
+            try:
+                return self._enter()
+            except AlreadyRunningError as exc:
+                if not self.wait:
+                    raise
+                told = _wait("the base", exc, since, told)
+
+    def _enter(self) -> "PipelineRun":
         now = _now()
         with db.session() as conn:
             for run_id, heartbeat_at in conn.execute(
@@ -154,4 +186,82 @@ class PipelineRun:
             "UPDATE pipeline_runs SET status = ?, finished_at = ?, heartbeat_at = ?, "
             "stage = ?, error = ? WHERE id = ?",
             (status, _iso(_now()), _iso(_now()), self.stage, error, self.run_id))
+        return False
+
+
+class LinkedInFetch:
+    """`with LinkedInFetch():` around a LinkedIn fetch: one at a time on this
+    machine, whichever identity it is for. They share one address, and
+    LinkedIn's rate limit is per address: two walks at once would each meet
+    twice the 429s (the owner, 2026-10-20: LinkedIn runs beside the other
+    sources, in a lane of its own).
+
+    A file beside the shared base, not a row in it: the fetch must not write
+    the base while another run holds it. Its time is refreshed every
+    HEARTBEAT_SECONDS; a file not refreshed for STALE_AFTER_SECONDS was left
+    by a killed process and is taken over. With wait=False a held lock raises
+    AlreadyRunningError; otherwise the fetch waits its turn."""
+
+    NAME = "linkedin_fetch.lock"
+
+    def __init__(self, wait: bool = True) -> None:
+        self.wait = wait
+        self.path = Path(common.DB_PATH).parent / self.NAME
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    def holder(self) -> str:
+        try:
+            info = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return "another LinkedIn fetch"
+        return (f"the LinkedIn fetch of {info.get('identity') or '?'} (pid {info.get('pid')} "
+                f"on {info.get('host')}, started {info.get('started_at')})")
+
+    def _stale(self) -> bool:
+        try:
+            age = time.time() - self.path.stat().st_mtime
+        except OSError:
+            return False
+        return age > STALE_AFTER_SECONDS
+
+    def _take(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        if self._stale():
+            self.path.unlink(missing_ok=True)
+        try:
+            fd = os.open(str(self.path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            raise AlreadyRunningError(f"{self.holder()} is going; one at a time: "
+                                      f"the address and its rate limit are shared") from None
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            json.dump({"identity": common.ACTIVE_IDENTITY, "pid": os.getpid(),
+                       "host": socket.gethostname(), "started_at": _iso(_now())}, out)
+
+    def __enter__(self) -> "LinkedInFetch":
+        since, told = time.monotonic(), None
+        while True:
+            try:
+                self._take()
+                break
+            except AlreadyRunningError as exc:
+                if not self.wait:
+                    raise
+                told = _wait("LinkedIn", exc, since, told)
+        self._thread = threading.Thread(target=self._beat, name="linkedin-heartbeat", daemon=True)
+        self._thread.start()
+        return self
+
+    def _beat(self) -> None:
+        while not self._stop.wait(HEARTBEAT_SECONDS):
+            try:
+                os.utime(self.path)
+            except OSError:
+                pass
+
+    def __exit__(self, *_exc) -> bool:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=HEARTBEAT_SECONDS + 5)
+        self.path.unlink(missing_ok=True)
         return False

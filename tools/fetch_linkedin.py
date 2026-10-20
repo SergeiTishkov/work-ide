@@ -111,8 +111,18 @@ ENRICH_LIMIT = 120
 # ceiling (ten pages) or sooner. Higher than the ceiling on purpose — should
 # LinkedIn ever serve an anonymous request deeper, the walk follows.
 MAX_PAGES = 100
-PAUSE_SECONDS = 1.5     # between pages; faster runs into 429s
-RATE_LIMIT_PAUSE_SECONDS = 30   # after a 429, before the one retry
+# The pacing (2026-10-20). Until then: 1.5 s between pages, and after a 429
+# one wait of 30 s and one more try, the page lost when that failed too. The
+# 7-day run of 2026-10-20 met a 429 on about one page in five (340 in the
+# first 111 pairs; 2026-10-17: one in sixteen) and spent close to three hours
+# in those waits. Now the pause between pages is the pacer's (_Pacer): it
+# doubles after each 429, up to MAX_PAUSE_SECONDS, and comes back down by
+# PAUSE_RECOVERY a page that went through; and a 429 is waited out
+# step by step, RATE_LIMIT_BACKOFF, before the page is given up.
+PAUSE_SECONDS = 1.5     # between pages, at the least; faster runs into 429s
+MAX_PAUSE_SECONDS = 12
+PAUSE_RECOVERY = 0.9    # the pause times this, a page that went through
+RATE_LIMIT_BACKOFF = (30, 60, 120)   # the waits after a 429 or a dropped connection
 
 _CARD_RE = re.compile(r"<li>(.*?)</li>", re.S)
 _TITLE_RE = re.compile(r'base-search-card__title[^>]*>(.*?)</h3>', re.S)
@@ -365,26 +375,51 @@ def _fetch_description(url: str, timeout: int) -> str:
     return fetch_page_facts(url, timeout)["description"]
 
 
+class _Pacer:
+    """The pause between two search pages: PAUSE_SECONDS while LinkedIn
+    answers, doubled by each 429 up to MAX_PAUSE_SECONDS, and back down by
+    PAUSE_RECOVERY a page that went through."""
+
+    def __init__(self) -> None:
+        self.pause = PAUSE_SECONDS
+
+    def limited(self) -> None:
+        self.pause = min(MAX_PAUSE_SECONDS, self.pause * 2)
+
+    def passed(self) -> None:
+        self.pause = max(PAUSE_SECONDS, self.pause * PAUSE_RECOVERY)
+
+    def wait(self) -> None:
+        time.sleep(self.pause)
+
+
 def _fetch_search_page(keyword: str, location: str, start: int, timeout: int,
-                         posted_within_days: Optional[int], counts: Optional[dict] = None) -> str:
-    """One search page; on a 429 or a dropped connection it waits and asks
-    once more. A long walk meets both now and then (2026-10-03: one
-    "connection aborted" in 1 389 requests), and one wait is cheaper than
-    losing the rest of the query."""
+                         posted_within_days: Optional[int], counts: Optional[dict] = None,
+                         pacer: Optional[_Pacer] = None) -> str:
+    """One search page; on a 429 or a dropped connection it waits
+    (RATE_LIMIT_BACKOFF, one wait longer than the last) and asks again. A long
+    walk meets both (2026-10-03: one "connection aborted" in 1 389 requests;
+    2026-10-20: a 429 on one page in five), and a wait is cheaper than losing
+    the rest of the query. Raises when the last try fails too."""
     import requests
 
-    try:
-        return _fetch_page(keyword, location, start, timeout, posted_within_days)
-    except requests.HTTPError as exc:
-        if getattr(exc.response, "status_code", None) != 429:
-            raise
-        reason = "rate_limited"
-    except (requests.ConnectionError, requests.Timeout):
-        reason = "dropped"
-    if counts is not None:
-        counts[reason] = counts.get(reason, 0) + 1
-    time.sleep(RATE_LIMIT_PAUSE_SECONDS)
-    return _fetch_page(keyword, location, start, timeout, posted_within_days)
+    for wait in (*RATE_LIMIT_BACKOFF, None):
+        try:
+            return _fetch_page(keyword, location, start, timeout, posted_within_days)
+        except requests.HTTPError as exc:
+            if getattr(exc.response, "status_code", None) != 429 or wait is None:
+                raise
+            reason = "rate_limited"
+            if pacer is not None:
+                pacer.limited()
+        except (requests.ConnectionError, requests.Timeout):
+            if wait is None:
+                raise
+            reason = "dropped"
+        if counts is not None:
+            counts[reason] = counts.get(reason, 0) + 1
+        time.sleep(wait)
+    raise AssertionError("unreachable")
 
 
 class _Walk:
@@ -403,10 +438,31 @@ class _Walk:
         self.capped = 0
         self.errors: List[str] = []
         self.counts = {"rate_limited": 0, "dropped": 0}
+        self.pacer = _Pacer()
+        # What each query brought (query_stats), for choosing the pairs worth
+        # asking: one entry per query, the narrower ones included.
+        self.stats: List[dict] = []
 
-    def query(self, keyword: str, location: str, market: str) -> bool:
+    def query(self, keyword: str, location: str, market: str, narrower: bool = False) -> bool:
         """Reads one query page by page. True when it reached the ceiling —
-        the list went on, but the guest search would not."""
+        the list went on, but the guest search would not. `narrower`: one
+        of split()'s queries."""
+        started = time.monotonic()
+        before = {"pages": self.pages_read, "cards": self.cards_seen, "new": len(self.records),
+                  "rate_limited": self.counts["rate_limited"], "errors": len(self.errors)}
+        capped = self._query(keyword, location, market)
+        self.stats.append({
+            "keyword": keyword, "location": location, "market": market,
+            "narrower": narrower,
+            "pages": self.pages_read - before["pages"], "cards": self.cards_seen - before["cards"],
+            "new": len(self.records) - before["new"],
+            "rate_limited": self.counts["rate_limited"] - before["rate_limited"],
+            "failed": len(self.errors) > before["errors"], "at_ceiling": capped,
+            "seconds": round(time.monotonic() - started, 1),
+        })
+        return capped
+
+    def _query(self, keyword: str, location: str, market: str) -> bool:
         self.queries += 1
         start = 0
         seen_here = set()
@@ -414,11 +470,12 @@ class _Walk:
         for _ in range(self.max_pages):
             try:
                 page_html = _fetch_search_page(keyword, location, start, self.timeout,
-                                                 self.posted_within_days, self.counts)
+                                                 self.posted_within_days, self.counts, self.pacer)
             except Exception as exc:  # noqa: BLE001
                 self.errors.append(f"{keyword}/{location}: {type(exc).__name__}")
                 return False
-            time.sleep(PAUSE_SECONDS)
+            self.pacer.passed()
+            self.pacer.wait()
 
             cards = _CARD_RE.findall(page_html)
             if not cards:
@@ -465,13 +522,37 @@ class _Walk:
         narrower += [(keyword, region) for region in SPLIT_REGIONS.get(country, [])]
         for words, place in narrower:
             self.split_queries += 1
-            self.query(words, place, country)
+            self.query(words, place, country, narrower=True)
 
     def note(self) -> str:
         return (f"{self.pages_read} pages, {len(self.records)} vacancies, "
                 f"{self.capped} at the ceiling, {self.split_queries} narrower queries"
                 + (f", {self.counts['rate_limited']} x 429" if self.counts["rate_limited"] else "")
+                + (f", pause {self.pacer.pause:.1f} s" if self.pacer.pause > PAUSE_SECONDS else "")
                 + (f", {len(self.errors)} errors" if self.errors else ""))
+
+
+def query_stats_path() -> Path:
+    """Where a fetch of the pipeline or of main() writes what each query
+    brought: the identity's runs folder, one file a fetch."""
+    from datetime import datetime
+
+    common.require_identity()
+    return common.DATA_DIR / "runs" / f"linkedin_queries_{datetime.now():%Y-%m-%d_%H%M%S}.json"
+
+
+def _write_stats(path: Optional[Path], walk: "_Walk", posted_within_days) -> None:
+    """Rewritten after every pair, so a fetch cut short leaves what it read.
+    Never raises: the numbers are for tuning, not for the run."""
+    if path is None:
+        return
+    try:
+        common.save_json_atomic(path, {"posted_within_days": posted_within_days,
+                                       "rate_limited": walk.counts["rate_limited"],
+                                       "dropped": walk.counts["dropped"],
+                                       "queries": walk.stats})
+    except Exception as exc:  # noqa: BLE001
+        common.eprint(f"[linkedin] query stats not written: {exc}")
 
 
 def fetch(keywords: Optional[List[str]] = None,
@@ -480,7 +561,8 @@ def fetch(keywords: Optional[List[str]] = None,
           enrich_limit: int = ENRICH_LIMIT,
           posted_within_days: Optional[int] = POSTED_WITHIN_DAYS,
           split_at_ceiling: bool = True,
-          timeout: int = common.DEFAULT_TIMEOUT):
+          timeout: int = common.DEFAULT_TIMEOUT,
+          query_stats_to: Optional[Path] = None):
     """Walks (keyword × country) pairs and returns (records, note).
 
     keywords/locations come from <prefix>_sources.yaml -> params. Locations
@@ -488,6 +570,8 @@ def fetch(keywords: Optional[List[str]] = None,
     lives in one place (see tools/markets.py). Each pair is read page after
     page until its list ends; a pair that reaches the guest search's ceiling
     is split into narrower queries (split_at_ceiling, see SPLIT_REGIONS).
+    query_stats_to: a file for what each query brought (query_stats_path),
+    rewritten after every pair.
     """
     import markets
     import progress
@@ -503,6 +587,7 @@ def fetch(keywords: Optional[List[str]] = None,
     # A full walk reads every page of every pair and can take hours; it says
     # how far along it is rather than going quiet until the end.
     tick = progress.Progress(len(keywords) * len(locations), "linkedin pairs")
+    stats_path = Path(query_stats_to) if query_stats_to else None
 
     for keyword in keywords:
         for location in locations:
@@ -510,7 +595,8 @@ def fetch(keywords: Optional[List[str]] = None,
                 walk.capped += 1
                 if split_at_ceiling:
                     walk.split(keyword, location)
-            tick.note = walk.note()
+            _write_stats(stats_path, walk, posted_within_days)
+            tick.note = f"{walk.note()} - last: {keyword} / {location}"
             tick()
 
     records, cards_seen, errors, counts = walk.records, walk.cards_seen, walk.errors, walk.counts
@@ -558,6 +644,9 @@ def fetch(keywords: Optional[List[str]] = None,
         note_parts.append(f"rate limited {counts['rate_limited']} times")
     if counts["dropped"]:
         note_parts.append(f"connection dropped {counts['dropped']} times")
+    idle = [s for s in walk.stats if not s["new"] and not s["failed"]]
+    if idle:
+        note_parts.append(f"{len(idle)} of {len(walk.stats)} queries brought nothing new")
     if errors:
         note_parts.append("errors: " + "; ".join(errors[:3]))
     return records, "; ".join(note_parts)
@@ -671,7 +760,8 @@ def main() -> None:
     identity_mod.activate_or_exit(args.identity)
 
     records, note = fetch(args.keyword, args.location, args.max_pages,
-                          posted_within_days=args.posted_within_days)
+                          posted_within_days=args.posted_within_days,
+                          query_stats_to=query_stats_path())
     print(f"{SOURCE_NAME}: {len(records)} records ({note})")
     for r in records[:10]:
         # Company names sometimes carry characters the Windows console encoding

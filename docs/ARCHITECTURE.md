@@ -777,7 +777,8 @@ after its remote check; and the steps visible in the task panel.
 
 `pipeline.py --top` (`run_top`):
 1. fetch every enabled source; LinkedIn for the window of
-   `linkedin_window` (below);
+   `linkedin_window` (below). Since 2026-10-20 every source but LinkedIn,
+   which has a run of its own ("LinkedIn beside the other sources");
 2. rescore the top classes (`TOP_CLASSES`: hot_lead, worth_a_look,
    long_shot, engagement_unconfirmed) and what this run brought — not the
    whole base;
@@ -799,8 +800,8 @@ starts as before, and the task "rest" is queued in the collect lane
 collection queued before it, so with two identities queued both top runs
 come first.
 
-`pipeline.py --rest` (`run_rest`): LinkedIn's window again when the last
-fetch left a gap (`linkedin_backfill_days`: it failed), then the full tail (`finalize_and_report`) with a "rebuild" selection, so what the top run
+`pipeline.py --rest` (`run_rest`): the full tail (`finalize_and_report`)
+with a "rebuild" selection, so what the top run
 marked fresh stays fresh. Its description stage leaves out
 remote_unconfirmed. The full cycle (`pipeline.py` with neither flag) is
 unchanged except for the AI stage.
@@ -835,14 +836,57 @@ read 4 of 168 (keyword × country) pairs. The owner had it removed on
 `note_linkedin_window` moves `linkedin_covered_to` to the fetch's start when
 the fetch did not fail. Otherwise it keeps the value read before the fetch —
 the fallback, `sources.linkedin.last_success`, has just moved to now and
-would hide the gap — and sets `linkedin_gap`, so the rest run reads the
-window again.
+would hide the gap — and sets `linkedin_gap`. Until 2026-10-20 the rest run
+read the window again on a gap; since, the next LinkedIn run asks for those
+days by the coverage left ("LinkedIn beside the other sources").
 
 Every mode's result has `collected`: the window in words ("LinkedIn: posted
 in the last 2 days - the days since the last collection, both included",
 with a failure when there was one). The summary to the
 person names it after every collection (`/top`, `/run`, RUNBOOK step 1);
 `last_run_stats.linkedin_days` keeps the number.
+
+### LinkedIn beside the other sources (2026-10-20)
+
+The owner, 2026-10-20: LinkedIn is the largest source and the slowest — the
+7-day run of that day had read 111 of 168 pairs after 14 hours, most of them
+waiting out 429s — and the other sources' vacancies, fetched in half an
+hour, waited for it. They asked for LinkedIn to run apart, side by side with
+the rest.
+
+Two runs cannot hold the base at once (`tools/runstate.py`: each loads the
+whole base and saves it whole), so only the network part runs beside the
+others:
+
+- `pipeline.py --linkedin` fetches LinkedIn's window without holding the
+  base (`fetch_linkedin_apart`): the window is read from the state, the base
+  is only asked whether it holds a LinkedIn vacancy (`db.any_from_source`),
+  and the records go to `data/identities/<p>/runs/linkedin_fetched.json`.
+  Then it waits for the base (`PipelineRun(wait=True)`, the stage "wait for
+  the base") and merges (`merge_linkedin`): the records, the window
+  (`note_linkedin_window`), and the top run's steps on the top classes and
+  what LinkedIn brought (`process_top`, shared with `run_top`). The
+  selection is a "rebuild", so the top run stays the baseline of what is
+  fresh: its vacancies stay fresh, and LinkedIn's new ones are fresh too. A
+  fetch that brought nothing records its failure in the state without
+  loading the base; the coverage stays, so the next run asks for those days.
+- `pipeline.py --top` fetches every source but LinkedIn; its `collected`
+  line says LinkedIn is fetched apart.
+- `pipeline.py --rest` fetches nothing. It read LinkedIn's window again after
+  a failed fetch; the LinkedIn run does that now, by the coverage it leaves.
+- The full cycle (no flag) still fetches LinkedIn inline.
+- One LinkedIn fetch at a time on the machine, whichever identity
+  (`runstate.LinkedInFetch`): the address and its rate limit are shared. The
+  full cycle takes the same lock.
+
+In the app, "Collect" queues two tasks: the collection (`/top`, the collect
+lane) and "linkedin" (`app/main/rest.js`, a lane of its own, which does not
+ask whether the base is free: the run waits for it itself). The rest of the
+base is queued when the later of the two ends, if the collection ended well;
+the CV/CL batch starts after each that ends well.
+
+The pacing of the fetch changed the same day (docs/sources/linkedin.md, "429
+and dropped connections"; "What each query brought").
 
 ### The AI check of the top (2026-10-17)
 

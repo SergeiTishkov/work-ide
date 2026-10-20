@@ -10,7 +10,7 @@ const { runCleanup } = require('./cleanup');
 const { Store } = require('./store');
 const { StoreThread } = require('./store-thread');
 const { Runner, killTree } = require('./runner');
-const { startRest: spawnRest } = require('./rest');
+const { startRest: spawnRest, startLinkedIn: spawnLinkedIn } = require('./rest');
 const { startReputation: spawnReputation } = require('./reputation');
 const { CvGenerator, INSTRUCTIONS_LIMIT } = require('./cv');
 const { TaskQueue, EXTERNAL } = require('./tasks');
@@ -119,15 +119,24 @@ async function startAuto(identity) {
   return `CV/CL batch started for ${identity} (pid ${pid}): see the task "CV/CL batch"`;
 }
 
-// The rest of the base after a collection (rest.js): the pipeline alone.
+// The rest of the base after a collection, and LinkedIn's own run beside
+// it (rest.js): the pipeline alone.
 function startRest(task, onLine) {
+  return startPipeline(task, onLine, spawnRest);
+}
+
+function startLinkedIn(task, onLine) {
+  return startPipeline(task, onLine, spawnLinkedIn);
+}
+
+function startPipeline(task, onLine, spawn) {
   if (fake) {
-    onLine(`fake rest: ${task.identity}`);
+    onLine(`fake ${task.kind}: ${task.identity}`);
     return { done: Promise.resolve({ ok: true, code: 0 }), stop() {} };
   }
   store.closeAll();
   data.call('closeAll').catch(() => {});
-  const handle = spawnRest({ root, python: pythonExecutable(root), identity: task.identity, onLine, kill: killTree });
+  const handle = spawn({ root, python: pythonExecutable(root), identity: task.identity, onLine, kill: killTree });
   return {
     done: handle.done.then((result) => {
       store.closeAll();
@@ -154,6 +163,7 @@ function startReputation(task, onLine) {
 const tasks = new TaskQueue({
   startCollect,
   startRest,
+  startLinkedIn,
   startReputation,
   startDocument: (task, onLine) => cv().start(task.identity, task.vacancyId, task.instructions, task.kind, onLine),
   startAuto,
@@ -179,7 +189,7 @@ batchWatch.poll();
 // A task id from the renderer: a number, or the batch's.
 const taskId = (id) => (id === EXTERNAL ? EXTERNAL : Number(id));
 
-const TASK_KINDS = new Set(['collect', 'rest', 'cv', 'letter', 'reputation']);
+const TASK_KINDS = new Set(['collect', 'rest', 'linkedin', 'cv', 'letter', 'reputation']);
 const IDENTITY_PATTERN = /^[a-z][a-z0-9]{2,9}$/;
 
 function enqueueTask(request) {
@@ -187,11 +197,14 @@ function enqueueTask(request) {
   if (!TASK_KINDS.has(r.kind)) throw new Error(`unknown task kind: ${r.kind}`);
   if (!IDENTITY_PATTERN.test(String(r.identity))) throw new Error(`invalid identity: ${r.identity}`);
   const text = (value, limit) => String(value == null ? '' : value).slice(0, limit);
-  if (r.kind === 'collect' || r.kind === 'rest') {
+  if (r.kind === 'collect' || r.kind === 'rest' || r.kind === 'linkedin') {
     // the pipeline would skip it too (tools/identity.py skip_if_inactive)
     const entry = identities.find((e) => e.prefix === r.identity);
     if (entry && entry.active === false) throw new Error(`${r.identity} is inactive: it is not collected`);
-    return tasks.enqueue({ kind: r.kind, identity: r.identity });
+    const queued = tasks.enqueue({ kind: r.kind, identity: r.identity });
+    // "Collect": the other sources and LinkedIn, side by side (tasks.js)
+    if (r.kind === 'collect') tasks.enqueue({ kind: 'linkedin', identity: r.identity });
+    return queued;
   }
   if (r.kind === 'reputation') {
     vacancyDir('x', r.identity, r.vacancyId);   // validates the id

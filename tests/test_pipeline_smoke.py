@@ -7,6 +7,8 @@ does produce a report with meaningful content.
 """
 import json
 
+import pytest
+
 import common
 import kb
 import pipeline
@@ -325,13 +327,18 @@ def test_linkedin_is_asked_for_the_days_since_the_last_collection_both_included(
     state["sources"]["linkedin"]["last_success"] = now.isoformat()
     pipeline.note_linkedin_window(state, now, before)
     assert state["linkedin_covered_to"] == now.isoformat()
-    assert pipeline.linkedin_backfill_days(state, base, now) == 0
-    # a failed fetch keeps the old coverage (not last_success) and leaves a gap
+    assert state["linkedin_gap"] is False
+    # a failed fetch keeps the old coverage (not last_success): the next run
+    # asks for those days again
     failed = {"sources": {"linkedin": {"consecutive_failures": 1, "last_success": now.isoformat()}}}
     pipeline.note_linkedin_window(failed, now, local(3, 6))
     assert failed["linkedin_covered_to"] == local(3, 6)
-    assert pipeline.linkedin_backfill_days(failed, base, now) == 4
+    assert failed["linkedin_gap"] is True
+    assert pipeline.linkedin_window(failed, base, now) == 4
     assert "the fetch failed" in pipeline.collected_text(failed, 4)
+    # the LinkedIn run asks the base whether it holds LinkedIn, not for the base
+    assert pipeline.linkedin_window_of(failed, True, now) == 4
+    assert pipeline.linkedin_window_of(failed, False, now) == full
 
 
 def test_the_top_subset_is_the_top_classes_and_what_this_run_brought():
@@ -387,17 +394,115 @@ def test_the_top_run_end_to_end(isolated_data_dir, monkeypatch):
 
     result = pipeline.run_top()
 
-    assert asked["posted_within_days"] == pipeline.LINKEDIN_FULL_DAYS, \
-        "no collection known: the full window"
-    assert "time_budget_minutes" not in asked, "LinkedIn is read to the end of its window"
-    assert "the full window" in result["collected"]
+    assert asked == {}, "LinkedIn is its own run (--linkedin), beside the top run"
+    assert "LinkedIn is not in this run" in result["collected"]
     assert result["new_vacancies"] == 1
     (vid,) = kb.load_vacancies()
     assert described["ids"] == {vid} and described["limit"] == pipeline.TOP_DESCRIPTION_LIMIT
     state = common.load_json(common.STATE_PATH, default={})
     assert state["last_run_stats"]["mode"] == "top"
     assert state["last_top_run_at"]
-    assert state["linkedin_covered_to"], "nothing was covered before: the top run's window counts"
-    assert state["last_run_stats"]["linkedin_days"] == pipeline.LINKEDIN_FULL_DAYS
+    assert "linkedin_covered_to" not in state, "the top run leaves LinkedIn's window alone"
+    assert state["last_run_stats"]["linkedin_days"] is None
     assert "error" in state["last_ai_screen"], "no model in tests: the AI check is skipped, the run goes on"
     assert (common.REPORTS_DIR / f"{common.FILE_PREFIX}latest.md").exists()
+
+
+def _linkedin_card(n):
+    return {"source": "linkedin", "external_id": f"https://www.linkedin.com/jobs/view/{n}",
+            "title": "Senior .NET Developer", "company": f"Company {n}",
+            "url": f"https://www.linkedin.com/jobs/view/{n}", "location_raw": "United Kingdom",
+            "remote": None, "tags": ["market:United Kingdom"], "description_text": "",
+            "posted_at": "2026-10-19"}
+
+
+def _quiet_top(monkeypatch):
+    import apply_channels
+    import company_intel
+    import enrich_descriptions
+
+    seen = {}
+
+    def fake_enrich(vacancies, **kwargs):
+        seen["described"] = set(vacancies)
+        return {"considered": 0}
+    monkeypatch.setattr(enrich_descriptions, "enrich", fake_enrich)
+    monkeypatch.setattr(pipeline.link_check, "check_links", lambda *_a, **_k: {"checked": 0})
+    monkeypatch.setattr(apply_channels, "collect", lambda *_a, **_k: {"considered": 0})
+    monkeypatch.setattr(company_intel, "enrich_companies", lambda *_a, **_k: {"checked": 0})
+    return seen
+
+
+def test_the_linkedin_run_fetches_apart_then_merges_like_the_top_run(isolated_data_dir, monkeypatch):
+    import db
+    import runstate
+
+    asked = {}
+
+    def linkedin(**params):
+        asked.update(params)
+        # the fetch holds LinkedIn, not the base: another run may hold the base
+        assert runstate.LinkedInFetch(wait=False).path.exists()
+        assert runstate.current() is None
+        return [_linkedin_card(1), _linkedin_card(2)], "queries 1, pages 1"
+
+    monkeypatch.setattr(pipeline, "FETCHERS", {"linkedin": linkedin})
+    monkeypatch.setattr(pipeline, "load_sources_config",
+                        lambda: [{"name": "linkedin", "params": {"keywords": [".NET"]}}])
+    seen = _quiet_top(monkeypatch)
+
+    staged = pipeline.fetch_linkedin_apart()
+    assert asked["posted_within_days"] == pipeline.LINKEDIN_FULL_DAYS, "no collection known: the full window"
+    assert asked["keywords"] == [".NET"]
+    assert str(asked["query_stats_to"]).startswith(str(common.DATA_DIR / "runs"))
+    assert pipeline.linkedin_staged_path().exists(), "kept until it is merged"
+    assert kb.load_vacancies() == {}, "the fetch writes nothing into the base"
+    assert not runstate.LinkedInFetch(wait=False).path.exists(), "LinkedIn is free again"
+
+    with runstate.PipelineRun(wait=True):
+        result = pipeline.merge_linkedin(staged)
+    assert result["new_vacancies"] == 2
+    assert "the full window" in result["collected"]
+    assert len(kb.load_vacancies()) == 2
+    assert seen["described"] == set(kb.load_vacancies()), "the top run's steps, on what LinkedIn brought"
+    assert not pipeline.linkedin_staged_path().exists()
+    state = common.load_json(common.STATE_PATH, default={})
+    assert state["linkedin_covered_to"] == staged["started_at"]
+    assert state["last_linkedin_stats"]["new_vacancies"] == 2
+    with db.session() as conn:
+        assert conn.execute("SELECT kind FROM selections").fetchall() == [("rebuild",)], \
+            "a rebuild: the top run's vacancies stay fresh, LinkedIn's new ones too"
+
+    # the next run asks for the days since this one, both included
+    asked.clear()
+    pipeline.fetch_linkedin_apart()
+    assert asked["posted_within_days"] == 1
+
+
+def test_a_failed_linkedin_fetch_records_the_failure_without_loading_the_base(isolated_data_dir, monkeypatch):
+    monkeypatch.setattr(pipeline, "FETCHERS", {"linkedin": lambda **_: ([], "errors: C#/UK: HTTPError")})
+    monkeypatch.setattr(pipeline, "load_sources_config", lambda: [{"name": "linkedin"}])
+    common.save_json_atomic(common.STATE_PATH, {"sources": {}, "linkedin_covered_to": "2026-10-15T06:00:00+00:00"})
+    monkeypatch.setattr(kb, "load_vacancies", lambda: pytest.fail("the base was loaded for nothing"))
+
+    result = pipeline.merge_linkedin(pipeline.fetch_linkedin_apart())
+    state = common.load_json(common.STATE_PATH, default={})
+    assert state["sources"]["linkedin"]["consecutive_failures"] == 1
+    assert state["linkedin_covered_to"] == "2026-10-15T06:00:00+00:00", "the next run asks for those days again"
+    assert "the fetch failed" in result["collected"]
+    assert not pipeline.linkedin_staged_path().exists()
+
+
+def test_an_identity_without_linkedin_has_nothing_to_fetch_apart(isolated_data_dir, monkeypatch):
+    monkeypatch.setattr(pipeline, "FETCHERS", {"linkedin": lambda **_: pytest.fail("fetched")})
+    monkeypatch.setattr(pipeline, "load_sources_config", lambda: [{"name": "linkedin", "enabled": False}])
+    assert pipeline.fetch_linkedin_apart() is None
+
+
+def test_the_rest_run_fetches_nothing(isolated_data_dir, monkeypatch):
+    monkeypatch.setattr(pipeline, "FETCHERS", {"linkedin": lambda **_: pytest.fail("fetched")})
+    monkeypatch.setattr(pipeline, "load_sources_config", lambda: [{"name": "linkedin"}])
+    common.save_json_atomic(common.STATE_PATH, {"sources": {}, "linkedin_gap": True})
+    monkeypatch.setattr(pipeline, "finalize_and_report", lambda *_a, **_k: "report.md")
+    assert pipeline.run_rest()["new_vacancies"] == 0
+

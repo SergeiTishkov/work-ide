@@ -3,13 +3,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { PassThrough } = require('node:stream');
-const { startRest, restArgs, restLine } = require('../../main/rest');
+const { startRest, restArgs, linkedinArgs, restLine } = require('../../main/rest');
 const { reputationArgs } = require('../../main/reputation');
 
 test('the rest of the base runs the pipeline in its rest mode; a malformed identity is refused', () => {
   assert.deepEqual(restArgs('sharp').slice(1), ['--identity', 'sharp', '--rest']);
   assert.match(restArgs('sharp')[0], /pipeline\.py$/);
   assert.throws(() => restArgs('../x'), /invalid identity/);
+});
+
+test("LinkedIn's own run is the pipeline in its linkedin mode", () => {
+  assert.deepEqual(linkedinArgs('sharp').slice(1), ['--identity', 'sharp', '--linkedin']);
+  assert.throws(() => linkedinArgs('../x'), /invalid identity/);
 });
 
 test("the pipeline's progress lines are prefixed as the collection's log has them", () => {

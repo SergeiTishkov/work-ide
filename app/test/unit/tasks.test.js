@@ -241,14 +241,76 @@ test('the rest of the base shows the pipeline stages, with no agent steps', asyn
   queue.enqueue({ kind: 'rest', identity: 'sharp' });
   await tick();
   const say = (text) => rest.started[0].onLine(text);
-  say("  | [10:00:00] >> fetch LinkedIn's missed days (posted in the last 6 days)");
-  say("  | [11:40:00] ok fetch LinkedIn's missed days (posted in the last 6 days) - 1:40:00 (8 000 records, 5 000 new)");
+  say('  | [10:00:00] >> rescore the base, current criteria (58 984 vacancies)');
+  say('  | [10:06:00] ok rescore the base, current criteria (58 984 vacancies) - 6:00');
   say('  | [11:40:01] >> AI check of the top');
   say('  | [11:50:01] ok AI check of the top - 10:00 (screened 120, rejected 30)');
   say('  | [11:51:00] pipeline finished in 1:51:00');
   const steps = queue.list()[0].steps;
   assert.deepEqual(steps.map((s) => [s.key, s.state, s.duration]), [
-    ['backfill', 'done', '1:40:00'], ['ai_check', 'done', '10:00']]);
+    ['rescore', 'done', '6:00'], ['ai_check', 'done', '10:00']]);
+});
+
+test('LinkedIn runs in a lane of its own, beside the collections, and shows its stages', async () => {
+  const collect = work();
+  const linkedin = work();
+  const queue = new TaskQueue({ startCollect: collect.start, startLinkedIn: linkedin.start, startDocument: work().start });
+  queue.enqueue({ kind: 'collect', identity: 'sharp' });
+  queue.enqueue({ kind: 'linkedin', identity: 'sharp' });
+  queue.enqueue({ kind: 'linkedin', identity: 'partsharp' });
+  await tick();
+  assert.deepEqual(queue.list().map((t) => [t.kind, t.lane, t.state]), [
+    ['collect', 'collect', 'running'], ['linkedin', 'linkedin', 'running'], ['linkedin', 'linkedin', 'queued']]);
+  assert.equal(queue.enqueue({ kind: 'linkedin', identity: 'sharp' }).error, 'already_queued');
+  const say = (text) => linkedin.started[0].onLine(text);
+  say('  | [10:00:00] >> fetch LinkedIn (LinkedIn: posted in the last 2 days)');
+  say('  | [12:00:00] ok fetch LinkedIn (LinkedIn: posted in the last 2 days) - 2:00:00 (6 000 records)');
+  say('  | [12:00:00] >> wait for the base');
+  say('  | [12:10:00] ok wait for the base - 10:00');
+  say("  | [12:10:00] >> merge LinkedIn's vacancies");
+  say("  | [12:11:00] ok merge LinkedIn's vacancies - 1:00 (6 000 records, 900 new)");
+  assert.deepEqual(queue.list()[1].steps.map((s) => [s.key, s.state, s.duration]), [
+    ['fetch', 'done', '2:00:00'], ['wait_base', 'done', '10:00'], ['merge_linkedin', 'done', '1:00']]);
+  linkedin.started[0].finish({ ok: true, code: 0 });
+  await tick();
+  assert.deepEqual(linkedin.started.map((s) => s.task.identity), ['sharp', 'partsharp']);
+});
+
+test('the rest of the base waits for both the collection and LinkedIn; either may end first', async () => {
+  const collect = work();
+  const linkedin = work();
+  const rest = work();
+  const autos = [];
+  const queue = new TaskQueue({
+    startCollect: collect.start, startLinkedIn: linkedin.start, startRest: rest.start, startDocument: work().start,
+    startAuto: async (identity) => { autos.push(identity); return null; },
+  });
+  // the collection first: the rest waits for LinkedIn
+  queue.enqueue({ kind: 'collect', identity: 'sharp' });
+  queue.enqueue({ kind: 'linkedin', identity: 'sharp' });
+  await tick();
+  collect.started[0].finish({ ok: true, code: 0 });
+  await tick();
+  assert.equal(queue.list().filter((t) => t.kind === 'rest').length, 0);
+  assert.match(queue.log(1).at(-1), /the rest of the base is queued when LinkedIn ends: task #2/);
+  linkedin.started[0].finish({ ok: false, code: 1 });
+  await tick();
+  assert.deepEqual(rest.started.map((s) => s.task.identity), ['sharp'], 'a failed LinkedIn run still lets the rest go');
+  assert.deepEqual(autos, ['sharp'], 'the CV batch after the collection; none after a failed LinkedIn run');
+  rest.started[0].finish({ ok: true, code: 0 });
+  await tick();
+
+  // LinkedIn first: the collection queues the rest as before
+  queue.enqueue({ kind: 'collect', identity: 'sharp' });
+  queue.enqueue({ kind: 'linkedin', identity: 'sharp' });
+  await tick();
+  linkedin.started[1].finish({ ok: true, code: 0 });
+  await tick();
+  assert.equal(rest.started.length, 1, 'no rest after LinkedIn alone');
+  assert.deepEqual(autos, ['sharp', 'sharp'], 'the CV batch for what LinkedIn brought');
+  collect.started[1].finish({ ok: true, code: 0 });
+  await tick();
+  assert.equal(rest.started.length, 2);
 });
 
 const BATCH = {

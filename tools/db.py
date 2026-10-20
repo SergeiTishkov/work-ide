@@ -236,6 +236,16 @@ def join_record(data: str, computed: Optional[str], duplicate_of: Optional[str])
     return record
 
 
+def any_from_source(source: str) -> bool:
+    """Whether the base holds a vacancy of `source`, without loading it (the
+    LinkedIn run's window, before it waits for the base)."""
+    if not exists():
+        return False
+    with session() as conn:
+        return conn.execute("SELECT 1 FROM vacancies WHERE json_extract(data, '$.source') = ? LIMIT 1",
+                            (source,)).fetchone() is not None
+
+
 def load_vacancies() -> dict:
     """Every vacancy in the base, keyed by id, with the active identity's
     verdict on it. A vacancy the identity has not scored yet comes without

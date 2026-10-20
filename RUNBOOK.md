@@ -46,10 +46,15 @@ clone: it is created when a template is cloned, see
 python tools/pipeline.py --identity <p>
 ```
 
-Two shorter modes split the same work (docs/ARCHITECTURE.md, "The top
-vacancies first"): `--top` does the top classes in about an hour (the app's
-"Collect" runs it through `/top`), `--rest` does the whole base afterwards
-(the app queues it). Without a flag the command is the full cycle.
+Three shorter modes split the same work (docs/ARCHITECTURE.md, "The top
+vacancies first", "LinkedIn beside the other sources"): `--top` does the top
+classes of every source but LinkedIn in about half an hour to an hour (the
+app's "Collect" runs it through `/top`); `--linkedin` is LinkedIn alone, run
+at the same time in a second terminal (the app queues it with "Collect"): it
+fetches for hours without holding the base, then waits for the base and
+merges; `--rest` does the whole base afterwards (the app queues it when both
+have ended). Without a flag the command is the full cycle, LinkedIn
+included.
 
 An identity turned off (the app's Menu → Identities, or `python
 tools/identity.py set-active --identity <p> off`) is not collected: every mode

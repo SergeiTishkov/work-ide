@@ -71,9 +71,27 @@ segments and the hiring country read that tag.
 list that goes on after it (10 holes in 100 pages of one deep walk). One empty
 page is stepped over; two in a row end the list.
 
-**429 and dropped connections.** One retry after 30 seconds, counted in the
-progress line. The pause between pages is 1.5 seconds; the description reader
-(`tools/enrich_descriptions.py`) keeps the same pause between vacancy pages.
+**429 and dropped connections.** Waited out step by step: 30, 60, then 120
+seconds (`RATE_LIMIT_BACKOFF`), a new try after each; the page is given up,
+with the rest of its query, when the last try fails too. Counted in the
+progress line. The pause between pages starts at 1.5 seconds
+(`PAUSE_SECONDS`), doubles after each 429 up to 12 (`MAX_PAUSE_SECONDS`), and
+comes back down by a tenth a page that went through (`_Pacer`); the progress
+line shows it while it is above 1.5. The description reader
+(`tools/enrich_descriptions.py`) keeps 1.5 seconds between vacancy pages.
+
+**What each query brought.** A fetch from the pipeline or from
+`fetch_linkedin.py` writes `data/identities/<p>/runs/linkedin_queries_<time>.json`,
+rewritten after every pair: per query (narrower ones included) the pages,
+cards, vacancies new to this fetch, 429s, whether it failed or reached the
+ceiling, and seconds. The fetch's note counts the queries that brought
+nothing new. It is there to choose the pairs worth asking from numbers.
+
+**One fetch at a time.** Every identity's LinkedIn fetch shares the machine's
+address, and the rate limit is per address: `runstate.LinkedInFetch` lets one
+run at a time and makes the next wait (a file beside the shared base,
+`linkedin_fetch.lock`, refreshed every 10 seconds; one left by a killed
+process is taken over after 45).
 
 ## The probe
 
@@ -94,6 +112,19 @@ with progress in the log:
   description.
 
 ## History
+
+**2026-10-20: a run of its own, and a pacer.** The 7-day run of 2026-10-20 met
+a 429 on about one page in five (340 in its first 111 pairs; on 2026-10-17 one
+in sixteen) and spent close to three hours in the 30-second waits, while the
+other sources' vacancies, ready in half an hour, waited for it. The owner
+asked for LinkedIn apart, beside the other sources, and for the fetcher to be
+tuned first. Since then:
+
+- `pipeline.py --linkedin` is LinkedIn's own run (docs/ARCHITECTURE.md,
+  "LinkedIn beside the other sources"); `--top` leaves it out;
+- the pacer and the waits of 30, 60 and 120 seconds above, in place of one
+  retry after 30;
+- the per-query numbers above, for pruning the pairs with nothing new.
 
 **2026-10-03: read to the end of every list.** The fetcher stepped by an
 assumed 25 cards and stopped when fewer came. LinkedIn serves ten, so every

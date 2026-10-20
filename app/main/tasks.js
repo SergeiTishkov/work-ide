@@ -32,6 +32,15 @@
 // so it runs after every collection queued before it — the top vacancies of
 // each identity first, the rest afterwards (the owner, 2026-10-17).
 //
+// LinkedIn is the task "linkedin" (`pipeline.py --linkedin`, rest.js), in a
+// lane of its own (the owner, 2026-10-20): its fetch takes hours, the other
+// sources half an hour, and the vacancies of those are not to wait for it.
+// "Collect" queues both. The run fetches without holding the base and waits
+// for it to merge (tools/runstate.py), so the lane does not ask externalBusy.
+// The rest of the base waits for both: it is queued when the later of the
+// two ends, if the collection ended well. A LinkedIn run that ends well
+// starts the CV/CL batch too, for what it brought.
+//
 // The work itself is injected (start*, startAuto, externalBusy, ...), so
 // tests run the queue without processes.
 
@@ -39,25 +48,27 @@ const { StepTracker } = require('./steps');
 
 const LANES = {
   collect: 'collect', rest: 'collect', cv: 'documents', letter: 'documents', reputation: 'reputation',
+  linkedin: 'linkedin',
 };
 const ACTIVE = new Set(['queued', 'running']);
 const LOG_LIMIT = 3000;
 const EXTERNAL = 'batch';
 
 class TaskQueue {
-  // startCollect(task, onLine) / startRest(task, onLine) / startReputation(task, onLine) /
-  // startDocument(task, onLine):
+  // startCollect(task, onLine) / startRest(task, onLine) / startLinkedIn(task, onLine) /
+  // startReputation(task, onLine) / startDocument(task, onLine):
   //   -> { done: Promise<{ ok, code?, error?, ...result }>, stop() }
   // startAuto(identity) -> Promise<string>: starts the CV/CL batch; a line
   //   for the collection's log
   // externalBusy(identity) -> Promise<string|null>: who holds the pipeline
   // stopExternal() / holdExternal(on): the batch's stop and hold files
-  constructor({ startCollect, startDocument, startRest = null, startReputation = null,
+  constructor({ startCollect, startDocument, startRest = null, startLinkedIn = null, startReputation = null,
     startAuto = null, externalBusy = null,
     stopExternal = () => {}, holdExternal = () => {},
     retryMs = 5000, now = () => new Date().toISOString(), clock = () => Date.now() }) {
     this.startCollect = startCollect;
     this.startRest = startRest;
+    this.startLinkedIn = startLinkedIn;
     this.startReputation = startReputation;
     this.startDocument = startDocument;
     this.startAuto = startAuto;
@@ -128,7 +139,7 @@ class TaskQueue {
     return a.kind === b.kind && a.identity === b.identity && (a.vacancyId || null) === (b.vacancyId || null);
   }
 
-  // request: { kind: 'collect'|'rest'|'cv'|'letter'|'reputation', identity, vacancyId?, title?,
+  // request: { kind: 'collect'|'rest'|'linkedin'|'cv'|'letter'|'reputation', identity, vacancyId?, title?,
   // company?, instructions?, origin? }
   enqueue(request) {
     if (!Object.hasOwn(LANES, request.kind)) throw new Error(`unknown task kind: ${request.kind}`);
@@ -154,7 +165,9 @@ class TaskQueue {
       log: [],
     };
     if (task.kind === 'collect') this.trackers.set(task.id, new StepTracker({ now: this.clock }));
-    if (task.kind === 'rest') this.trackers.set(task.id, new StepTracker({ now: this.clock, agent: false }));
+    if (task.kind === 'rest' || task.kind === 'linkedin') {
+      this.trackers.set(task.id, new StepTracker({ now: this.clock, agent: false }));
+    }
     this.tasks.push(task);
     this.changed();
     this.pump();
@@ -247,6 +260,7 @@ class TaskQueue {
     try {
       if (task.kind === 'collect') handle = this.startCollect(task, onLine);
       else if (task.kind === 'rest') handle = this.startRest(task, onLine);
+      else if (task.kind === 'linkedin') handle = this.startLinkedIn(task, onLine);
       else if (task.kind === 'reputation') handle = this.startReputation(task, onLine);
       else handle = this.startDocument(task, onLine);
     } catch (error) {
@@ -261,7 +275,8 @@ class TaskQueue {
   }
 
   async completed(task, result) {
-    if (task.kind === 'collect' && result.ok && !task.stopping && this.startAuto) {
+    const ok = result.ok && !task.stopping;
+    if ((task.kind === 'collect' || task.kind === 'linkedin') && ok && this.startAuto) {
       try {
         const line = await this.startAuto(task.identity);
         if (line) this.append(task, line);
@@ -269,11 +284,23 @@ class TaskQueue {
         this.append(task, `CV/CL batch: ${error.message}`);
       }
     }
-    if (task.kind === 'collect' && result.ok && !task.stopping && this.startRest) {
-      const queued = this.enqueue({ kind: 'rest', identity: task.identity, origin: 'auto' });
-      if (queued.ok) this.append(task, `the rest of the base is queued: task #${queued.task.id}`);
+    if (task.kind === 'collect' && ok && this.startRest) {
+      const linkedin = this.tasks.find((t) => t.kind === 'linkedin' && t.identity === task.identity
+        && ACTIVE.has(t.state));
+      if (linkedin) {
+        linkedin.restAfter = true;
+        this.append(task, `the rest of the base is queued when LinkedIn ends: task #${linkedin.id}`);
+      } else {
+        this.queueRest(task);
+      }
     }
+    if (task.kind === 'linkedin' && task.restAfter && this.startRest) this.queueRest(task);
     this.finish(task, result);
+  }
+
+  queueRest(after) {
+    const queued = this.enqueue({ kind: 'rest', identity: after.identity, origin: 'auto' });
+    if (queued.ok) this.append(after, `the rest of the base is queued: task #${queued.task.id}`);
   }
 
   finish(task, result) {

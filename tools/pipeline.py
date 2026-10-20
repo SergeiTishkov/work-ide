@@ -9,14 +9,19 @@ python tools/pipeline.py            -> the full cycle: fetch from every enabled
                                        retroactively) -> rebuild companies.json
                                        -> report.
 
-python tools/pipeline.py --top      -> the top vacancies first, in about an
-                                       hour (the owner, 2026-10-17): fetch
-                                       (LinkedIn only since the last top run)
-                                       -> score -> read the descriptions the
-                                       remote check needs -> the AI check of
-                                       the top classes -> links, application
-                                       channels, company facts for the top
-                                       only -> selection and report.
+python tools/pipeline.py --top      -> the top vacancies first (the owner,
+                                       2026-10-17): fetch every source but
+                                       LinkedIn -> score -> read the
+                                       descriptions the remote check needs ->
+                                       the AI check of the top classes ->
+                                       links, application channels, company
+                                       facts for the top only -> selection
+                                       and report.
+python tools/pipeline.py --linkedin -> LinkedIn, beside any other run (the
+                                       owner, 2026-10-20): fetch its window
+                                       without holding the base, then wait
+                                       for the base, merge, and do the top
+                                       run's steps on what it brought.
 python tools/pipeline.py --rest     -> everything the top run left: the whole
                                        base rescored, links, descriptions,
                                        salary benchmark, the AI check of what
@@ -30,6 +35,7 @@ pipeline carries on.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 import time
 import traceback
@@ -154,29 +160,28 @@ def linkedin_window(state: dict, vacancies: dict, now: Optional[datetime] = None
     linkedin_covered_to to today, both included, at most LINKEDIN_FULL_DAYS;
     LINKEDIN_FULL_DAYS when nothing was collected yet or no LinkedIn vacancy
     is left in the base."""
+    return linkedin_window_of(
+        state, any(v.get("source") == "linkedin" for v in vacancies.values()), now)
+
+
+def linkedin_window_of(state: dict, base_holds_linkedin: bool, now: Optional[datetime] = None) -> int:
+    """linkedin_window, told whether the base holds a LinkedIn vacancy rather
+    than handed the base (the LinkedIn run reads it before it may load it)."""
     now = now or datetime.now(timezone.utc)
     covered = _parse_stamp(linkedin_covered_to(state))
-    if covered is None or not any(v.get("source") == "linkedin" for v in vacancies.values()):
+    if covered is None or not base_holds_linkedin:
         return LINKEDIN_FULL_DAYS
     days = (now.astimezone().date() - covered.astimezone().date()).days + 1
     return max(1, min(LINKEDIN_FULL_DAYS, days))
 
 
-def linkedin_backfill_days(state: dict, vacancies: dict, now: Optional[datetime] = None) -> int:
-    """Days the rest run asks LinkedIn for: the window again when the last
-    fetch left a gap (it failed), else 0."""
-    if not state.get("linkedin_gap"):
-        return 0
-    return linkedin_window(state, vacancies, now)
-
-
 def note_linkedin_window(state: dict, started: datetime, covered_before) -> None:
     """After a LinkedIn fetch that started at `started` with the window from
     linkedin_window: moves linkedin_covered_to to `started` when it did not
-    fail. Otherwise it stays at
-    `covered_before` (linkedin_covered_to read before the fetch: the fallback,
-    last_success, has just moved to now and would hide the gap), and
-    linkedin_gap tells the rest run to read the window again."""
+    fail. Otherwise it stays at `covered_before` (linkedin_covered_to read
+    before the fetch: the fallback, last_success, has just moved to now and
+    would hide the gap), so the next LinkedIn run asks for those days again.
+    linkedin_gap records which it was."""
     linkedin = state.get("sources", {}).get("linkedin") or {}
     if not linkedin.get("consecutive_failures"):
         state["linkedin_covered_to"] = started.isoformat()
@@ -195,10 +200,14 @@ def linkedin_window_text(days: int) -> str:
     return text
 
 
-def collected_text(state: dict, days: Optional[int]) -> str:
+def collected_text(state: dict, days: Optional[int], linkedin_apart: bool = False) -> str:
     """What the run collected, in the words the summary to the person repeats
     (the owner, 2026-10-17: say after every collection how many days of
-    vacancies were collected)."""
+    vacancies were collected). linkedin_apart: the top run, which leaves
+    LinkedIn to its own run."""
+    if linkedin_apart:
+        return ("LinkedIn is not in this run: it is fetched by its own run beside it "
+                "(pipeline.py --linkedin); the other sources serve their whole current feed")
     if not days:
         return "LinkedIn not asked; the other sources serve their whole current feed"
     text = f"{linkedin_window_text(days)} - the days since the last collection, both included"
@@ -530,13 +539,17 @@ def fetched_sources(sources_cfg: list, criteria: dict) -> list:
 
 
 def fetch_sources(enabled: list, vacancies: dict, state: dict, criteria: dict, profile: dict,
-                  contracts: Optional[dict] = None, overrides: Optional[dict] = None) -> dict:
+                  contracts: Optional[dict] = None, overrides: Optional[dict] = None,
+                  prefetched: Optional[dict] = None) -> dict:
     """Fetches every source in `enabled`, merges and scores what came.
     `overrides` {source: {param: value}} replaces fetcher parameters for this
-    run (the top run's LinkedIn window). Returns {"new", "updated", "fetched",
-    "skipped", "touched": set of vacancy ids merged this run}."""
+    run (the LinkedIn window). `prefetched` {source: (records, note)} is what
+    was fetched already (the LinkedIn run's merge): merged without asking.
+    Returns {"new", "updated", "fetched", "skipped", "touched": set of vacancy
+    ids merged this run}."""
     contracts = contracts or {}
     overrides = overrides or {}
+    prefetched = prefetched or {}
     new_count = updated_count = total_fetched = total_skipped = 0
     touched = set()
     for src in enabled:
@@ -545,7 +558,13 @@ def fetch_sources(enabled: list, vacancies: dict, state: dict, criteria: dict, p
         source_started = time.monotonic()
         new_before, updated_before = new_count, updated_count
         params = {**fetch_params(src), **(overrides.get(name) or {})}
-        raw_records, err = fetch_source_safely(name, fetch_fn, params)
+        if name in prefetched:
+            raw_records, err = prefetched[name]
+        elif name == "linkedin":
+            with runstate.LinkedInFetch():
+                raw_records, err = fetch_source_safely(name, fetch_fn, params)
+        else:
+            raw_records, err = fetch_source_safely(name, fetch_fn, params)
         _archive_raw_records(name, raw_records)
         normalized, skipped = normalize.normalize_batch(raw_records)
         total_fetched += len(normalized)
@@ -613,7 +632,7 @@ def run_pipeline(include_manual_placeholder_note: bool = True,
                  + ", ".join(names))
     fetch_started = time.monotonic()
     counts = fetch_sources(enabled, vacancies, state, criteria, profile, contracts,
-                           overrides={"linkedin": {"posted_within_days": days}})
+                           overrides={"linkedin": linkedin_params(days)})
     if "linkedin" in names:
         note_linkedin_window(state, started_at, covered_before)
     new_count, updated_count = counts["new"], counts["updated"]
@@ -643,6 +662,12 @@ def run_pipeline(include_manual_placeholder_note: bool = True,
     }
 
 
+def linkedin_params(days: int) -> dict:
+    """The LinkedIn fetcher's parameters for a run: the window, and the file
+    for what each query brought (fetch_linkedin.query_stats_path)."""
+    return {"posted_within_days": days, "query_stats_to": fetch_linkedin.query_stats_path()}
+
+
 def _load():
     common.ensure_dirs()
     with progress.stage("load the knowledge base") as st:
@@ -657,31 +682,52 @@ def _load():
 
 def run_top(check_contracts: bool = False) -> dict:
     """The top vacancies first (the owner, 2026-10-17: about an hour, daily):
-    fetch -> the remote check by script (the pages of the top classes and of
-    what this run brought) -> the AI check of the top -> links, application
-    channels and company facts of the top -> selection and report. The whole
-    base is rescored by the rest run (run_rest)."""
+    fetch every source but LinkedIn -> the remote check by script (the pages
+    of the top classes and of what this run brought) -> the AI check of the
+    top -> links, application channels and company facts of the top ->
+    selection and report. LinkedIn is its own run (run_linkedin), beside this
+    one; the whole base is rescored by the rest run (run_rest)."""
     sources_cfg = load_sources_config()
     criteria = score.load_criteria()
     profile = score.load_profile()
     vacancies, prev_companies, state = _load()
 
-    enabled = fetched_sources(sources_cfg, criteria)
+    enabled = [s for s in fetched_sources(sources_cfg, criteria) if s.get("name") != "linkedin"]
     names = [s.get("name") for s in enabled]
     contracts = check_source_contracts(names) if check_contracts else {}
-    days = linkedin_window(state, vacancies)
-    covered_before = linkedin_covered_to(state)
-    started_at = datetime.now(timezone.utc)
-    with progress.stage(f"fetch {len(enabled)} sources ({linkedin_window_text(days)})") as st:
+    with progress.stage(f"fetch {len(enabled)} sources (LinkedIn apart)") as st:
         progress.log("   " + ", ".join(names))
-        counts = fetch_sources(enabled, vacancies, state, criteria, profile, contracts,
-                               overrides={"linkedin": {"posted_within_days": days}})
+        counts = fetch_sources(enabled, vacancies, state, criteria, profile, contracts)
         st.note = (f"{progress.number(counts['fetched'])} records, "
                    f"{progress.number(counts['new'])} new")
-    if "linkedin" in names:
-        note_linkedin_window(state, started_at, covered_before)
-    touched = counts["touched"]
+    companies = process_top(vacancies, prev_companies, state, criteria, profile, counts["touched"])
 
+    state["run_count"] = state.get("run_count", 0) + 1
+    state["last_run_at"] = state["last_top_run_at"] = kb.now_iso()
+    state["last_run_stats"] = {
+        "mode": "top",
+        "new_vacancies": counts["new"],
+        "updated_vacancies": counts["updated"],
+        "total_fetched_this_run": counts["fetched"],
+        "total_skipped_this_run": counts["skipped"],
+        "linkedin_days": None,
+    }
+    report_path = _save_and_report(vacancies, companies, state, "run")
+    return {
+        "new_vacancies": counts["new"],
+        "updated_vacancies": counts["updated"],
+        "total_in_kb": len(vacancies),
+        "report_path": report_path,
+        "collected": collected_text(state, None, linkedin_apart=True),
+        "source_contracts": {name: r["status"] for name, r in contracts.items()},
+    }
+
+
+def process_top(vacancies: dict, prev_companies: dict, state: dict, criteria: dict,
+                profile: dict, touched) -> dict:
+    """The top run's steps after its fetch, on the top classes and what the
+    fetch brought (`touched`); the LinkedIn run's merge does the same. Returns
+    the rebuilt companies."""
     # The remote check by script: the page of every top vacancy with no text,
     # and of what this run brought into remote_unconfirmed — for a LinkedIn
     # card the page is what says "remote". Older remote_unconfirmed is not
@@ -733,56 +779,112 @@ def run_top(check_contracts: bool = False) -> dict:
         top = top_subset(vacancies)
         with progress.stage(f"rescore the top, with company facts ({progress.number(len(top))} vacancies)"):
             rescore_all(top, criteria, profile, companies)
-
-    state["run_count"] = state.get("run_count", 0) + 1
-    state["last_run_at"] = state["last_top_run_at"] = kb.now_iso()
-    state["last_run_stats"] = {
-        "mode": "top",
-        "new_vacancies": counts["new"],
-        "updated_vacancies": counts["updated"],
-        "total_fetched_this_run": counts["fetched"],
-        "total_skipped_this_run": counts["skipped"],
-        "linkedin_days": days if "linkedin" in names else None,
-    }
-    report_path = _save_and_report(vacancies, companies, state, "run")
-    return {
-        "new_vacancies": counts["new"],
-        "updated_vacancies": counts["updated"],
-        "total_in_kb": len(vacancies),
-        "report_path": report_path,
-        "collected": collected_text(state, days if "linkedin" in names else None),
-        "source_contracts": {name: r["status"] for name, r in contracts.items()},
-    }
+    return companies
 
 
-def run_rest() -> dict:
-    """What the top run left: LinkedIn's days nobody asked for, when there
-    are any, then the full tail (finalize_and_report) — the whole base
-    rescored, every link, the pages of the top classes (remote_unconfirmed
-    no more), the AI check of what rose to the top. A "rebuild" selection, so
-    what the top run marked fresh stays fresh."""
+def linkedin_staged_path() -> Path:
+    """What the LinkedIn run fetched, kept until it is merged."""
+    return common.DATA_DIR / "runs" / "linkedin_fetched.json"
+
+
+def fetch_linkedin_apart() -> Optional[dict]:
+    """The LinkedIn run's first half: its window fetched without holding the
+    base, so the other runs go on meanwhile, and kept in
+    linkedin_staged_path(). Writes nothing else: the window is read from the
+    state, and the base is only asked whether it holds a LinkedIn vacancy.
+    One LinkedIn fetch at a time on the machine (runstate.LinkedInFetch).
+    None when this identity does not fetch LinkedIn."""
+    criteria = score.load_criteria()
+    linkedin = [s for s in fetched_sources(load_sources_config(), criteria)
+                if s.get("name") == "linkedin"]
+    if not linkedin:
+        return None
+    import db
+
+    state = common.load_json(common.STATE_PATH, default={})
+    days = linkedin_window_of(state, db.any_from_source("linkedin"))
+    covered_before = linkedin_covered_to(state)
+    path = linkedin_staged_path()
+    if path.exists():
+        progress.log("   an earlier LinkedIn fetch was never merged; its days are asked again")
+    with runstate.LinkedInFetch():
+        started_at = datetime.now(timezone.utc)
+        with progress.stage(f"fetch LinkedIn ({linkedin_window_text(days)})") as st:
+            records, note = fetch_source_safely(
+                "linkedin", FETCHERS["linkedin"], {**fetch_params(linkedin[0]), **linkedin_params(days)})
+            st.note = f"{progress.number(len(records))} records"
+    staged = {"started_at": started_at.isoformat(), "days": days, "covered_before": covered_before,
+              "note": note, "records": records}
+    common.save_json_atomic(path, staged)
+    return staged
+
+
+def merge_linkedin(staged: dict) -> dict:
+    """The LinkedIn run's second half, holding the base: what was fetched is
+    merged, the window noted, and the top run's steps done on the top classes
+    and what LinkedIn brought (process_top). A "rebuild" selection: the
+    baseline of what is fresh stays the top run's, so its vacancies stay
+    fresh, and so do LinkedIn's new ones."""
     sources_cfg = load_sources_config()
     criteria = score.load_criteria()
     profile = score.load_profile()
-    vacancies, prev_companies, state = _load()
-    days = linkedin_backfill_days(state, vacancies)
-    covered_before = linkedin_covered_to(state)
     linkedin = [s for s in fetched_sources(sources_cfg, criteria) if s.get("name") == "linkedin"]
-    new = 0
-    if days and linkedin:
-        started_at = datetime.now(timezone.utc)
-        with progress.stage(f"fetch LinkedIn's missed days ({linkedin_window_text(days)})") as st:
-            counts = fetch_sources(linkedin, vacancies, state, criteria, profile,
-                                   overrides={"linkedin": {"posted_within_days": days}})
-            st.note = f"{progress.number(counts['fetched'])} records, {progress.number(counts['new'])} new"
-        note_linkedin_window(state, started_at, covered_before)
-        new = counts["new"]
+    records, note = staged.get("records") or [], staged.get("note")
+    started_at = _parse_stamp(staged.get("started_at")) or datetime.now(timezone.utc)
+    days = staged.get("days")
+    if not records:
+        # Nothing to merge: the failure is recorded, the base is not loaded.
+        state = common.load_json(common.STATE_PATH, default={"run_count": 0, "sources": {}})
+        state.setdefault("sources", {})
+        fetch_sources(linkedin, {}, state, criteria, profile, prefetched={"linkedin": (records, note)})
+        note_linkedin_window(state, started_at, staged.get("covered_before"))
+        common.save_json_atomic(common.STATE_PATH, state)
+        linkedin_staged_path().unlink(missing_ok=True)
+        return {"new_vacancies": 0, "collected": collected_text(state, days)}
+
+    vacancies, prev_companies, state = _load()
+    with progress.stage("merge LinkedIn's vacancies") as st:
+        counts = fetch_sources(linkedin, vacancies, state, criteria, profile,
+                               prefetched={"linkedin": (records, note)})
+        st.note = (f"{progress.number(counts['fetched'])} records, "
+                   f"{progress.number(counts['new'])} new")
+    note_linkedin_window(state, started_at, staged.get("covered_before"))
+    companies = process_top(vacancies, prev_companies, state, criteria, profile, counts["touched"])
+    state["last_linkedin_run_at"] = kb.now_iso()
+    state["last_linkedin_stats"] = {"new_vacancies": counts["new"], "updated_vacancies": counts["updated"],
+                                    "total_fetched_this_run": counts["fetched"], "linkedin_days": days}
+    report_path = _save_and_report(vacancies, companies, state, "rebuild")
+    linkedin_staged_path().unlink(missing_ok=True)
+    return {"new_vacancies": counts["new"], "updated_vacancies": counts["updated"],
+            "total_in_kb": len(vacancies), "report_path": report_path,
+            "collected": collected_text(state, days)}
+
+
+def run_rest() -> dict:
+    """What the top run left: the full tail (finalize_and_report) — the whole
+    base rescored, every link, the pages of the top classes
+    (remote_unconfirmed no more), the AI check of what rose to the top. A
+    "rebuild" selection, so what the top run marked fresh stays fresh.
+
+    It fetched LinkedIn's window again after a failed fetch until 2026-10-20;
+    LinkedIn has its own run since, and a failed one leaves the coverage
+    where it was, so the next asks for those days (note_linkedin_window)."""
+    vacancies, prev_companies, state = _load()
     report_path = finalize_and_report(
         vacancies, prev_companies, state, selection_kind="rebuild",
         description_classes=tuple(c for c in enrich_descriptions.HEAD_CLASSES if c != "remote_unconfirmed"))
-    return {"new_vacancies": new, "total_in_kb": len(vacancies), "report_path": report_path,
-            "collected": (collected_text(state, days) if days and linkedin
-                          else "nothing: the last collection left no gap")}
+    return {"new_vacancies": 0, "total_in_kb": len(vacancies), "report_path": report_path,
+            "collected": "nothing: the rest run fetches nothing"}
+
+
+def _run_mode(args, staged: Optional[dict]) -> dict:
+    if args.linkedin:
+        return merge_linkedin(staged)
+    if args.top:
+        return run_top(check_contracts=not args.skip_contracts)
+    if args.rest:
+        return run_rest()
+    return run_pipeline(check_contracts=not args.skip_contracts)
 
 
 def main() -> None:
@@ -798,6 +900,9 @@ def main() -> None:
                       help="the top vacancies first, in about an hour (see run_top)")
     mode.add_argument("--rest", action="store_true",
                       help="what the top run left: the whole base (see run_rest)")
+    mode.add_argument("--linkedin", action="store_true",
+                      help="LinkedIn alone, beside any other run: fetched without holding "
+                           "the base, then merged when the base is free (see fetch_linkedin_apart)")
     args = parser.parse_args()
     prefix = identity_mod.activate_or_exit(args.identity)
     if identity_mod.skip_if_inactive(prefix):
@@ -808,19 +913,25 @@ def main() -> None:
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     log_path = progress.open_log(common.DATA_DIR / "runs" / f"pipeline_{stamp}.log")
     started = time.monotonic()
-    mode_name = "top" if args.top else "rest" if args.rest else "full"
+    mode_name = "top" if args.top else "rest" if args.rest else "linkedin" if args.linkedin else "full"
     progress.log(f"pipeline ({mode_name}) for '{common.ACTIVE_IDENTITY}' started; log: {log_path}")
     try:
+        staged = fetch_linkedin_apart() if args.linkedin else None
         # Marks the run as going in the database (the app's indicator), and
         # refuses to start while another run is alive — of any identity: the
-        # base is shared.
-        with runstate.PipelineRun(log_path=log_path):
-            if args.top:
-                result = run_top(check_contracts=not args.skip_contracts)
-            elif args.rest:
-                result = run_rest()
-            else:
-                result = run_pipeline(check_contracts=not args.skip_contracts)
+        # base is shared. The LinkedIn run waits for it instead: its fetch
+        # is done, and the merge takes minutes.
+        if args.linkedin and staged is None:
+            result = {"collected": "nothing: this identity does not fetch LinkedIn"}
+        else:
+            with contextlib.ExitStack() as held:
+                run = runstate.PipelineRun(log_path=log_path, wait=args.linkedin)
+                if args.linkedin:
+                    with progress.stage("wait for the base"):
+                        held.enter_context(run)
+                else:
+                    held.enter_context(run)
+                result = _run_mode(args, staged)
     except runstate.AlreadyRunningError as exc:
         progress.log(f"!! not started: {exc}")
         progress.close_log()

@@ -6,6 +6,8 @@ change any day. So what is checked is not only "it parses correct markup" but
 — more importantly — "with changed markup it returns ZERO and an error rather
 than a stream of rubbish". A silently poisoned database is worse than an empty one.
 """
+import json
+
 import fetch_linkedin
 
 
@@ -367,6 +369,96 @@ def test_a_rate_limited_page_is_asked_once_more(monkeypatch):
     records, note = fetch_linkedin.fetch(keywords=["C#"], locations=["UK"], enrich_limit=0)
     assert len(records) == 5 and "errors" not in note
     assert attempts[:2] == [0, 0]
+
+
+def _limited(times, fake):
+    """A page source answering 429 to the first `times` requests."""
+    import requests
+
+    attempts = []
+
+    def limited(*args):
+        attempts.append(args[2])
+        if len(attempts) <= times:
+            response = requests.Response()
+            response.status_code = 429
+            raise requests.HTTPError(response=response)
+        return fake(*args)
+    return limited, attempts
+
+
+def _sleeps(monkeypatch, fake):
+    slept = []
+    monkeypatch.setattr(fetch_linkedin, "_fetch_page", fake)
+    monkeypatch.setattr(fetch_linkedin.time, "sleep", slept.append)
+    return slept
+
+
+def test_a_429_is_waited_out_longer_each_time_before_the_page_is_given_up(monkeypatch):
+    fake, _ = _pages(5)
+    limited, attempts = _limited(len(fetch_linkedin.RATE_LIMIT_BACKOFF), fake)
+    slept = _sleeps(monkeypatch, limited)
+    records, note = fetch_linkedin.fetch(keywords=["C#"], locations=["UK"], enrich_limit=0)
+    assert len(records) == 5 and "errors" not in note
+    assert attempts[:4] == [0, 0, 0, 0]
+    assert slept[:3] == list(fetch_linkedin.RATE_LIMIT_BACKOFF) == [30, 60, 120]
+
+    fake, _ = _pages(5)
+    limited, _ = _limited(len(fetch_linkedin.RATE_LIMIT_BACKOFF) + 1, fake)
+    _sleeps(monkeypatch, limited)
+    records, note = fetch_linkedin.fetch(keywords=["C#"], locations=["UK"], enrich_limit=0)
+    assert records == [] and "errors: C#/UK: HTTPError" in note
+
+
+def test_the_pause_between_pages_doubles_after_a_429_and_comes_back_down():
+    pacer = fetch_linkedin._Pacer()
+    assert pacer.pause == fetch_linkedin.PAUSE_SECONDS
+    pacer.limited()
+    assert pacer.pause == 2 * fetch_linkedin.PAUSE_SECONDS
+    for _ in range(10):
+        pacer.limited()
+    assert pacer.pause == fetch_linkedin.MAX_PAUSE_SECONDS
+    pacer.passed()
+    assert pacer.pause == fetch_linkedin.MAX_PAUSE_SECONDS * fetch_linkedin.PAUSE_RECOVERY
+    for _ in range(100):
+        pacer.passed()
+    assert pacer.pause == fetch_linkedin.PAUSE_SECONDS
+
+
+def test_the_pages_after_a_429_wait_longer(monkeypatch):
+    fake, _ = _pages(30)
+    limited, _ = _limited(1, fake)
+    slept = _sleeps(monkeypatch, limited)
+    fetch_linkedin.fetch(keywords=["C#"], locations=["UK"], enrich_limit=0)
+    base = fetch_linkedin.PAUSE_SECONDS
+    assert slept[0] == 30, "the 429 is waited out first"
+    pauses = slept[1:]
+    assert pauses[0] > base, "the page after a 429 waits longer than the base pause"
+    assert pauses == sorted(pauses, reverse=True), "and the pause comes back down"
+
+
+def test_what_each_query_brought_is_written_after_every_pair(monkeypatch, tmp_path):
+    fake, _ = _pages(5)
+    _quiet(monkeypatch, fake)
+    path = tmp_path / "queries.json"
+    records, note = fetch_linkedin.fetch(keywords=["C#", "F#"], locations=["UK"], enrich_limit=0,
+                                         query_stats_to=path)
+    written = json.loads(path.read_text(encoding="utf-8"))
+    queries = written["queries"]
+    assert [(q["keyword"], q["location"]) for q in queries] == [("C#", "UK"), ("F#", "UK")]
+    # the second page repeats the first, which ends the list
+    assert queries[0]["pages"] == 2 and queries[0]["cards"] == 10 and queries[0]["new"] == 5
+    assert queries[1]["new"] == 0, "the same five vacancies: nothing new"
+    assert not queries[0]["narrower"] and not queries[0]["at_ceiling"]
+    assert "1 of 2 queries brought nothing new" in note
+
+
+def test_without_a_file_no_query_stats_are_written(monkeypatch, tmp_path):
+    fake, _ = _pages(5)
+    _quiet(monkeypatch, fake)
+    monkeypatch.chdir(tmp_path)
+    fetch_linkedin.fetch(keywords=["C#"], locations=["UK"], enrich_limit=0)
+    assert list(tmp_path.iterdir()) == []
 
 
 # ---------------------------------------------------------------------------
