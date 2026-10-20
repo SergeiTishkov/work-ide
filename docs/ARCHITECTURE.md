@@ -1196,18 +1196,12 @@ The objection to mutable global state — concurrency — does not apply here: t
 tools are single-threaded and single-session, and one active identity per
 process is exactly the constraint wanted.
 
-## Further development (candidates for the next cycle)
+## Further development
 
-- Add Dice.com as a source (RSS or public search), if a usable endpoint exists.
-- ~~A gate for "not a simple" role (Principal Scientist/Agentic/R&D)~~ — done
-  2026-07-30, see `role_complexity_signal` above.
-- ~~A hard regional tie as a dealbreaker~~ — done 2026-07-30, see
-  `restrictive_region_signal` above. The region list is incomplete in principle;
-  extend it as new wordings turn up ("remote DACH only" and the like) that it
-  does not yet catch.
-- Smarter geographic deduplication (see "Rejected approaches" above) — if enough
-  data accumulates, it is worth comparing (company, title-without-city).
-- `link_check.py` treats only 404/410 as "dead" and deliberately does not try to
-  detect "200 OK, but the page says 'vacancy closed'" (that would need brittle
-  per-site content sniffing). If it becomes a frequent problem, collect concrete
-  examples and consider narrow per-domain rules rather than a general solution.
+The list of work, done and waiting, is `tasks/` (format in `tasks/README.md`):
+ideas nobody has agreed to yet are in `tasks/1-triage/`, agreed work in
+`tasks/2-to-do/`. The candidates this section listed until 2026-10-20 were
+either done (the role-complexity gate, the regional dealbreaker) or dropped:
+Dice.com answers 403 (`docs/SOURCES.md`); the region list is extended as
+wordings turn up, not as a task; near-duplicates are already merged; closed
+pages are recognised per board where a board needs it.
