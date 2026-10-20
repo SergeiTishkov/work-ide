@@ -47,6 +47,7 @@ from typing import Callable, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
+import taskq  # noqa: E402
 
 TOOLS = {"cv": "cv_tailor.py", "letter": "cover_letter.py"}
 GONE = "Vacancy not found"   # cv_tailor.GONE, without importing the model code
@@ -139,8 +140,11 @@ class Batch:
         self.status: dict = {}
 
     def log(self, text: str) -> None:
+        line = f"{datetime.now():%Y-%m-%d %H:%M:%S}  {text}"
         with self.where["log"].open("a", encoding="utf-8") as fh:
-            fh.write(f"{datetime.now():%Y-%m-%d %H:%M:%S}  {text}\n")
+            fh.write(line + "\n")
+        # and to stdout: the task queue's worker logs what the batch prints
+        print(line, flush=True)
 
     def save(self, **changes) -> None:
         self.status.update(changes)
@@ -298,7 +302,10 @@ def main(argv=None) -> int:
         print(f"queued behind the running batch (pid {other['pid']})")
         return 0
     try:
-        Batch(where).run(requests, plan_for, generate_with_tools)
+        # Listed in the task queue (tools/taskq.py) when started by hand.
+        with taskq.Registered("cv_batch", args.identities[0] if len(args.identities) == 1 else None,
+                              log_path=where["log"], args={"identities": args.identities, "all": args.all}):
+            Batch(where).run(requests, plan_for, generate_with_tools)
     except RuntimeError as exc:
         common.eprint(f"cv_batch: {exc}")
         return 1

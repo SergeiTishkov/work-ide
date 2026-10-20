@@ -78,6 +78,7 @@ import score  # noqa: E402
 import progress  # noqa: E402
 import runstate  # noqa: E402
 import selections  # noqa: E402
+import taskq  # noqa: E402
 
 FETCHERS = {
     "arbeitnow": fetch_arbeitnow.fetch,
@@ -900,53 +901,58 @@ def main() -> None:
     started = time.monotonic()
     mode_name = "top" if args.top else "rest" if args.rest else "linkedin" if args.linkedin else "full"
     progress.log(f"pipeline ({mode_name}) for '{common.ACTIVE_IDENTITY}' started; log: {log_path}")
-    try:
-        staged = fetch_linkedin_apart() if args.linkedin else None
-        # Marks the run as going in the database (the app's indicator), and
-        # refuses to start while another run is alive — of any identity: the
-        # base is shared. The LinkedIn run waits for it instead: its fetch
-        # is done, and the merge takes minutes.
-        if args.linkedin and staged is None:
-            result = {"collected": "nothing: this identity does not fetch LinkedIn"}
-        else:
-            with contextlib.ExitStack() as held:
-                run = runstate.PipelineRun(log_path=log_path, wait=args.linkedin)
-                if args.linkedin:
-                    with progress.stage("wait for the base"):
+    # Listed in the task queue like any other task (tools/taskq.py), whoever
+    # started it; under the queue's worker it is that task already.
+    kind = mode_name if mode_name in ("rest", "linkedin") else "pipeline"
+    with taskq.Registered(kind, common.ACTIVE_IDENTITY, log_path=log_path,
+                          args={"mode": mode_name} if kind == "pipeline" else None):
+        try:
+            staged = fetch_linkedin_apart() if args.linkedin else None
+            # Marks the run as going in the database (the app's indicator), and
+            # refuses to start while another run is alive — of any identity: the
+            # base is shared. The LinkedIn run waits for it instead: its fetch
+            # is done, and the merge takes minutes.
+            if args.linkedin and staged is None:
+                result = {"collected": "nothing: this identity does not fetch LinkedIn"}
+            else:
+                with contextlib.ExitStack() as held:
+                    run = runstate.PipelineRun(log_path=log_path, wait=args.linkedin)
+                    if args.linkedin:
+                        with progress.stage("wait for the base"):
+                            held.enter_context(run)
+                    else:
                         held.enter_context(run)
-                else:
-                    held.enter_context(run)
-                result = _run_mode(args, staged)
-    except runstate.AlreadyRunningError as exc:
-        progress.log(f"!! not started: {exc}")
-        progress.close_log()
-        sys.exit(2)
-    finally:
-        progress.log(f"pipeline finished in {progress.duration(time.monotonic() - started)}")
-        progress.close_log()
-    print("Pipeline finished:")
-    for k, v in result.items():
-        print(f"  {k}: {v}")
-    # Same idea as the feedback reminder below: what needs a repair is said in
-    # the output, with the command that repairs it.
-    statuses = result.get("source_contracts") or {}
-    broken = [n for n, status in statuses.items() if status == "broken"]
-    blocked = [n for n, status in statuses.items() if status == "blocked"]
-    if broken:
-        print(f"  sources answering differently than their fetchers expect: {', '.join(broken)}"
-              f" — repair with /source-doctor <source>")
-    if blocked:
-        print(f"  sources now refusing anonymous requests: {', '.join(blocked)}"
-              f" — tell the owner")
-    # A reminder that lives in the output rather than in somebody's memory:
-    # feedback left in the app is a bug report against the filter.
-    import feedback
+                    result = _run_mode(args, staged)
+        except runstate.AlreadyRunningError as exc:
+            progress.log(f"!! not started: {exc}")
+            progress.close_log()
+            sys.exit(2)
+        finally:
+            progress.log(f"pipeline finished in {progress.duration(time.monotonic() - started)}")
+            progress.close_log()
+        print("Pipeline finished:")
+        for k, v in result.items():
+            print(f"  {k}: {v}")
+        # Same idea as the feedback reminder below: what needs a repair is said in
+        # the output, with the command that repairs it.
+        statuses = result.get("source_contracts") or {}
+        broken = [n for n, status in statuses.items() if status == "broken"]
+        blocked = [n for n, status in statuses.items() if status == "blocked"]
+        if broken:
+            print(f"  sources answering differently than their fetchers expect: {', '.join(broken)}"
+                  f" — repair with /source-doctor <source>")
+        if blocked:
+            print(f"  sources now refusing anonymous requests: {', '.join(blocked)}"
+                  f" — tell the owner")
+        # A reminder that lives in the output rather than in somebody's memory:
+        # feedback left in the app is a bug report against the filter.
+        import feedback
 
-    pending = feedback.count()
-    if pending["bugged"] or pending["rejected"]:
-        print(f"  pending feedback: {pending['bugged']} wrong picks, "
-              f"{pending['rejected']} not for me — review with /feedback "
-              f"(python tools/feedback.py --identity {common.ACTIVE_IDENTITY} collect)")
+        pending = feedback.count()
+        if pending["bugged"] or pending["rejected"]:
+            print(f"  pending feedback: {pending['bugged']} wrong picks, "
+                  f"{pending['rejected']} not for me — review with /feedback "
+                  f"(python tools/feedback.py --identity {common.ACTIVE_IDENTITY} collect)")
 
 
 if __name__ == "__main__":

@@ -318,3 +318,41 @@ def test_the_log_command_prints_the_file(isolated_data_dir, capsys):
         taskq.append_log(task, "first\n\nsecond")
     assert taskq.main(["log", str(task["id"])]) == 0
     assert capsys.readouterr().out == "first\nsecond\n"
+
+
+def _pipeline_main(monkeypatch, mode, run):
+    import sys
+    import identity
+    import pipeline
+    monkeypatch.delenv(taskq.TASK_ENV, raising=False)
+    monkeypatch.setattr(sys, "argv", ["pipeline.py", "--identity", "ftf", mode])
+    monkeypatch.setattr(identity, "activate_or_exit", lambda value=None, quiet=False: "ftf")
+    monkeypatch.setattr(identity, "skip_if_inactive", lambda prefix: False)
+    monkeypatch.setattr(pipeline, "run_rest", run)
+    monkeypatch.setattr(pipeline, "run_top", lambda **_: run())
+    pipeline.main()
+
+
+def test_a_pipeline_run_from_a_terminal_is_listed_while_it_runs(isolated_data_dir, monkeypatch):
+    seen = []
+
+    def run():
+        with taskq.session() as conn:
+            seen.extend(taskq.tasks(conn, active_only=True))
+        return {"collected": "nothing"}
+    _pipeline_main(monkeypatch, "--rest", run)
+    assert [(t["kind"], t["identity"], t["state"], t["worker"]) for t in seen] == [("rest", "ftf", "running", "external")]
+    assert seen[0]["log_path"].endswith(".log") and "pipeline_" in seen[0]["log_path"]
+    with taskq.session() as conn:
+        assert taskq.get(conn, seen[0]["id"])["state"] == "done"
+
+
+def test_a_failing_pipeline_run_from_a_terminal_is_listed_failed(isolated_data_dir, monkeypatch):
+    def run():
+        raise RuntimeError("network down")
+    with pytest.raises(RuntimeError):
+        _pipeline_main(monkeypatch, "--top", run)
+    with taskq.session() as conn:
+        (task,) = taskq.tasks(conn)
+    assert (task["kind"], task["args"], task["state"], task["error"]) == (
+        "pipeline", {"mode": "top"}, "failed", "RuntimeError: network down")
