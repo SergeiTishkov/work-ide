@@ -2,6 +2,7 @@
 
 Source: the owner, 2026-10-20 ("the reports folder is not needed any more, I
 only ever use the UI; delete it and clean the tools of it")
+Scope: tools, app, docs, config, rules
 
 ## Business
 Every collection still wrote `reports/<prefix>_latest.md`, a file per

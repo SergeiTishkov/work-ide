@@ -8,7 +8,9 @@ description: Tie every change and every commit to a task in tasks/. Use before s
 The change: `$ARGUMENTS` (or the one just asked for).
 
 The rule is the owner's (2026-10-20) and has no exceptions: a one-line fix
-asked for in passing is a task too. The format of a task is
+asked for in passing is a task too. It covers work that ends in a commit:
+purely local work — checking or fixing local data, running a collection,
+answering a question — has no task. The format of a task is
 `tasks/README.md`; the commit hook `.githooks/commit-msg` refuses a commit
 that does not follow this.
 
@@ -29,8 +31,13 @@ python tools/tasks.py find <two or three words of the change>
 - **Nothing covers it** — make one:
 
   ```
-  python tools/tasks.py new to-do <a-few-words> "<Title: what the person gets>" --source "the owner, <date>"
+  python tools/tasks.py new to-do <a-few-words> "<Title: what the person gets>" --source "the owner, <date>" --scope "<scope>, <scope>"
   ```
+
+  The scope says what the task is about, one or more of: `identity:<prefix>`,
+  `tools`, `app`, `config`, `rules`, `docs`, `tasks`, `other` (the table is in
+  `tasks/README.md`, "Scope"). When the work grows into another area, add
+  that scope to the `Scope:` line.
 
   `to-do` when the owner asked for it, `triage` when it is the agent's own
   idea (and then stop and ask, as above). Fill `## Business` with what the
@@ -62,7 +69,13 @@ commit. Merges, reverts and fixups are exempt.
 
 If the hook refuses, fix the task or the message — never `--no-verify`.
 
-## 4. Afterwards
+## 4. A task that needed no commit
+
+It was local work after all. Delete the file (`git rm tasks/<stage>/NNNN-*.md`)
+in a commit of task files only, which needs no `Task:` line. Do not rewrite
+history; the number is not handed out again.
+
+## 5. Afterwards
 
 `python tools/tasks.py log <number>` lists the commits of a task; that is
 its history, so tasks made from now on carry no `Commits:` line.

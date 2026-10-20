@@ -453,6 +453,10 @@ has no exceptions for size: **every change is a task, every commit names its
 task.** The procedure is the `task` skill (`.claude/skills/task/SKILL.md`);
 use it before the first edit of any change and before every commit.
 
+- A task is for work that ends in a commit. Purely local work — checking or
+  fixing local data, running a collection, answering a question — has none.
+  A task that turned out to need no commit is deleted (`git rm`, a commit of
+  task files only); history is not rewritten, and its number is not reused.
 - Before starting, find the task the work belongs to
   (`python tools/tasks.py find <words>`). Work the owner asks for that has no
   task gets one in `tasks/2-to-do/` first, a one-line fix included; an idea
@@ -470,7 +474,9 @@ use it before the first edit of any change and before every commit.
   `tests/test_commit_hook.py` fails while it is off). Never `--no-verify`.
 
 Numbers are four digits, unique, never reused; tasks are written in English,
-business first.
+business first. Every task from 0052 on names its scope on a `Scope:` line:
+`identity:<prefix>`, `tools`, `app`, `config`, `rules`, `docs`, `tasks` or
+`other`, several allowed (`tasks/README.md`, "Scope").
 
 ## 13. Where to put a change
 

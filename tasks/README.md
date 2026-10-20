@@ -26,6 +26,7 @@ A file can be a ticket, a feature or an epic. The shape follows its size:
 
 Commits: <hashes> (tasks 0000-0050 only; later ones: python tools/tasks.py log NNNN)
 Source: who asked for it, and when
+Scope: tools, docs
 
 ## Business
 What the person needs and why: the case that showed it, measured where it
@@ -39,6 +40,27 @@ approach. Not a copy of the code.
 - DONE - <what>
 - TO DO - <what>
 ```
+
+## Scope
+
+Every task from 0052 on says what it is about on a `Scope:` line under
+`Source:` (the owner, 2026-10-20): one or more of the scopes below,
+comma-separated. Tasks before 0052 have none and keep it that way.
+
+| Scope | What it covers |
+|---|---|
+| `identity:<prefix>` | one identity: its template, its documents (`identity:sharp`) |
+| `tools` | `tools/` and their tests |
+| `app` | the desktop app |
+| `config` | shared configuration in `config/`, sources included |
+| `rules` | `CLAUDE.md`, skills, commands, hooks: how the agent works |
+| `docs` | README, RUNBOOK, `docs/` |
+| `tasks` | the task system: this README, `tools/tasks.py`, the commit hook |
+| `other` | anything else |
+
+The list is `SCOPES` in `tools/tasks.py`; a new scope goes there and here.
+
+## Items
 
 The items are the last section. Each is one line starting with
 `- TO DO - ` or `- DONE - `, spelled exactly so.
@@ -55,7 +77,7 @@ The items are the last section. Each is one line starting with
   sub-tickets after it.
 
 `tests/test_tasks.py` checks the format: the three folders, unique numbers,
-`## Business` first, the marks spelled one way, no TO DO left in a DONE task,
+the scope of every task from 0052 on, `## Business` first, the marks spelled one way, no TO DO left in a DONE task,
 at least one TO DO in the other two stages.
 
 ## Every commit names its task
@@ -63,9 +85,15 @@ at least one TO DO in the other two stages.
 The owner, 2026-10-20: every change is a task, every commit names its task.
 The procedure is the `task` skill (`.claude/skills/task/SKILL.md`).
 
+- A task is for work that ends in a commit. Purely local work — checking or
+  fixing local data, running a collection, answering a question — has none.
 - Work that has no task gets one before the first edit
-  (`python tools/tasks.py new to-do <a-few-words> "<Title>"`): in `2-to-do/`
-  when the owner asked for it, in `1-triage/` when it is the agent's own idea.
+  (`python tools/tasks.py new to-do <a-few-words> "<Title>" --scope <scopes>`):
+  in `2-to-do/` when the owner asked for it, in `1-triage/` when it is the
+  agent's own idea.
+- A task that turned out to need no commit is deleted (`git rm`, in a commit
+  of task files only). History is not rewritten, and the number is not
+  handed out again: `tools/tasks.py next` reads it from git history.
 - The commit message has a line `Task: NNNN`, and the commit changes that
   task's file: the item it finishes marked DONE, the work it does added as an
   item, or the file moved to `3-done/` with its last item.

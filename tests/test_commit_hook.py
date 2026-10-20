@@ -90,6 +90,12 @@ def test_a_commit_of_task_files_only_needs_no_task_line(repo):
     assert ok, err
 
 
+def test_deleting_a_task_that_needed_no_commit_needs_no_task_line(repo):
+    _git(repo, "rm", "-q", "tasks/2-to-do/0002-agreed-work.md")
+    ok, err = _commit(repo, "Tasks: 0002 needed no commit")
+    assert ok, err
+
+
 def test_a_change_to_the_task_system_is_not_a_task_file(repo):
     _write(repo, "tasks/README.md", "the format\n")
     ok, err = _commit(repo, "Tasks: a new rule")

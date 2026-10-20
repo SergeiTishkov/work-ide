@@ -2,6 +2,7 @@
 
 Source: task 0052, 2026-10-20: the Markdown report was the only place that
 showed it
+Scope: app, tools
 
 ## Business
 The Markdown report had a Source health table (each source's status, last
