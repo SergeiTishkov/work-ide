@@ -1759,9 +1759,16 @@ test('"Score" in Details: a row per part, a cell per point, earned ones bright, 
 
 test('Refresh is a button of its own, left of the theme and the language, the same size and icon', async ({ page }) => {
   await open(page);
-  const order = await page.locator('header.topbar > .picker')
+  const order = await page.locator('header.topbar > .picker, header.topbar > .menu-slot')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
-  expect(order).toEqual(['refresh-slot', 'theme-picker', 'language-picker']);
+  expect(order).toEqual(['refresh-slot', 'theme-picker', 'language-picker', 'menu-slot']);
+  // Menu: on the top bar's line, right of the language (task 0065), as tall as the pickers
+  const language = await page.getByTestId('language-button').boundingBox();
+  const menu = await page.getByTestId('menu-slot').getByTestId('menu-button').boundingBox();
+  expect(menu.x).toBeGreaterThan(language.x + language.width);
+  expect(Math.abs((menu.y + menu.height / 2) - (language.y + language.height / 2))).toBeLessThan(1);
+  expect(menu.height).toBe(language.height);
+  await expect(page.getByTestId('panel').getByTestId('menu-button')).toHaveCount(0);
   const refresh = page.getByTestId('refresh');
   await expect(refresh).toHaveText('\u27F3');
   await expect(refresh).toHaveAttribute('title', en['app.refresh_hint']);
@@ -1777,7 +1784,7 @@ test('Refresh is a button of its own, left of the theme and the language, the sa
 
 test('the menu holds Collect, Review feedback, Clean up, Identities, Settings; "Clean up" filters, counts, deletes', async ({ page }) => {
   await open(page);
-  const order = await page.locator('.actions > *').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.className));
+  const order = await page.locator('.menu-slot > *').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.className));
   expect(order).toEqual(['commands']);
   await command(page, 'cleanup');
   const items = await page.getByTestId('menu').locator('[role="menuitem"]')

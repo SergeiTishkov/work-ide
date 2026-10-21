@@ -965,7 +965,22 @@
       el('span', { class: 'spinner' }), el('span', {}, t('app.loading')));
   }
 
+  // The menu stands in the top bar, right of the language (the owner,
+  // 2026-10-21); it needs the identity's data, so it is drawn with the panel.
+  function renderMenuSlot() {
+    const host = document.querySelector('[data-testid="menu-slot"]');
+    const info = state.booted && state.identities.length ? current() : null;
+    if (!info) {
+      host.replaceChildren();
+      return;
+    }
+    const identity = state.identities.find((i) => i.prefix === state.active);
+    const pending = info.pending ? info.pending.bugged + info.pending.rejected : 0;
+    host.replaceChildren(renderMenu(identity, pending));
+  }
+
   function renderPanel() {
+    renderMenuSlot();
     const panel = document.querySelector('[data-testid="panel"]');
     if (!state.booted) {
       panel.replaceChildren(renderLoading());
@@ -1628,7 +1643,6 @@
   });
 
   function renderToolbar(identity, info) {
-    const pending = info.pending ? info.pending.bugged + info.pending.rejected : 0;
     const selection = info.selection;
     return el('div', { class: 'toolbar' },
       el('div', { class: 'identity-heading' },
@@ -1638,8 +1652,7 @@
             id: selection.id,
             run: selection.run,
             date: String(selection.created_at || '').slice(0, 16).replace('T', ' '),
-          }) + (selection.kind === 'rebuild' ? ` · ${t('selection.rebuild')}` : ''))),
-      el('div', { class: 'actions' }, renderMenu(identity, pending)));
+          }) + (selection.kind === 'rebuild' ? ` · ${t('selection.rebuild')}` : ''))));
   }
 
   // --- "Clean up": vacancies deleted for good (tools/cleanup.py) ----------------

@@ -145,10 +145,12 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 .actions { display: flex; gap: 8px; }
 .actions { align-items: center; }
 /* The commands menu (app.js, renderMenu): Collect, Stop, Review feedback,
-   Clean up, Identities. Opens under its button, right-aligned: the button
-   sits at the toolbar's right edge. */
+   Clean up, Identities, Scheduler, Settings. Opens under its button,
+   right-aligned: the button is the last in the top bar, after the language. */
+.menu-slot { display: flex; margin-left: 4px; }
+.menu-slot:empty { display: none; }
 .commands { position: relative; display: inline-flex; }
-.menu-button { display: inline-flex; align-items: center; gap: 6px; }
+.menu-button { display: inline-flex; align-items: center; gap: 6px; height: 30px; }
 .menu-button[aria-expanded="true"] { border-color: var(--accent); }
 .commands-menu {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 300px; max-width: 400px;
