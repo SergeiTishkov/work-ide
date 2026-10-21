@@ -27,5 +27,5 @@ drag highlight. The dismissed batch is remembered across restarts (the
 batch's `started_at`, stored beside its status file or in the base).
 
 ## Items
-- DONE - Borders of the panel and its split 2px, VS Code style; UI test for the width (`--panel-border`, a stronger line in both themes; the sashes 6px, centred over the lines, keep the accent on hover and drag)
+- DONE - Borders of the panel and its split 2px, VS Code style; UI test for the width (`--panel-border`, a stronger line in both themes; the sashes 6px, centred on the lines, keep the accent on hover and drag)
 - DONE - A cleared finished CV batch does not come back after a restart; test (the queue of task 0056 covers it: the panel lists `tasks.sqlite` rows, "Clear finished" sets their `hidden` column through `taskq.py hide`, and `cv_batch.json` is read only while its row runs; `app/test/unit/queue.test.js` restarts the client over a cleared batch)
