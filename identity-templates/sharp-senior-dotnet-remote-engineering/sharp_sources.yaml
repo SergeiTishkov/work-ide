@@ -135,6 +135,24 @@ sources:
     # identity turns it on with params: {countries: ["<ISO code>"]}.
     enabled: false
 
+  - name: justjoinit
+    # justjoin.it's remote B2B .NET offers (2026-10-22, task 0047). Off
+    # here: a Polish board, and 35 of the 118 offers of 2026-10-22 list
+    # Polish. An identity turns it on; the module's filters are the default.
+    enabled: false
+
+  - name: freelancermap
+    # freelancermap.de's fully remote contract projects (2026-10-22, task
+    # 0047). Off here: 14 of 22 read on 2026-10-22 were written in German.
+    # An identity turns it on; the module's queries are the default.
+    enabled: false
+
+  - name: djinni
+    # djinni.co's remote .NET postings (2026-10-22, task 0047). Off here:
+    # which country lists stay depends on the residency. An identity turns
+    # it on with params: {country: "<ISO alpha-3>"}.
+    enabled: false
+
   - name: workingnomads
     enabled: true
 

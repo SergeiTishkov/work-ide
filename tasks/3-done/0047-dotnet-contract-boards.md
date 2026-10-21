@@ -48,9 +48,19 @@ order of expected yield, each with the trap the survey found:
   paging when no .NET title comes, since later pages fill with unrelated
   jobs; `applicantLocationRequirements` is the geography.
 
+Live, 2026-10-22, scored for sharp:
+- justjoinit: 118 records; 5 hot_lead, 17 worth_a_look, 22 long_shot, 74
+  rejected (64 by the language gate: Polish beside English).
+- freelancermap: 67 records from four queries in two sort orders (paging
+  still returns page 1); 2 worth_a_look, 2 long_shot, 63 rejected (57
+  German).
+- djinni: 47 records, 15 unrelated postings left out; 12 hot_lead, 8
+  worth_a_look, 6 long_shot, 21 rejected. Written "Remote; candidates in
+  ...", with " only" when the list names countries and not the residency.
+
 ## Items
 - DONE - Survey Eastern European B2B boards and German and Dutch freelance platforms; write the result and the plan here
-- TO DO - Fetcher for justjoin.it
-- TO DO - Fetcher for freelancermap.de
-- TO DO - Fetcher for djinni.co
-- TO DO - Registry: justjoin.it and nofluffjobs answer again; the rejected boards above recorded
+- DONE - Fetcher for justjoin.it
+- DONE - Fetcher for freelancermap.de
+- DONE - Fetcher for djinni.co
+- DONE - Registry: justjoin.it and nofluffjobs answer again; the rejected boards above recorded

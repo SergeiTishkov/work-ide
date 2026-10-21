@@ -59,6 +59,9 @@ import fetch_jobserve  # noqa: E402
 import fetch_dataart  # noqa: E402
 import fetch_arcdev  # noqa: E402
 import fetch_workatastartup  # noqa: E402
+import fetch_justjoinit  # noqa: E402
+import fetch_freelancermap  # noqa: E402
+import fetch_djinni  # noqa: E402
 import fetch_landing_jobs  # noqa: E402
 import fetch_mycareersfuture  # noqa: E402
 import fetch_outside_ir35  # noqa: E402
@@ -118,6 +121,12 @@ FETCHERS = {
     # Y Combinator startups' postings, searched by keyword, remote ones only
     # (2026-10-21).
     "workatastartup": fetch_workatastartup.fetch,
+    # Remote .NET contract work on Eastern European and German boards
+    # (2026-10-22, task 0047): justjoin.it's remote B2B offers, freelancermap's
+    # fully remote projects, djinni's remote postings.
+    "justjoinit": fetch_justjoinit.fetch,
+    "freelancermap": fetch_freelancermap.fetch,
+    "djinni": fetch_djinni.fetch,
 }
 
 # The classes the top run works on (the owner, 2026-10-17: "collect, check

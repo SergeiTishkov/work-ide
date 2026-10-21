@@ -280,6 +280,68 @@ sources:
       filters, so the keywords decide the yield. Mostly full time, and
       "US citizen/visa only" is common (written into the text as "Visa: ...").
 
+  - name: justjoinit
+    site: "justjoin.it"
+    kind: json_api
+    remote_only: false
+    params_schema:
+      categories: "the board's category keys, one listing each ([\"net\"]); net by default"
+      remote_work_options: "the work-option filter (\"remote\"); remote by default; none: every option"
+      employment_types: "the contract filter (\"b2b\"); b2b by default; none: every contract"
+      details: "fetch each offer's full text and language list (one request each); true by default"
+    yield_notes: >
+      Measured 2026-10-21: 118 remote B2B .NET offers. Read in full: 66 need
+      Polish, 15 residence in Poland or the EU, 40 say nothing of either, 4
+      "anywhere". A live run 2026-10-22: 118 records, 35 listing Polish;
+      scored for SHARP, 5 hot leads, 17 worth a look, 22 long shots, 74
+      rejected (64 of them on the language gate).
+    caveats: >
+      A Polish board: many offers silent on location still expect a Polish
+      sole-trader contract. A listed Polish is written into the text as
+      "Polish and English skills required", which the language gate reads;
+      Polish listed without English is not read as a refusal (the module).
+      `workplaceType` and `perPage` are ignored by the API, and a keyword
+      search returns thousands of unrelated offers.
+
+  - name: freelancermap
+    site: "freelancermap.de"
+    kind: html_embedded_json
+    remote_only: false
+    params_schema:
+      queries: "search words, two requests each (newest, most relevant), up to 22 projects a request; a default list in the module"
+      remote_percent: "the remote share filter, 100 by default; none: any"
+      contract_type: "the contract filter (\"contracting\"); contracting by default; none: any"
+    yield_notes: >
+      Measured 2026-10-21: 96 fully remote contracting projects for ".net"
+      with the board's Germany default, 101 for every country (the fetcher
+      asks for every country). A live run 2026-10-22, the four default words
+      newest and most relevant: 67 distinct projects.
+    caveats: >
+      Paging does not reach an anonymous request: every page number answers
+      the first 22. Newest and most relevant together give about 40 a word,
+      and the 22 newest for ".net" spanned 15 days, so a daily run sees the
+      inflow. Mostly German texts and DACH clients; ".net" also matches
+      roles outside the stack, which the scoring judges.
+
+  - name: djinni
+    site: "djinni.co"
+    kind: html_jsonld
+    remote_only: true
+    params_schema:
+      keyword: "the board's primary keyword (\".NET\"); .NET by default"
+      country: "ISO alpha-3 code of the residency (\"GEO\"): one more search for postings that name it; none: no such search"
+      worldwide: "one more search for postings open worldwide; true by default"
+    yield_notes: >
+      Measured 2026-10-21: 47 remote .NET postings; candidate locations 16
+      Ukraine alone, 19 Europe, 7 none, 4 a list holding Georgia. A live run
+      2026-10-22 with country GEO: 47 kept, 15 unrelated left out; the
+      country and worldwide searches added none beyond the plain one.
+    caveats: >
+      The Ukrainian market: many postings assume Ukraine in the text. When a
+      search runs out, later pages are filled with unrelated postings; the
+      fetcher stops there and leaves out what does not name the stack.
+      employmentType says hours only, nothing about a contract.
+
   - name: workingnomads
     site: "workingnomads.com"
     kind: json_api

@@ -249,6 +249,46 @@ sources:
       Accept. 20 keywords: 437 postings, 160 remote, 65 not tied to one
       country other than Georgia. tools/fetch_workatastartup.py.
 
+  - name: justjoinit
+    status: implemented
+    implemented_at: "2026-10-22"
+    task: "tasks/3-done/0047-dotnet-contract-boards.md"
+    kind: json_api
+    endpoint: "https://justjoin.it/api/candidate-api/offers"
+    checked: >
+      2026-08-04: 404 on the old endpoints. 2026-10-21/22: the candidate API
+      answers JSON with no key; categories=net&remoteWorkOptions=remote&
+      employmentTypes=b2b gave 118 offers, paged by itemsCount and the
+      meta.next.cursor; the detail (/offers/<slug>) carries the body and the
+      languages, 35 of the 118 listing Polish. tools/fetch_justjoinit.py.
+
+  - name: freelancermap
+    status: implemented
+    implemented_at: "2026-10-22"
+    task: "tasks/3-done/0047-dotnet-contract-boards.md"
+    kind: html_embedded_json
+    endpoint: "https://www.freelancermap.de/project/search/ajax"
+    checked: >
+      2026-10-21/22: /project/search/ajax answers the search's JSON to a GET,
+      at most 22 projects a query; paging does not work for an anonymous
+      request (pagenr 2, 3, 5 all return page 1). Several queries, newest and
+      most relevant, merged on id: 67 distinct fully remote contract projects
+      on 2026-10-22. tools/fetch_freelancermap.py.
+
+  - name: djinni
+    status: implemented
+    implemented_at: "2026-10-22"
+    task: "tasks/3-done/0047-dotnet-contract-boards.md"
+    kind: html_jsonld
+    endpoint: "https://djinni.co/jobs/?primary_keyword=.NET&employment=remote"
+    checked: >
+      2026-10-21/22: each results page carries its postings as a JSON-LD
+      JobPosting list with applicantLocationRequirements as ISO alpha-3
+      countries or a region; past the search's own results the pages fill
+      with other categories. Plain, country=GEO and region=worldwide
+      searches: 47 .NET postings kept, 15 unrelated left out on 2026-10-22.
+      tools/fetch_djinni.py.
+
   - name: gun_io
     status: rejected
     checked: "2026-08-05"
@@ -443,16 +483,6 @@ sources:
     checked: "2026-08-04"
     reason: "HTTP 403."
 
-  - name: justjoinit
-    status: rejected
-    checked: "2026-08-04"
-    reason: "HTTP 404, the endpoints changed. Poland is not a priority market."
-
-  - name: nofluffjobs
-    status: rejected
-    checked: "2026-08-04"
-    reason: "HTTP 400/405, it requires an undocumented request body."
-
   - name: relocate_me
     status: rejected
     checked: "2026-08-04"
@@ -582,3 +612,83 @@ sources:
     status: rejected
     kind: json
     reason: "The same: an affid is needed, and the results are aggregated."
+
+  # --- Surveyed for remote .NET contract work, 2026-10-21 (task 0047) --------
+
+  - name: nofluffjobs
+    status: pending
+    task: "tasks/3-done/0047-dotnet-contract-boards.md"
+    kind: json_api
+    endpoint: "https://nofluffjobs.com/api/search/posting?pageTo=1&pageSize=100&salaryCurrency=PLN&salaryPeriod=month&region=pl&language=en-GB"
+    checked: >
+      2026-08-04: 400/405 without the request body. 2026-10-21: a POST with
+      the body {"rawSearch": "city=remote requirement=.NET employment=b2b"}
+      and content type application/infiniteSearch+json answers 54 remote B2B
+      postings; 38 ask for Polish, 7 for residence, about 12 open. The
+      top-level fullyRemote is false on all 54; location.fullyRemote is the
+      one that says remote.
+
+  - name: jobs_dou_ua
+    status: rejected
+    checked: "2026-10-21"
+    reason: "200, RSS and HTML; 71 remote .NET, 20 read, nearly all assume Ukraine: 5-8 open."
+
+  - name: freelance_de
+    status: rejected
+    checked: "2026-10-21"
+    reason: "200 HTML, 62 C#; the full search needs a session, the company is hidden without a paid account, mostly freelancermap's postings."
+
+  - name: dev_bg
+    status: rejected
+    checked: "2026-10-21"
+    reason: "200 HTML; 16 fully remote, Bulgarian employment: about 2 open."
+
+  - name: gulp
+    status: rejected
+    checked: "2026-10-21"
+    reason: "200, POST API; 8-15 C#/.NET of 846, DACH on-site: about 0 open."
+
+  - name: bulldogjob
+    status: rejected
+    checked: "2026-10-21"
+    reason: "200, Next.js data; 5 remote B2B, all asking for Polish."
+
+  - name: theprotocol
+    status: rejected
+    checked: "2026-10-21"
+    reason: "HTTP 403."
+
+  - name: malt
+    status: rejected
+    checked: "2026-10-21"
+    reason: "HTTP 403."
+
+  - name: upwork
+    status: rejected
+    checked: "2026-10-21"
+    reason: "HTTP 403."
+
+  - name: ejobs_ro
+    status: rejected
+    checked: "2026-10-21"
+    reason: "HTTP 403."
+
+  - name: twago
+    status: rejected
+    checked: "2026-10-21"
+    reason: "HTTP 404."
+
+  - name: solcom
+    status: rejected
+    checked: "2026-10-21"
+    reason: "HTTP 503."
+
+  - name: hays_de
+    status: rejected
+    checked: "2026-10-21"
+    reason: "The listing is rendered in the browser; no postings in the plain answer."
+
+  - name: freelance_nl
+    status: rejected
+    checked: "2026-10-21"
+    reason: "The listing is rendered in the browser; no postings in the plain answer."
