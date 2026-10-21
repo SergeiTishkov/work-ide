@@ -204,6 +204,9 @@ function registerIpc(window) {
   handle('copy-text', (text) => {
     clipboard.writeText(String(text));
   });
+  // After a copy, when the setting asks for it (task 0070): Windows brings
+  // forward the window under the app, where the link is pasted.
+  handle('minimize-window', () => window.minimize());
   handle('open-cv-file', async (file) => {
     const problem = await shell.openPath(tasks.checkProduced(file));
     if (problem) throw new Error(problem);

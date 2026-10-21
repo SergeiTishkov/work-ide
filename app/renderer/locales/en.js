@@ -119,6 +119,8 @@
   'settings.title': 'Settings',
   'settings.show_tasks': 'Show the task list',
   'settings.show_tasks_hint': 'Hidden, the tasks still run: neither the panel nor its tab is shown.',
+  'settings.minimize_on_copy': 'Minimize the app after a copy',
+  'settings.minimize_on_copy_hint': '"Copy URL" and "Copy CV/CL Directory Path" minimize the window, so the one under it, where the copy goes, comes forward.',
   'settings.close': 'Close',
   'run.inactive': 'This identity is inactive: it is not collected. Turn it on in Menu → Identities.',
   'identities.title': 'Identities',

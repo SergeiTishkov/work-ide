@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('api', {
   refresh: () => call('refresh'),
   openExternal: (url) => call('open-external', url),
   copyText: (text) => call('copy-text', text),
+  minimizeWindow: () => call('minimize-window'),
   // The task queue (main/tasks.js). request: { kind: 'collect' | 'cv' |
   // 'letter', identity, vacancyId?, title?, company?, instructions? }
   enqueueTask: (request) => call('enqueue-task', request),

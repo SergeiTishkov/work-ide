@@ -624,6 +624,27 @@ test('"Copy URL" beside "Open" copies the link and says so', async ({ page }) =>
   await expect(row.getByTestId('btn-copy-url')).toHaveText(en['action.copy_url']);
 });
 
+test('a copy minimizes the app unless "Settings…" turns it off; kept after a restart', async ({ page }) => {
+  await open(page);
+  const row = byId(page, 'a1');
+  await row.getByTestId('btn-copy-url').click();
+  await expect.poll(() => calls(page, 'minimizeWindow')).toEqual([[]]);
+
+  await (await command(page, 'open-settings')).click();
+  const minimize = page.getByTestId('setting-minimize-on-copy');
+  await expect(page.getByTestId('settings-dialog')).toContainText(en['settings.minimize_on_copy']);
+  await expect(minimize).toBeChecked();
+  await minimize.uncheck();
+  await page.getByTestId('settings-close').click();
+  await row.getByTestId('btn-copy-url').click();
+  await expect.poll(() => calls(page, 'copyText')).toEqual([['https://example.test/a1'], ['https://example.test/a1']]);
+  expect(await calls(page, 'minimizeWindow')).toEqual([[]]);
+
+  await page.reload();
+  await (await command(page, 'open-settings')).click();
+  await expect(page.getByTestId('setting-minimize-on-copy')).not.toBeChecked();
+});
+
 test('a vacancy title opens in the browser, not in the app', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('title').click();
@@ -1394,6 +1415,7 @@ test('the vacancy\'s folder: opened, or its path copied, once it has a CV or a c
   expect(await calls(page, 'openDocumentsDir')).toEqual([['sharp', 'a1']]);
   await row.getByTestId('btn-copy-docs-path').click();
   expect(await calls(page, 'copyText')).toEqual([['/docs/sharp/a1']]);
+  await expect.poll(() => calls(page, 'minimizeWindow')).toEqual([[]]);
   await expect(row.getByTestId('btn-copy-docs-path')).toHaveText(en['action.copied']);
   await expect(row.getByTestId('btn-copy-docs-path')).toHaveText(en['action.copy_docs_path']);
   await expect(byId(page, 'a2r').getByTestId('btn-open-docs')).toHaveCount(0);

@@ -122,7 +122,7 @@
   // the rest of the app's storage
   const SETTINGS_KEY = 'work-ide-settings';
   // showFinished and taskOrder: the task list's gear (task 0068)
-  const DEFAULT_SETTINGS = { showTasks: true, showFinished: true, taskOrder: 'oldest' };
+  const DEFAULT_SETTINGS = { showTasks: true, showFinished: true, taskOrder: 'oldest', minimizeOnCopy: true };
   const TASK_ORDERS = ['oldest', 'newest'];
   const TASK_ORDER_KEYS = { oldest: 'task.order_oldest', newest: 'task.order_newest' };
   // How often the pipeline indicator asks the databases. Tests shorten it.
@@ -1210,7 +1210,9 @@
 
   // --- "Settings...": the app's own settings (the owner, 2026-10-21) ------------
   // The first one: whether the task list is shown at all. Hidden, the tasks
-  // run as before; neither the panel nor its tab is there.
+  // run as before; neither the panel nor its tab is there. The second (task
+  // 0070): "Copy URL" and "Copy CV/CL Directory Path" minimize the app, so the
+  // window the copy goes into comes forward; on unless turned off.
 
   function readSettings() {
     try {
@@ -1257,6 +1259,13 @@
         }),
         el('span', {}, t('settings.show_tasks'))),
       el('p', { class: 'muted setting-hint' }, t('settings.show_tasks_hint')),
+      el('label', { class: 'setting' },
+        el('input', {
+          type: 'checkbox', testid: 'setting-minimize-on-copy', checked: state.settings.minimizeOnCopy,
+          onchange: (event) => saveSetting('minimizeOnCopy', event.target.checked),
+        }),
+        el('span', {}, t('settings.minimize_on_copy'))),
+      el('p', { class: 'muted setting-hint' }, t('settings.minimize_on_copy_hint')),
       el('div', { class: 'reason-actions' },
         el('button', { testid: 'settings-close', onclick: closeSettings }, t('settings.close')))));
   }
@@ -2688,6 +2697,7 @@
       await api.copyText(text);
       button.textContent = t('action.copied');
       setTimeout(() => { button.textContent = t(labelKey); }, 1500);
+      if (state.settings.minimizeOnCopy) await api.minimizeWindow();
     });
   }
 

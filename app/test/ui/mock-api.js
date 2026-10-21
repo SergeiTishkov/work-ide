@@ -494,6 +494,9 @@ function installMockApi(fixture) {
     async copyText(text) {
       record('copyText', [text]);
     },
+    async minimizeWindow() {
+      record('minimizeWindow', []);
+    },
     async openCvFile(file) {
       record('openCvFile', [file]);
     },

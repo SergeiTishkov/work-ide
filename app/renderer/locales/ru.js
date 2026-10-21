@@ -122,6 +122,8 @@
   'settings.title': 'Настройки',
   'settings.show_tasks': 'Показывать список задач',
   'settings.show_tasks_hint': 'Скрытые задачи всё равно выполняются: не видно ни панели, ни её язычка.',
+  'settings.minimize_on_copy': 'Сворачивать приложение после копирования',
+  'settings.minimize_on_copy_hint': '«Copy URL» и «Copy CV/CL Directory Path» сворачивают окно, и на первый план выходит окно под ним, куда вставляется скопированное.',
   'settings.close': 'Закрыть',
   'run.inactive': 'Идентичность неактивна: её не собираем. Включить: Меню → Идентичности.',
   'identities.title': 'Идентичности',
