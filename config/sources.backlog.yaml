@@ -335,11 +335,16 @@ sources:
   # --- Queued: one employer's own career site, named by the owner ------------
 
   - name: dataart
-    status: pending
-    task: "tasks/1-triage/0043-dataart-careers.md"
-    kind: unknown
-    endpoint: "https://www.dataart.team/en/vacancies?locations=5770"
-    checked: "not yet: no request has been made"
+    status: implemented
+    implemented_at: "2026-10-21"
+    task: "tasks/3-done/0043-dataart-careers.md"
+    kind: json_api
+    endpoint: "https://www.dataart.team/dataart-team/api/vacancies/filter-content-page"
+    checked: >
+      2026-10-21: the page is a single-page app; its list and each vacancy come
+      from a JSON API under /dataart-team/api, no key, ~25 requests all 200.
+      117 vacancies, 29 open to Georgia, none .NET (the site's four .NET
+      vacancies hired from India, the USA or EU countries). tools/fetch_dataart.py.
     seen_by_the_owner: >
       2026-10-20, a screenshot: the location filter "Remote.Georgia" (id 5770
       in the URL) lists 26 vacancies of 117, in categories AI, Backend, Data &

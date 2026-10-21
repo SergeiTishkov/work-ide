@@ -56,6 +56,7 @@ import fetch_contractoruk  # noqa: E402
 import fetch_devitjobs  # noqa: E402
 import fetch_jobs_ch  # noqa: E402
 import fetch_jobserve  # noqa: E402
+import fetch_dataart  # noqa: E402
 import fetch_landing_jobs  # noqa: E402
 import fetch_mycareersfuture  # noqa: E402
 import fetch_outside_ir35  # noqa: E402
@@ -107,6 +108,8 @@ FETCHERS = {
     # Filters by engagement for real — part-time and contract as a field, not
     # a phrase. Added 2026-09-13 for a search looking for side work.
     "remoterocketship": fetch_remoterocketship.fetch,
+    # One employer's own vacancies, by the countries it hires from (task 0043).
+    "dataart": fetch_dataart.fetch,
 }
 
 # The classes the top run works on (the owner, 2026-10-17: "collect, check

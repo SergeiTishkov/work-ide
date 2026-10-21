@@ -230,6 +230,22 @@ sources:
     yield_notes: "Measured 2026-08-04: 50 records. It has a remote flag and a pay range."
     caveats: "Some vacancies are posted anonymously — the company is recovered from the URL."
 
+  - name: dataart
+    site: "dataart.team"
+    kind: json_api
+    remote_only: false
+    params_schema:
+      countries: "the countries a vacancy must hire from, as the site spells them (\"Georgia\"); none: every vacancy"
+      details: "fetch each vacancy's full text (one request each); true by default"
+    yield_notes: >
+      Measured 2026-10-21: 117 vacancies on the site, 29 open to Georgia (the
+      country), none of them .NET; its four .NET vacancies hired from India,
+      the USA or a list of EU countries.
+    caveats: >
+      One employer. No salary and no posting date in its API. Each vacancy
+      names the countries it hires from; the fetcher asks for the identity's
+      own, so `countries` belongs in the identity's sources file.
+
   - name: workingnomads
     site: "workingnomads.com"
     kind: json_api

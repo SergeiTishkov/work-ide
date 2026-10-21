@@ -16,4 +16,5 @@ the site serves its list as data. Nothing measured yet; the entry stays in
 `config/sources.backlog.yaml` with what is known.
 
 ## Items
-- TO DO - Measure the site (data behind the list, paging, the countries field) and write the plan here as the next items
+- DONE - Measured 2026-10-21: a JSON API under /dataart-team/api, no key, no Cloudflare. filter-fields-page gives the country ids, filter-content-page?countries=<id>&pageSize=200 the list (banner cards mixed in, contentType 1), /vacancy/<slug> the full text. No salary, no posting date. 117 vacancies, 29 open to Georgia, none .NET
+- DONE - `tools/fetch_dataart.py` with tests; in the catalogue and the pipeline; off in the SHARP template (the country is the residency); on in SHARP's own sources file with countries [Georgia]

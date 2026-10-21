@@ -117,6 +117,12 @@ sources:
   - name: landing_jobs
     enabled: true
 
+  - name: dataart
+    # DataArt's own vacancies, by the countries each hires from (task 0043).
+    # Off here: the country is the person's residency. An identity turns it
+    # on in its own sources file with params: {countries: ["<country>"]}.
+    enabled: false
+
   - name: workingnomads
     enabled: true
 
