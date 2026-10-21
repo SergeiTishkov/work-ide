@@ -3019,7 +3019,8 @@
     const active = state.tasks.filter((task) => ACTIVE_TASK.has(task.state)).length;
     tab.title = t('task.unfold');
     tab.replaceChildren(
-      state.tasks.some((task) => task.state === 'running') && el('span', { class: 'spinner small' }),
+      // the DOM's own replaceChildren writes a false as text: not el()
+      ...(state.tasks.some((task) => task.state === 'running') ? [el('span', { class: 'spinner small' })] : []),
       el('span', {}, t('task.list_title', { n: active })));
   }
 

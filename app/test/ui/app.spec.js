@@ -59,6 +59,11 @@ test('"Collect vacancies" queues a collection; the bottom panel lists it with it
   await expect(page.getByTestId('task-panel')).toBeVisible();
   await expect(page.getByTestId('task-empty')).toHaveText(en['task.empty']);
   await expect(page.getByTestId('task-tab')).toBeHidden();
+  // folded, the empty panel is a tab with its title only (task 0066: it said "false" first)
+  await page.getByTestId('task-panel-fold').click();
+  await expect(page.getByTestId('task-tab')).toHaveText(en['task.list_title'].replace('{n}', '0'));
+  await page.getByTestId('task-tab').click();
+  await expect(page.getByTestId('task-panel')).toBeVisible();
   await (await command(page, 'run-collect')).click();
   await expect(page.getByTestId('menu')).toHaveCount(0);   // an item closes the menu
   expect(await calls(page, 'enqueueTask')).toEqual([[{ kind: 'collect', identity: 'sharp' }]]);
