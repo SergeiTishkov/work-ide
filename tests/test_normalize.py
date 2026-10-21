@@ -140,3 +140,18 @@ def test_normalize_record_tags_coerced_to_list_of_strings():
     }
     rec = normalize.normalize_record(raw)
     assert rec["tags"] == ["single-tag-not-a-list"]
+
+
+def test_short_fields_lose_html_and_entities():
+    # task 0076: "AI &amp; Engineering" in 13 LinkedIn titles, jobspresso's
+    # "Spellbook<br>&nbsp;Canada" as a company
+    record = normalize.normalize_record({
+        "source": "x", "external_id": "1", "url": "https://example.com/1",
+        "title": "Software Engineer AI &amp; Engineering Automation (m/w/d)",
+        "company": "Nationwide Recruitment Service &amp; HR Careers",
+        "location_raw": "Berlin<br>&nbsp;Germany"})
+    assert record["title"] == "Software Engineer AI & Engineering Automation (m/w/d)"
+    assert record["company"] == "Nationwide Recruitment Service & HR Careers"
+    assert record["location_raw"] == "Berlin Germany"
+    assert normalize.plain("C# & .NET <Senior>") == "C# & .NET"
+    assert normalize.plain("  Acme  ") == "Acme"

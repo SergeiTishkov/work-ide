@@ -40,6 +40,30 @@ def _text(node, tag: str) -> str:
     return (found.text or "").strip() if found is not None and found.text else ""
 
 
+def _listing(item, name: str) -> str:
+    """A WP Job Manager field (job_listing:company, :location, :salary,
+    :job_category). Its namespace is the board's own address
+    (xmlns:job_listing="https://jobspresso.co"), so it is found by the
+    local name."""
+    for child in item:
+        if isinstance(child.tag, str) and child.tag.endswith("}" + name) and child.text:
+            return child.text.strip()
+    return ""
+
+
+_CREATOR_BREAK = re.compile(r"<br\s*/?>", re.IGNORECASE)
+_PIN = "\u26b2"   # the map-pin sign jobspresso puts before the place
+
+
+def split_creator(creator: str):
+    """jobspresso's dc:creator is the company and the place in one string of
+    HTML: "Spellbook<br>\u26b2&nbsp;Canada" -> ("Spellbook", "Canada").
+    Until 2026-10-22 it was taken whole as the company (task 0076)."""
+    company, _, place = _CREATOR_BREAK.sub("\n", creator or "", count=1).partition("\n")
+    return (common.strip_html(company).strip(),
+            common.strip_html(place).replace(_PIN, "").strip())
+
+
 def _split_title_and_company(raw_title: str, explicit_company: str):
     """The company comes from its own field when there is one; otherwise the
     title is parsed, in the form «Senior Developer at Acme»."""
@@ -57,13 +81,16 @@ def _item_to_common_schema(item, board: str, remote_only: bool, default_location
     if not raw_title or not url:
         return None
 
-    # Different boards put the company in different tags; the known ones are tried.
-    explicit_company = ""
-    for tag in ("{http://www.w3.org/2005/Atom}company", "company", "dc:creator",
-                "{http://purl.org/dc/elements/1.1/}creator"):
-        explicit_company = _text(item, tag)
-        if explicit_company:
-            break
+    # Different boards put the company in different tags; the known ones are
+    # tried. WP Job Manager's own field first: dc:creator on jobspresso holds
+    # the place as well.
+    explicit_company = _listing(item, "company")
+    creator_place = ""
+    if not explicit_company:
+        for tag in ("company", "{http://purl.org/dc/elements/1.1/}creator"):
+            explicit_company, creator_place = split_creator(_text(item, tag))
+            if explicit_company:
+                break
 
     title, company = _split_title_and_company(raw_title, explicit_company)
     if not company:
@@ -77,12 +104,16 @@ def _item_to_common_schema(item, board: str, remote_only: bool, default_location
         "title": title,
         "company": company,
         "url": url,
-        "location_raw": _text(item, "location") or default_location,
+        # Until 2026-10-22 every jobspresso vacancy took the default,
+        # "Worldwide", the US-only ones included (task 0076).
+        "location_raw": (_listing(item, "location") or creator_place
+                         or _text(item, "location") or default_location),
         "remote": True if remote_only else None,
         "tags": [f"board:{board}"] + categories[:5],
         "description_text": common.strip_html(_text(item, "description")),
         "posted_at": _text(item, "pubDate") or None,
-        "salary_raw": None,
+        "salary_raw": _listing(item, "salary") or None,
+        "employment_types": _listing(item, "job_category") or None,
     }
 
 

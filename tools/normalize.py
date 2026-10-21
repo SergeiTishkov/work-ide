@@ -83,6 +83,17 @@ def employment_types(value) -> list:
     return [t for t in EMPLOYMENT_TYPES if t in found]
 
 
+def plain(value) -> str:
+    """A short field (title, company, place) as text: HTML entities decoded,
+    tags dropped, whitespace collapsed. Until 2026-10-22 13 LinkedIn titles
+    said "AI &amp; Engineering" and 20 jobspresso companies carried
+    "<br>&nbsp;" and the place (task 0076)."""
+    text = str(value or "").strip()
+    if "<" in text or "&" in text:
+        text = " ".join(common.strip_html(text).split())
+    return text
+
+
 def normalize_record(raw: dict) -> Optional[dict]:
     """raw -> canonical vacancy dict (without first_seen/last_seen/computed —
     those are added when merging into the knowledge base in kb.py).
@@ -97,8 +108,8 @@ def normalize_record(raw: dict) -> Optional[dict]:
 
     source = str(raw["source"]).strip()
     external_id = str(raw["external_id"]).strip()
-    title = str(raw["title"]).strip()
-    company = str(raw["company"]).strip()
+    title = plain(raw["title"])
+    company = plain(raw["company"])
     url = str(raw["url"]).strip()
 
     description_text = common.strip_html(
@@ -141,7 +152,7 @@ def normalize_record(raw: dict) -> Optional[dict]:
         # The searches that served it, "<keyword> @ <place>" (LinkedIn; see
         # tools/linkedin_yield.py). None from a board that is not searched.
         "found_by": [str(q).strip() for q in raw.get("found_by") or [] if str(q).strip()] or None,
-        "location_raw": str(raw.get("location_raw") or "").strip(),
+        "location_raw": plain(raw.get("location_raw")),
         "remote": remote,
         # Where the employer or the board says the work happens: "remote",
         # "hybrid", "on-site", or None for "nobody said". A separate field from
