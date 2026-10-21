@@ -322,6 +322,18 @@ class Store {
 
   // { source: website } — a database collected before 2026-10-04 has none,
   // and the drop-down shows the source's own name.
+  // [{ source, site, total, shortlisted, applied }]: everything each board
+  // brought this identity ("Sources...", task 0054).
+  sourceYield(identity) {
+    const db = this.connection(identity);
+    if (!db) return [];
+    const sites = this.sourceSites(db);
+    return db.prepare(this.queries.source_yield).all({ identity }).map((r) => ({
+      source: r.source, site: sites[r.source] || null,
+      total: r.total, shortlisted: r.shortlisted || 0, applied: r.applied || 0,
+    }));
+  }
+
   sourceSites(db) {
     const row = db.prepare(this.queries.source_sites).get();
     if (!row || !row.value) return {};

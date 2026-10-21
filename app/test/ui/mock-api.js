@@ -319,6 +319,11 @@ function installMockApi(fixture) {
       for (const row of narrowed(identity, view, 'ages')) totals[ageOf(row)] += 1;
       return totals;
     },
+    // fixture.sourceHealth: { identity: rows } as main/source-health.js builds them
+    async sourceHealth(identity) {
+      record('sourceHealth', [identity]);
+      return copy((data.sourceHealth || {})[identity] || []);
+    },
     async listRoles(identity, view) {
       record('listRoles', [identity, view]);
       const totals = { stack: 0, off_stack: 0, stretch: 0 };

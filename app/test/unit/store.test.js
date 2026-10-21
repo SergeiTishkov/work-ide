@@ -437,6 +437,22 @@ test('the source list counts each board under the status filter', () => {
   store.closeAll();
 });
 
+test("each board's yield: every vacancy it brought, shortlisted now and applied to (task 0054)", () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  db.prepare("INSERT INTO meta (key, value) VALUES ('source_sites', ?)").run(JSON.stringify({ linkedin: 'linkedin.com' }));
+  db.prepare("UPDATE vacancy_identity SET class = 'not_a_fit' WHERE vacancy_id IN ('old00', 'old01')").run();
+  db.prepare("UPDATE vacancy_identity SET duplicate_of = 'old03' WHERE vacancy_id = 'old02'").run();
+  db.close();
+  store.setFeedback('test', 'new0', 'applied');
+  store.setFeedback('test', 'old05', 'rejected', 'not for me');
+  const rows = Object.fromEntries(store.sourceYield('test').map((r) => [r.source, r]));
+  assert.deepEqual(rows.linkedin, { source: 'linkedin', site: 'linkedin.com', total: 19, shortlisted: 17, applied: 0 });
+  assert.deepEqual(rows.devitjobs, { source: 'devitjobs', site: null, total: 3, shortlisted: 3, applied: 1 });
+  assert.deepEqual(store.sourceYield('other'), []);
+  store.closeAll();
+});
+
 test('each board comes with its website when the selection recorded them', () => {
   const { store, file } = setup();
   const db = new DatabaseSync(file);

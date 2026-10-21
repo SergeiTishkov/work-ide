@@ -1023,6 +1023,7 @@
     const parts = [renderToolbar(identity, info)];
     if (state.cleanup) parts.push(renderCleanup());
     if (state.identitiesPopup) parts.push(renderIdentities());
+    if (state.sourcesPopup) parts.push(renderSources());
     if (!info.selection) {
       parts.push(el('p', { class: 'empty', testid: 'never-collected' }, t('identity.never_collected')));
     } else if (!info.segments.length) {
@@ -1151,6 +1152,7 @@
     feedbackItem(pending),
     menuItem({ testid: 'cleanup', text: t('cleanup.button'), title: t('cleanup.hint'), onclick: openCleanup }),
     menuItem({ testid: 'open-identities', text: t('menu.identities'), onclick: openIdentities }),
+    menuItem({ testid: 'open-sources', text: t('menu.sources'), onclick: openSources }),
     menuItem({ testid: 'open-scheduler', text: t('menu.scheduler'), onclick: openScheduler }),
     menuItem({ testid: 'open-settings', text: t('menu.settings'), onclick: openSettings }));
     return el('span', { class: 'commands' }, button, menu);
@@ -1224,6 +1226,76 @@
       p.error && el('p', { class: 'cleanup-error', testid: 'identities-error' }, p.error),
       el('div', { class: 'reason-actions' },
         el('button', { testid: 'identities-close', onclick: closeIdentities }, t('identities.close')))));
+  }
+
+  // --- "Sources...": how each board fares and what it brings (task 0054) ------
+  // The last attempt of each board from the pipeline's state file, beside
+  // every vacancy it brought this identity: in the base, shortlisted now,
+  // applied to. Failing boards first. Read once on opening.
+  async function openSources() {
+    const identity = state.active;
+    state.sourcesPopup = { identity, rows: null, error: null };
+    render();
+    try {
+      const rows = await api.sourceHealth(identity);
+      if (state.sourcesPopup && state.sourcesPopup.identity === identity) state.sourcesPopup.rows = rows;
+    } catch (error) {
+      if (state.sourcesPopup) state.sourcesPopup.error = error.message || String(error);
+    }
+    render();
+  }
+
+  function closeSources() {
+    state.sourcesPopup = null;
+    render();
+  }
+
+  function sourceRunText(row) {
+    if (!row.lastAttempt) return t('sources.not_run');
+    if (row.failures > 0) {
+      return t('sources.failing', {
+        count: row.failures,
+        since: row.lastSuccess ? formatDate(row.lastSuccess) : t('sources.never'),
+      });
+    }
+    return t('sources.ok', { date: formatDate(row.lastAttempt), count: row.fetched == null ? 0 : row.fetched });
+  }
+
+  function renderSources() {
+    const p = state.sourcesPopup;
+    const body = p.error
+      ? el('p', { class: 'cleanup-error', testid: 'sources-error' }, p.error)
+      : !p.rows
+        ? el('p', { class: 'muted', testid: 'sources-loading' }, t('sources.loading'))
+        : !p.rows.length
+          ? el('p', { class: 'muted', testid: 'sources-empty' }, t('sources.empty'))
+          : el('table', { class: 'sources-table' },
+            el('thead', {}, el('tr', {},
+              el('th', {}, t('sources.col.source')), el('th', {}, t('sources.col.run')),
+              el('th', { class: 'num' }, t('sources.col.total')),
+              el('th', { class: 'num' }, t('sources.col.shortlisted')),
+              el('th', { class: 'num' }, t('sources.col.applied')))),
+            el('tbody', {}, ...p.rows.map((row) => el('tr', {
+              class: row.failures > 0 ? 'failing' : null, testid: `source-row-${row.source}`,
+            },
+            el('td', { title: row.site ? row.source : null }, row.site || row.source),
+            el('td', { testid: `source-run-${row.source}` },
+              sourceRunText(row),
+              row.error && el('div', { class: 'muted source-error', title: row.error },
+                row.error.split('\n')[0].slice(0, 160))),
+            el('td', { class: 'num' }, String(row.total)),
+            el('td', { class: 'num', testid: `source-shortlisted-${row.source}` }, String(row.shortlisted)),
+            el('td', { class: 'num' }, String(row.applied))))));
+    return el('div', {
+      class: 'overlay', testid: 'sources-overlay',
+      onclick: (event) => { if (event.target === event.currentTarget) closeSources(); },
+    },
+    el('div', { class: 'popup sources', role: 'dialog', 'aria-modal': 'true', testid: 'sources-dialog' },
+      el('h2', {}, t('sources.title')),
+      el('p', { class: 'muted' }, t('sources.explain')),
+      body,
+      el('div', { class: 'reason-actions' },
+        el('button', { testid: 'sources-close', onclick: closeSources }, t('sources.close')))));
   }
 
   // --- "Settings...": the app's own settings (the owner, 2026-10-21) ------------

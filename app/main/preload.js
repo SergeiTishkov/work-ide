@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('api', {
   listCompanies: (identity, view) => call('companies', identity, view),
   listAges: (identity, view) => call('ages', identity, view),
   listRoles: (identity, view) => call('roles', identity, view),
+  sourceHealth: (identity) => call('source-health', identity),
   // filters: { ages, statuses, classes } (main/cleanup.js); a dry run counts
   cleanup: (identity, filters, dryRun) => call('cleanup', identity, filters, Boolean(dryRun)),
   setFeedback: (identity, id, status, reason) => call('set-feedback', identity, id, status, reason ?? null),

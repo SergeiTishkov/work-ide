@@ -357,6 +357,20 @@ WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
   AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
 GROUP BY role;
 
+-- name: source_yield
+-- "Sources..." (task 0054): each board's vacancies the identity holds, how
+-- many of them are shortlisted now and how many were applied to. Every
+-- vacancy, not the latest selection: a board is judged by all it brought.
+-- Near-duplicates are left out, as in the list.
+SELECT json_extract(v.data, '$.source') AS source,
+       COUNT(*) AS total,
+       SUM(vi.class IN ('hot_lead', 'worth_a_look', 'long_shot')) AS shortlisted,
+       SUM(vi.feedback_status NOT IN ('new', 'rejected', 'bugged', 'expired')) AS applied
+FROM vacancy_identity vi
+JOIN vacancies v ON v.id = vi.vacancy_id
+WHERE vi.identity_id = :identity AND vi.duplicate_of IS NULL
+GROUP BY source;
+
 -- name: pipeline_running
 -- The latest run still marked running, of any identity: the base is shared,
 -- so one run at a time (tools/runstate.py). Whether it is really alive is

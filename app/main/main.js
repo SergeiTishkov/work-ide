@@ -14,6 +14,7 @@ const { QueueClient } = require('./queue');
 const { WorkerKeeper } = require('./workers');
 const { documentsState, resolveRoot, vacancyDir } = require('./documents');
 const { listIdentities } = require('./identities');
+const { readSourceState, sourceHealth } = require('./source-health');
 const { codeStamp, refreshAction } = require('./code-stamp');
 
 const startedWithCode = codeStamp();
@@ -149,6 +150,11 @@ function registerIpc(window) {
   handle('companies', (identity, view) => data.call('companies', identity, view || {}));
   handle('ages', (identity, view) => data.call('ages', identity, view || {}));
   handle('roles', (identity, view) => data.call('roles', identity, view || {}));
+  handle('source-health', async (identity) => {
+    const entry = identities.find((e) => e.prefix === identity);
+    if (!entry) throw new Error(`unknown identity: ${identity}`);
+    return sourceHealth(readSourceState(entry.dataDir, identity), await data.call('sourceYield', identity));
+  });
   // Deleting compacts the file (VACUUM), which an open connection can hold
   // up: both close first and open again on the next read.
   handle('cleanup', async (identity, filters, dryRun) => {

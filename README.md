@@ -225,6 +225,11 @@ Work can run on a timetable: the app's Menu → "Task scheduler…", or
 A schedule is due while a worker runs; a run missed while the computer was
 off or asleep is caught up once or skipped, as the schedule says.
 
+Menu → "Sources…" shows each board of the open identity: its last run (how
+many it fetched, or how many runs in a row it has failed and its error) and
+every vacancy it has brought: in the base, in the shortlist now, applied
+to. That is how a board is judged after a couple of runs.
+
 The app's tests
 (`cd app && npm test`) spend no tokens: the agent is mocked at the boundary.
 

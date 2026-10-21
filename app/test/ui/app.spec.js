@@ -1094,6 +1094,41 @@ test('"Identities" turns one off: it cannot be collected, its tab goes once anot
   await expect(await command(page, 'run-collect')).toBeEnabled();
 });
 
+test('"Sources" lists each board of the open identity, failing ones in red with their error', async ({ page }) => {
+  // task 0054
+  const fixture = standardFixture();
+  fixture.sourceHealth = {
+    sharp: [
+      { source: 'jobicy', site: 'jobicy.com', total: 40, shortlisted: 0, applied: 0,
+        lastAttempt: '2026-10-21T08:00:00+00:00', lastSuccess: '2026-10-18T08:00:00+00:00', failures: 3,
+        error: 'HTTPError: 503 Service Unavailable\nmore', fetched: 0 },
+      { source: 'linkedin', site: 'linkedin.com', total: 42007, shortlisted: 39, applied: 4,
+        lastAttempt: '2026-10-21T09:00:00+00:00', lastSuccess: '2026-10-21T09:00:00+00:00', failures: 0,
+        error: null, fetched: 7960 },
+      { source: 'manual', site: null, total: 2, shortlisted: 1, applied: 1,
+        lastAttempt: null, lastSuccess: null, failures: 0, error: null, fetched: null },
+    ],
+  };
+  await open(page, fixture);
+  await (await command(page, 'open-sources')).click();
+  const dialog = page.getByTestId('sources-dialog');
+  await expect(dialog).toContainText(en['sources.explain']);
+  expect(await calls(page, 'sourceHealth')).toEqual([['sharp']]);
+  await expect(page.getByTestId('source-row-jobicy')).toHaveClass(/failing/);
+  await expect(page.getByTestId('source-run-jobicy')).toContainText('failed runs in a row: 3; last success: ');
+  await expect(page.getByTestId('source-run-jobicy')).toContainText('HTTPError: 503 Service Unavailable');
+  await expect(page.getByTestId('source-run-jobicy')).not.toContainText('more');
+  await expect(page.getByTestId('source-run-linkedin')).toContainText('7960 fetched');
+  await expect(page.getByTestId('source-shortlisted-linkedin')).toHaveText('39');
+  await expect(page.getByTestId('source-run-manual')).toHaveText(en['sources.not_run']);
+  await page.getByTestId('sources-close').click();
+  await expect(dialog).toHaveCount(0);
+
+  await page.getByTestId('identity-tab-partsharp').click();
+  await (await command(page, 'open-sources')).click();
+  await expect(page.getByTestId('sources-empty')).toBeVisible();
+});
+
 test('an inactive identity has no tab, and the app opens on an active one', async ({ page }) => {
   const fixture = standardFixture();
   fixture.identities[1].active = false;   // partsharp
@@ -1914,14 +1949,14 @@ test('Refresh is a button of its own, left of the theme and the language, the sa
   await expect(page.getByTestId('menu').getByTestId('refresh')).toHaveCount(0);
 });
 
-test('the menu holds Collect, Review feedback, Clean up, Identities, Settings; "Clean up" filters, counts, deletes', async ({ page }) => {
+test('the menu holds Collect, Review feedback, Clean up, Identities, Sources, Settings; "Clean up" filters, counts, deletes', async ({ page }) => {
   await open(page);
   const order = await page.locator('.menu-slot > *').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.className));
   expect(order).toEqual(['commands']);
   await command(page, 'cleanup');
   const items = await page.getByTestId('menu').locator('[role="menuitem"]')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid || n.querySelector('[data-testid]').dataset.testid));
-  expect(items).toEqual(['run-collect', 'run-feedback', 'cleanup', 'open-identities', 'open-scheduler', 'open-settings']);
+  expect(items).toEqual(['run-collect', 'run-feedback', 'cleanup', 'open-identities', 'open-sources', 'open-scheduler', 'open-settings']);
   await page.getByTestId('cleanup').click();
   const dialog = page.getByTestId('cleanup-dialog');
   await expect(dialog).toBeVisible();
