@@ -1811,6 +1811,44 @@ test('"Age" stands after "Status": today, a week, a month, older, each with its 
   await expect(byId(page, 'a1')).toBeVisible();
 });
 
+// task 0049 (the owner, 2026-10-21): b1 is a stretch, a2r another stack the CV fits, a1 on the stack
+test('"Category" shows the stretches alone or hides them, each kind of role with its count', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('fit-filter').click();
+  await expect(page.getByTestId('role-option-all')).toHaveText(`${en['filter.role_all']} (3)`);
+  await expect(page.getByTestId('role-option-stack')).toHaveText(`${en['filter.role.stack']} (1)`);
+  await expect(page.getByTestId('role-option-off_stack')).toHaveText(`${en['filter.role.off_stack']} (1)`);
+  await expect(page.getByTestId('role-option-stretch')).toHaveText(`${en['filter.role.stretch']} (1)`);
+  await page.keyboard.press('Escape');
+
+  await check(page, 'fit-filter', ['stretch'], 'role-option-');
+  expect(await lastListing(page)).toEqual(['sharp', view({ roles: ['stretch'] })]);
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(1);
+  await expect(byId(page, 'b1')).toBeVisible();
+  await expect(page.getByTestId('fit-filter-value')).toHaveText(en['filter.role.stretch']);
+  // the classes count under it, and the kinds of role keep their own numbers
+  await page.getByTestId('fit-filter').click();
+  await expect(page.getByTestId('fit-option-hot_lead')).toHaveText(`${en['class.hot_lead']} (0)`);
+  await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${en['class.worth_a_look']} (1)`);
+  await expect(page.getByTestId('role-option-stack')).toHaveText(`${en['filter.role.stack']} (1)`);
+  await page.keyboard.press('Escape');
+
+  // hidden: every kind but the stretches
+  await check(page, 'fit-filter', ['stack', 'off_stack'], 'role-option-');
+  expect((await lastListing(page))[1].roles).toEqual(['stack', 'off_stack']);
+  await expect(byId(page, 'b1')).toHaveCount(0);
+  await expect(byId(page, 'a1')).toBeVisible();
+  await expect(byId(page, 'a2r')).toBeVisible();
+
+  await page.getByTestId('fit-filter').click();
+  await page.getByTestId('role-option-all').click();
+  await expect(page.getByTestId('role-option-stretch')).toHaveAttribute('data-state', 'on');
+  await page.keyboard.press('Escape');
+  expect(await lastListing(page)).toEqual(['sharp', VIEW]);
+  await expect(byId(page, 'b1')).toBeVisible();
+  await expect(page.getByTestId('fit-filter-value')).toHaveText(en['filter.fit_all']);
+});
+
 test('the stub\'s text has one width, so the buttons after it stand in one column', async ({ page }) => {
   await open(page);
   await byId(page, 'a1').getByTestId('btn-applied').click();

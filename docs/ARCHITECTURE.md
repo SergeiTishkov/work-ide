@@ -79,6 +79,12 @@ shown and the names hidden, not the names shown: with a shown-list, unticking
 one name would freeze the list, and every company a later run brings would be
 hidden.
 
+"Category" (task 0049, 2026-10-21) also takes the kind of role under the
+classes: on the CV's stack, another stack the CV fits, or a stretch for the
+CV, worked out in `view_pool` from the view's `stretch` mark (ROLE in
+`schemas/queries.sql`) and counted by `view_roles` with the kinds aside. The
+person lists the stretches alone, or hides them, without a sixth drop-down.
+
 A text field after the drop-downs (2026-10-19) takes words: a row stays when
 every word is part of its title, company, intermediary's name, board, link,
 hiring country or technologies (WORDS in `schemas/queries.sql`). It is applied

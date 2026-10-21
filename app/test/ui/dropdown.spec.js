@@ -56,7 +56,7 @@ test('the keyboard: arrows move, Enter checks and leaves the list open, Escape c
   await settled(page);
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', {
     segments: null, statuses: ['new'], fresh: ['fresh', 'earlier'], sources: null, fits: null, companies: null, ages: null,
-    text: '',
+    roles: null, text: '',
   }]);
   await expect(page.getByTestId('filter-value')).toHaveText(en['filter.new']);
   await page.keyboard.press('Escape');
@@ -86,7 +86,7 @@ test('quick clicks ask for one list, and a spinner stands in for it until it com
   const asked = (await calls(page, 'loadListing')).slice(before);
   expect(asked).toEqual([['sharp', {
     segments: null, statuses: ['new', 'applied'], fresh: ['fresh', 'earlier'], sources: null, fits: null, companies: null, ages: null,
-    text: '',
+    roles: null, text: '',
   }]]);
   await page.evaluate(() => window.__releaseListing());
   await settled(page);

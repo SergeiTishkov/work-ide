@@ -42,6 +42,9 @@ const FRESHNESS = ['fresh', 'earlier'];
 const COMPANY_KINDS = ['marketplace', 'agency', 'reposter', 'other'];
 // The "Age" drop-down's bands (AGE in schemas/queries.sql).
 const AGES = ['today', 'week', 'month', 'older'];
+// The "Category" drop-down's second group (ROLE in schemas/queries.sql, task
+// 0049): on the CV's stack, another stack the CV fits, a stretch for the CV.
+const ROLES = ['stack', 'off_stack', 'stretch'];
 // The first answers, set directly; the funnel beyond "applied" is reached
 // only step by step (advance).
 const STATUSES = ['new', 'applied', 'rejected', 'bugged', 'expired'];
@@ -179,7 +182,8 @@ class Store {
 
   // The view's query parameters. `segments` null means every market: the one
   // holding everything, or all of them when the selection names none.
-  // `sources` and `fits` null mean every board and class; `companies`
+  // `sources`, `fits`, `ages` and `roles` null mean every board, class, age
+  // and kind of role; `companies`
   // null every company, or { kinds: [shown], hidden: [names hidden among them] }.
   // `text` the words a row must hold, empty for any.
   viewParams(db, identity, selection, view = {}) {
@@ -187,8 +191,9 @@ class Store {
     const fresh = view.fresh || [];
     const unknown = [...statuses.filter((s) => !VIEW_STATUSES.includes(s)),
       ...fresh.filter((f) => !FRESHNESS.includes(f)),
-      ...(view.ages || []).filter((a) => !AGES.includes(a))];
-    if (unknown.length) throw new Error(`unknown status, freshness or age: ${unknown.join(', ')}`);
+      ...(view.ages || []).filter((a) => !AGES.includes(a)),
+      ...(view.roles || []).filter((r) => !ROLES.includes(r))];
+    if (unknown.length) throw new Error(`unknown status, freshness, age or role: ${unknown.join(', ')}`);
     const companies = view.companies == null ? null
       : { kinds: view.companies.kinds || [], hidden: view.companies.hidden || [] };
     const kinds = companies ? companies.kinds.filter((k) => !COMPANY_KINDS.includes(k)) : [];
@@ -210,6 +215,7 @@ class Store {
       fits: listed(view.fits),
       companies: companies && JSON.stringify(companies),
       ages: listed(view.ages),
+      roles: listed(view.roles),
       words: wordsOf(view.text),
     };
   }
@@ -299,6 +305,18 @@ class Store {
     if (!selection) return result;
     const { ages, ...params } = this.viewParams(db, identity, selection, view);   // the ages aside
     for (const row of db.prepare(this.queries.view_ages).all(params)) result[row.age] = row.total;
+    return result;
+  }
+
+  // { kind of role: how many }, the chosen kinds aside: the "Category"
+  // drop-down's second group (task 0049).
+  roles(identity, view) {
+    const result = Object.fromEntries(ROLES.map((r) => [r, 0]));
+    const db = this.connection(identity);
+    const selection = db && this.latestSelection(db, identity);
+    if (!selection) return result;
+    const { roles, ...params } = this.viewParams(db, identity, selection, view);   // the roles aside
+    for (const row of db.prepare(this.queries.view_roles).all(params)) result[row.role] = row.total;
     return result;
   }
 
@@ -422,5 +440,5 @@ class Store {
 }
 
 module.exports = {
-  Store, SchemaMismatchError, STATUSES, FUNNEL, NEW, DENIED, VIEW_STATUSES, FRESHNESS, COMPANY_KINDS, AGES, nowIso,
+  Store, SchemaMismatchError, STATUSES, FUNNEL, NEW, DENIED, VIEW_STATUSES, FRESHNESS, COMPANY_KINDS, AGES, ROLES, nowIso,
 };

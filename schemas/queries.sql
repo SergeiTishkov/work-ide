@@ -36,10 +36,11 @@
 --              Hidden names, not shown ones, so an intermediary a later run
 --              brings is listed (the owner, 2026-10-14);
 --   :ages      NULL for any age, or the ages chosen (see AGE);
+--   :roles     NULL for every kind of role, or the kinds chosen (see ROLE);
 --   :words     NULL for no text filter, or the words typed (see WORDS).
 -- A row is shown when its status is one of :statuses AND its freshness one
--- of :fresh, and the board, class, company, age and words match. view_pool is what all
--- five queries read; `-- include: view_pool` stands for its text (the
+-- of :fresh, and the board, class, company, age, role and words match. view_pool is what
+-- all the view queries read; `-- include: view_pool` stands for its text (the
 -- loaders in tools/selections.py and app/main/queries.js put it in).
 --
 -- COMPANY KINDS. Which company is an intermediary is Python's call
@@ -71,6 +72,11 @@
 -- up to 30, 'older' beyond. Each is a band of its own: "up to a week" is
 -- 'today' and 'week' checked together.
 --
+-- ROLE (task 0049, the owner, 2026-10-21): how the role stands against the
+-- CV, from view.stretch. 'stack' when it is on the CV's stack (no stretch),
+-- 'off_stack' for another stack the CV fits (fit 'fits'), 'stretch' for a
+-- stretch for the CV (fit 'stretch').
+--
 -- WORDS (the owner, 2026-10-19): the text field over the drop-downs. A row
 -- matches when every word typed is part of its title, company (and the
 -- intermediary's name), board, link, hiring country or technologies. Both
@@ -82,7 +88,7 @@
 -- EACH DROP-DOWN'S OWN NUMBERS. A drop-down counts its rows under the other
 -- drop-downs, not under itself: view_sources ignores :sources,
 -- view_class_totals ignores :fits, view_companies ignores :companies,
--- view_ages ignores :ages, and view_counts counts the statuses under :fresh and the freshness under
+-- view_ages ignores :ages, view_roles ignores :roles, and view_counts counts the statuses under :fresh and the freshness under
 -- :statuses.
 
 -- name: latest_selection
@@ -107,7 +113,7 @@ SELECT display_name AS value FROM identities WHERE id = :identity;
 SELECT value FROM meta WHERE key = 'source_sites';
 
 -- name: view_pool
--- Not a query of its own: the common start of the five below.
+-- Not a query of its own: the common start of the view queries below.
 runs AS (
   SELECT id, kind FROM selections WHERE identity_id = :identity
 ),
@@ -190,7 +196,13 @@ pool AS (
            WHEN age_days <= 7 THEN 'week'
            WHEN age_days <= 30 THEN 'month'
            ELSE 'older'
-         END AS age
+         END AS age,
+         -- how the role stands against the CV (ROLE)
+         CASE json_extract(view, '$.stretch.fit')
+           WHEN 'stretch' THEN 'stretch'
+           WHEN 'fits' THEN 'off_stack'
+           ELSE 'stack'
+         END AS role
   FROM joined
   WHERE :words IS NULL
      OR NOT EXISTS (SELECT 1 FROM json_each(:words) w WHERE instr(haystack, fold(w.value)) = 0)
@@ -212,6 +224,7 @@ matched AS (
            OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
                AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
     AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
+    AND (:roles IS NULL OR role IN (SELECT value FROM json_each(:roles)))
 ),
 ranked AS (
   SELECT *, ROW_NUMBER() OVER (
@@ -249,6 +262,7 @@ base AS (
            OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
                AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
     AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
+    AND (:roles IS NULL OR role IN (SELECT value FROM json_each(:roles)))
 )
 SELECT 'status' AS axis, feedback_status AS key, COUNT(*) AS total
 FROM base
@@ -274,6 +288,7 @@ WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
          OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
              AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
   AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
+  AND (:roles IS NULL OR role IN (SELECT value FROM json_each(:roles)))
 GROUP BY class;
 
 -- name: view_sources
@@ -289,6 +304,7 @@ WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
          OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
              AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
   AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
+  AND (:roles IS NULL OR role IN (SELECT value FROM json_each(:roles)))
 GROUP BY source
 ORDER BY total DESC, source;
 
@@ -304,6 +320,7 @@ WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
   AND (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
   AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
   AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
+  AND (:roles IS NULL OR role IN (SELECT value FROM json_each(:roles)))
 GROUP BY company_kind, company_name
 ORDER BY total DESC, kind, name;
 
@@ -320,7 +337,25 @@ WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
   AND (:companies IS NULL
          OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
              AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
+  AND (:roles IS NULL OR role IN (SELECT value FROM json_each(:roles)))
 GROUP BY age;
+
+-- name: view_roles
+-- The "Category" drop-down's second group (ROLE): (role, how many) under
+-- every other drop-down.
+WITH
+-- include: view_pool
+SELECT role, COUNT(*) AS total
+FROM pool
+WHERE feedback_status IN (SELECT value FROM json_each(:statuses))
+  AND fresh IN (SELECT value FROM json_each(:fresh))
+  AND (:sources IS NULL OR source IN (SELECT value FROM json_each(:sources)))
+  AND (:fits IS NULL OR class IN (SELECT value FROM json_each(:fits)))
+  AND (:companies IS NULL
+         OR (company_kind IN (SELECT value FROM json_each(:companies, '$.kinds'))
+             AND COALESCE(company_name, '') NOT IN (SELECT value FROM json_each(:companies, '$.hidden'))))
+  AND (:ages IS NULL OR age IN (SELECT value FROM json_each(:ages)))
+GROUP BY role;
 
 -- name: pipeline_running
 -- The latest run still marked running, of any identity: the base is shared,

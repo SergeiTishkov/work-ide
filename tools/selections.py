@@ -233,12 +233,15 @@ COMPANY_KINDS = ("marketplace", "agency", "reposter", "other")
 # The "Age" drop-down's bands (AGE in schemas/queries.sql): posted today, up to
 # a week, up to a month, longer ago.
 AGES = ("today", "week", "month", "older")
+# The "Category" drop-down's second group (ROLE in schemas/queries.sql, task
+# 0049): on the CV's stack, another stack the CV fits, a stretch for the CV.
+ROLES = ("stack", "off_stack", "stretch")
 
 
 def view(segments, statuses=NEW, fresh=FRESHNESS, sources=None, fits=None, companies=None,
-         ages=None, text="") -> dict:
-    """What to list. `sources`, `fits` and `ages` are None for every board,
-    class and age (a list, even an empty one, names them). `companies` is None
+         ages=None, roles=None, text="") -> dict:
+    """What to list. `sources`, `fits`, `ages` and `roles` are None for every
+    board, class, age and kind of role (a list, even an empty one, names them). `companies` is None
     for every company, or {"kinds": [the kinds shown], "hidden": [names hidden
     among them]} — see THE VIEW in schemas/queries.sql. `text` is the words
     a row must hold (WORDS there), empty for any."""
@@ -246,6 +249,7 @@ def view(segments, statuses=NEW, fresh=FRESHNESS, sources=None, fits=None, compa
             "sources": None if sources is None else list(sources),
             "fits": None if fits is None else list(fits),
             "ages": None if ages is None else list(ages),
+            "roles": None if roles is None else list(roles),
             "companies": None if companies is None else {
                 "kinds": list(companies.get("kinds") or []),
                 "hidden": list(companies.get("hidden") or [])}}
@@ -255,8 +259,9 @@ def _params(selection_id: int, chosen: dict) -> dict:
     unknown = [s for s in chosen["statuses"] if s not in STATUSES]
     unknown += [f for f in chosen["fresh"] if f not in FRESHNESS]
     unknown += [a for a in chosen.get("ages") or () if a not in AGES]
+    unknown += [r for r in chosen.get("roles") or () if r not in ROLES]
     if unknown:
-        raise ValueError(f"unknown status, freshness or age: {unknown}")
+        raise ValueError(f"unknown status, freshness, age or role: {unknown}")
     companies = chosen.get("companies")
     if companies is not None:
         unknown = [k for k in companies["kinds"] if k not in COMPANY_KINDS]
@@ -275,6 +280,7 @@ def _params(selection_id: int, chosen: dict) -> dict:
         "fits": listed(chosen.get("fits")),
         "companies": None if companies is None else json.dumps(companies),
         "ages": listed(chosen.get("ages")),
+        "roles": listed(chosen.get("roles")),
         "words": words(chosen.get("text")),
     }
 
@@ -341,6 +347,15 @@ def ages(conn, selection_id: int, chosen: dict) -> dict:
     result = {age: 0 for age in AGES}
     for age, total in conn.execute(load_queries()["view_ages"], _params(selection_id, chosen)):
         result[age] = total
+    return result
+
+
+def roles(conn, selection_id: int, chosen: dict) -> dict:
+    """{kind of role: how many the view holds}, the chosen kinds aside: the
+    "Category" drop-down's second group."""
+    result = {role: 0 for role in ROLES}
+    for role, total in conn.execute(load_queries()["view_roles"], _params(selection_id, chosen)):
+        result[role] = total
     return result
 
 

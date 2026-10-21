@@ -203,6 +203,7 @@ function installMockApi(fixture) {
       && (aside === 'fits' || view.fits == null || view.fits.includes(row.class))
       && (aside === 'companies' || companyShown(row, view.companies))
       && (aside === 'ages' || view.ages == null || view.ages.includes(ageOf(row)))
+      && (aside === 'roles' || view.roles == null || view.roles.includes(roleOf(row)))
       && holdsWords(row, view.text));
   }
 
@@ -221,6 +222,9 @@ function installMockApi(fixture) {
   // The age band the query works out of the posted date (schemas/queries.sql,
   // AGE); here a row's own `age`, else today.
   const ageOf = (row) => row.age || 'today';
+
+  // The kind of role the query works out of view.stretch (schemas/queries.sql, ROLE).
+  const roleOf = (row) => ({ stretch: 'stretch', fits: 'off_stack' })[(row.view.stretch || {}).fit] || 'stack';
 
   const NOW = '2026-10-01T10:00:00+00:00';
 
@@ -313,6 +317,12 @@ function installMockApi(fixture) {
       record('listAges', [identity, view]);
       const totals = { today: 0, week: 0, month: 0, older: 0 };
       for (const row of narrowed(identity, view, 'ages')) totals[ageOf(row)] += 1;
+      return totals;
+    },
+    async listRoles(identity, view) {
+      record('listRoles', [identity, view]);
+      const totals = { stack: 0, off_stack: 0, stretch: 0 };
+      for (const row of narrowed(identity, view, 'roles')) totals[roleOf(row)] += 1;
       return totals;
     },
     async listCompanies(identity, view) {

@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('api', {
   // false turns the identity off: nothing collects for it
   setIdentityActive: (identity, active) => call('set-identity-active', identity, Boolean(active)),
   loadSegments: (identity) => call('segments', identity),
-  // view: { segments, statuses, fresh, sources, fits, companies, ages, text } (store.viewParams);
+  // view: { segments, statuses, fresh, sources, fits, companies, ages, roles, text } (store.viewParams);
   // page: { shown: { class: rows }, expanded: [class] }
   loadListing: (identity, view, page) => call('listing', identity, view, page || {}),
   classTotals: (identity, view) => call('class-totals', identity, view),
@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('api', {
   listSources: (identity, view) => call('sources', identity, view),
   listCompanies: (identity, view) => call('companies', identity, view),
   listAges: (identity, view) => call('ages', identity, view),
+  listRoles: (identity, view) => call('roles', identity, view),
   // filters: { ages, statuses, classes } (main/cleanup.js); a dry run counts
   cleanup: (identity, filters, dryRun) => call('cleanup', identity, filters, Boolean(dryRun)),
   setFeedback: (identity, id, status, reason) => call('set-feedback', identity, id, status, reason ?? null),

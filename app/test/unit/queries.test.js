@@ -28,7 +28,7 @@ test('the company kinds are a table built once, looked up by an index, in every 
   db.exec(fs.readFileSync(path.join(SCHEMA_DIR, 'db.sql'), 'utf8'));
   const queries = loadQueries(SCHEMA_DIR);
   for (const name of ['view_listing', 'view_counts', 'view_class_totals', 'view_sources', 'view_companies',
-    'view_ages']) {
+    'view_ages', 'view_roles']) {
     const params = Object.fromEntries([...queries[name].matchAll(/:(\w+)/g)].map((m) => [m[1], null]));
     const plan = db.prepare(`EXPLAIN QUERY PLAN ${queries[name]}`).all(params).map((r) => r.detail);
     assert.ok(plan.includes('MATERIALIZE company_kinds'), `${name}: ${plan.join(' | ')}`);

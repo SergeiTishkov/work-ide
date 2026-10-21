@@ -23,15 +23,23 @@
   // markets, boards, classes or companies: all of them, also the ones a later
   // run adds. companies: { kinds: [shown], hidden: [names hidden among them] }.
   // text: the words typed in the text field (WORDS there), '' for none.
+  // roles: null for every kind of role (ROLE there).
   const DEFAULT_VIEW = {
     segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, fits: null, companies: null, ages: null,
-    text: '',
+    roles: null, text: '',
   };
   // The "Age" drop-down (the owner, 2026-10-17): how long ago it was posted,
   // in bands of their own (schemas/queries.sql, AGE).
   const AGES = ['today', 'week', 'month', 'older'];
   const AGE_KEYS = {
     today: 'filter.age.today', week: 'filter.age.week', month: 'filter.age.month', older: 'filter.age.older',
+  };
+  // The kinds of role, the "Category" drop-down's second group (task 0049,
+  // the owner, 2026-10-21; schemas/queries.sql, ROLE): on the CV's stack,
+  // another stack the CV fits, a stretch for the CV — the row's badge.
+  const ROLES = ['stack', 'off_stack', 'stretch'];
+  const ROLE_KEYS = {
+    stack: 'filter.role.stack', off_stack: 'filter.role.off_stack', stretch: 'filter.role.stretch',
   };
   // The "Company" drop-down's groups, in its order (tools/company_kinds.py):
   // the intermediaries, each listed by name, then every other company as one row.
@@ -161,6 +169,8 @@
     companies: [],
     // { age band: how many }: the "Age" drop-down's numbers, the ages aside
     ages: {},
+    // { kind of role: how many }: the "Category" drop-down's second group, the roles aside
+    roles: {},
     // the "Clean up" popup while open: { ages, statuses, classes, result, busy, error }
     cleanup: null,
     // intermediary name -> kind, kept across loads: a hidden one the view has
@@ -386,6 +396,7 @@
       state.sources = [];
       state.companies = [];
       state.ages = {};
+      state.roles = {};
       state.classTotals = {};
       render();
       return;
@@ -393,7 +404,7 @@
     const view = viewToLoad(info);
     // the rows asked for travel only when set
     const page = Object.keys(state.shown).length ? [{ shown: { ...state.shown } }] : [];
-    const [listing, counts, totals, pending, sources, companies, ages] = await Promise.all([
+    const [listing, counts, totals, pending, sources, companies, ages, roles] = await Promise.all([
       api.loadListing(state.active, view, ...page),
       api.listingCounts(state.active, view),
       api.classTotals(state.active, view),
@@ -401,9 +412,11 @@
       api.listSources(state.active, view),
       api.listCompanies(state.active, view),
       api.listAges ? api.listAges(state.active, view) : {},
+      api.listRoles ? api.listRoles(state.active, view) : {},
     ]);
     if (asked !== listRequest) return;
     state.ages = ages || {};
+    state.roles = roles || {};
     state.listing = listing;
     state.counts = counts;
     state.classTotals = totals;
@@ -2084,6 +2097,9 @@
   // and its vacancies stayed hidden once they came back. Another class
   // (engagement_unconfirmed, the part-time search's) while it holds any or
   // is chosen.
+  // Under the classes, the kinds of role (task 0049, the owner, 2026-10-21):
+  // on the CV's stack, another stack the CV fits, a stretch for the CV, so
+  // the stretches can be shown alone or hidden. null in the view is every kind.
   function renderFitFilter(view) {
     const chosen = view.fits;
     const totals = state.classTotals;
@@ -2098,14 +2114,31 @@
         checked: !chosen || chosen.includes(cls),
       };
     });
+    const chosenRoles = view.roles;
+    const roleOptions = ROLES.map((role) => ({
+      value: role, label: t(ROLE_KEYS[role]), text: counted(t(ROLE_KEYS[role]), state.roles[role]),
+      testid: `role-option-${role}`, checked: !chosenRoles || chosenRoles.includes(role),
+    }));
+    const allRoles = ROLES.reduce((sum, role) => sum + (state.roles[role] || 0), 0);
+    // closed: the classes chosen, then the kinds of role chosen; either one
+    // alone when the other takes all
+    const parts = [];
+    if (chosen) parts.push(summaryOf(t('filter.fit_all'), options));
+    if (chosenRoles) parts.push(summaryOf(t('filter.role_all'), roleOptions));
+    let summary = parts.length ? parts.join(' · ') : t('filter.fit_all');
+    if (parts.includes(t('filter.none'))) summary = t('filter.none');
     return checklist({
-      testid: 'fit-filter', label: t('filter.fit_legend'), labelTestid: 'fit-label',
-      summary: !chosen ? t('filter.fit_all') : summaryOf(t('filter.fit_all'), options),
+      testid: 'fit-filter', label: t('filter.fit_legend'), labelTestid: 'fit-label', summary,
       groups: [{
         key: 'fits', options, whole: !chosen,
         master: { text: counted(t('filter.fit_all'), all), testid: 'fit-option-all' },
+      }, {
+        key: 'roles', options: roleOptions, whole: !chosenRoles,
+        master: { text: counted(t('filter.role_all'), allRoles), testid: 'role-option-all' },
       }],
-      onToggle: (group, values) => changeView({ fits: values.length === options.length ? null : values }),
+      onToggle: (group, values) => (group.key === 'roles'
+        ? changeView({ roles: values.length === ROLES.length ? null : values })
+        : changeView({ fits: values.length === options.length ? null : values })),
     });
   }
 

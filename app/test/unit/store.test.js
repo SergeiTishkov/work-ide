@@ -140,8 +140,9 @@ test('bad input is refused', () => {
   assert.throws(() => store.setFeedback('test', 'old00', 'maybe'));
   assert.throws(() => store.setFeedback('test', 'nope', 'applied'));
   assert.throws(() => store.listing('test', v('full', 'whatever')), /unknown status/);
-  assert.throws(() => store.counts('test', { ...v('full'), fresh: ['stale'] }), /unknown status, freshness or age/);
-  assert.throws(() => store.ages('test', { ...v('full'), ages: ['ancient'] }), /unknown status, freshness or age/);
+  assert.throws(() => store.counts('test', { ...v('full'), fresh: ['stale'] }), /unknown status, freshness, age or role/);
+  assert.throws(() => store.ages('test', { ...v('full'), ages: ['ancient'] }), /unknown status, freshness, age or role/);
+  assert.throws(() => store.roles('test', { ...v('full'), roles: ['sideways'] }), /unknown status, freshness, age or role/);
   store.closeAll();
 });
 
@@ -549,6 +550,32 @@ test('age: the posted date sorts each vacancy into one bucket; the filter narrow
   assert.deepEqual(store.listing('test', { ...all, ages: ['today', 'week'] }).map((r) => r.id), ['new0', 'new1']);
   assert.equal(count(store, 'test', { ...all, ages: ['month'] }), 1);
   assert.equal(count(store, 'test', { ...all, ages: [] }), 0);
+  store.closeAll();
+});
+
+// task 0049: on the stack, another stack the CV fits, a stretch for the CV
+test('role: the stretch mark sorts each vacancy into one kind; the filter narrows list and counts', () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  const setFit = (id, fit) => db.prepare("UPDATE vacancy_identity SET view = json_set(view, '$.stretch', "
+    + "json_object('fit', ?, 'work_kind', 'data', 'reason', 'r')) WHERE identity_id = 'test' AND vacancy_id = ?")
+    .run(fit, id);
+  setFit('new0', 'stretch');
+  setFit('new1', 'fits');
+  db.close();
+  const all = v('full', 'all');
+  const roles = store.roles('test', { ...all, roles: ['stretch'] });
+  assert.equal(roles.stretch, 1);
+  assert.equal(roles.off_stack, 1);
+  assert.equal(Object.values(roles).reduce((a, b) => a + b, 0), count(store, 'test', all), 'roles ignore their own filter');
+  const expanded = { expanded: ['hot_lead', 'worth_a_look'] };
+  assert.deepEqual(store.listing('test', { ...all, roles: ['stretch'] }, expanded).map((r) => r.id), ['new0']);
+  assert.deepEqual(store.listing('test', { ...all, roles: ['off_stack', 'stretch'] }, expanded).map((r) => r.id).sort(),
+    ['new0', 'new1']);
+  assert.equal(count(store, 'test', { ...all, roles: ['stack'] }), roles.stack);
+  assert.equal(count(store, 'test', { ...all, roles: [] }), 0);
+  const ages = store.ages('test', { ...all, roles: ['stretch'] });
+  assert.equal(Object.values(ages).reduce((a, b) => a + b, 0), 1, 'the other drop-downs count under it');
   store.closeAll();
 });
 

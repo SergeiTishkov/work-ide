@@ -646,6 +646,29 @@ def test_the_age_comes_from_the_posted_date_else_the_first_sighting(isolated_dat
         with pytest.raises(ValueError):
             selections.listing(conn, sel, {**every, "ages": ["ancient"]})
 
+
+def test_the_role_comes_from_the_stretch_mark(isolated_data_dir):
+    # task 0049: on the stack, another stack the CV fits, a stretch for the CV
+    def marked(vid, fit):
+        v = _vacancy(vid)
+        v["computed"]["score_breakdown"]["stretch_roles"] = {"fit": fit, "work_kind": "data"}
+        return v
+    sel = _store({"s": _vacancy("s"), "s2": _vacancy("s2"), "f": marked("f", "fits"),
+                  "x": marked("x", "stretch"), "n": marked("n", "no")})
+    every = selections.view(["full"], selections.STATUSES, selections.FRESHNESS)
+    with db.session() as conn:
+        assert selections.roles(conn, sel, {**every, "roles": ["stretch"]}) ==             {"stack": 3, "off_stack": 1, "stretch": 1}
+        def ids(roles):
+            return set(_ids(selections.listing(conn, sel, {**every, "roles": roles})))
+        assert ids(["stretch"]) == {"x"}
+        assert ids(["stack", "off_stack"]) == {"s", "s2", "f", "n"}
+        assert ids([]) == set()
+        assert ids(None) == {"s", "s2", "f", "x", "n"}
+        assert _count(conn, sel, {**every, "roles": ["off_stack"]}) == 1
+        assert selections.ages(conn, sel, {**every, "roles": ["stretch"]})["today"] == 1
+        with pytest.raises(ValueError):
+            selections.listing(conn, sel, {**every, "roles": ["sideways"]})
+
 def test_the_words_typed_narrow_the_list_and_every_count(isolated_data_dir):
     sel = _store({
         "a": _vacancy("a", title="Backend Engineer (Go)", company="Zürich Labs"),

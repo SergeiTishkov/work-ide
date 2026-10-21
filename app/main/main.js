@@ -148,6 +148,7 @@ function registerIpc(window) {
   handle('sources', (identity, view) => data.call('sources', identity, view || {}));
   handle('companies', (identity, view) => data.call('companies', identity, view || {}));
   handle('ages', (identity, view) => data.call('ages', identity, view || {}));
+  handle('roles', (identity, view) => data.call('roles', identity, view || {}));
   // Deleting compacts the file (VACUUM), which an open connection can hold
   // up: both close first and open again on the next read.
   handle('cleanup', async (identity, filters, dryRun) => {

@@ -16,14 +16,16 @@ function showRows(name) {
 }
 
 // Leaves exactly `values` checked in the check list (null: every row), and
-// closes it.
-async function check(page, testid, values) {
+// closes it. Only the rows whose testid starts with `rows` are touched: by
+// default the drop-down's own ("fit-filter": fit-option-...), so the kinds of
+// role under the classes (role-option-...) stay as they are.
+async function check(page, testid, values, rows = `${testid.replace(/-filter$/, '')}-option-`) {
   const menu = page.getByTestId(`${testid}-menu`);
   if (await menu.isHidden()) await page.getByTestId(testid).click();
   for (let guard = 0; guard < 40; guard += 1) {
-    const rows = await menu.locator('[role="option"][data-value]')
+    const found = await menu.locator(`[role="option"][data-value][data-testid^="${rows}"]`)
       .evaluateAll((nodes) => nodes.map((n) => [n.dataset.value, n.dataset.state]));
-    const wrong = rows.find(([value, state]) => (!values || values.includes(value)) !== (state === 'on'));
+    const wrong = found.find(([value, state]) => (!values || values.includes(value)) !== (state === 'on'));
     if (!wrong) break;
     const row = menu.locator(`[role="option"][data-value="${wrong[0]}"]`);
     await row.click();
@@ -50,7 +52,8 @@ async function choose(page, testid, value) {
 // The view the app starts with, and one changed from it (renderer/app.js,
 // DEFAULT_VIEW): what the listing calls carry.
 const VIEW = {
-  segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, fits: null, companies: null, ages: null, text: '',
+  segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, fits: null, companies: null, ages: null,
+  roles: null, text: '',
 };
 const BOTH = ['fresh', 'earlier'];
 const view = (change = {}) => ({ ...VIEW, ...change });
