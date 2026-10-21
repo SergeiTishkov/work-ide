@@ -13,4 +13,5 @@ Check what the stored filter keeps for a value that is not listed, and make
 it keep the choice.
 
 ## Items
-- TO DO - Check the behaviour on a source that vanishes and returns; write the fix here if it loses the choice
+- DONE - Checked 2026-10-21. Company: keeps the choice (a hidden name the view empties stays on the list, unticked). Source: lost it. The view keeps the boards shown, and every listed board ticked became "all"; so with devitjobs hidden and emptied by "Hot leads", linkedin off and on again made the filter "all", and devitjobs came back ticked
+- DONE - Fix: every listed board ticked becomes "all" only when no board seen since the app started is off the list; the "All" row itself is "all" as before. UI test, failing without the fix

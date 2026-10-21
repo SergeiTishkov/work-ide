@@ -1153,6 +1153,32 @@ test('the text field after the drop-downs narrows the list by words, together wi
   await expect(field).toHaveValue('devitjobs');
 });
 
+test('a source hidden, then emptied by another drop-down, stays hidden after a click on another source', async ({ page }) => {
+  // task 0048: devitjobs hidden; "Hot leads" alone leaves nothing from it, so
+  // its row goes; linkedin off and on again used to make the filter "all"
+  await open(page);
+  await choose(page, 'source-filter', 'linkedin');
+  await choose(page, 'fit-filter', 'hot_lead');
+  await page.getByTestId('source-filter').click();
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveCount(0);
+  await page.getByTestId('source-option-linkedin').click();
+  await expect(page.getByTestId('source-option-linkedin')).toHaveAttribute('data-state', 'off');
+  await page.getByTestId('source-option-linkedin').click();
+  await expect(page.getByTestId('source-option-linkedin')).toHaveAttribute('data-state', 'on');
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await lastListing(page))[1].sources).toEqual(['linkedin']);
+
+  await choose(page, 'fit-filter', '');
+  await page.getByTestId('source-filter').click();
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'off');
+  await expect(byId(page, 'b1')).toHaveCount(0);
+  // "All" is all: devitjobs too, and the boards a later run brings
+  await page.getByTestId('source-option-all').click();
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'on');
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await lastListing(page))[1].sources).toBeNull();
+});
+
 test('the status filter and the source apply together', async ({ page }) => {
   await open(page);
   await choose(page, 'source-filter', 'linkedin');

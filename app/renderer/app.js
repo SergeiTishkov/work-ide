@@ -153,6 +153,9 @@
     dropdownScroll: 0,
     // [{ source, site, total }]: the boards the view holds, the boards aside
     sources: [],
+    // { identity: Set of boards }: every board listed since the app started,
+    // so a board hidden and then emptied by the other drop-downs is known
+    seenSources: {},
     // [{ kind, name, total }]: the companies the view holds, the companies
     // aside; every other company is one row, name null
     companies: [],
@@ -405,6 +408,8 @@
     state.counts = counts;
     state.classTotals = totals;
     state.sources = sources;
+    const seen = state.seenSources[state.active] || (state.seenSources[state.active] = new Set());
+    for (const s of sources) if (s.source) seen.add(s.source);
     state.companies = companies;
     for (const c of companies) if (c.name) state.companyKinds[c.name] = c.kind;
     // a chosen board the view has emptied keeps its website on the list
@@ -2105,7 +2110,11 @@
   }
 
   // The boards under the other three drop-downs, each with how many; a
-  // chosen one stays on the list even when nothing is left from it.
+  // chosen one stays on the list even when nothing is left from it. The view
+  // keeps the boards shown; every board ticked becomes "all" (null, the ones
+  // a later run brings too) only when no board known to be hidden is off the
+  // list (task 0048: a hidden board the other drop-downs emptied came back
+  // ticked after a click on another one).
   function renderSourceFilter(view) {
     const chosen = view.sources;
     const sources = state.sources.filter((s) => s.source);
@@ -2124,9 +2133,16 @@
       summary: !chosen ? t('filter.source_all') : summaryOf(t('filter.source_all'), options),
       groups: [{
         key: 'sources', options, whole: !chosen,
-        master: { text: counted(t('filter.source_all'), all), testid: 'source-option-all' },
+        master: {
+          text: counted(t('filter.source_all'), all), testid: 'source-option-all',
+          toggle: () => changeView({ sources: chosen ? null : [] }),
+        },
       }],
-      onToggle: (group, values) => changeView({ sources: values.length === options.length ? null : values }),
+      onToggle: (group, values) => {
+        const known = state.seenSources[state.active] || new Set();
+        const hiddenAside = [...known].some((source) => !options.some((o) => o.value === source));
+        changeView({ sources: values.length === options.length && !hiddenAside ? null : values });
+      },
     });
   }
 
