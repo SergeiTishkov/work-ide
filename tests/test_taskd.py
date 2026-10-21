@@ -257,8 +257,8 @@ def test_the_commands_of_each_kind():
     assert cv.argv == [py, tools("cv_tailor.py"), "--identity", "ftf", "--vacancy", "abc123", "--json",
                        "--instructions", "shorter"] and cv.result_json
     assert taskd.command(task("letter", vacancy_id="abc"), python=py).argv[1] == tools("cover_letter.py")
-    batch = taskd.command(task("cv_batch", args={"all": True}), python=py)
-    assert batch.argv == [py, tools("cv_batch.py"), "ftf", "--all"] and batch.graceful_stop
+    batch = taskd.command(task("cv_batch"), python=py)
+    assert batch.argv == [py, tools("cv_batch.py"), "ftf"] and batch.graceful_stop
     assert taskd.command(task("reputation", vacancy_id="v1"), python=py).argv[1] == tools("reputation_lookup.py")
 
 

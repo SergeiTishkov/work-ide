@@ -237,7 +237,7 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
         return Command(argv, result_json=True)
     if kind == "cv_batch":
         import cv_batch
-        argv = [python, tool("cv_batch.py"), _identity(task)] + (["--all"] if args.get("all") else [])
+        argv = [python, tool("cv_batch.py"), _identity(task)]
         return Command(argv, graceful_stop=lambda: cv_batch.paths()["stop"].touch())
     if kind == "reputation":
         return Command([python, tool("reputation_lookup.py"), "--identity", _identity(task),

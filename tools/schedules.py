@@ -203,8 +203,6 @@ def _args(what: str, args: Optional[dict]) -> dict:
         if not clean:
             raise ValueError("a clean-up names at least one filter (ages, statuses, classes)")
         return clean
-    if what == "cv_batch":
-        return {"all": True} if args.get("all") else {}
     if what == "collect":
         return {k: False for k in ("linkedin", "documents") if args.get(k) is False}
     return {}

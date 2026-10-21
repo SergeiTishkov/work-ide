@@ -5,15 +5,13 @@ After a collection the app starts it for the identity; it can be started by
 hand as well:
 
     python tools/cv_batch.py sharp partsharp         # what cv_auto picks now
-    python tools/cv_batch.py sharp --all             # every filter as new
     python tools/cv_batch.py --stop                  # after the current document
     python tools/cv_batch.py --status
 
-What is picked is cv_auto's choice (fresh vacancies for a filter already
-applied, the earlier ones too for a new filter; --all treats every filter as
-new), and the filters are recorded as applied. A document already in the
-vacancy's folder, or a vacancy found gone, is skipped — so a stopped batch
-goes on where it was when started again.
+What is picked is cv_auto's choice: every vacancy of the shortlist its
+filters match. A document already in the vacancy's folder, or a vacancy
+found gone, is skipped — so a stopped batch goes on where it was when
+started again.
 
 ONE BATCH AT A TIME, one document at a time: each drives Word through COM.
 Started while a batch runs, the request joins it (cv_batch.pending) and the
@@ -102,12 +100,12 @@ def running(where: dict) -> Optional[dict]:
     return None
 
 
-def request(where: dict, prefixes: List[str], everything: bool) -> None:
+def request(where: dict, prefixes: List[str]) -> None:
     """Adds identities to the running batch's list (it reads them when its
     own list ends)."""
     with where["pending"].open("a", encoding="utf-8") as fh:
         for prefix in prefixes:
-            fh.write(json.dumps({"identity": prefix, "all": everything}) + "\n")
+            fh.write(json.dumps({"identity": prefix}) + "\n")
 
 
 def take_pending(where: dict) -> List[dict]:
@@ -153,10 +151,10 @@ class Batch:
         tmp.write_text(json.dumps(self.status, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(tmp, self.where["status"])
 
-    def add(self, work: list, requests: List[dict], plan: Callable[[str, bool], list]) -> None:
+    def add(self, work: list, requests: List[dict], plan: Callable[[str], list]) -> None:
         for req in requests:
             prefix = req["identity"]
-            items = plan(prefix, bool(req.get("all")))
+            items = plan(prefix)
             self.log(f"{prefix}: {len(items)} vacancies, {sum(len(i['documents']) for i in items)} documents")
             if prefix not in self.status["identities"]:
                 self.status["identities"].append(prefix)
@@ -173,10 +171,10 @@ class Batch:
         self.save(holding=False)
         self.log("resumed")
 
-    def run(self, requests: List[dict], plan: Callable[[str, bool], list],
+    def run(self, requests: List[dict], plan: Callable[[str], list],
             generate: Callable[[str, dict, str], dict]) -> dict:
-        """requests: [{"identity", "all"}]; plan(prefix, all) -> cv_auto
-        items; generate(prefix, item, kind) -> the tool's JSON result."""
+        """requests: [{"identity"}]; plan(prefix) -> cv_auto items;
+        generate(prefix, item, kind) -> the tool's JSON result."""
         where = self.where
         where["log"].parent.mkdir(parents=True, exist_ok=True)
         other = running(where)
@@ -256,8 +254,8 @@ class Batch:
         self.save()
 
 
-def plan_for(prefix: str, everything: bool) -> list:
-    """cv_auto's pick for the identity; its filters recorded as applied."""
+def plan_for(prefix: str) -> list:
+    """cv_auto's pick for the identity."""
     import cv_auto
     import db
     import identity as identity_mod
@@ -266,9 +264,7 @@ def plan_for(prefix: str, everything: bool) -> list:
     if settings is None or not db.exists():
         return []
     with db.session() as conn:
-        items = cv_auto.pick(conn, settings, prefix, applied=[] if everything else cv_auto.applied_filters())
-    cv_auto.remember(settings)
-    return items
+        return cv_auto.pick(conn, settings, prefix)
 
 
 def generate_with_tools(prefix: str, item: dict, kind: str) -> dict:
@@ -290,7 +286,6 @@ def generate_with_tools(prefix: str, item: dict, kind: str) -> dict:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="CVs and cover letters for what the cv.auto filters pick")
     parser.add_argument("identities", nargs="*", help="Identity prefixes, in the order to go through them")
-    parser.add_argument("--all", action="store_true", help="Every filter as new: the earlier vacancies too")
     parser.add_argument("--stop", action="store_true", help="Stop after the current document")
     parser.add_argument("--status", action="store_true", help="Print the status")
     args = parser.parse_args(argv)
@@ -308,16 +303,16 @@ def main(argv=None) -> int:
         return 0
     if not args.identities:
         parser.error("name the identities, e.g. sharp partsharp")
-    requests = [{"identity": p, "all": args.all} for p in args.identities]
+    requests = [{"identity": p} for p in args.identities]
     other = running(where)
     if other:
-        request(where, args.identities, args.all)
+        request(where, args.identities)
         print(f"queued behind the running batch (pid {other['pid']})")
         return 0
     try:
         # Listed in the task queue (tools/taskq.py) when started by hand.
         with taskq.Registered("cv_batch", args.identities[0] if len(args.identities) == 1 else None,
-                              log_path=where["log"], args={"identities": args.identities, "all": args.all}):
+                              log_path=where["log"], args={"identities": args.identities}):
             Batch(where).run(requests, plan_for, generate_with_tools)
     except ai_limit.UsageLimit as exc:
         ai_limit.record(exc)

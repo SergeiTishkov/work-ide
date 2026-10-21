@@ -1,7 +1,7 @@
 """
-tools/cv_auto.py: which vacancies of the latest collection get a CV and a
-cover letter without a click — the identity's filters, any of them; fresh
-vacancies for a filter already applied, the earlier ones too for a new one.
+tools/cv_auto.py: which vacancies of the shortlist get a CV and a cover
+letter without a click — the identity's filters, any of them; every match,
+fresh or earlier, that lacks a document.
 """
 from __future__ import annotations
 
@@ -31,8 +31,9 @@ def _segments(monkeypatch):
                         lambda prefix=None: segments.parse_segments(CONFIG))
 
 
-def _vacancy(vid, location="Anywhere in the World", classification="long_shot", source="remotive"):
-    return {"id": vid, "title": f"Developer {vid}", "company": f"Company {vid}",
+def _vacancy(vid, location="Anywhere in the World", classification="long_shot", source="remotive",
+             company=None):
+    return {"id": vid, "title": f"Developer {vid}", "company": company or f"Company {vid}",
             "url": f"https://example.test/{vid}", "location_raw": location, "source": source,
             "description_text": "C# and SQL Server.", "tags": [],
             "computed": {"score": 60, "classification": classification,
@@ -50,28 +51,40 @@ def _two_runs():
     selections.record(second, {"run_count": 2}, kind="run")
 
 
-def _pick(tmp_path, settings=SETTINGS, applied=None):
+def _pick(tmp_path, settings=SETTINGS):
     with db.session() as conn:
-        return cv_auto.pick(conn, settings, "ftf", tmp_path / "docs", applied=applied)
+        return cv_auto.pick(conn, settings, "ftf", tmp_path / "docs")
 
 
 def _ids(items):
     return sorted(i["vacancy_id"] for i in items)
 
 
-def _applied(settings=SETTINGS):
-    return [cv_auto.filter_key(one, settings["documents"]) for one in settings["filters"]]
-
-
-def test_a_new_filter_takes_the_earlier_vacancies_too_an_applied_one_the_fresh_only(isolated_data_dir, tmp_path):
+def test_every_match_of_the_latest_selection_fresh_or_earlier(isolated_data_dir, tmp_path):
+    # the owner, 2026-10-21: a vacancy that rose into a class after its first
+    # run (old_uk_hot, old_w) gets its documents as a fresh one does
     _two_runs()
     assert _ids(_pick(tmp_path)) == ["new_w", "old_uk_hot", "old_w"]
-    assert _ids(_pick(tmp_path, applied=_applied())) == ["new_w"]
-    # the worldwide filter applied, the hot leads one added since
-    worldwide_only = {"documents": ["cv", "letter"], "filters": [{"markets": ["worldwide"]}]}
-    assert _ids(_pick(tmp_path, applied=_applied(worldwide_only))) == ["new_w", "old_uk_hot"]
+    assert _ids(_pick(tmp_path)) == ["new_w", "old_uk_hot", "old_w"]   # asking again changes nothing
     item = next(i for i in _pick(tmp_path) if i["vacancy_id"] == "new_w")
     assert item["documents"] == ["cv", "letter"] and item["title"] == "Developer new_w"
+
+
+def test_company_kinds_leave_out_a_freelance_marketplace(isolated_data_dir, tmp_path):
+    vacancies = {"hot": _vacancy("hot", UK, "hot_lead"),
+                 "team": _vacancy("team", classification="hot_lead", company="A.Team"),
+                 "lemon": _vacancy("lemon", UK, "worth_a_look", company="Lemon.io"),
+                 "agency": _vacancy("agency", UK, "long_shot", company="Kforce Inc."),
+                 "unread": _vacancy("unread", UK, "remote_unconfirmed")}
+    kb.save_vacancies(vacancies)
+    selections.record(vacancies, {"run_count": 1}, kind="run")
+    shortlist = {"documents": ["cv", "letter"], "filters": [{
+        "classes": ["hot_lead", "worth_a_look", "long_shot"], "company_kinds": ["agency", "reposter", "other"]}]}
+    assert _ids(_pick(tmp_path, shortlist)) == ["agency", "hot"]
+    every_kind = {"documents": ["cv"], "filters": [{"classes": ["hot_lead", "worth_a_look", "long_shot"]}]}
+    assert _ids(_pick(tmp_path, every_kind)) == ["agency", "hot", "lemon", "team"]
+    nothing = {"documents": ["cv"], "filters": [{"company_kinds": []}]}
+    assert _pick(tmp_path, nothing) == []
 
 
 def test_everything_named_in_one_filter_must_match(isolated_data_dir, tmp_path):
@@ -99,25 +112,13 @@ def test_a_document_already_made_or_found_gone_is_not_made_again(isolated_data_d
     assert kinds == {"new_w": ["letter"], "old_uk_hot": ["cv", "letter"]}
 
 
-def test_remember_makes_every_filter_fresh_only_and_no_filters_forget(isolated_data_dir):
-    assert cv_auto.applied_filters() == []
-    cv_auto.remember(SETTINGS)
-    assert cv_auto.applied_filters() == _applied()
-    # the order inside a filter does not make it new
-    reordered = {"documents": ["letter", "cv"], "filters": [{"classes": ["hot_lead"]}, {"markets": ["worldwide"]}]}
-    assert sorted(_applied(reordered)) == sorted(cv_auto.applied_filters())
-    # more documents: every filter is new again
-    assert _applied({"documents": ["cv"], "filters": SETTINGS["filters"]})[0] not in cv_auto.applied_filters()
-    cv_auto.remember(None)
-    assert cv_auto.applied_filters() == []
-
-
 def test_the_settings_are_checked():
     assert cv_auto.auto_settings({}) is None
     assert cv_auto.auto_settings({"cv": {"auto": {"filters": [{"markets": ["worldwide"]}]}}}) == {
         "documents": ["cv", "letter"], "filters": [{"markets": ["worldwide"]}]}
     for bad in ({"filters": []}, {"filters": [{"market": ["uk"]}]}, {"filters": [{"classes": "hot_lead"}]},
-                {"documents": ["resume"], "filters": [{}]}, ["worldwide"]):
+                {"documents": ["resume"], "filters": [{}]}, ["worldwide"],
+                {"filters": [{"company_kinds": ["marketplaces"]}]}, {"filters": [{"company_kinds": "other"}]}):
         with pytest.raises(cv_auto.AutoError):
             cv_auto.auto_settings({"cv": {"auto": bad}})
 

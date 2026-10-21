@@ -380,6 +380,8 @@ cv:
       - markets: [eu]                # inside one filter everything must match
         sources: [weworkremotely.com]
         classes: [hot_lead]
+      - classes: [hot_lead]          # the app's "Company" groups (config/company_kinds.yaml):
+        company_kinds: [agency, reposter, other]   # no freelance marketplaces
 ```
 
 A key left out of a filter matches anything. Candidates are the vacancies of
@@ -391,13 +393,11 @@ After a collection the task queue makes them in one batch (`tools/cv_batch.py`,
 a task of the collection, shown in the app's task panel); it can be run by hand:
 `python tools/cv_batch.py <prefix>`, `--stop`, `--status`.
 
-A filter already applied picks only the **fresh** vacancies of the run. A
-**new** filter — auto-generation just switched on, a filter added, or
-`documents` changed — also picks the earlier vacancies of the latest
-selection, once, at the end of the next collection. What was applied is kept
-in `data/identities/<prefix>/cv_auto.json`; deleting it makes every filter
-new again. `python tools/cv_auto.py --identity <prefix>` lists what the next
-collection would generate.
+Every matching vacancy of the latest selection gets its documents, fresh or
+earlier: one that rose into a class after its first run is covered by the
+next batch (until 2026-10-21 only the fresh vacancies were, see
+`docs/ARCHITECTURE.md`). `python tools/cv_auto.py --identity <prefix>` lists
+what the next batch would generate.
 
 ## Practical commands
 

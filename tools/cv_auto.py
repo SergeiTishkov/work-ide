@@ -1,6 +1,6 @@
 """
-Which vacancies of the latest collection get a CV and a cover letter without
-a click: the identity's own filters (the owner, 2026-10-13).
+Which vacancies of the shortlist get a CV and a cover letter without a
+click: the identity's own filters (the owner, 2026-10-13).
 
     python tools/cv_auto.py --identity sharp          # what would be generated
     python tools/cv_auto.py --identity sharp --json   # for the app
@@ -17,20 +17,22 @@ matches ANY of them is picked:
           - markets: [worldwide]
             sources: [devitjobs.com, weworkremotely.com]   # a board or its site
             classes: [hot_lead]
+          - classes: [hot_lead, worth_a_look, long_shot]
+            company_kinds: [agency, reposter, other]       # no freelance marketplaces
 
 Inside one filter everything named must match; a key left out matches
-anything. Candidates are the vacancies of the latest selection with no
-answer yet; a document already in the vacancy's folder (tools/documents.py)
-is not made again, nor one whose vacancy was found gone (an error in its log).
+anything. `company_kinds` are the groups of the app's "Company" drop-down
+(config/company_kinds.yaml). Candidates are the vacancies of the latest
+selection with no answer yet; a document already in the vacancy's folder
+(tools/documents.py) is not made again, nor one whose vacancy was found gone
+(an error in its log).
 
-FRESH, AND THE CATCH-UP (the owner, 2026-10-13). A filter the collections
-already applied picks only the fresh vacancies (the latest run brought them
-in for the first time). A filter that is new — auto-generation just turned
-on, a filter added, `documents` changed — picks the earlier vacancies of the
-latest selection too, once: at the end of the next collection. What was
-applied is kept in data/identities/<prefix>/cv_auto.json; cv_batch.py writes
-it when it takes the pick (--remember does the same). --all treats every
-filter as new.
+EVERY MATCH, NOT ONLY THE FRESH ONES (the owner, 2026-10-21: "every such
+vacancy must have a CV/CL"). Until then a filter already applied took only
+the vacancies the latest run brought in for the first time, and one that
+rose into a class later (a rescore, a description fetched, the AI read of a
+stretch role) never got documents: 14 of 16 that day. The documents already
+made are what keeps a vacancy from being made twice.
 
 After a collection ends the app starts tools/cv_batch.py for the identity,
 which asks this module what to make and makes it, one document at a time.
@@ -50,7 +52,7 @@ import db  # noqa: E402
 import documents  # noqa: E402
 import selections  # noqa: E402
 
-FILTER_KEYS = ("markets", "sources", "classes")
+FILTER_KEYS = ("markets", "sources", "classes", "company_kinds")
 DOCUMENT_KINDS = ("cv", "letter")
 
 
@@ -82,29 +84,11 @@ def auto_settings(profile: dict) -> Optional[dict]:
         for key in FILTER_KEYS:
             if key in one and not isinstance(one[key], list):
                 raise AutoError(f"cv.auto.filters[{index}].{key} must be a list")
+        unknown = [k for k in one.get("company_kinds") or [] if k not in selections.COMPANY_KINDS]
+        if unknown:
+            raise AutoError(f"cv.auto.filters[{index}].company_kinds: unknown {unknown}; "
+                            f"use {list(selections.COMPANY_KINDS)}")
     return {"documents": list(kinds), "filters": filters}
-
-
-def filter_key(one: dict, kinds: List[str]) -> str:
-    """One filter with the documents it makes, as the applied list keeps it:
-    the order of keys and values does not matter."""
-    return json.dumps({"filter": {k: sorted(str(v) for v in one[k]) for k in sorted(one)},
-                       "documents": sorted(kinds)}, sort_keys=True)
-
-
-def state_path() -> Path:
-    return common.DATA_DIR / "cv_auto.json"
-
-
-def applied_filters() -> List[str]:
-    return list((common.load_json(state_path(), {}) or {}).get("applied") or [])
-
-
-def remember(settings: Optional[dict]) -> None:
-    """Every filter of the profile is applied from now on: fresh only. With
-    no filters the list empties, so a filter turned on again is new again."""
-    keys = [filter_key(one, settings["documents"]) for one in settings["filters"]] if settings else []
-    common.save_json_atomic(state_path(), {"applied": keys})
 
 
 def _source_keys(names: List[str]) -> List[str]:
@@ -119,13 +103,11 @@ def _source_keys(names: List[str]) -> List[str]:
     return keys
 
 
-def pick(conn, settings: dict, prefix: str, base: Optional[Path] = None,
-         applied: Optional[List[str]] = None) -> List[dict]:
+def pick(conn, settings: dict, prefix: str, base: Optional[Path] = None) -> List[dict]:
     """[{"vacancy_id", "title", "company", "class", "documents": [kinds to
     make]}] in the order of the app's list (the class, then the score), each
-    vacancy once. A filter in `applied` takes the fresh vacancies only; any
-    other one the earlier ones too (the catch-up)."""
-    applied = set(applied or [])
+    vacancy once: every vacancy of the latest selection with no answer that
+    matches a filter and lacks a document."""
     selection_id = selections.latest_selection_id(conn)
     if selection_id is None:
         return []
@@ -139,11 +121,11 @@ def pick(conn, settings: dict, prefix: str, base: Optional[Path] = None,
         unknown = [m for m in markets if m not in all_markets]
         if unknown:
             raise AutoError(f"cv.auto: unknown markets {unknown}; this identity has {all_markets}")
-        chosen = selections.view(markets, statuses=selections.NEW,
-                                 fresh=(("fresh",) if filter_key(one, settings["documents"]) in applied
-                                        else selections.FRESHNESS),
+        kinds = one.get("company_kinds")
+        chosen = selections.view(markets, statuses=selections.NEW, fresh=selections.FRESHNESS,
                                  sources=_source_keys(one["sources"]) if one.get("sources") else None,
-                                 fits=one.get("classes"))
+                                 fits=one.get("classes"),
+                                 companies={"kinds": list(kinds), "hidden": []} if kinds is not None else None)
         for row in selections.listing(conn, selection_id, chosen, expanded=classes):
             picked.setdefault(row["vacancy_id"], row)
     existing = documents.state(prefix, list(picked), base)
@@ -165,11 +147,6 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="The vacancies to generate a CV and a cover letter for")
     parser.add_argument("--identity", default=None, help="Search identity prefix")
     parser.add_argument("--json", action="store_true", help="Print the result as one JSON line")
-    parser.add_argument("--all", action="store_true",
-                        help="Every filter as new: the earlier vacancies of the latest selection too")
-    parser.add_argument("--remember", action="store_true",
-                        help="Record the filters as applied: from now on they take fresh vacancies only "
-                             "(cv_batch.py does it when it takes the pick)")
     args = parser.parse_args(argv)
 
     import identity as identity_mod
@@ -180,9 +157,7 @@ def main(argv=None) -> int:
             items = []
         else:
             with db.session() as conn:
-                items = pick(conn, settings, prefix, applied=[] if args.all else applied_filters())
-        if args.remember:
-            remember(settings)
+                items = pick(conn, settings, prefix)
     except (AutoError, documents.DocumentsError) as exc:
         if args.json:
             print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))

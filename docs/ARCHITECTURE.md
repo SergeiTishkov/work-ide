@@ -784,19 +784,18 @@ stdio, and returns at once.
 ### Generation without a click (2026-10-13)
 
 The profile's `cv.auto` (`docs/IDENTITIES.md`) names filters — markets,
-sources, classes; AND inside a filter, OR between filters. A collection
-queues **one batch** for the identity after its top and another after its
-LinkedIn (the task service above): `tools/cv_batch.py <prefix>`. It asks `tools/cv_auto.py`
-what to make, records the filters as applied, and makes the documents one by
-one. Until 2026-10-13 (the same day) the app queued one task per document;
+sources, classes, company kinds; AND inside a filter, OR between filters. A
+collection queues **one batch** for the identity after its top and another
+after its LinkedIn (the task service above): `tools/cv_batch.py <prefix>`. It
+asks `tools/cv_auto.py` what to make and makes the documents one by one. Until 2026-10-13 (the same day) the app queued one task per document;
 the first catch-up was 971 documents, so the owner asked for one batch task
 instead.
 
 **Why a process of its own.** About 2.4 minutes per vacancy (CV 1.6, cover
 letter 0.8): 489 vacancies are some 20 hours. It runs as a task in the
 documents slot and outlives the window; a stopped batch started again
-skips what is made (`python tools/cv_batch.py sharp --all` goes on with the
-catch-up).
+skips what is made (`python tools/cv_batch.py sharp` goes on where it
+stopped).
 
 **How the app shows it** (`app/main/queue.js`). The batch writes
 `data/cv_batch.json` (pid, state, index/total, made/gone/failed, the
@@ -818,18 +817,28 @@ into the documents slot, and it waits only for the batch's current one. The
 file is removed when those documents are done; a hold whose process is gone
 is ignored.
 
-**Fresh, and the catch-up.** The owner first asked for a one-off generation
-over every matching vacancy and fresh ones after that, then changed it: when
-auto-generation is switched on later, or a filter is added, the next
-collection should also cover the earlier vacancies matching the new filter.
-So a filter is identified by its content (plus `documents`), the applied
-ones are kept in `data/identities/<prefix>/cv_auto.json`, and only a filter
-not yet there picks the earlier vacancies of the latest selection. Changing
-`documents` makes every filter new.
+**Every match, not only the fresh ones (2026-10-21).** Every vacancy of the
+latest selection with no answer that a filter matches gets its documents;
+the documents already in its folder (or its "gone" error) keep it from being
+made twice. Until then a filter already applied took only the fresh
+vacancies of the run (below), and a vacancy that rose into a class later —
+a rescore, a description fetched, the AI read of a stretch role — never got
+documents: on 2026-10-21, 14 of the 16 vacancies SHARP's filters matched
+had none. The owner: "every such vacancy must have a CV/CL; there are 10-15
+a week". `company_kinds` came the same day: a freelance marketplace (A.Team,
+Lemon.io) is one application per marketplace, so SHARP's filter leaves it
+out.
 
-**Not taken:** a separate "generate for the backlog" button — the owner's
-second answer made the catch-up part of the collection, and a button would
-be a second path to the same thing.
+**Rejected: fresh, and the catch-up (2026-10-13 to 2026-10-21).** A filter
+was identified by its content (plus `documents`), the applied ones were kept
+in `data/identities/<prefix>/cv_auto.json`, and only a filter not yet there
+picked the earlier vacancies of the latest selection; an applied one took
+the vacancies new in the run. It made the batch after a collection small,
+and missed every vacancy whose class changed after its first run.
+
+**Not taken:** a separate "generate for the backlog" button — the batch of
+every collection covers the backlog, and a button would be a second path to
+the same thing.
 
 ### The top vacancies first: `--top`, then `--rest` (2026-10-17)
 

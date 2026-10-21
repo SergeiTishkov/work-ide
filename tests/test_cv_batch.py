@@ -19,12 +19,12 @@ ITEMS = {
 }
 
 
-def _plan(prefix, everything):
+def _plan(prefix):
     return ITEMS[prefix]
 
 
-def _ask(*prefixes, everything=False):
-    return [{"identity": p, "all": everything} for p in prefixes]
+def _ask(*prefixes):
+    return [{"identity": p} for p in prefixes]
 
 
 def _status(where):
@@ -56,12 +56,11 @@ def test_the_status_follows_each_document_and_ends_finished(tmp_path):
     assert "finished: 2 made, 1 gone, 1 failed" in log
 
 
-def test_the_mode_reaches_the_plan(tmp_path):
+def test_each_identity_reaches_the_plan(tmp_path):
     asked = []
     cv_batch.Batch(cv_batch.paths(tmp_path)).run(
-        _ask("sharp", everything=True), lambda p, everything: asked.append((p, everything)) or [],
-        lambda *a: {"ok": True})
-    assert asked == [("sharp", True)]
+        _ask("sharp", "partsharp"), lambda p: asked.append(p) or [], lambda *a: {"ok": True})
+    assert asked == ["sharp", "partsharp"]
 
 
 def test_a_stop_file_ends_the_batch_before_the_next_document(tmp_path):
@@ -83,7 +82,7 @@ def test_a_request_made_while_it_runs_joins_the_batch(tmp_path):
 
     def generate(prefix, item, kind):
         if not done:
-            cv_batch.request(where, ["partsharp"], False)
+            cv_batch.request(where, ["partsharp"])
         done.append((prefix, item["vacancy_id"], kind))
         return {"ok": True}
 
@@ -136,7 +135,7 @@ def test_a_running_batch_is_not_started_twice_and_a_crash_is_recorded(tmp_path, 
 
     monkeypatch.setattr(cv_batch, "pid_alive", lambda pid: False)
 
-    def broken(prefix, everything):
+    def broken(prefix):
         raise ValueError("no database")
 
     with pytest.raises(ValueError):
@@ -150,9 +149,9 @@ def test_started_by_hand_while_one_runs_the_request_joins_it(tmp_path, monkeypat
     monkeypatch.setattr(cv_batch, "paths", lambda: where)
     monkeypatch.setattr(cv_batch, "pid_alive", lambda pid: True)
     where["status"].write_text(json.dumps({"state": "running", "pid": 4242}), encoding="utf-8")
-    assert cv_batch.main(["sharp", "--all"]) == 0
+    assert cv_batch.main(["sharp"]) == 0
     assert "queued behind the running batch (pid 4242)" in capsys.readouterr().out
-    assert cv_batch.take_pending(where) == [{"identity": "sharp", "all": True}]
+    assert cv_batch.take_pending(where) == [{"identity": "sharp"}]
 
 
 def test_this_process_is_alive_and_a_made_up_pid_is_not():
