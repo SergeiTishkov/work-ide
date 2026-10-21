@@ -42,8 +42,11 @@ sources:
       # Set explicitly rather than taken from tech_stack.core: "SQL Server" is
       # not a language, but it is half of the work this stack does.
       # "forward deployed" and "LLM": the applied AI roles (2026-10-20, see
-      # linkedin below).
-      keywords: [".NET", "C#", "ASP.NET", "SQL Server", "forward deployed", "LLM"]
+      # linkedin below). "applied AI" and "deployed engineer" (2026-10-22,
+      # task 0077): 9 and 12 threads the first two did not find; "deployment
+      # strategist" found none and is not here.
+      keywords: [".NET", "C#", "ASP.NET", "SQL Server", "forward deployed", "LLM",
+                 "applied AI", "deployed engineer"]
       hits_per_keyword: 50
 
   - name: arbeitnow
@@ -77,10 +80,18 @@ sources:
       # deployed" ones; the per-query statistics
       # (data/identities/<p>/runs/linkedin_queries_*.json) show which earns
       # its 28 pairs.
+      #
+      # 2026-10-22 (task 0077): the other names of the forward deployed role
+      # from the owner's FDE research. "AI engineer" may already bring some
+      # of them, but it reaches the 100-card ceiling, and a narrower query
+      # reads deeper. Three words are 84 more pairs; the per-query statistics
+      # after a run say which to keep. "Solutions engineer" is not here: the
+      # criteria refuse it as a pre-sales title.
       keywords: [".NET developer", "C# developer", "ASP.NET",
                  "senior .NET engineer", "contract C# developer",
                  ".NET architect", "forward deployed engineer",
-                 "forward engineer", "AI engineer"]
+                 "forward engineer", "AI engineer", "applied AI engineer",
+                 "AI deployment engineer", "deployment strategist"]
       # Every page of every (word x country) pair, postings of the last week
       # (measured 2026-10-03: ten cards a page and at most 100 per query to an
       # anonymous request; a query that reaches that ceiling is split by the

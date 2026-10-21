@@ -6,6 +6,20 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V31 — forward deployed companies and titles, 2026-10-22
+
+**Added** (`sharp_ats_targets.yaml`): 26 careers boards of companies that
+hire forward deployed engineers, deployment strategists and applied AI
+engineers (OpenAI, Anthropic, Databricks, Palantir, Cohere, Cursor and
+others), each checked on 2026-10-22. Together about 5 500 postings, about
+600 of them FDE-like by title. If you keep your own ATS targets file, copy
+the block if you want these companies.
+
+**Added** (`sharp_sources.yaml`): LinkedIn keywords "applied AI engineer",
+"AI deployment engineer", "deployment strategist" (84 more queries a run);
+HN keywords "applied AI", "deployed engineer". If you keep your own sources
+file, add them there: a template update does not reach it.
+
 ## V30 — ITAR as a word, 2026-10-22
 
 **Changed** (`sharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers.keywords`):

@@ -68,3 +68,170 @@ targets:
     token: tether
     enabled: true
     notes: "Found through WWR: the description led to tether.recruitee.com."
+
+  # --- Forward deployed engineering (2026-10-22, task 0077) ---------------
+  # Companies that hire forward deployed engineers, deployment strategists
+  # and applied AI engineers: the owner's FDE research of 2026-10-22. Each
+  # board was checked that day; the numbers are its postings and the titles
+  # among them that read as forward deployed, applied AI or deployment
+  # roles. Most such roles are on-site or tied to one country, and the
+  # location rules refuse those; titles go to the screening model as
+  # stretch roles (criteria `stretch_roles`). Left out: Mistral (its Lever
+  # board was empty and no other board answered), Gorgias (no such roles),
+  # Jobgether (a job aggregator with 3 841 postings, not an employer).
+
+  - company: "OpenAI"
+    provider: ashby
+    token: openai
+    enabled: true
+    notes: "2026-10-22: 809 postings, 103 of them FDE-like."
+
+  - company: "Cohere"
+    provider: ashby
+    token: cohere
+    enabled: true
+    notes: "2026-10-22: 114 postings, 11 of them FDE-like."
+
+  - company: "ElevenLabs"
+    provider: ashby
+    token: elevenlabs
+    enabled: true
+    notes: "2026-10-22: 160 postings, 17 of them FDE-like."
+
+  - company: "Cursor"
+    provider: ashby
+    token: cursor
+    enabled: true
+    notes: "2026-10-22: 130 postings, 10 of them FDE-like."
+
+  - company: "Decagon"
+    provider: ashby
+    token: decagon
+    enabled: true
+    notes: "2026-10-22: 134 postings, 21 of them FDE-like."
+
+  - company: "Harvey"
+    provider: ashby
+    token: harvey
+    enabled: true
+    notes: "Its forward deployed roles are for finance (private credit, buyout). 2026-10-22: 348 postings, 3 of them FDE-like."
+
+  - company: "Sierra"
+    provider: ashby
+    token: sierra
+    enabled: true
+    notes: "Its forward deployed role is \"Software Engineer, Agent\". 2026-10-22: 190 postings, 8 of them FDE-like."
+
+  - company: "n8n"
+    provider: ashby
+    token: n8n
+    enabled: true
+    notes: "2026-10-22: 42 postings, 4 of them FDE-like."
+
+  - company: "LangChain"
+    provider: ashby
+    token: langchain
+    enabled: true
+    notes: "2026-10-22: 104 postings, 18 of them FDE-like."
+
+  - company: "Cognition"
+    provider: ashby
+    token: cognition
+    enabled: true
+    notes: "2026-10-22: 105 postings, 23 of them FDE-like."
+
+  - company: "Deepgram"
+    provider: ashby
+    token: deepgram
+    enabled: true
+    notes: "2026-10-22: 91 postings, 11 of them FDE-like."
+
+  - company: "Writer"
+    provider: ashby
+    token: writer
+    enabled: true
+    notes: "2026-10-22: 45 postings, 5 of them FDE-like."
+
+  - company: "Legora"
+    provider: ashby
+    token: legora
+    enabled: true
+    notes: "2026-10-22: 309 postings, 8 of them FDE-like."
+
+  - company: "Parloa"
+    provider: ashby
+    token: parloa
+    enabled: true
+    notes: "2026-10-22: 55 postings, 8 of them FDE-like."
+
+  - company: "Miro"
+    provider: ashby
+    token: miro
+    enabled: true
+    notes: "\"Forward Deployed Consultant\". 2026-10-22: 22 postings, 2 of them FDE-like."
+
+  - company: "Anthropic"
+    provider: greenhouse
+    token: anthropic
+    enabled: true
+    notes: "2026-10-22: 674 postings, 59 of them FDE-like."
+
+  - company: "Scale AI"
+    provider: greenhouse
+    token: scaleai
+    enabled: true
+    notes: "2026-10-22: 175 postings, 21 of them FDE-like."
+
+  - company: "Databricks"
+    provider: greenhouse
+    token: databricks
+    enabled: true
+    notes: "2026-10-22: 897 postings, 135 of them FDE-like."
+
+  - company: "Cresta"
+    provider: greenhouse
+    token: cresta
+    enabled: true
+    notes: "2026-10-22: 84 postings, 13 of them FDE-like."
+
+  - company: "Glean"
+    provider: greenhouse
+    token: gleanwork
+    enabled: true
+    notes: "2026-10-22: 119 postings, 6 of them FDE-like."
+
+  - company: "Nebius"
+    provider: greenhouse
+    token: nebius
+    enabled: true
+    notes: "2026-10-22: 383 postings, 13 of them FDE-like."
+
+  - company: "Toloka"
+    provider: greenhouse
+    token: toloka
+    enabled: true
+    notes: "\"Freelance Forward Deployed AI Engineer\". 2026-10-22: 17 postings, 2 of them FDE-like."
+
+  - company: "JetBrains"
+    provider: greenhouse
+    token: jetbrains
+    enabled: true
+    notes: "2026-10-22: 52 postings, 1 of them FDE-like."
+
+  - company: "Together AI"
+    provider: greenhouse
+    token: togetherai
+    enabled: true
+    notes: "2026-10-22: 79 postings, 2 of them FDE-like."
+
+  - company: "Vercel"
+    provider: greenhouse
+    token: vercel
+    enabled: true
+    notes: "2026-10-22: 96 postings, 4 of them FDE-like."
+
+  - company: "Palantir"
+    provider: lever
+    token: palantir
+    enabled: true
+    notes: "\"Deployment Strategist\" and \"Forward Deployed Software Engineer\". 2026-10-22: 304 postings, 100 of them FDE-like."
