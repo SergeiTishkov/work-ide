@@ -38,5 +38,5 @@ model's reason. The scorer's time-zone reading goes to the model as a fact.
 - DONE - Update the local sharp identity to template v28 (`templates.py update --identity sharp`; on v29 by 2026-10-21)
 - DONE - Apply the owner's personal stretch settings to the local identity (2026-10-21: `stretch_roles: {enabled: true, stretch_points: -4}` and `stretch_if` on the junior rule for data, ML/AI and forward deployed titles; until then the switch was off, and the base's forward roles stayed refused by title: 341 of 454, the owner asked why none showed)
 - TO DO - Full Python and UI suites on main after the merge
-- TO DO - Read the stretch backlog: about 1,168 vacancies, about $7, 400 a run (the first `rest` run queued 2026-10-21; the queue holds one `rest` of an identity at a time, so the next is added when it ends)
+- DONE - Read the stretch backlog (SHARP, 2026-10-21): five `rest` runs screened 459, 443, 417, 400 and 114 vacancies and kept 26, 25, 6, 4 and 2 (1,833 read, 63 kept, USD 21.07). The estimate was 1,168: each run's description fetch (927, then 334) made more vacancies wait for a read. No stretch waits now
 - TO DO - Review the kept and rejected stretch roles with the owner; tune `stretch_points` and the doubtful kinds
