@@ -123,6 +123,18 @@ sources:
     # on in its own sources file with params: {countries: ["<country>"]}.
     enabled: false
 
+  - name: arcdev
+    # Arc's own remote requests (2026-10-21). Off here: country_code is the
+    # person's residency. An identity turns it on in its own sources file
+    # with params: {country_code: "<ISO code>"}.
+    enabled: false
+
+  - name: workatastartup
+    # Y Combinator startups' remote postings, by keyword (2026-10-21). Off
+    # here: which single-country postings stay depends on the residency. An
+    # identity turns it on with params: {countries: ["<ISO code>"]}.
+    enabled: false
+
   - name: workingnomads
     enabled: true
 

@@ -57,6 +57,8 @@ import fetch_devitjobs  # noqa: E402
 import fetch_jobs_ch  # noqa: E402
 import fetch_jobserve  # noqa: E402
 import fetch_dataart  # noqa: E402
+import fetch_arcdev  # noqa: E402
+import fetch_workatastartup  # noqa: E402
 import fetch_landing_jobs  # noqa: E402
 import fetch_mycareersfuture  # noqa: E402
 import fetch_outside_ir35  # noqa: E402
@@ -110,6 +112,12 @@ FETCHERS = {
     "remoterocketship": fetch_remoterocketship.fetch,
     # One employer's own vacancies, by the countries it hires from (task 0043).
     "dataart": fetch_dataart.fetch,
+    # Arc's own remote requests, filtered by the residency's country code
+    # (2026-10-21; its LinkedIn re-index is left out, see the module).
+    "arcdev": fetch_arcdev.fetch,
+    # Y Combinator startups' postings, searched by keyword, remote ones only
+    # (2026-10-21).
+    "workatastartup": fetch_workatastartup.fetch,
 }
 
 # The classes the top run works on (the owner, 2026-10-17: "collect, check

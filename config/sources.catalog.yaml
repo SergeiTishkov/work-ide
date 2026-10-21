@@ -246,6 +246,40 @@ sources:
       names the countries it hires from; the fetcher asks for the identity's
       own, so `countries` belongs in the identity's sources file.
 
+  - name: arcdev
+    site: "arc.dev"
+    kind: json_api
+    remote_only: true
+    params_schema:
+      country_code: "ISO code of the country the work is done from (\"GE\"); the API leaves requests open to it; none: every request"
+      details: "fetch each request's full text (one request each); true by default"
+    yield_notes: >
+      Measured 2026-10-21: 67 requests from Arc's own clients, 56 contract and
+      11 permanent; 45 open to Georgia (GE). One .NET among them: a part-time
+      C#/.NET trading-system contract, worldwide, $40-$70 an hour.
+    caveats: >
+      A marketplace: the client is not named (company "Arc.dev client"), and
+      applying goes through an Arc profile. The list needs the header
+      `x-requested-from: arc-next` (422 without it). The board's second list
+      of ~9,000 is a LinkedIn re-index and is not fetched.
+
+  - name: workatastartup
+    site: "workatastartup.com"
+    kind: json_api
+    remote_only: true
+    params_schema:
+      keywords: "search words, one request each, up to 30 postings a word; a default list in the module"
+      countries: "the residency, ISO codes or names ([\"GE\"]): a posting remote in one other country only is left out; none: every remote posting"
+      details: "fetch each posting's page for its text and visa line (one request each); true by default"
+    yield_notes: >
+      Measured 2026-10-21: 20 keywords gave 437 distinct postings of Y
+      Combinator startups, 160 remote: 42 naming no country, 95 one country
+      (81 the US), 23 several. 65 kept for Georgia.
+    caveats: >
+      No paging and no posting date; the search ignores role and remote
+      filters, so the keywords decide the yield. Mostly full time, and
+      "US citizen/visa only" is common (written into the text as "Visa: ...").
+
   - name: workingnomads
     site: "workingnomads.com"
     kind: json_api

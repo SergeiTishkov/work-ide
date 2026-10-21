@@ -202,11 +202,23 @@ sources:
       9_day_fortnight, flexible_hours) — a proven mark of the working pattern
       rather than a guess from text.
 
-  - name: arc_dev
-    status: pending
-    task: "tasks/1-triage/0044-arc-dev.md"
-    kind: html_next_data
-    endpoint: "https://arc.dev/remote-jobs"
+  - name: arcdev
+    status: implemented
+    implemented_at: "2026-10-21"
+    task: "tasks/3-done/0044-arc-dev.md"
+    kind: json_api
+    endpoint: "https://api.arc.dev/job-requests/public-search"
+    checked: >
+      2026-10-21: the page's data comes from a JSON API at api.arc.dev, no key
+      or cookie; the header `x-requested-from: arc-next` is required (422
+      "csrf check failed" without it). POST /job-requests/public-search pages
+      with per_page up to 100 (101: 409) and filters by country_code; GET
+      /job-requests/<key> gives the markdown text, required_locations and
+      hours a week. 67 of Arc's own requests, 45 open to GE, one .NET (a
+      part-time C#/.NET trading-system contract, worldwide, $40-$70 an hour).
+      The second list, /p/job-posts/public-search (~9,000), re-indexes
+      LinkedIn postings, about zero worldwide .NET: not fetched.
+      tools/fetch_arcdev.py.
     measured: >
       HTTP 200, 30 vacancies in __NEXT_DATA__. The fields are exceptionally apt
       for this search: clientTimeZoneRestriction, overlapHours, jobType,
@@ -221,6 +233,21 @@ sources:
       jobType permanent/contract, but the path filter is ignored:
       /remote-jobs/part-time, /freelance and /part-time/.net return the same
       thirty. Needs its search parameters worked out before a fetcher.
+
+  - name: workatastartup
+    status: implemented
+    implemented_at: "2026-10-21"
+    task: "tasks/3-done/0046-yc-jobs-full-time.md"
+    kind: json_api
+    endpoint: "https://www.workatastartup.com/jobs/search?q=<keyword>"
+    checked: >
+      2026-10-21: Y Combinator's board for its companies, a separate site from
+      ycombinator.com/jobs (yc_jobs below). The search answers JSON to
+      `Accept: application/json`, up to 30 postings a keyword, no paging,
+      role and remote parameters ignored; a posting's page is Inertia data
+      (descriptionHtml, sponsorsVisa) and answers 406 without a text/html
+      Accept. 20 keywords: 437 postings, 160 remote, 65 not tied to one
+      country other than Georgia. tools/fetch_workatastartup.py.
 
   - name: gun_io
     status: rejected
@@ -505,7 +532,10 @@ sources:
       GET, with a `type` field — 29 of 30 remote engineering postings
       "Full-time", and "US citizen/visa only" is common. Interesting companies,
       the wrong engagement. Reconsider for a full-time startup search.
-    task: "tasks/1-triage/0046-yc-jobs-full-time.md"
+      2026-10-21, for the full-time search: no paging, 133 distinct remote
+      postings across every role page, about 3-4 reachable from UTC+4; the
+      same companies post on workatastartup.com (above), which is fetched.
+    task: "tasks/3-done/0046-yc-jobs-full-time.md"
 
   - name: fractionaljobs_io
     status: rejected
