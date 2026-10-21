@@ -212,3 +212,14 @@ def test_cmd_set_salary_estimate_missing_vacancy_exits(isolated_data_dir):
 
     with _pytest.raises(SystemExit):
         kb.cmd_set_salary_estimate(Args())
+
+
+def test_merge_vacancy_keeps_every_search_that_ever_found_it(isolated_data_dir):
+    # Task 0050: a later run that asked fewer searches must not make the
+    # earlier ones look as if they found nothing.
+    vacancies = {}
+    kb.merge_vacancy(vacancies, {**make_normalized(), "found_by": ["C# @ Israel", ".NET @ Israel"]}, DUMMY_COMPUTED)
+    kb.merge_vacancy(vacancies, {**make_normalized(), "found_by": [".NET @ Israel", "C# @ Cyprus"]}, DUMMY_COMPUTED)
+    assert vacancies["vac-1"]["found_by"] == ["C# @ Israel", ".NET @ Israel", "C# @ Cyprus"]
+    kb.merge_vacancy(vacancies, make_normalized(), DUMMY_COMPUTED)
+    assert len(vacancies["vac-1"]["found_by"]) == 3

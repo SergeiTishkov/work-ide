@@ -263,6 +263,19 @@ def test_a_region_found_vacancy_belongs_to_the_country(monkeypatch):
     assert {t for r in records for t in r["tags"]} == {"market:Germany"}
 
 
+def test_a_record_names_every_query_that_served_it(monkeypatch):
+    """Task 0050: the yield of a query is what it alone finds."""
+    def fake(keyword, location, start, timeout, posted_within_days=None):
+        if start:
+            return ""
+        ids = {"C#": [1, 2], ".NET": [2, 3]}[keyword]
+        return "".join(_card(i) for i in ids)
+    _quiet(monkeypatch, fake)
+    records, _ = fetch_linkedin.fetch(keywords=["C#", ".NET"], locations=["Israel"], enrich_limit=0)
+    found = {r["url"].rsplit("-", 1)[-1].split("?")[0]: r["found_by"] for r in records}
+    assert found == {"1": ["C# @ Israel"], "2": ["C# @ Israel", ".NET @ Israel"], "3": [".NET @ Israel"]}
+
+
 def test_a_query_below_the_ceiling_is_not_split(monkeypatch):
     calls = []
     _quiet(monkeypatch, _ceiling_search(calls, sizes={"United Kingdom": 42}))

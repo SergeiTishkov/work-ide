@@ -430,7 +430,8 @@ class _Walk:
         self.posted_within_days = posted_within_days
         self.timeout = timeout
         self.records: List[dict] = []
-        self.seen_urls = set()
+        # url -> its record, so a later query that finds it again is noted
+        self.by_url: dict = {}
         self.cards_seen = 0
         self.pages_read = 0
         self.queries = 0
@@ -496,15 +497,21 @@ class _Walk:
             start += len(cards)
 
             fresh_here = 0
+            asked = f"{keyword} @ {location}"
             for card in cards:
                 rec = _card_to_common_schema(card, location, market)
                 if rec is None or rec["url"] in seen_here:
                     continue
                 seen_here.add(rec["url"])
                 fresh_here += 1
-                if rec["url"] in self.seen_urls:  # found by an earlier query
+                earlier = self.by_url.get(rec["url"])
+                if earlier is not None:  # found by an earlier query
+                    earlier["found_by"].append(asked)
                     continue
-                self.seen_urls.add(rec["url"])
+                # Every query that served the card (task 0050): a query is
+                # worth its time when it alone finds what reaches the shortlist.
+                rec["found_by"] = [asked]
+                self.by_url[rec["url"]] = rec
                 self.records.append(rec)
             # Past the end of a list the guest search may repeat cards it has
             # already served. Only this query's own cards count: a page of

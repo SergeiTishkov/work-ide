@@ -118,6 +118,11 @@ def merge_vacancy(kb: dict, normalized: dict, computed: dict) -> str:
         record["employment_types"] = normalize.employment_types(
             list(existing.get("employment_types") or [])
             + list(record.get("employment_types") or []))
+    # Every search that ever served it: a later run with fewer queries, or a
+    # shorter date window, must not make a query look as if it found nothing.
+    if existing.get("found_by") or record.get("found_by"):
+        record["found_by"] = list(dict.fromkeys(
+            list(existing.get("found_by") or []) + list(record.get("found_by") or [])))
     record.setdefault("external_signals", {})
     kb[vid] = record
     return "updated"

@@ -138,6 +138,9 @@ def normalize_record(raw: dict) -> Optional[dict]:
         # person opens (devitjobs: its detail API takes the id, the page has a
         # slug). See enrich_descriptions.
         "read_url": str(raw.get("read_url") or "").strip() or None,
+        # The searches that served it, "<keyword> @ <place>" (LinkedIn; see
+        # tools/linkedin_yield.py). None from a board that is not searched.
+        "found_by": [str(q).strip() for q in raw.get("found_by") or [] if str(q).strip()] or None,
         "location_raw": str(raw.get("location_raw") or "").strip(),
         "remote": remote,
         # Where the employer or the board says the work happens: "remote",

@@ -87,6 +87,13 @@ cards, vacancies new to this fetch, 429s, whether it failed or reached the
 ceiling, and seconds. The fetch's note counts the queries that brought
 nothing new. It is there to choose the pairs worth asking from numbers.
 
+**Which searches found a vacancy.** "Nothing new" hides a pair whose
+vacancies another pair found first. Each vacancy carries `found_by`, every
+search that ever served it ("<keyword> @ <place>", kept across runs; since
+2026-10-21, task 0050), and `tools/linkedin_yield.py --by query|keyword|country`
+counts the shortlisted vacancies each search found alone: a search with none
+can go without losing a shortlisted vacancy.
+
 **One fetch at a time.** Every identity's LinkedIn fetch shares the machine's
 address, and the rate limit is per address: `runstate.LinkedInFetch` lets one
 run at a time and makes the next wait (a file beside the shared base,
