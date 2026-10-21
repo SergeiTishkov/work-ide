@@ -434,6 +434,17 @@ button.cv.done { color: var(--applied); border-color: var(--applied); }
 .task.queued .task-label, .task.stopped .task-label { color: var(--muted); }
 .task-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .task-empty { padding: 3px 12px; font-size: 12.5px; color: var(--muted); }
+/* the task list's gear menu, under the list's title at its right edge */
+.tasks-pane { position: relative; }
+.pane-title button.pane-fold.pressed { color: var(--accent); }
+.task-view-menu {
+  position: absolute; right: 8px; top: 26px; z-index: 20; display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 4px; min-width: 200px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2); font-size: 12.5px; white-space: nowrap;
+}
+.task-view-menu label { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+.task-view-menu label:hover { background: var(--accent-soft); }
+.task-view-sep { height: 1px; margin: 3px 4px; background: var(--border); }
 .task-auto {
   margin-left: 6px; padding: 0 5px; border: 1px solid var(--border); border-radius: 4px;
   font-size: 10.5px; color: var(--muted);

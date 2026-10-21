@@ -130,6 +130,47 @@ test('the panel\'s cross asks before it stops a task; "Cancel", Escape and a cli
   await expect(page.getByTestId('task-1')).toHaveAttribute('data-state', 'stopped');
 });
 
+test("the task list's gear: finished tasks shown or not, oldest or newest on top, kept after a restart", async ({ page }) => {
+  await open(page);
+  const addEnded = () => page.evaluate(() => {
+    window.__addTask({ kind: 'rest', identity: 'sharp', state: 'done' });
+    window.__addTask({ kind: 'clean', identity: 'sharp', state: 'failed' });
+  });
+  await addEnded();
+  await (await command(page, 'run-collect')).click();
+  const ids = () => page.locator('[data-testid="task-list"] .task').evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
+  await expect.poll(ids).toEqual(['task-1', 'task-2', 'task-3']);   // oldest on top, as until now
+  await expect(page.getByTestId('task-view-menu')).toHaveCount(0);
+  await page.getByTestId('task-view').click();
+  const menu = page.getByTestId('task-view-menu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText(en['task.view_finished']);
+  await expect(page.getByTestId('task-view-finished')).toBeChecked();
+  await expect(page.getByTestId('task-view-order-oldest')).toBeChecked();
+  await page.getByTestId('task-view-order-newest').check();
+  await expect.poll(ids).toEqual(['task-3', 'task-2', 'task-1']);
+  await expect(page.getByTestId('task-3')).toHaveClass(/chosen/);   // the log still follows the running one
+  await page.getByTestId('task-view-finished').uncheck();
+  await expect.poll(ids).toEqual(['task-3']);
+  await expect(page.getByTestId('tasks-clear')).toHaveCount(0);
+  await expect(menu).toBeVisible();   // the menu stays open while it is used
+  await page.mouse.click(5, 5);
+  await expect(menu).toHaveCount(0);
+
+  await page.reload();
+  await addEnded();
+  await expect.poll(ids).toEqual([]);
+  await expect(page.getByTestId('task-empty')).toHaveText(en['task.none_shown']);
+  await (await command(page, 'run-collect')).click();
+  await expect.poll(ids).toEqual(['task-3']);
+  await page.getByTestId('task-view').click();
+  await expect(page.getByTestId('task-view-order-newest')).toBeChecked();
+  await page.getByTestId('task-view-finished').check();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('task-view-menu')).toHaveCount(0);
+  await expect.poll(ids).toEqual(['task-3', 'task-2', 'task-1']);
+});
+
 test('the panel folds into a tab at the bottom edge, opens from it, and stays folded after a restart', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('task-tab')).toBeHidden();

@@ -121,7 +121,10 @@
   // The app's own settings (Menu -> Settings...), kept per Windows user with
   // the rest of the app's storage
   const SETTINGS_KEY = 'work-ide-settings';
-  const DEFAULT_SETTINGS = { showTasks: true };
+  // showFinished and taskOrder: the task list's gear (task 0068)
+  const DEFAULT_SETTINGS = { showTasks: true, showFinished: true, taskOrder: 'oldest' };
+  const TASK_ORDERS = ['oldest', 'newest'];
+  const TASK_ORDER_KEYS = { oldest: 'task.order_oldest', newest: 'task.order_newest' };
   // How often the pipeline indicator asks the databases. Tests shorten it.
   const POLL_MS = window.__WORK_IDE_POLL_MS || 5000;
   const SESSION_KEY = 'work-ide-view';
@@ -201,6 +204,7 @@
     // identity, however it was started (tools/runstate.py)
     pipelines: {},
     openPicker: null,   // which top-bar drop-down is open: 'theme', 'language' or null
+    taskViewOpen: false,   // the task list's gear menu
   };
 
   // --- the view survives "Refresh" and a restart ----------------------------
@@ -930,11 +934,13 @@
   document.addEventListener('click', () => {
     togglePicker(null);
     closeMenu();
+    openTaskView(false);
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       togglePicker(null);
       closeMenu();
+      openTaskView(false);
       closeDropdowns();
     }
   });
@@ -2963,12 +2969,72 @@
     }
   }, 1000);
 
+  // The tasks the list shows, in its order: the gear's two settings.
+  function shownTasks() {
+    const tasks = state.settings.showFinished ? state.tasks
+      : state.tasks.filter((task) => ACTIVE_TASK.has(task.state));
+    return state.settings.taskOrder === 'newest' ? [...tasks].reverse() : tasks;
+  }
+
+  // the chosen task, else the latest running one, else the latest shown
   function shownTaskId() {
-    const chosen = state.tasks.find((task) => task.id === state.chosenTask);
+    const tasks = state.settings.taskOrder === 'newest' ? [...shownTasks()].reverse() : shownTasks();
+    const chosen = tasks.find((task) => task.id === state.chosenTask);
     if (chosen) return chosen.id;
-    const running = state.tasks.filter((task) => task.state === 'running');
+    const running = tasks.filter((task) => task.state === 'running');
     if (running.length) return running[running.length - 1].id;
-    return state.tasks.length ? state.tasks[state.tasks.length - 1].id : null;
+    return tasks.length ? tasks[tasks.length - 1].id : null;
+  }
+
+  function openTaskView(open) {
+    if (state.taskViewOpen === open) return;
+    state.taskViewOpen = open;
+    renderTaskPanel();
+  }
+
+  function setTaskView(name, value) {
+    saveSetting(name, value);
+    renderTaskPanel();
+  }
+
+  function gearIcon() {
+    const icon = el('span', { class: 'chevron', 'aria-hidden': 'true' });
+    icon.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" '
+      + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/>'
+      + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 '
+      + '1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 '
+      + '1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 '
+      + '4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 '
+      + '1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06'
+      + '.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    return icon;
+  }
+
+  // The gear's menu: drawn in the pane, under the title (the title clips
+  // what overflows it).
+  function renderTaskView() {
+    const host = document.querySelector('[data-testid="task-view-host"]');
+    if (!state.taskViewOpen) {
+      host.replaceChildren();
+      return;
+    }
+    host.replaceChildren(el('div', {
+      class: 'task-view-menu', testid: 'task-view-menu', onclick: (event) => event.stopPropagation(),
+    },
+    el('label', {},
+      el('input', {
+        type: 'checkbox', testid: 'task-view-finished', checked: state.settings.showFinished,
+        onchange: (event) => setTaskView('showFinished', event.target.checked),
+      }),
+      t('task.view_finished')),
+    el('div', { class: 'task-view-sep' }),
+    TASK_ORDERS.map((order) => el('label', {},
+      el('input', {
+        type: 'radio', name: 'task-order', testid: `task-view-order-${order}`,
+        checked: state.settings.taskOrder === order,
+        onchange: () => setTaskView('taskOrder', order),
+      }),
+      t(TASK_ORDER_KEYS[order])))));
   }
 
   function chooseTask(id) {
@@ -3045,8 +3111,11 @@
     const id = shownTaskId();
     const list = document.querySelector('[data-testid="task-list"]');
     const scroll = list.scrollTop;
-    if (!state.tasks.length) list.replaceChildren(el('div', { class: 'task-empty', testid: 'task-empty' }, t('task.empty')));
-    else list.replaceChildren(...state.tasks.flatMap((task) => [el('div', {
+    const tasks = shownTasks();
+    if (!tasks.length) {
+      list.replaceChildren(el('div', { class: 'task-empty', testid: 'task-empty' },
+        t(state.tasks.length ? 'task.none_shown' : 'task.empty')));
+    } else list.replaceChildren(...tasks.flatMap((task) => [el('div', {
       class: `task ${task.state}${task.id === id ? ' chosen' : ''}`,
       testid: `task-${task.id}`, 'data-state': task.state, title: taskStateText(task),
       onclick: () => chooseTask(task.id),
@@ -3074,9 +3143,15 @@
         queued > 0 && el('button', {
           class: 'link', testid: 'tasks-cancel-queued', onclick: () => guarded(() => api.cancelQueued(null)),
         }, t('task.cancel_queued', { n: queued })),
-        finished > 0 && el('button', {
+        finished > 0 && state.settings.showFinished && el('button', {
           class: 'link', testid: 'tasks-clear', onclick: () => guarded(() => api.clearTasks()),
-        }, t('task.clear'))));
+        }, t('task.clear')),
+        el('button', {
+          class: `link pane-fold${state.taskViewOpen ? ' pressed' : ''}`, testid: 'task-view',
+          title: t('task.view'), 'aria-label': t('task.view'), 'aria-expanded': state.taskViewOpen ? 'true' : 'false',
+          onclick: (event) => { event.stopPropagation(); openTaskView(!state.taskViewOpen); },
+        }, gearIcon())));
+    renderTaskView();
     const shown = state.tasks.find((task) => task.id === id);
     document.querySelector('[data-testid="task-log-title"]').replaceChildren(
       el('span', { class: 'pane-caption' }, shown
