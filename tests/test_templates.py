@@ -87,6 +87,29 @@ def test_declared_signal_keywords_do_not_hide_inside_ordinary_words(name):
     assert not offenders, offenders
 
 
+# Ordinary words a refusal keyword must not sit inside: each a real false
+# refusal (task 0073: "itar" in "Mitarbeiter" and "military").
+_WORDS_THAT_HIDE_REFUSALS = ["mitarbeiter", "mitarbeit", "military", "solitary", "unitary", "sanitary"]
+
+
+@pytest.mark.parametrize("name", sorted(templates.template_folders()))
+def test_hard_dealbreaker_keywords_do_not_hide_inside_ordinary_words(name):
+    """A hard dealbreaker refuses the vacancy, so a keyword inside an ordinary
+    word refuses vacancies that never said it."""
+    import score
+
+    path = templates.template_dir(name) / f"{name}_criteria.yaml"
+    if not path.exists():
+        return
+    criteria = common.load_yaml(path) or {}
+    keywords = ((criteria.get("remote_location_fit") or {}).get("hard_dealbreakers") or {}).get("keywords") or []
+    assert keywords, "no hard dealbreaker keywords read: the test reads the wrong key"
+    offenders = [f"'{keyword}' inside '{word}'" for keyword in keywords
+                 for word in _WORDS_THAT_HIDE_REFUSALS
+                 if (needle := score.keyword_needle(keyword)) and needle in f" {word} "]
+    assert not offenders, offenders
+
+
 @pytest.fixture()
 def sandbox(tmp_path, monkeypatch):
     """Its own set of templates and its own local-identities folder."""

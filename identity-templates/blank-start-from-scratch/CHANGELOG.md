@@ -2,6 +2,14 @@
 
 New versions go on TOP.
 
+## V6 — ITAR as a word, 2026-10-22
+
+**Changed** (`blank_criteria.yaml` → `remote_location_fit.hard_dealbreakers.keywords`):
+"itar" becomes " itar" and "(itar". The bare "itar" sat inside "Mitarbeiter"
+(German postings) and "military", and refused 11 vacancies on 2026-10-22
+that never named ITAR. If your local criteria list "itar" among the hard
+dealbreakers, write it the same way.
+
 ## V5 — an optional parent CV, 2026-10-12
 
 **Added** (`blank_questionnaire.yaml`): `person.parent_cv` — an optional file

@@ -52,7 +52,10 @@ regions:
       - "must be a us citizen"
       - "u.s. person required"
       - "united states person required"
-      - "itar"              # export control: in effect requires a US person
+      # export control: in effect requires a US person. The leading space is a
+      # word boundary: a bare "itar" sat inside "Mitarbeiter" (task 0073).
+      - " itar"
+      - "(itar"
       - "security clearance"
     company_located_phrases:
       - "united states"

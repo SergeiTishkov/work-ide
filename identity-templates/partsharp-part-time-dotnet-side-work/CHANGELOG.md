@@ -6,6 +6,14 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V17 — ITAR as a word, 2026-10-22
+
+**Changed** (`partsharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers.keywords`):
+"itar" becomes " itar" and "(itar". The bare "itar" sat inside "Mitarbeiter"
+(German postings) and "military", and refused 11 vacancies on 2026-10-22
+that never named ITAR. If your local criteria list "itar" among the hard
+dealbreakers, write it the same way.
+
 ## V16 — remote on LinkedIn only in words, 2026-10-12
 
 **Changed** (`tools/score.py`, `_score_remote_location`): on a board that

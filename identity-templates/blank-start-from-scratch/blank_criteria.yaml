@@ -241,7 +241,11 @@ remote_location_fit:
       - "office based"
       - "no remote work"
       - "not a remote"
-      - "itar"
+      # " itar" with its leading space: a bare "itar" sat inside "Mitarbeiter"
+      # and "military" and refused 11 vacancies that never named ITAR
+      # (2026-10-22, task 0073).
+      - " itar"
+      - "(itar"
       - "must be a u.s. person"
       - "u.s. person required"
       - "united states person required"
