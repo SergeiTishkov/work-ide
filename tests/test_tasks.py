@@ -20,16 +20,17 @@ MARK_LIKE = re.compile(r"^(?:- |### )(?:to[ -]?do|done)\b", re.IGNORECASE)
 
 def _tickets():
     for stage in STAGES:
-        for path in sorted((TASKS / stage).iterdir()):
-            yield stage, path
+        if (TASKS / stage).is_dir():   # git keeps no empty folder: an emptied stage is absent in a clone
+            for path in sorted((TASKS / stage).iterdir()):
+                yield stage, path
 
 
 def _lines(path):
     return path.read_text(encoding="utf-8").splitlines()
 
 
-def test_four_stages_in_order_and_nothing_else():
-    assert sorted(p.name for p in TASKS.iterdir() if p.is_dir()) == list(STAGES)
+def test_no_folder_but_the_four_stages():
+    assert set(p.name for p in TASKS.iterdir() if p.is_dir()) <= set(STAGES)
 
 
 def test_a_task_is_a_numbered_markdown_file_with_a_number_of_its_own():
@@ -94,7 +95,7 @@ def test_marks_are_spelled_one_way_and_agree_with_the_stage():
 def test_a_cancelled_task_says_who_cancelled_it_when_and_why():
     """The owner, 2026-10-21: work decided against keeps its file, in
     4-cancelled, with the decision on a 'Cancelled:' line under 'Source:'."""
-    for path in sorted((TASKS / "4-cancelled").iterdir()):
+    for path in sorted((TASKS / "4-cancelled").glob("*.md")):
         lines = _lines(path)
         cancelled = [line for line in lines if line.startswith("Cancelled: ")]
         assert len(cancelled) == 1, f"4-cancelled/{path.name}: one 'Cancelled: <who, when>: <why>' line"
@@ -116,6 +117,12 @@ def test_a_new_task_takes_the_next_number_and_passes_the_format(tmp_path, monkey
     assert [line for line in lines if line.startswith("## ")][0] == "## Business"
     assert MARK.match(lines[-1]) and MARK.match(lines[-1]).group(1) == "TO DO"
     assert tasks_tool.find(["fix"]) == [path]
+
+
+def test_a_new_task_goes_into_a_stage_git_did_not_keep(tmp_path, monkeypatch):
+    monkeypatch.setattr(tasks_tool, "TASKS", tmp_path)
+    path = tasks_tool.new("triage", "an-idea", "An idea", "the agent", "Why.", "tools")
+    assert path.parent == tmp_path / "1-triage" and path.is_file()
 
 
 def test_a_new_task_needs_a_scope_from_the_list(tmp_path, monkeypatch):

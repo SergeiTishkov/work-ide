@@ -110,6 +110,7 @@ def new(stage: str, slug: str, title: str, source: str, business: str, scope: st
     scope = ", ".join(part.strip() for part in scope.split(","))
     number = next_number()
     path = TASKS / STAGES[stage] / f"{number}-{slug}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)   # git keeps no empty stage folder
     text = SKELETON.format(number=number, title=title, source=source, business=business, scope=scope)
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(text)
