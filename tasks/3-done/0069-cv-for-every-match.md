@@ -34,4 +34,5 @@ every company kind but marketplace.
 ## Items
 - DONE - `cv_auto.pick`: every match of the latest selection; `company_kinds`; the fresh-only bookkeeping removed (cv_batch, taskd, schedules); tests; docs
 - DONE - SHARP's `cv.auto`: hot leads, worth a look, long shots; no marketplaces (local profile; `cv_auto.json` of both identities removed: nothing reads it)
-- TO DO - Documents for the vacancies in the list now (a CV/CL batch for sharp)
+- DONE - Documents for the vacancies in the list now: 13 vacancies, 26 documents made, 0 gone, 0 failed (task #3, 2026-10-21)
+- DONE - A collection also queues a batch after the rest of the base: its AI read raised AI Engineer, Backend at Deel into Worth a look on 2026-10-21, and no batch followed it

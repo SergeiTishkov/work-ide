@@ -785,8 +785,10 @@ stdio, and returns at once.
 
 The profile's `cv.auto` (`docs/IDENTITIES.md`) names filters — markets,
 sources, classes, company kinds; AND inside a filter, OR between filters. A
-collection queues **one batch** for the identity after its top and another
-after its LinkedIn (the task service above): `tools/cv_batch.py <prefix>`. It
+collection queues **one batch** for the identity after its top, another
+after its LinkedIn and a third after the rest of the base, whose AI read
+raises stretch roles into a class (the task service above):
+`tools/cv_batch.py <prefix>`. It
 asks `tools/cv_auto.py` what to make and makes the documents one by one. Until 2026-10-13 (the same day) the app queued one task per document;
 the first catch-up was 971 documents, so the owner asked for one batch task
 instead.

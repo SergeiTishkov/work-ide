@@ -148,7 +148,7 @@ def test_a_collection_is_a_group_in_order(conn):
     ids = made["ids"]
     kinds = [(t["kind"], t["group_id"]) for t in made["group"]]
     assert kinds == [("collect", ids["top"]), ("linkedin", ids["top"]), ("rest", ids["top"]),
-                     ("cv_batch", ids["top"]), ("cv_batch", ids["top"])]
+                     ("cv_batch", ids["top"]), ("cv_batch", ids["top"]), ("cv_batch", ids["top"])]
     assert claim(conn)["id"] == ids["top"]
     assert claim(conn)["id"] == ids["linkedin"]
     assert claim(conn) is None
@@ -162,6 +162,11 @@ def test_a_collection_is_a_group_in_order(conn):
     # the rest goes after a failed LinkedIn; LinkedIn's own batch does not
     assert claim(conn)["id"] == ids["rest"]
     assert taskq.get(conn, ids["cv_batch_linkedin"])["state"] == "skipped"
+    # the batch after the rest: what its AI read raised into a class
+    assert taskq.get(conn, ids["cv_batch_rest"])["waiting_for"] == f"#{ids['rest']} to end"
+    taskq.finish(conn, ids["cv_batch"], "done")
+    taskq.finish(conn, ids["rest"], "done")
+    assert claim(conn, "desktop", BOTH)["id"] == ids["cv_batch_rest"]
 
 
 def test_a_failed_top_skips_the_rest_and_its_batch(conn):
@@ -173,6 +178,7 @@ def test_a_failed_top_skips_the_rest_and_its_batch(conn):
     assert taskq.get(conn, ids["rest"])["state"] == "skipped"
     assert taskq.get(conn, ids["rest"])["error"] == f"#{ids['top']} ended failed"
     assert taskq.get(conn, ids["cv_batch"])["state"] == "skipped"
+    assert taskq.get(conn, ids["cv_batch_rest"])["state"] == "skipped"
 
 
 def test_a_collection_already_going_is_not_queued_twice(conn):

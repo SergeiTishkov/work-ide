@@ -37,8 +37,8 @@ and it has a usage limit, task 0057). A task nobody can run now waits, with
 the reason in `waiting_for`.
 
 A COLLECTION IS A GROUP: the top (the agent's /top), LinkedIn beside it, the
-rest of the base after both, and a CV/CL batch after the top and after
-LinkedIn for what each brought (collection()).
+rest of the base after both, and a CV/CL batch after each of the three for
+what it brought or raised into a class (collection()).
 
 NOTHING STAYS "RUNNING" FOR A DEAD PROCESS: the one running a task refreshes
 its heartbeat_at; sweep() finds a task not refreshed for STALE_AFTER_SECONDS,
@@ -242,7 +242,8 @@ def collection(conn: sqlite3.Connection, identity: str, *, origin: Optional[str]
                linkedin: bool = True, documents: bool = True) -> dict:
     """One collection as a group (the owner, 2026-10-21): the top; LinkedIn
     beside it; the rest of the base after both, if the top ended done; a
-    CV/CL batch after the top and one after LinkedIn, each if that ended done.
+    CV/CL batch after the top, one after LinkedIn and one after the rest, each
+    if that ended done (the rest's AI read raises stretch roles into a class).
     A collection of the identity already queued or going is not queued twice."""
     origin = origin or default_origin()
     _validate("collect", identity, origin)
@@ -264,6 +265,8 @@ def collection(conn: sqlite3.Connection, identity: str, *, origin: Optional[str]
             if "linkedin" in made:
                 made["cv_batch_linkedin"] = _insert(conn, "cv_batch", identity, origin=origin,
                                                     group_id=top, after=[(made["linkedin"], True)])
+            made["cv_batch_rest"] = _insert(conn, "cv_batch", identity, origin=origin, group_id=top,
+                                            after=[(made["rest"], True)])
     return {"added": True, "task": get(conn, top), "group": group(conn, top), "ids": made}
 
 
