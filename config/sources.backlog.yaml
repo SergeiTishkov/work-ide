@@ -522,14 +522,15 @@ sources:
       and no postings. A talent network: you apply once and are matched.
 
   - name: aijobs_ai
-    status: pending
-    task: "tasks/1-triage/0045-aijobs-ai.md"
+    status: rejected
+    task: "tasks/3-done/0045-aijobs-ai.md"
     kind: html
-    checked: "2026-09-13"
-    measured: >
-      21 job links on the remote page, a JobPosting on each job page, a job-type
-      filter in the UI. Mostly machine-learning roles, which a .NET CV does not
-      reach; reconsidered since stretch roles (2026-10-20).
+    checked: "2026-10-21"
+    reason: >
+      About 728 remote postings, 20 a page, 10 requests a minute: a full read
+      takes over an hour. Of 61 read, one reachable from Georgia, one real
+      .NET mention, all full time; 57 of 61 apply on Greenhouse boards, which
+      fetch_ats.py reads directly. Its employers go to the ATS targets instead.
 
   # --- Rejected 2026-10-20: a key is needed, and the results only repeat ------
   # --- boards already fetched ------------------------------------------------
