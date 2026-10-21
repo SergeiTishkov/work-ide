@@ -6,16 +6,17 @@ folder a file sits in is its stage.
 
 | Folder | Stage | What is in it |
 |---|---|---|
-| `1-triage/` | TRIAGE | Ideas nobody has agreed to yet: the agent's own backlog, sources noticed in passing, offers made in a conversation. The owner decides whether each goes to TO DO or is deleted. |
+| `1-triage/` | TRIAGE | Ideas nobody has agreed to yet: the agent's own backlog, sources noticed in passing, offers made in a conversation. The owner decides whether each goes to TO DO or is cancelled. |
 | `2-to-do/` | TO DO | Work the owner wants, with at least one item still to do. |
 | `3-done/` | DONE | Work finished: every item is DONE. Written from the git history up to 2026-10-20. |
+| `4-cancelled/` | CANCELLED | Work the owner decided not to do (2026-10-21), from any stage: the file stays as it stood, with a `Cancelled:` line under `Source:` saying who decided, when and why. Its TO DO items stay; nothing is done under it. |
 
 A task moves by moving its file. Its number stays.
 
 ## One file, one task
 
 `NNNN-a-few-words.md`: four digits from 0000, then a few words in English.
-The number is unique across the three folders and is never reused; a new
+The number is unique across the four folders and is never reused; a new
 task takes the next free one. Tasks are written in English, like the rest of
 the repository.
 
@@ -26,6 +27,7 @@ A file can be a ticket, a feature or an epic. The shape follows its size:
 
 Commits: <hashes> (tasks 0000-0050 only; later ones: python tools/tasks.py log NNNN)
 Source: who asked for it, and when
+Cancelled: who decided, when: why (a task in 4-cancelled only)
 Scope: tools, docs
 
 ## Business
@@ -76,9 +78,9 @@ The items are the last section. Each is one line starting with
   and planning items move into sub-ticket 1, and the rest of the work becomes
   sub-tickets after it.
 
-`tests/test_tasks.py` checks the format: the three folders, unique numbers,
+`tests/test_tasks.py` checks the format: the four folders, unique numbers,
 the scope of every task from 0052 on, `## Business` first, the marks spelled one way, no TO DO left in a DONE task,
-at least one TO DO in the other two stages.
+at least one TO DO in triage and to-do, a `Cancelled:` line in a cancelled task.
 
 ## Every commit names its task
 
@@ -92,13 +94,15 @@ The procedure is the `task` skill (`.claude/skills/task/SKILL.md`).
   in `2-to-do/` when the owner asked for it, in `1-triage/` when it is the
   agent's own idea.
 - A task that turned out to need no commit is deleted (`git rm`, in a commit
-  of task files only). History is not rewritten, and the number is not
+  of task files only). A task the owner decided against is not deleted: it
+  moves to `4-cancelled/` with its `Cancelled:` line. History is not rewritten, and the number is not
   handed out again: `tools/tasks.py next` reads it from git history.
 - The commit message has a line `Task: NNNN`, and the commit changes that
   task's file: the item it finishes marked DONE, the work it does added as an
   item, or the file moved to `3-done/` with its last item.
-- A task in `1-triage/` is not agreed work: a commit naming only triage tasks
-  changes nothing outside `tasks/`.
+- A task in `1-triage/` is not agreed work, and one in `4-cancelled/` will
+  not be done: a commit naming only such tasks changes nothing outside
+  `tasks/`.
 - A commit that changes task files only (`tasks/<stage>/NNNN-*.md`) needs no
   task. A change to this README, the hook or `tools/tasks.py` does.
 - Merges, reverts and fixups are exempt.

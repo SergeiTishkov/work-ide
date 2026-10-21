@@ -28,6 +28,9 @@ python tools/tasks.py find <two or three words of the change>
 - **A task in `1-triage/` covers it** — triage is not agreed work. If the
   owner has now asked for it, move the file to `2-to-do/` (same number) as
   part of the first commit. If the owner has not, do not start: ask.
+- **A task in `4-cancelled/` covers it** — the owner decided against it. Do
+  not start: ask. If the owner wants it after all, move it back to `2-to-do/`
+  and drop its `Cancelled:` line.
 - **Nothing covers it** — make one:
 
   ```

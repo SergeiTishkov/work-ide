@@ -83,6 +83,20 @@ def test_a_triage_task_does_not_cover_work_outside_tasks(repo):
     assert not ok and "triage" in err
 
 
+def test_a_cancelled_task_does_not_cover_work_outside_tasks(repo):
+    _write(repo, "tools/a.py", "y\n")
+    _write(repo, "tasks/4-cancelled/0004-not-wanted.md", "# 0004 Not wanted\n")
+    ok, err = _commit(repo, "Do it anyway\n\nTask: 0004")
+    assert not ok and "cancelled" in err
+
+
+def test_cancelling_a_task_needs_no_task_line(repo):
+    (repo / "tasks/4-cancelled").mkdir()
+    _git(repo, "mv", "tasks/2-to-do/0002-agreed-work.md", "tasks/4-cancelled/0002-agreed-work.md")
+    ok, err = _commit(repo, "Tasks: 0002 is cancelled")
+    assert ok, err
+
+
 def test_a_commit_of_task_files_only_needs_no_task_line(repo):
     _write(repo, "tasks/1-triage/0003-another-idea.md", "# 0003 Another idea\n")
     _write(repo, "tasks/2-to-do/0002-agreed-work.md", "# 0002 Agreed work, planned\n")

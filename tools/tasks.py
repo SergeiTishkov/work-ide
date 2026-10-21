@@ -19,7 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TASKS = ROOT / "tasks"
-STAGES = {"triage": "1-triage", "to-do": "2-to-do", "done": "3-done"}
+STAGES = {"triage": "1-triage", "to-do": "2-to-do", "done": "3-done", "cancelled": "4-cancelled"}
 NAME = re.compile(r"^(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 

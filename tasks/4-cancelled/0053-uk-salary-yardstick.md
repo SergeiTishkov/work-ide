@@ -2,6 +2,7 @@
 
 Source: task 0052, 2026-10-20: the Markdown report was the only place that
 showed it
+Cancelled: the owner, 2026-10-21: not needed
 Scope: tools, app
 
 ## Business

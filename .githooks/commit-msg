@@ -6,8 +6,8 @@
 #
 # and the commit changes that task's file: it marks the item it finishes,
 # adds the item it does, or moves the file to the next stage. A task in
-# 1-triage is not agreed work yet, so a commit naming only triage tasks may
-# change nothing outside tasks/.
+# 1-triage is not agreed work yet, and one in 4-cancelled will not be done,
+# so a commit naming only such tasks may change nothing outside tasks/.
 #
 # The one kind of commit with no task: one that changes task files only
 # (tasks/<stage>/NNNN-*.md) — writing, updating, moving or deleting tasks.
@@ -23,7 +23,7 @@ case "$subject" in
 esac
 
 changed=$(git diff --cached --name-only)
-if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '^tasks/[1-3]-[a-z-]+/[0-9]{4}-[^/]*\.md$'; then
+if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '^tasks/[1-4]-[a-z-]+/[0-9]{4}-[^/]*\.md$'; then
   exit 0
 fi
 
@@ -46,12 +46,12 @@ for number in $numbers; do
   printf '%s\n' "$staged" | grep -qx "$path" \
     || fail "Task $number: the commit does not change $path (mark the item done, add the item, or move the file)."
   case "$path" in
-    tasks/1-triage/*) ;;
+    tasks/1-triage/*|tasks/4-cancelled/*) ;;
     *) only_triage=no ;;
   esac
 done
 
 if [ "$only_triage" = yes ] && [ -n "$outside" ]; then
-  fail "only triage tasks are named, and a task in triage is not agreed work: move it to tasks/2-to-do/ first, or commit only the task."
+  fail "only triage or cancelled tasks are named, and neither is agreed work: move the task to tasks/2-to-do/ first, or commit only the task."
 fi
 exit 0

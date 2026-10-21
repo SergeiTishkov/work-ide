@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import tasks as tasks_tool  # noqa: E402
 
 TASKS = ROOT / "tasks"
-STAGES = ("1-triage", "2-to-do", "3-done")
+STAGES = ("1-triage", "2-to-do", "3-done", "4-cancelled")
 NAME = re.compile(r"^(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
 MARK = re.compile(r"^(?:- |### )(TO DO|DONE) - \S")
 # a line that means to be a mark but is spelled another way
@@ -28,7 +28,7 @@ def _lines(path):
     return path.read_text(encoding="utf-8").splitlines()
 
 
-def test_three_stages_in_order_and_nothing_else():
+def test_four_stages_in_order_and_nothing_else():
     assert sorted(p.name for p in TASKS.iterdir() if p.is_dir()) == list(STAGES)
 
 
@@ -83,10 +83,23 @@ def test_marks_are_spelled_one_way_and_agree_with_the_stage():
                 assert match, f"{stage}/{path.name}:{number}: write '- TO DO - <what>' or '- DONE - <what>'"
                 marks.append(match.group(1))
         assert marks, f"{stage}/{path.name}: no items"
+        if stage == "4-cancelled":
+            continue  # left as it stood when the owner cancelled it
         if stage == "3-done":
             assert "TO DO" not in marks, f"{path.name}: a TO DO left in a DONE task"
         else:
             assert "TO DO" in marks, f"{stage}/{path.name}: nothing left to do, so it belongs in 3-done"
+
+
+def test_a_cancelled_task_says_who_cancelled_it_when_and_why():
+    """The owner, 2026-10-21: work decided against keeps its file, in
+    4-cancelled, with the decision on a 'Cancelled:' line under 'Source:'."""
+    for path in sorted((TASKS / "4-cancelled").iterdir()):
+        lines = _lines(path)
+        cancelled = [line for line in lines if line.startswith("Cancelled: ")]
+        assert len(cancelled) == 1, f"4-cancelled/{path.name}: one 'Cancelled: <who, when>: <why>' line"
+        assert lines.index(cancelled[0]) < lines.index("## Business"), \
+            f"4-cancelled/{path.name}: Cancelled comes before ## Business"
 
 
 def test_a_new_task_takes_the_next_number_and_passes_the_format(tmp_path, monkeypatch):

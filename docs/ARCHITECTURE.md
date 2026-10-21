@@ -1346,7 +1346,7 @@ process is exactly the constraint wanted.
 
 The list of work, done and waiting, is `tasks/` (format in `tasks/README.md`):
 ideas nobody has agreed to yet are in `tasks/1-triage/`, agreed work in
-`tasks/2-to-do/`. The candidates this section listed until 2026-10-20 were
+`tasks/2-to-do/`, work decided against in `tasks/4-cancelled/`. The candidates this section listed until 2026-10-20 were
 either done (the role-complexity gate, the regional dealbreaker) or dropped:
 Dice.com answers 403 (`docs/SOURCES.md`); the region list is extended as
 wordings turn up, not as a task; near-duplicates are already merged; closed

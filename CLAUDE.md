@@ -438,7 +438,8 @@ history.
   than any other.
 - `docs/VACANCY_CHECKLIST.md` — the mandatory manual checklist for candidates.
 - `tasks/` — the list of work: one file per task, the folder its stage
-  (`1-triage`, `2-to-do`, `3-done`). The format is `tasks/README.md`.
+  (`1-triage`, `2-to-do`, `3-done`, `4-cancelled`). The format is
+  `tasks/README.md`.
 
 **Identity-level documents** (in its folder, with its prefix):
 
@@ -470,6 +471,8 @@ use it before the first edit of any change and before every commit.
   fixing local data, running a collection, answering a question — has none.
   A task that turned out to need no commit is deleted (`git rm`, a commit of
   task files only); history is not rewritten, and its number is not reused.
+  A task the owner decided against moves to `tasks/4-cancelled/` with a
+  `Cancelled:` line, and covers no work.
 - Before starting, find the task the work belongs to
   (`python tools/tasks.py find <words>`). Work the owner asks for that has no
   task gets one in `tasks/2-to-do/` first, a one-line fix included; an idea
