@@ -428,9 +428,13 @@ sources:
   # --- Not a vacancy source, but wanted for something else -------------------
 
   - name: itjobswatch_salary_benchmark
-    status: implemented
-    implemented_at: "2026-09-08"
-    implemented_as: "tools/salary_benchmark.py, beside the UK report, outside the score"
+    status: rejected
+    checked: "2026-10-22"
+    reason: >
+      Read by tools/salary_benchmark.py for the Markdown report's UK block
+      from 2026-09-08; the report went on 2026-10-20, the owner did not want
+      the yardstick in the app (task 0053), and the tool was removed
+      (task 0075). The page itself still answers.
     kind: html
     endpoint: "https://www.itjobswatch.co.uk/jobs/uk/.net.do"
     measured: "200 (2026-09-08)"

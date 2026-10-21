@@ -70,26 +70,13 @@ contract slug is fetched too: that inventory is invisible to the plain search.
 
 ## A yardstick for pay: IT Jobs Watch
 
-Not a source of vacancies — it publishes none. It publishes six-month rolling
-medians per technology (`tools/salary_benchmark.py`). The Markdown report
-showed them beside the UK shortlist; since it was removed (2026-10-20) nothing
-refreshes or shows them — a triage task (0053) decides where they go:
-
-    .NET      £60,000/year permanent (-4.0%)   £525/day contract (+6.6%)
-    ASP.NET   £55,000/year (-4.3%)             £475/day (-11.6%)
-    Azure     £65,000/year (+8.3%)             £525/day (+1.9%)
-
-That fills the middle of the three levels of trust in a salary (CLAUDE.md
-section 5): a person reading "£55,000 - £60,000" cannot otherwise tell whether
-it is generous or poor.
-
-**Two things it must never do**, both easy and both wrong: it must not fill in
-a vacancy's own salary — a market median is not what THIS employer pays — and
-it must not touch the score, where every UK .NET vacancy would gain the same
-points and the number would only get less honest. Both are asserted by tests.
-
-The site is British, so the block is rendered only where UK vacancies appear.
-No equivalent of this quality is known for the EU or Canada.
+Not a source of vacancies: it publishes six-month rolling medians of UK pay
+per technology (.NET £60,000 a year permanent, £525 a day contract, on
+2026-09-08). `tools/salary_benchmark.py` read them for the Markdown report's
+UK block from 2026-09-08. The report went on 2026-10-20, the owner did not
+want the yardstick in the app (task 0053, cancelled), and the tool was
+removed on 2026-10-22 (task 0075). Recorded in config/sources.backlog.yaml
+so the page is not measured again.
 
 ## Part-time and freelance work: which boards say how many hours
 
