@@ -55,7 +55,10 @@ test('sections follow the class order, with their titles from the locale', async
 
 test('"Collect vacancies" queues a collection; the bottom panel lists it with its log', async ({ page }) => {
   await open(page);
-  await expect(page.getByTestId('task-panel')).toBeHidden();
+  // with no tasks the panel is there and says so (task 0064)
+  await expect(page.getByTestId('task-panel')).toBeVisible();
+  await expect(page.getByTestId('task-empty')).toHaveText(en['task.empty']);
+  await expect(page.getByTestId('task-tab')).toBeHidden();
   await (await command(page, 'run-collect')).click();
   await expect(page.getByTestId('menu')).toHaveCount(0);   // an item closes the menu
   expect(await calls(page, 'enqueueTask')).toEqual([[{ kind: 'collect', identity: 'sharp' }]]);
@@ -1482,7 +1485,7 @@ test('documents the app queued itself show on their cards and in the panel, mark
   // what the app queued itself shows no result on the card: the folder has it
   await expect(row.getByTestId('cv-result')).toHaveCount(0);
   await page.getByTestId('tasks-clear').click();
-  await expect(page.getByTestId('task-panel')).toBeHidden();
+  await expect(page.getByTestId('task-empty')).toBeVisible();
 });
 
 test('the panel\'s height and split are dragged on their sashes and kept', async ({ page }) => {
@@ -1670,7 +1673,7 @@ test('the CV/CL batch is one task: its progress, its document on the card, its l
   }, ['stopped before 10/971']));
   await expect(task).toHaveAttribute('data-state', 'stopped');
   await page.getByTestId('tasks-clear').click();
-  await expect(page.getByTestId('task-panel')).toBeHidden();
+  await expect(page.getByTestId('task-empty')).toBeVisible();
 });
 
 test("a document asked for while the batch runs says it waits for the batch's current document", async ({ page }) => {

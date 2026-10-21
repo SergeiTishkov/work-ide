@@ -3000,8 +3000,8 @@
   // tasks run either way.
   function renderTaskTab() {
     const tab = document.querySelector('[data-testid="task-tab"]');
-    const listed = state.tasks.length > 0 && state.settings.showTasks;
-    tab.hidden = !listed || !state.panelFolded;
+    // shown with no tasks too, as VS Code's panel (task 0064)
+    tab.hidden = !state.settings.showTasks || !state.panelFolded;
     if (tab.hidden) return;
     const active = state.tasks.filter((task) => ACTIVE_TASK.has(task.state)).length;
     tab.title = t('task.unfold');
@@ -3026,12 +3026,13 @@
   function renderTaskPanel() {
     const panel = document.querySelector('[data-testid="task-panel"]');
     renderTaskTab();
-    panel.hidden = !state.tasks.length || !state.settings.showTasks || state.panelFolded;
+    panel.hidden = !state.settings.showTasks || state.panelFolded;
     if (panel.hidden) return;
     const id = shownTaskId();
     const list = document.querySelector('[data-testid="task-list"]');
     const scroll = list.scrollTop;
-    list.replaceChildren(...state.tasks.flatMap((task) => [el('div', {
+    if (!state.tasks.length) list.replaceChildren(el('div', { class: 'task-empty', testid: 'task-empty' }, t('task.empty')));
+    else list.replaceChildren(...state.tasks.flatMap((task) => [el('div', {
       class: `task ${task.state}${task.id === id ? ' chosen' : ''}`,
       testid: `task-${task.id}`, 'data-state': task.state, title: taskStateText(task),
       onclick: () => chooseTask(task.id),

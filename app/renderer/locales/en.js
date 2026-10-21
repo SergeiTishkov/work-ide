@@ -148,6 +148,7 @@
   'task.cancel_queued': 'Cancel queued ({n})',
   'task.clear': 'Clear finished',
   'task.list_title': 'Tasks ({n} active)',
+  'task.empty': 'No tasks. What the app, the agent, a terminal or a schedule adds shows here.',
   'task.fold': 'Fold the panel',
   'task.unfold': 'Open the task panel',
   'task.stop_confirm': 'Are you sure you want to stop this task?',
