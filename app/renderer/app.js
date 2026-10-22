@@ -1052,11 +1052,20 @@
   function collectState() {
     const pipeline = state.pipelines[state.active] || { running: false };
     const task = findTask(state.active, 'collect');
+    // a task of the identity's collection after its top: LinkedIn, the rest,
+    // a CV/CL batch. The collection is going until the last ends, and the
+    // queue takes no second one (tools/taskq.py active_collection, task 0089)
+    const tail = state.tasks.find((t) => ACTIVE_TASK.has(t.state) && t.identity === state.active && t.groupId)
+      || null;
     return {
-      pipeline, task,
+      pipeline, task, tail,
       running: Boolean(pipeline.running || (task && task.state === 'running')),
       queued: Boolean(task && task.state === 'queued'),
     };
+  }
+
+  function kindName(kind) {
+    return TASK_KIND_KEYS[kind] ? t(TASK_KIND_KEYS[kind]) : kind;
   }
 
   function collectingText(pipeline) {
@@ -1092,7 +1101,7 @@
   }
 
   function collectItem(identity) {
-    const { pipeline, task, running, queued } = collectState();
+    const { pipeline, task, tail, running, queued } = collectState();
     if (queued) {
       return menuItem({
         testid: 'run-collect', disabled: true, text: t('run.queued'),
@@ -1105,6 +1114,12 @@
         title: t('run.collecting_since', { time: String(pipeline.startedAt || '').slice(11, 16) }),
         text: [el('span', { class: 'spinner small', testid: 'collect-indicator' }),
           el('span', { class: 'menu-text' }, collectingText(pipeline))],
+      });
+    }
+    if (tail) {
+      return menuItem({
+        testid: 'run-collect', disabled: true, text: t('run.going', { what: kindName(tail.kind) }),
+        title: t('run.going_hint'),
       });
     }
     if (identity && identity.active === false) {

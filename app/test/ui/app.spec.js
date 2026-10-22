@@ -237,6 +237,15 @@ test('"Settings…" hides the task list: no panel and no tab, the tasks run on; 
   await expect(page.getByTestId('task-panel')).toBeVisible();
 });
 
+test('a collection whose top ended is going while a task of its group runs', async ({ page }) => {
+  // task 0089: LinkedIn of the same collection runs; no second collection
+  await open(page);
+  await page.evaluate(() => window.__addTask({ kind: 'linkedin', identity: 'sharp', state: 'running', groupId: 1 }));
+  const button = await command(page, 'run-collect');
+  await expect(button).toHaveText(en['run.going'].replace('{what}', en['task.kind.linkedin']));
+  await expect(button).toBeDisabled();
+});
+
 test('collections of several identities queue: the first runs, the others wait their turn', async ({ page }) => {
   await open(page);
   await (await command(page, 'run-collect')).click();

@@ -38,7 +38,9 @@ the reason in `waiting_for`.
 
 A COLLECTION IS A GROUP: the top (the agent's /top), LinkedIn beside it, the
 rest of the base after both, and a CV/CL batch after each of the three for
-what it brought or raised into a class (collection()).
+what it brought or raised into a class (collection()). It is going until
+the last task of the group ends, and no second one is queued meanwhile
+(active_collection(), task 0089).
 
 NOTHING STAYS "RUNNING" FOR A DEAD PROCESS: the one running a task refreshes
 its heartbeat_at; sweep() finds a task not refreshed for STALE_AFTER_SECONDS,
@@ -239,19 +241,36 @@ def add(conn: sqlite3.Connection, kind: str, identity: Optional[str] = None, *,
     return {"added": True, "task": get(conn, task_id)}
 
 
+def active_collection(conn: sqlite3.Connection, identity: Optional[str]) -> Optional[dict]:
+    """A task of a collection of the identity still queued or going: its top,
+    or any task of its group: LinkedIn, the rest, a CV/CL batch (the owner,
+    2026-10-23, task 0089: a collection is a batch of tasks, going until the
+    last of them ends). The running one first."""
+    row = conn.execute(
+        "SELECT id FROM tasks WHERE identity IS ? AND state IN ('queued', 'running') "
+        "AND (kind = 'collect' OR group_id IS NOT NULL) "
+        "ORDER BY state = 'running' DESC, id LIMIT 1", (identity,)).fetchone()
+    return get(conn, row[0]) if row else None
+
+
 def collection(conn: sqlite3.Connection, identity: str, *, origin: Optional[str] = None,
                linkedin: bool = True, documents: bool = True) -> dict:
     """One collection as a group (the owner, 2026-10-21): the top; LinkedIn
     beside it; the rest of the base after both, if the top ended done; a
     CV/CL batch after the top, one after LinkedIn and one after the rest, each
     if that ended done (the rest's AI read raises stretch roles into a class).
-    A collection of the identity already queued or going is not queued twice."""
+    A collection of the identity still going is not queued again, a click or
+    a schedule alike: going until the last task of its group ends
+    (active_collection; task 0089). Until 2026-10-23 only the top counted,
+    and with the top done and LinkedIn, the rest and two batches still
+    waiting, a second group could be queued beside the first."""
     origin = origin or default_origin()
     _validate("collect", identity, origin)
     with transaction(conn):
-        existing = same_active(conn, "collect", identity, None)
+        existing = active_collection(conn, identity)
         if existing:
-            return {"added": False, "task": existing, "group": group(conn, existing["group_id"])}
+            return {"added": False, "task": existing,
+                    "group": group(conn, existing["group_id"]) or [existing]}
         top = _insert(conn, "collect", identity, origin=origin)
         conn.execute("UPDATE tasks SET group_id = ? WHERE id = ?", (top, top))
         made = {"top": top}

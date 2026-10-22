@@ -188,6 +188,19 @@ def test_a_collection_already_going_is_not_queued_twice(conn):
     assert len(taskq.tasks(conn)) == len(first["group"])
 
 
+def test_a_collection_is_going_until_the_last_task_of_its_group_ends(conn):
+    # task 0089, 2026-10-23: the top (#10) was done while LinkedIn ran for
+    # hours and the rest and two batches waited; a second group was possible
+    ids = taskq.collection(conn, "ftf", origin="schedule")["ids"]
+    conn.execute("UPDATE tasks SET state = 'done' WHERE id IN (?, ?)", (ids["top"], ids["cv_batch"]))
+    conn.execute("UPDATE tasks SET state = 'running' WHERE id = ?", (ids["linkedin"],))
+    again = taskq.collection(conn, "ftf", origin="app")
+    assert not again["added"] and again["task"]["id"] == ids["linkedin"]   # the running one is named
+    assert taskq.collection(conn, "abc", origin="app")["added"]           # another identity is free
+    conn.execute("UPDATE tasks SET state = 'done' WHERE group_id = ?", (ids["top"],))
+    assert taskq.collection(conn, "ftf", origin="app")["added"]
+
+
 def test_collections_of_two_identities_take_turns_in_the_slot(conn):
     worker(conn)
     a = taskq.add(conn, "collect", "ftf", origin="app")["task"]

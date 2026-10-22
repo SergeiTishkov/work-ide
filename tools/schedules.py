@@ -325,8 +325,10 @@ def _latest_due(cron: Cron, since: datetime, at: datetime) -> Optional[datetime]
         due = following
 
 
-def _queue(conn: sqlite3.Connection, schedule: dict, identities: Sequence[str]) -> List[int]:
-    what, args, ids = schedule["what"], schedule["args"], []
+def _queue(conn: sqlite3.Connection, schedule: dict, identities: Sequence[str]) -> tuple:
+    """(the ids queued, "#11 linkedin sharp" for each identity whose same
+    work was going already)."""
+    what, args, ids, going = schedule["what"], schedule["args"], [], []
     for prefix in identities:
         if what == "collect":
             made = taskq.collection(conn, prefix, origin="schedule", linkedin=args.get("linkedin", True),
@@ -335,7 +337,10 @@ def _queue(conn: sqlite3.Connection, schedule: dict, identities: Sequence[str]) 
         else:
             made = taskq.add(conn, what, prefix, origin="schedule", args=args)
             ids += [made["task"]["id"]] if made["added"] else []
-    return ids
+        if not made["added"]:
+            task = made["task"]
+            going.append(f"#{task['id']} {task['kind']} {prefix} ({task['state']})")
+    return ids, going
 
 
 def run_due(conn: sqlite3.Connection, at: Optional[datetime] = None,
@@ -375,10 +380,13 @@ def run_due(conn: sqlite3.Connection, at: Optional[datetime] = None,
         else:
             off = inactive_of()
             prefixes = [p for p in wanted if p not in off]
-        ids = _queue(conn, schedule, prefixes)
+        ids, going = _queue(conn, schedule, prefixes)
         note = (f"{label}: {'caught up, ' if late else ''}"
-                + (f"queued #{', #'.join(map(str, ids))}" if ids else "nothing queued (no active identity, "
-                   "or the same work was already queued)"))
+                + (f"queued #{', #'.join(map(str, ids))}" if ids
+                   else f"nothing queued, the same work is going: {', '.join(going)}" if going
+                   else "nothing queued (no active identity)"))
+        if ids and going:
+            note += f"; the same work is going: {', '.join(going)}"
         conn.execute("UPDATE schedules SET last_run_at = ?, last_tasks = ?, last_note = ? WHERE id = ?",
                      (taskq.iso(at), json.dumps(ids), note, schedule_id))
         said.append(note)

@@ -38,26 +38,30 @@ Gaps found:
 - The worker keeps the code it started with: the app's worker of 20:12
   still runs the code before tasks 0087 and 0088.
 
+The owner's decision, 2026-10-23: the "same work is going" rule, for the
+whole collection: "a collection is in fact a batch of tasks; count the
+whole batch". The minimum gap and the worker restart on new code are not
+taken now.
+
 ## Implementation
-To be decided with the owner. Proposals:
-- One rule for "the same work is going": a collection of the identity is
-  going while ANY task of its group is queued or going; a click or a
-  schedule then queues nothing and says "already going: #11 LinkedIn, 80%".
-  The same for a single kind (`rest`, `linkedin`, `cv_batch`) against a
-  group that holds it.
-- Schedules: skip a due run when the same work for the identity is going,
-  whoever started it (the rule above), not only the schedule's own run.
-- Optional: a schedule's minimum gap: a run due less than N hours after the
-  previous run of the same work ENDED is skipped (a 23:00 catch-up that
-  ended at 00:50 makes the 01:00 run pointless). N per schedule, or a
-  default such as half the period.
-- The worker ends between tasks when its code changed (as the app's
-  code stamp does), so a fix applies without closing anything.
-- On reliability without a server: the queue is local by design; what made
-  it miss work was no worker running (0056: `taskd.py install`, a worker of
-  the user's session started by Task Scheduler, outside the app), a session
-  that ended before its pipeline (0088), and races between the batch and
-  the person (0087). A server is not needed for any of these.
+- `tools/taskq.py`: `active_collection()`: a queued or running task of the
+  identity that is its top (`collect`) or belongs to a collection's group
+  (LinkedIn, the rest, a CV/CL batch), the running one first.
+  `collection()` queues nothing while it finds one, and returns it.
+- `tools/schedules.py`: the note of a run that queued nothing names what is
+  going: "nothing queued, the same work is going: #11 linkedin sharp
+  (running)".
+- The app: "Collect vacancies" is off while a task of the identity's
+  collection runs or waits after its top, with "Collection going: <task>".
+- Single kinds were covered already: `taskq.add` queues one task of a kind,
+  identity and vacancy at a time, a task of a group included.
+- Tests: `test_taskq.py`, `test_schedules.py`, `app/test/ui/app.spec.js`.
+
+Proposed, not taken (the owner, 2026-10-23): a minimum gap between runs of a
+schedule (a catch-up that ended at 00:50 and the run due at 01:00); a worker
+that ends between tasks when its code changed.
 
 ## Items
-- TO DO - Decide with the owner: the "same work is going" rule, the minimum gap, the worker restart on new code
+- DONE - A collection is going until the last task of its group ends; none is queued beside it
+- DONE - A schedule's note names the work that is going
+- DONE - The app shows the collection as going while its group runs

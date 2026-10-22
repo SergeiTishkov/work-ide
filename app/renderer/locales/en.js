@@ -146,6 +146,8 @@
   'identities.no_base': 'No base yet: collect it once first',
   'identities.close': 'Close',
   'run.queued': 'Collection queued',
+  'run.going': 'Collection going: {what}',
+  'run.going_hint': 'A collection is a group of tasks; a new one can start when the last of them ends',
   'run.queued_hint': 'Waits for the tasks before it in the queue',
   'action.queued': 'Queued…',
   'action.collect_reputation': 'Collect reputation',

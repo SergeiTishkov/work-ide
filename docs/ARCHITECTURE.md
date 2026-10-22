@@ -985,7 +985,11 @@ others:
 "Collect" queues the top (`/top`, the collect slot) and "linkedin" (a slot
 of its own, which does not ask whether the base is free: the run waits for
 it itself) side by side. The rest of the base waits for both and runs if
-the top ended done; a CV/CL batch follows each that ends done.
+the top ended done; a CV/CL batch follows each that ends done. The
+collection is going until the last task of its group ends: a click or a
+schedule queues no second one meanwhile (`taskq.active_collection`, task
+0089). Until 2026-10-23 only the top counted; that night the top was done
+while LinkedIn ran its sixth hour and the rest and two batches waited.
 
 **The top's session waits for its pipeline (2026-10-22, task 0088).** The
 agent ran the pipeline, Claude Code moved the command into the background

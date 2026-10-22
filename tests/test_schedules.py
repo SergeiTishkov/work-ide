@@ -264,3 +264,14 @@ def test_end_to_end_a_schedule_queues_its_task_the_worker_runs_it_and_the_schedu
         assert shown["last_tasks"] == [task["id"]] and shown["last_result"] == "done"
         assert shown["last_note"].endswith(f"queued #{task['id']}")
     assert any(line.startswith(f"schedule #{made['id']}") for line in said)
+
+
+def test_a_schedule_queues_no_collection_while_one_started_by_hand_is_going(conn):
+    # task 0089: the whole group counts, whoever queued it
+    ids = taskq.collection(conn, "sharp", origin="app")["ids"]
+    conn.execute("UPDATE tasks SET state = 'done' WHERE id = ?", (ids["top"],))
+    conn.execute("UPDATE tasks SET state = 'running' WHERE id = ?", (ids["linkedin"],))
+    made = schedules.add(conn, "collect", "sharp", "0 1 * * *", at=local(2026, 10, 22, 0, 59))
+    said = due(conn, local(2026, 10, 23, 1, 0))
+    assert said == [f"schedule #{made['id']} (collect), the run of 2026-10-23 01:00: nothing queued, "
+                    f"the same work is going: #{ids['linkedin']} linkedin sharp (running)"]
