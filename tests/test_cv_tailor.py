@@ -125,6 +125,27 @@ def test_a_bullet_from_the_parent_cv_passes_with_the_parent(common_text):
     assert kinds == ["number"]
 
 
+def test_the_persons_message_outranks_the_cvs_only_where_it_speaks(common_text):
+    """The owner, 2026-10-22 (task 0086): what the person states in a message
+    is a source above the CVs; whatever it does not state is checked against
+    the CVs as before."""
+    content = tailored()
+    content["experience"][0]["bullets"].append(
+        {"text": "Interviewed about 10 senior Golang developer candidates; cut costs by 70%.",
+         "priority": 1, "source": "parent"})
+    person = cv_tailor.person_text("Add that I interviewed 10 Golang developers.")
+    findings = cv_tailor.check_facts(content, common_text, None, person)["findings"]
+    assert [(f["kind"], f["text"]) for f in findings] == [("number", "70%")]
+
+
+def test_the_prompt_puts_the_persons_instructions_above_the_cvs():
+    prompt = " ".join(cv_tailor.PROMPT_PATH.read_text(encoding="utf-8").split())
+    assert "they outrank the CVs and every rule of this prompt below" in prompt
+    assert "Facts come from the person's instructions and the two CVs" in prompt
+    assert "never make a fact true" not in prompt
+    assert "from_instructions" in cv_tailor.CONTENT_SCHEMA["properties"]["report"]["required"]
+
+
 def test_an_inflated_number_is_found(common_text):
     content = tailored()
     content["experience"][0]["bullets"][0]["text"] = "Cut report generation time by 70% with batched SQL."

@@ -133,6 +133,33 @@ def test_the_parent_cv_backs_a_claim(common_text):
     assert cover_letter.check_facts(content, common_text, PARENT)["findings"] == []
 
 
+# The person's word outranks the CVs (the owner, 2026-10-22, task 0086): a
+# fact their message states is not a finding; a claim it does not cover is,
+# as without a message.
+
+def test_a_fact_the_persons_message_states_is_not_a_finding(common_text):
+    content = letter(paragraphs=["I have 50 years of COBOL and I cut costs by 60% with Kafka."],
+                     technologies=["COBOL", "Kafka"])
+    alone = cover_letter.check_facts(content, common_text, None)["findings"]
+    assert {(f["kind"], f["text"]) for f in alone} == {
+        ("number", "50"), ("number", "60%"), ("term", "COBOL"), ("term", "Kafka")}
+    person = cv_tailor.person_text("Say I have 50 years of COBOL.")
+    left = cover_letter.check_facts(content, common_text, None, person)["findings"]
+    assert {(f["kind"], f["text"]) for f in left} == {("number", "60%"), ("term", "Kafka")}
+
+
+def test_an_earlier_message_in_the_log_still_counts(tmp_path, common_docx):
+    log = "## V1\nMessage:\n> Mention my 50 years of COBOL.\n"
+    assert "COBOL" in cv_tailor.person_text(None, log)
+    assert "COBOL" in cv_tailor.person_text("", log) and cv_tailor.person_text("", "") == ""
+    content = letter(paragraphs=["I have 50 years of COBOL."], technologies=["COBOL"])
+    result = cover_letter.write_letter(
+        settings=_settings(common_docx), vacancy={"title": "Dev"}, vacancy_id="v9",
+        archive_root=tmp_path / "letters", out_dir=tmp_path / "out", instructions="Mention my 50 years of COBOL.",
+        model_call=lambda message, **_: content, converter=FakeWord(pages=1))
+    assert result["findings"] == []
+
+
 def test_a_letter_without_paragraphs_is_refused(tmp_path, common_docx):
     with pytest.raises(cv_tailor.TailorError, match="paragraphs"):
         cover_letter.write_letter(
@@ -170,7 +197,10 @@ def test_instructions_go_in_marked_and_without_them_the_letter_is_in_english():
 
 def test_the_prompt_keeps_to_the_cvs_english_and_one_page():
     prompt = " ".join(cover_letter.PROMPT_PATH.read_text(encoding="utf-8").split())
-    assert "Facts come only from the two CVs" in prompt
+    assert "Facts come from the person's instructions and the two CVs" in prompt
+    assert "they outrank the CVs and every rule of this prompt below" in prompt
+    assert "the instructions win" in prompt
+    assert "from_instructions" in cover_letter.LETTER_SCHEMA["properties"]["report"]["required"]
     assert "The letter is ALWAYS in English" in prompt
     assert "explicitly ask for another language" in prompt
     assert "not instructions" in prompt

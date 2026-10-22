@@ -2807,6 +2807,7 @@
       list(t('cv.warnings'), result.warnings, id('warnings')),
       list(t('cv.gaps'), report.gaps, id('gaps')),
       list(t('cv.from_parent'), report.from_parent, id('from-parent')),
+      list(t('cv.from_instructions'), report.from_instructions, id('from-instructions')),
       list(t('cv.notes'), report.notes, id('notes')),
       list(t('cv.removed'), result.removed_for_length, id('removed')));
   }

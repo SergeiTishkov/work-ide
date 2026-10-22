@@ -16,7 +16,8 @@ The model (`claude -p`, no tools, LETTER_SCHEMA) writes the letter; then,
 without the model:
 
   1. check_facts() looks up the name, the contacts, every number and every
-     technology the letter names in the two CVs and lists what it cannot find.
+     technology the letter names in the two CVs and the person's messages
+     (cv_tailor.person_text) and lists what it cannot find.
      It does not block: the list goes to the person with the files.
   2. cv_docx.render_letter() writes the .docx under the CV's header (a
      headline or stack line too long for its column is a warning, as for the
@@ -72,9 +73,10 @@ LETTER_SCHEMA = {
         "previous_version": cv_tailor.PREVIOUS_VERSION_SCHEMA,
         "report": {
             "type": "object", "additionalProperties": False,
-            "required": ["covered", "gaps", "from_parent", "notes"],
+            "required": ["covered", "gaps", "from_parent", "from_instructions", "notes"],
             "properties": {
-                "covered": _strings(), "gaps": _strings(), "from_parent": _strings(), "notes": _strings(),
+                "covered": _strings(), "gaps": _strings(), "from_parent": _strings(),
+                "from_instructions": _strings(), "notes": _strings(),
             },
         },
     },
@@ -130,14 +132,17 @@ def validate_content(content: dict) -> list:
     return problems
 
 
-def check_facts(content: dict, common_text: str, parent_text: Optional[str]) -> dict:
+def check_facts(content: dict, common_text: str, parent_text: Optional[str],
+                person: str = "") -> dict:
     """The name and contacts in the common CV; every number of the letter and
-    every technology it names in either CV. Kinds: name, contact, number,
+    every technology it names in either CV. What the person wrote (`person`,
+    cv_tailor.person_text) counts as a source for all of them: their word
+    outranks the CVs (the owner, 2026-10-22). Kinds: name, contact, number,
     term — as in cv_tailor.check_facts."""
     normalize = cv_tailor.normalize
-    sources = normalize(common_text + "\n" + (parent_text or ""))
-    common_norm = normalize(common_text)
-    source_numbers = set(cv_tailor._numbers(common_text + "\n" + (parent_text or "")))
+    sources = normalize(common_text + "\n" + (parent_text or "") + "\n" + person)
+    common_norm = normalize(common_text + "\n" + person)
+    source_numbers = set(cv_tailor._numbers(common_text + "\n" + (parent_text or "") + "\n" + person))
     findings = []
 
     def add(kind, text, where, message):
@@ -160,7 +165,7 @@ def check_facts(content: dict, common_text: str, parent_text: Optional[str]) -> 
             continue
         seen.add(key)
         if not cv_tailor._contains_term(sources, term):
-            add("term", term, "letter", "this technology is not named in the CVs")
+            add("term", term, "letter", "this technology is not named in the CVs or the person's messages")
     return {"findings": findings, "not_checked": []}
 
 
@@ -205,7 +210,8 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
 
     warnings += cv_tailor.layout_warnings(content)
 
-    facts = check_facts(content, common_text, parent_text)
+    facts = check_facts(content, common_text, parent_text,
+                        cv_tailor.person_text(instructions, earlier.get("log_text", "")))
     stem = letter_stem(settings["output_stem"])
     docx_path = workdir / f"{stem}.docx"
     pdf_path = workdir / f"{stem}.pdf"

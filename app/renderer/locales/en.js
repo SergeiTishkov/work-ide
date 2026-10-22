@@ -360,6 +360,7 @@
   'cv.warnings': 'Notes',
   'cv.gaps': 'Vacancy requirements with no evidence in the CVs',
   'cv.from_parent': 'Taken from the parent CV',
+  'cv.from_instructions': 'Taken from your messages',
   'cv.notes': 'Look at before sending',
   'cv.removed': 'Cut to fit the pages',
   'action.undo': 'undo',

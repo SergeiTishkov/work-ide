@@ -559,7 +559,12 @@ the second click on the same button (or the form's own button, or
 Ctrl+Enter) sends what it holds, empty included — as a rejection's reason
 works. They reach the tool as `--instructions` and the model as
 `<person_instructions>`, apart from the vacancy: unlike the vacancy, they are
-instructions, but they never make a fact true. The prompt's one hard rule on
+instructions, and they outrank the CVs and the prompt's other rules (the
+owner, 2026-10-22, task 0086; until then they "never made a fact true"). A
+fact the person states in them, or in an earlier message of the log, is a
+fact; where it contradicts a CV, it wins; what they ask to rewrite in the CVs
+is rewritten. The report lists such facts (`from_instructions`). The prompt's
+one rule on
 language: the CV is in English, whatever the language of the vacancy or the
 CVs, unless the instructions explicitly ask for another language; an
 instruction written in Russian is not such a request. Without instructions
@@ -578,6 +583,10 @@ The steps:
    CV; employer, title and dates of every job against both CVs; the jobs in
    reverse chronological order; every number and every technology name found
    in one of the CVs; no job and no skill category of the common CV left out.
+   The person's messages (this one and the log's) are a source too: what they
+   state is not a finding; what they do not cover is checked as without a
+   message. Without a message the check is unchanged: it is there because a
+   model's small rewordings add up to a different career.
    What fails is a finding for the person to look at, not a refusal: a
    reworded bullet is often right, and the person reads the CV before sending.
 3. `tools/cv_docx.py` renders the content in the common CV's layout (the

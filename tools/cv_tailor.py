@@ -24,8 +24,10 @@ The model returns the CV as JSON (CONTENT_SCHEMA) plus a report for the
 person. Then, without the model:
 
   1. check_facts() compares every company, title, date range, number and
-     technology with the two CVs and lists what it cannot find there. It
-     does not block: the list goes to the person with the files.
+     technology with the two CVs and the person's messages (this one and the
+     log's) and lists what it cannot find there. It does not block: the list
+     goes to the person with the files. The person's word outranks the CVs
+     (the owner, 2026-10-22): what they state in a message is a source.
   2. cv_docx renders the .docx in the common CV's layout; Word converts it to
      .pdf and counts the pages (cv_convert).
   3. fit_length() cuts the bullets the model marked least needed (priority 3,
@@ -184,10 +186,10 @@ CONTENT_SCHEMA = {
         "previous_version": PREVIOUS_VERSION_SCHEMA,
         "report": {
             "type": "object", "additionalProperties": False,
-            "required": ["jd_keywords", "covered", "gaps", "from_parent", "notes"],
+            "required": ["jd_keywords", "covered", "gaps", "from_parent", "from_instructions", "notes"],
             "properties": {
                 "jd_keywords": _strings(), "covered": _strings(), "gaps": _strings(),
-                "from_parent": _strings(), "notes": _strings(),
+                "from_parent": _strings(), "from_instructions": _strings(), "notes": _strings(),
             },
         },
     },
@@ -457,16 +459,25 @@ def _start_of(dates: str) -> Optional[tuple]:
     return (int(match.group(1)), 0) if match else None
 
 
-def check_facts(content: dict, common_text: str, parent_text: Optional[str]) -> dict:
-    """Every factual claim in the tailored CV, looked up in the two source CVs.
+def person_text(instructions: Optional[str], log_text: str = "") -> str:
+    """What the person wrote for this document: the new message and the log of
+    the earlier ones. A source of facts for check_facts, above the CVs."""
+    return "\n".join(t for t in ((instructions or "").strip(), (log_text or "").strip()) if t)
+
+
+def check_facts(content: dict, common_text: str, parent_text: Optional[str],
+                person: str = "") -> dict:
+    """Every factual claim in the tailored CV, looked up in the two source CVs
+    and in what the person wrote (`person`, see person_text). The person's word
+    outranks the CVs where it speaks; the rest is checked as without it.
 
     Returns {"findings": [{"kind", "text", "where", "message"}], "not_checked": [...]}.
     Kinds: name, contact, company, title, dates, order, number, term,
     missing_job, missing_category. A finding is a thing to look at, not a
     proof of invention: "MS SQL" written as "SQL Server" is a finding too."""
-    sources = normalize(common_text + "\n" + (parent_text or ""))
-    common_norm = normalize(common_text)
-    source_numbers = set(_numbers(common_text + "\n" + (parent_text or "")))
+    sources = normalize(common_text + "\n" + (parent_text or "") + "\n" + person)
+    common_norm = normalize(common_text + "\n" + person)
+    source_numbers = set(_numbers(common_text + "\n" + (parent_text or "") + "\n" + person))
     findings = []
     not_checked = []
 
@@ -512,7 +523,7 @@ def check_facts(content: dict, common_text: str, parent_text: Optional[str]) -> 
             continue
         seen.add(key)
         if not _contains_term(sources, term):
-            add("term", term, "Skills / Tech stack", "this technology is not named in the CVs")
+            add("term", term, "Skills / Tech stack", "this technology is not named in the CVs or the person's messages")
 
     tailored_companies = {normalize(j.get("company", "")) for j in content.get("experience") or []}
     for company in _common_companies(common_text):
@@ -700,7 +711,8 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
         raise TailorError("the CV content is not usable: " + "; ".join(problems))
     warnings += layout_warnings(content)
 
-    facts = check_facts(content, common_text, parent_text)
+    facts = check_facts(content, common_text, parent_text,
+                        person_text(instructions, earlier.get("log_text", "")))
     stem = settings["output_stem"]
     docx_path = workdir / f"{stem}.docx"
     pdf_path = workdir / f"{stem}.pdf"
