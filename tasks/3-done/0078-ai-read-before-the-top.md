@@ -46,8 +46,8 @@ What happened (2026-10-22):
 - The class is listed (`report.LISTED_CLASSES`) between long_shot and
   remote_unconfirmed, read by the AI check (`ai_screen.SCREENED_CLASSES`),
   its description fetched (`enrich_descriptions.HEAD_CLASSES`), offered by
-  the clean-up; the app shows "⏳ Not processed with AI" / "⏳ Не обработано
-  AI". CVs, channels and company facts are not made for it.
+  the clean-up; the app shows "⏳ Not processed with AI" (and the Russian
+  locale's own words). CVs, channels and company facts are not made for it.
 - `ai_screen.screen`: a failed call is sent again, two more rounds after
   20 s.
 - `pipeline.queue_ai_read`: a run that saves with vacancies waiting queues
