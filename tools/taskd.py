@@ -168,12 +168,14 @@ def last_json(lines: Sequence[str]) -> Optional[dict]:
 
 class Command:
     """How one task runs: the command line, how its lines read in the log,
-    whether it follows the pipeline's own log, how it is stopped."""
+    whether it follows the pipeline's own log, how it is stopped, what it
+    adds to the environment."""
 
     def __init__(self, argv: List[str], *, map_line: Callable[[str], Optional[str]] = lambda s: s,
                  follow_dir: Optional[Path] = None, graceful_stop: Optional[Callable[[], None]] = None,
-                 result_json: bool = False) -> None:
+                 result_json: bool = False, env: Optional[Dict[str, str]] = None) -> None:
         self.argv = argv
+        self.env = env or {}
         self.map_line = map_line
         self.follow_dir = follow_dir
         self.graceful_stop = graceful_stop
@@ -194,6 +196,54 @@ def _vacancy(task: dict) -> str:
     return vacancy
 
 
+# The agent's session of a collection runs the pipeline as one foreground
+# command, an hour and more (task 0088). Claude Code moves a command past its
+# timeout (2 minutes unless asked) into the background, and a background
+# command of `claude -p` has a time limit of its own; on 2026-10-22 the
+# session ended its turn 28 s after starting the pipeline, and the pipeline
+# died with it. Documented settings (code.claude.com/docs/en/env-vars):
+# no background tasks, and a Bash timeout of 3 hours.
+AGENT_ENV = {
+    "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1",
+    "BASH_DEFAULT_TIMEOUT_MS": str(3 * 3600 * 1000),
+    "BASH_MAX_TIMEOUT_MS": str(3 * 3600 * 1000),
+}
+
+# The pipeline's first and last lines (tools/pipeline.py).
+PIPELINE_TASK_RE = re.compile(r"\(queue task (\d+)\)")
+PIPELINE_FINISHED = "pipeline finished in"
+
+
+def pipeline_task(first_line: str) -> Optional[int]:
+    """The queue task a pipeline log belongs to, from its first line."""
+    found = PIPELINE_TASK_RE.search(first_line or "")
+    return int(found.group(1)) if found else None
+
+
+def cut_off_pipeline(runs_dir: Path, task_id: int, since: float) -> Optional[str]:
+    """The last line of a pipeline log of this task that never says
+    "pipeline finished": the session ended and its pipeline died with it
+    (task 0088). None when every log of the task finished, or there is none
+    (an inactive identity starts no pipeline)."""
+    try:
+        files = sorted(runs_dir.glob("pipeline_*.log"))
+    except OSError:
+        return None
+    for path in files:
+        try:
+            if path.stat().st_mtime < since - 1:
+                continue
+            lines = [line for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+                     if line.strip()]
+        except OSError:
+            continue
+        if not lines or pipeline_task(lines[0]) != task_id:
+            continue
+        if not any(PIPELINE_FINISHED in line for line in lines):
+            return lines[-1].strip()
+    return None
+
+
 def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] = None) -> Command:
     """The command for a task, refused when its fields do not fit."""
     python = python or python_executable()
@@ -206,7 +256,8 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
             raise RuntimeError("the `claude` command was not found (Claude Code CLI)")
         return Command([claude, "-p", f"/top {prefix}", "--output-format", "stream-json", "--verbose",
                         "--allowedTools", ",".join(ALLOWED_TOOLS)],
-                       map_line=describe_event, follow_dir=common.identity_data_dir(prefix) / "runs")
+                       map_line=describe_event, follow_dir=common.identity_data_dir(prefix) / "runs",
+                       env=AGENT_ENV)
     if kind in ("rest", "linkedin", "pipeline", "ai"):
         mode = {"rest": ["--rest"], "linkedin": ["--linkedin"], "ai": ["--ai"]}.get(kind)
         if mode is None:
@@ -270,7 +321,7 @@ class Process:
         self.stopping_since: Optional[float] = None
         self.forced = False
         self._lock = threading.Lock()
-        env = {**os.environ, "PYTHONIOENCODING": "utf-8", taskq.TASK_ENV: str(task["id"])}
+        env = {**os.environ, **cmd.env, "PYTHONIOENCODING": "utf-8", taskq.TASK_ENV: str(task["id"])}
         self.started = time.time()
         self.proc = popen(cmd.argv, cwd=str(root or common.ROOT), env=env, stdin=subprocess.DEVNULL,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -309,9 +360,12 @@ class Process:
 
     def _follow(self) -> None:
         """The pipeline's own log, while the agent runs it: the agent sees a
-        command's output only when it ends, an hour later."""
+        command's output only when it ends, an hour later. Only the logs of
+        this task: a LinkedIn run beside it writes to the same folder (task
+        0088)."""
         offsets: Dict[Path, int] = {}
         rest: Dict[Path, str] = {}
+        others: set = set()
         while True:
             alive = self.proc.poll() is None
             try:
@@ -319,12 +373,20 @@ class Process:
             except OSError:
                 files = []
             for path in files:
+                if path in others:
+                    continue
                 try:
                     stat = path.stat()
                 except OSError:
                     continue
                 if path not in offsets:
                     if stat.st_mtime < self.started - 1:
+                        continue
+                    first = self._first_line(path)
+                    if first is None:
+                        continue                    # not written yet: the next round
+                    if pipeline_task(first) != self.task["id"]:
+                        others.add(path)
                         continue
                     offsets[path] = 0
                 if stat.st_size <= offsets[path]:
@@ -342,6 +404,21 @@ class Process:
             if not alive:
                 return
             time.sleep(1)
+
+    @staticmethod
+    def _first_line(path: Path) -> Optional[str]:
+        try:
+            with path.open("rb") as fh:
+                head = fh.readline()
+        except OSError:
+            return None
+        return head.decode("utf-8", errors="replace") if head.endswith(b"\n") else None
+
+    def cut_off(self) -> Optional[str]:
+        """cut_off_pipeline for a session that runs the pipeline."""
+        if self.cmd.follow_dir is None:
+            return None
+        return cut_off_pipeline(self.cmd.follow_dir, self.task["id"], self.started)
 
     def poll(self) -> Optional[int]:
         code = self.proc.poll()
@@ -636,6 +713,17 @@ class Worker:
             taskq.requeue(conn, task_id, why)
             self.say(f"#{task_id}: the AI usage limit; queued again until {until.isoformat(timespec='minutes')}")
             return
+        cut = handle.cut_off() if state == "done" and hasattr(handle, "cut_off") else None
+        if cut is not None and task is not None:
+            # The session ended its turn while its pipeline ran, and the
+            # pipeline died with it (2026-10-22, task 10): nothing was saved.
+            why = f"the session ended before its pipeline; the pipeline's log stops at: {cut}"
+            if task["attempts"] < taskq.MAX_ATTEMPTS:
+                self.log_to(task)(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {why}; queued again")
+                taskq.requeue(conn, task_id, f"{why}; queued again")
+                self.say(f"#{task_id}: the pipeline was cut off; queued again")
+                return
+            state, error = "failed", why
         if task is not None:
             self.log_to(task)(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] ended: {state}" + (f" ({error})" if error else ""))
         taskq.finish(conn, task_id, state, error, result)

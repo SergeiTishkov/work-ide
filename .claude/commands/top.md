@@ -30,7 +30,15 @@ Identity: `$ARGUMENTS` (empty means: establish it in step 1).
 3. `python tools/source_contract.py --identity <p>` — act on each status as in
    `/run`, step 3 (`broken`: repair with `/source-doctor <source>` first).
 4. `python tools/pipeline.py --identity <p> --top --skip-contracts` — the
-   pipeline's top mode:
+   pipeline's top mode. **Run it as one foreground command and wait for it
+   to end** (up to an hour or two): no background run, no Monitor, and do
+   not end the turn while it runs: a session that ends kills its pipeline,
+   and nothing it collected is saved (2026-10-22, task 0088). Under a queue
+   worker the Bash timeout is 3 hours and background tasks are off; started
+   by hand, pass the longest timeout the Bash tool allows. Its progress is
+   in `data/identities/<p>/runs/pipeline_<time>.log`. The worker fails a
+   session whose pipeline log has no "pipeline finished" line and runs it
+   again. What it does:
    - fetch every enabled source but LinkedIn;
    - the remote check by script: the pages of the top classes and of what
      this run brought, then a rescore of those;

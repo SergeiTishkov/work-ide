@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import os
 import sqlite3
 import sys
 import time
@@ -1027,7 +1028,12 @@ def main() -> None:
     started = time.monotonic()
     mode_name = ("top" if args.top else "rest" if args.rest else "linkedin" if args.linkedin
                  else "links" if args.links else "ai" if args.ai else "full")
-    progress.log(f"pipeline ({mode_name}) for '{common.ACTIVE_IDENTITY}' started; log: {log_path}")
+    # The queue task it runs under, on the first line: the worker follows the
+    # logs of its own task only, and fails a task whose log stops short of
+    # "pipeline finished" (tools/taskd.py, task 0088).
+    own = os.environ.get(taskq.TASK_ENV) or ""
+    tag = f" (queue task {own})" if own.isdigit() else ""
+    progress.log(f"pipeline ({mode_name}) for '{common.ACTIVE_IDENTITY}' started{tag}; log: {log_path}")
     # Listed in the task queue like any other task (tools/taskq.py), whoever
     # started it; under the queue's worker it is that task already.
     kind = mode_name if mode_name in ("rest", "linkedin", "links", "ai") else "pipeline"

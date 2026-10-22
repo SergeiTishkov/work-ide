@@ -246,6 +246,11 @@ def test_the_commands_of_each_kind():
     collect = taskd.command(task("collect"), python=py, claude="claude")
     assert collect.argv[:3] == ["claude", "-p", "/top ftf"] and "stream-json" in collect.argv
     assert collect.follow_dir.parts[-3:] == ("identities", "ftf", "runs")
+    # the pipeline stays in the foreground of the session (task 0088)
+    assert collect.env["CLAUDE_CODE_DISABLE_BACKGROUND_TASKS"] == "1"
+    assert int(collect.env["BASH_DEFAULT_TIMEOUT_MS"]) >= 3600 * 1000
+    assert collect.env["BASH_MAX_TIMEOUT_MS"] == collect.env["BASH_DEFAULT_TIMEOUT_MS"]
+    assert taskd.command(task("rest"), python=py).env == {}
     assert taskd.command(task("rest"), python=py).argv == [py, tools("pipeline.py"), "--identity", "ftf", "--rest"]
     assert taskd.command(task("ai"), python=py).argv == [py, tools("pipeline.py"), "--identity", "ftf", "--ai"]
     assert taskd.command(task("linkedin"), python=py).argv[-1] == "--linkedin"
@@ -343,12 +348,63 @@ def test_the_pipeline_log_is_followed_during_a_collection(isolated_data_dir, tmp
     old = time.time() - 3600
     import os
     os.utime(runs / "pipeline_old.log", (old, old))
+    # its own log, and a LinkedIn run's beside it, which is not followed (task 0088)
     script = ("import time, pathlib; time.sleep(0.3); "
-              f"pathlib.Path(r'{runs / 'pipeline_new.log'}').write_text('[10:00:00] >> fetch\\n'); time.sleep(1.5)")
+              f"pathlib.Path(r'{runs / 'pipeline_linkedin.log'}').write_text("
+              "'[09:59:00] pipeline (linkedin) started (queue task 8); log: x\\n'); "
+              f"pathlib.Path(r'{runs / 'pipeline_new.log'}').write_text("
+              "'[10:00:00] pipeline (top) started (queue task 7); log: x\\n[10:00:01] >> fetch\\n'); "
+              "time.sleep(1.5)")
     lines = []
     cmd = taskd.Command([sys.executable, "-c", script], follow_dir=runs)
     run_until_ended(taskd.Process(task("collect"), cmd, lines.append))
-    assert lines == ["  | [10:00:00] >> fetch"]
+    assert lines == ["  | [10:00:00] pipeline (top) started (queue task 7); log: x", "  | [10:00:01] >> fetch"]
+
+
+def test_a_pipeline_log_of_the_task_that_never_finished_is_found(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    since = time.time()
+    (runs / "pipeline_a.log").write_text(
+        "[20:14:04] pipeline (top) for 'ftf' started (queue task 10); log: x\n"
+        "[20:14:29]    ok jobicy: 100 records\n", encoding="utf-8")
+    (runs / "pipeline_b.log").write_text(
+        "[20:12:07] pipeline (linkedin) for 'ftf' started (queue task 11); log: x\n", encoding="utf-8")
+    assert taskd.cut_off_pipeline(runs, 10, since) == "[20:14:29]    ok jobicy: 100 records"
+    assert taskd.cut_off_pipeline(runs, 12, since) is None          # no log of its own: nothing to say
+    with (runs / "pipeline_a.log").open("a", encoding="utf-8") as fh:
+        fh.write("[21:02:00] pipeline finished in 47:56\n")
+    assert taskd.cut_off_pipeline(runs, 10, since) is None
+    assert taskd.pipeline_task("[20:14:04] pipeline (top) for 'ftf' started; log: x") is None
+
+
+class CutOffHandle(FakeHandle):
+    """A collect session that ended done while its pipeline's log stops short."""
+
+    def cut_off(self):
+        return "[20:14:29]    ok jobicy: 100 records"
+
+
+def test_a_session_that_ends_before_its_pipeline_is_queued_again_then_fails(made, isolated_data_dir):
+    # 2026-10-22, task 10: "done" 28 s after the pipeline started; it had died
+    make, _, _ = made
+    worker = make("background", ("ai",))
+    handles = {}
+
+    def start(task, on_line):
+        handles[task["id"]] = CutOffHandle(task, on_line)
+        return handles[task["id"]]
+
+    worker.start = start
+    top = add("collect")
+    worker.tick()
+    for attempt in range(1, taskq.MAX_ATTEMPTS + 1):
+        assert (state(top)["state"], state(top)["attempts"]) == ("running", attempt)
+        handles[top].code = 0
+        worker.tick()               # ends it, and starts it again in the same round
+    ended = state(top)
+    assert ended["state"] == "failed" and "ok jobicy: 100 records" in ended["error"]
+    assert "queued again" in Path(ended["log_path"]).read_text(encoding="utf-8")
 
 
 # --- the machine and Task Scheduler --------------------------------------------------

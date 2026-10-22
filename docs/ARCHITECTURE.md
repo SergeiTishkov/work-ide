@@ -987,6 +987,19 @@ of its own, which does not ask whether the base is free: the run waits for
 it itself) side by side. The rest of the base waits for both and runs if
 the top ended done; a CV/CL batch follows each that ends done.
 
+**The top's session waits for its pipeline (2026-10-22, task 0088).** The
+agent ran the pipeline, Claude Code moved the command into the background
+after its 2-minute timeout, the agent ended its turn "watching the log", and
+`claude -p` ended 28 s after the pipeline started; the pipeline died in the
+fetch, saved nothing, and the task was marked done. Now the worker starts the
+session with `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` and a 3-hour Bash
+timeout (`taskd.AGENT_ENV`), and `/top` says to run the pipeline as one
+foreground command. The pipeline's first line names its queue task
+("started (queue task 10)"); the worker follows only that task's logs (it
+used to mirror a LinkedIn run beside it too), and a session that ends with a
+log of its task lacking "pipeline finished" is queued again, up to
+`MAX_ATTEMPTS` starts, then failed with the log's last line.
+
 The pacing of the fetch changed the same day (docs/sources/linkedin.md, "429
 and dropped connections"; "What each query brought").
 
