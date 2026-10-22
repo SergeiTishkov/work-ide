@@ -27,6 +27,19 @@ selection with no answer yet; a document already in the vacancy's folder
 (tools/documents.py) is not made again, nor one whose vacancy was found gone
 (an error in its log).
 
+THE PERSON'S VACANCIES ARE LEFT ALONE (the owner, 2026-10-22, task 0087):
+"the person has most likely worked with the vacancy already, and that's it".
+Neither document is made for a vacancy that has
+- any feedback (a status other than "new");
+- a CV or a cover letter of the person's: a version the batch did not make
+  (documents.py marks the batch's "Made automatically."). A CV alone is
+  enough to make no letter, and the other way round;
+- a CV or a letter task in the queue (tools/taskq.py), queued or running.
+left_alone() says which; the batch asks it again before every document, after
+a pause too, since the person may order a document while the batch runs. On
+2026-10-22 it did not, and the batch made a CV and a letter for INSO while
+the owner's own two tasks for it were queued.
+
 EVERY MATCH, NOT ONLY THE FRESH ONES (the owner, 2026-10-21: "every such
 vacancy must have a CV/CL"). Until then a filter already applied took only
 the vacancies the latest run brought in for the first time, and one that
@@ -103,11 +116,58 @@ def _source_keys(names: List[str]) -> List[str]:
     return keys
 
 
-def pick(conn, settings: dict, prefix: str, base: Optional[Path] = None) -> List[dict]:
+def manual_tasks(prefix: str, vacancy_ids: List[str], tasks_conn=None) -> set:
+    """The vacancies with a CV or a letter task queued or running. The
+    batch makes its documents itself, not through the queue, so each such
+    task is the person's."""
+    if not vacancy_ids:
+        return set()
+    import taskq
+    if tasks_conn is None:
+        if not taskq.path().exists():
+            return set()
+        with taskq.session() as conn:
+            return manual_tasks(prefix, vacancy_ids, conn)
+    marks = ",".join("?" * len(taskq.ACTIVE))
+    rows = tasks_conn.execute(
+        f"SELECT DISTINCT vacancy_id FROM tasks WHERE kind IN ('cv', 'letter') AND identity = ? "
+        f"AND state IN ({marks})", (prefix, *taskq.ACTIVE)).fetchall()
+    return {r[0] for r in rows} & set(vacancy_ids)
+
+
+def answered(conn, vacancy_ids: List[str]) -> set:
+    """The vacancies with feedback: a status other than "new"."""
+    if not vacancy_ids:
+        return set()
+    marks = ",".join("?" * len(vacancy_ids))
+    rows = conn.execute(
+        f"SELECT vacancy_id FROM vacancy_identity WHERE identity_id = ? AND feedback_status <> 'new' "
+        f"AND vacancy_id IN ({marks})", (db.identity(), *vacancy_ids)).fetchall()
+    return {r[0] for r in rows}
+
+
+def left_alone(conn, prefix: str, vacancy_ids: List[str], base: Optional[Path] = None,
+               tasks_conn=None, existing: Optional[dict] = None) -> dict:
+    """{vacancy id: why the batch makes nothing for it} for the vacancies
+    the person works with (THE PERSON'S VACANCIES ARE LEFT ALONE)."""
+    if existing is None:
+        existing = documents.state(prefix, list(vacancy_ids), base)
+    why = {}
+    for vacancy_id in answered(conn, vacancy_ids):
+        why[vacancy_id] = "the person gave feedback"
+    for vacancy_id in vacancy_ids:
+        if vacancy_id not in why and (existing.get(vacancy_id) or {}).get("by_person"):
+            why[vacancy_id] = "the person made a document for it"
+    for vacancy_id in manual_tasks(prefix, vacancy_ids, tasks_conn):
+        why.setdefault(vacancy_id, "the person generates a document for it")
+    return why
+
+
+def pick(conn, settings: dict, prefix: str, base: Optional[Path] = None, tasks_conn=None) -> List[dict]:
     """[{"vacancy_id", "title", "company", "class", "documents": [kinds to
     make]}] in the order of the app's list (the class, then the score), each
     vacancy once: every vacancy of the latest selection with no answer that
-    matches a filter and lacks a document."""
+    matches a filter and lacks a document, except those left_alone()."""
     selection_id = selections.latest_selection_id(conn)
     if selection_id is None:
         return []
@@ -129,8 +189,11 @@ def pick(conn, settings: dict, prefix: str, base: Optional[Path] = None) -> List
         for row in selections.listing(conn, selection_id, chosen, expanded=classes):
             picked.setdefault(row["vacancy_id"], row)
     existing = documents.state(prefix, list(picked), base)
+    alone = left_alone(conn, prefix, list(picked), base, tasks_conn, existing)
     result = []
     for vacancy_id, row in picked.items():
+        if vacancy_id in alone:
+            continue
         have = existing.get(vacancy_id, {})
         kinds = [k for k in settings["documents"]
                  if not have.get(k) and not (have.get("errors") or {}).get(k)]

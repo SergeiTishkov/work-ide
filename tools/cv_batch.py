@@ -11,7 +11,13 @@ hand as well:
 What is picked is cv_auto's choice: every vacancy of the shortlist its
 filters match. A document already in the vacancy's folder, or a vacancy
 found gone, is skipped — so a stopped batch goes on where it was when
-started again.
+started again. The documents it makes are marked "Made automatically." in
+their logs (--auto to the tools).
+
+THE PERSON'S VACANCIES ARE LEFT ALONE (task 0087, cv_auto.left_alone): before
+each document, after a pause too, the batch asks again whether the person
+gave feedback on the vacancy, made a document for it or has a CV or letter
+task for it in the queue; then it makes nothing for it ("left alone").
 
 ONE BATCH AT A TIME, one document at a time: each drives Word through COM.
 Started while a batch runs, the request joins it (cv_batch.pending) and the
@@ -172,9 +178,11 @@ class Batch:
         self.log("resumed")
 
     def run(self, requests: List[dict], plan: Callable[[str], list],
-            generate: Callable[[str, dict, str], dict]) -> dict:
+            generate: Callable[[str, dict, str], dict],
+            check: Optional[Callable[[str, dict], Optional[str]]] = None) -> dict:
         """requests: [{"identity"}]; plan(prefix) -> cv_auto items;
-        generate(prefix, item, kind) -> the tool's JSON result."""
+        generate(prefix, item, kind) -> the tool's JSON result; check(prefix,
+        item) -> why the vacancy is left alone now, or None."""
         where = self.where
         where["log"].parent.mkdir(parents=True, exist_ok=True)
         other = running(where)
@@ -184,7 +192,7 @@ class Batch:
         offset = where["log"].stat().st_size if where["log"].exists() else 0
         self.status = {"pid": os.getpid(), "state": "running", "holding": False, "identities": [],
                        "started_at": _now(), "ended_at": None, "total": 0, "index": 0,
-                       "made": 0, "failed": 0, "gone": 0, "current": None, "error": None,
+                       "made": 0, "failed": 0, "gone": 0, "left_alone": 0, "current": None, "error": None,
                        "log_offset": offset}
         self.save()
         self.log(f"start: {' '.join(r['identity'] for r in requests)}")
@@ -204,11 +212,18 @@ class Batch:
                         continue
                     prefix, item, kind = work[index]
                     index += 1
-                    self.step(index, len(work), prefix, item, kind, generate)
+                    why = check(prefix, item) if check else None
+                    if why:
+                        self.status["left_alone"] += 1
+                        self.log(f"left alone [{index}/{len(work)}] {prefix} {kind} {item['vacancy_id']}: {why}")
+                        self.save()
+                    else:
+                        self.step(index, len(work), prefix, item, kind, generate)
                     if index == len(work):
                         self.add(work, take_pending(where), plan)
                 s = self.status
-                self.log(f"finished: {s['made']} made, {s['gone']} gone, {s['failed']} failed")
+                self.log(f"finished: {s['made']} made, {s['gone']} gone, {s['failed']} failed, "
+                         f"{s['left_alone']} left alone")
                 self.save(state="finished", current=None, ended_at=_now())
                 # a request that came while finishing: it found this batch
                 # running and left it to this batch
@@ -267,10 +282,22 @@ def plan_for(prefix: str) -> list:
         return cv_auto.pick(conn, settings, prefix)
 
 
+def check_now(prefix: str, item: dict) -> Optional[str]:
+    """cv_auto.left_alone for one vacancy, asked right before its document."""
+    import cv_auto
+    import db
+    import identity as identity_mod
+    identity_mod.activate_or_exit(prefix, quiet=True)
+    if not db.exists():
+        return None
+    with db.session() as conn:
+        return cv_auto.left_alone(conn, prefix, [item["vacancy_id"]]).get(item["vacancy_id"])
+
+
 def generate_with_tools(prefix: str, item: dict, kind: str) -> dict:
     proc = subprocess.run(
         [sys.executable, str(common.ROOT / "tools" / TOOLS[kind]), "--identity", prefix,
-         "--vacancy", item["vacancy_id"], "--json"],
+         "--vacancy", item["vacancy_id"], "--json", "--auto"],
         cwd=common.ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
         env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     for line in reversed(proc.stdout.splitlines()):
@@ -313,7 +340,7 @@ def main(argv=None) -> int:
         # Listed in the task queue (tools/taskq.py) when started by hand.
         with taskq.Registered("cv_batch", args.identities[0] if len(args.identities) == 1 else None,
                               log_path=where["log"], args={"identities": args.identities}):
-            Batch(where).run(requests, plan_for, generate_with_tools)
+            Batch(where).run(requests, plan_for, generate_with_tools, check_now)
     except ai_limit.UsageLimit as exc:
         ai_limit.record(exc)
         print(ai_limit.mark(exc), flush=True)

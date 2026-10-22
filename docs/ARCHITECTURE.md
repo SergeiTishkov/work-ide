@@ -834,6 +834,17 @@ into the documents slot, and it waits only for the batch's current one. The
 file is removed when those documents are done; a hold whose process is gone
 is ignored.
 
+**The person's vacancies are left alone (2026-10-22, task 0087).** The batch
+makes neither document for a vacancy with any feedback, with a CV or a
+cover letter of the person's, or with a CV or letter task of theirs queued
+or running; it asks again before each document, after a pause too
+(`cv_auto.left_alone`). A version the batch made says "Made automatically."
+in its log (`--auto` to `cv_tailor.py` and `cover_letter.py`); every other
+version is the person's, those made before the mark included. On
+2026-10-22 the batch, resuming from a hold, made INSO's CV and letter while
+the owner's own two tasks for it were queued: four versions the owner could
+not tell apart.
+
 **Every match, not only the fresh ones (2026-10-21).** Every vacancy of the
 latest selection with no answer that a filter matches gets its documents;
 the documents already in its folder (or its "gone" error) keep it from being

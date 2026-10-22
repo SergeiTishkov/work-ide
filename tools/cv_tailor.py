@@ -660,19 +660,21 @@ def earlier_versions(document) -> dict:
             "version": document.next_version()}
 
 
-def publish_version(document, files: List[Path], content: dict, instructions: Optional[str]) -> dict:
+def publish_version(document, files: List[Path], content: dict, instructions: Optional[str],
+                    auto: bool = False) -> dict:
     verdict = content.get("previous_version") or {}
     try:
         return document.publish(files, message=instructions,
                                 previous_failed=bool(verdict.get("failed")),
-                                failed_reason=(verdict.get("reason") or "").strip() or None)
+                                failed_reason=(verdict.get("reason") or "").strip() or None,
+                                auto=auto)
     except documents.DocumentsError as exc:
         raise TailorError(str(exc))
 
 
 def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path, out_dir: Path,
            content: Optional[dict] = None, model_call=call_model, converter=None,
-           instructions: Optional[str] = None) -> dict:
+           instructions: Optional[str] = None, auto: bool = False) -> dict:
     """The whole run; returns the result the app shows. `out_dir` is the
     vacancy's folder of documents (documents.vacancy_dir): the new version
     goes there, the current one into "Old versions". `converter` is a
@@ -754,7 +756,7 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
                         f"{settings['target_pages']}")
 
     files = [docx_path] + ([pdf_path] if pdf_path.exists() else [])
-    version = publish_version(document, files, content, instructions)
+    version = publish_version(document, files, content, instructions, auto)
     published = version["files"]
     verdict = content.get("previous_version") or {}
     if version.get("previous_failed"):
@@ -792,6 +794,8 @@ def main(argv=None) -> int:
     parser.add_argument("--json", action="store_true", help="Print the result as one JSON line")
     parser.add_argument("--instructions", default=None,
                         help="The person's instructions for this CV (what to stress, the language...)")
+    parser.add_argument("--auto", action="store_true",
+                        help="Made by the document batch, not the person (the log says so)")
     args = parser.parse_args(argv)
 
     import identity as identity_mod
@@ -813,6 +817,7 @@ def main(argv=None) -> int:
             out_dir=out_dir,
             content=content,
             instructions=args.instructions,
+            auto=args.auto,
         )
     except ai_limit.UsageLimit as exc:
         # its own exit code: the task queue holds AI work until the reset (task 0057)

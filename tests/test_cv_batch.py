@@ -158,3 +158,25 @@ def test_this_process_is_alive_and_a_made_up_pid_is_not():
     assert cv_batch.pid_alive(os.getpid())
     assert not cv_batch.pid_alive(None)
     assert not cv_batch.pid_alive(2 ** 30)
+
+
+def test_a_vacancy_the_person_took_up_meanwhile_is_left_alone(tmp_path):
+    # task 0087: the owner ordered INSO's documents while the batch paused;
+    # the batch asks again before each document, after the pause too
+    where = cv_batch.paths(tmp_path)
+    taken = set()
+    made = []
+
+    def generate(prefix, item, kind):
+        made.append((item["vacancy_id"], kind))
+        taken.add("a1")             # the person orders a1's letter meanwhile
+        return {"ok": True}
+
+    status = cv_batch.Batch(where).run(
+        _ask("sharp", "partsharp"), _plan, generate,
+        check=lambda prefix, item: "the person generates a document for it" if item["vacancy_id"] in taken else None)
+    assert made == [("a1", "cv"), ("a2", "cv"), ("b1", "letter")]
+    assert (status["made"], status["left_alone"]) == (3, 1)
+    log = where["log"].read_text(encoding="utf-8")
+    assert "left alone [2/4] sharp letter a1: the person generates a document for it" in log
+    assert "finished: 3 made, 0 gone, 0 failed, 1 left alone" in log

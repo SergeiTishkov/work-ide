@@ -171,7 +171,8 @@ def check_facts(content: dict, common_text: str, parent_text: Optional[str],
 
 def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path, out_dir: Path,
                  content: Optional[dict] = None, model_call=None, converter=None,
-                 instructions: Optional[str] = None, today: Optional[date] = None) -> dict:
+                 instructions: Optional[str] = None, today: Optional[date] = None,
+                 auto: bool = False) -> dict:
     """The whole run; returns the result the app shows. `out_dir` is the
     vacancy's folder of documents, as for cv_tailor.tailor. `converter` is a
     cv_convert.WordSession-like object, or None to pick one here."""
@@ -233,7 +234,7 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
         warnings.append(f"{pages} pages: a cover letter is one page; shorten it before sending")
 
     files = [docx_path] + ([pdf_path] if pdf_path.exists() else [])
-    version = cv_tailor.publish_version(document, files, content, instructions)
+    version = cv_tailor.publish_version(document, files, content, instructions, auto)
     published = version["files"]
     if version.get("previous_failed"):
         say(f"V{version['version'] - 1} marked failed: {(content.get('previous_version') or {}).get('reason') or ''}")
@@ -269,6 +270,8 @@ def main(argv=None) -> int:
     parser.add_argument("--json", action="store_true", help="Print the result as one JSON line")
     parser.add_argument("--instructions", default=None,
                         help="The person's instructions for this letter (what to stress, the language...)")
+    parser.add_argument("--auto", action="store_true",
+                        help="Made by the document batch, not the person (the log says so)")
     args = parser.parse_args(argv)
 
     import identity as identity_mod
@@ -291,6 +294,7 @@ def main(argv=None) -> int:
             out_dir=out_dir,
             content=content,
             instructions=args.instructions,
+            auto=args.auto,
         )
     except ai_limit.UsageLimit as exc:
         # its own exit code: the task queue holds AI work until the reset (task 0057)

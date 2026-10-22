@@ -84,7 +84,7 @@ def test_a_cv_and_a_letter_share_the_vacancys_folder_with_logs_of_their_own(tmp_
     assert sorted(p.name for p in folder.iterdir()) == [
         "CV Alex.pdf", "CV log.md", "Cover Letter Alex.pdf", "Cover Letter log.md"]
     state = documents.state("sharp", ["v1", "v2"], tmp_path)
-    assert state == {"v1": {"dir": str(folder), "cv": 1, "letter": 1, "errors": {}}}
+    assert state == {"v1": {"dir": str(folder), "cv": 1, "letter": 1, "errors": {}, "by_person": True}}
 
 
 def test_files_without_a_log_count_as_the_first_version(tmp_path):
@@ -112,7 +112,7 @@ def test_a_vacancy_found_gone_leaves_an_error_and_no_version(tmp_path):
     # a version made later ends the log, and the error is gone with it
     doc.publish([_new(tmp_path, "x.pdf", "cv")], message=None, previous_failed=False, failed_reason=None)
     assert documents.state("sharp", ["v1"], tmp_path)["v1"] == {"dir": str(folder), "cv": 1, "letter": 0,
-                                                                "errors": {}}
+                                                                "errors": {}, "by_person": True}
 
 
 def test_an_error_after_a_version_keeps_the_version(tmp_path):
@@ -123,3 +123,16 @@ def test_an_error_after_a_version_keeps_the_version(tmp_path):
     entries = documents.read_log(folder / "CV log.md")
     assert [(e["version"], e["message"]) for e in entries] == [(1, "Shorter.")]
     assert documents.last_error(folder / "CV log.md").startswith("Vacancy not found")
+
+
+def test_a_version_the_batch_made_is_marked_and_the_rest_are_the_persons(tmp_path):
+    # task 0087: the batch leaves alone a vacancy with a document of the person's
+    folder = tmp_path / "sharp" / "v1"
+    doc = documents.Document(folder, "cv", "CV Alex")
+    doc.publish([_new(tmp_path, "x.pdf", "one")], message=None, previous_failed=False,
+                failed_reason=None, auto=True)
+    assert "Without a message.\nMade automatically.\n" in (folder / "CV log.md").read_text(encoding="utf-8")
+    assert documents.state("sharp", ["v1"], tmp_path)["v1"]["by_person"] is False
+    doc.publish([_new(tmp_path, "x.pdf", "two")], message="Shorter.", previous_failed=False, failed_reason=None)
+    assert [e["auto"] for e in documents.read_log(folder / "CV log.md")] == [True, False]
+    assert documents.state("sharp", ["v1"], tmp_path)["v1"]["by_person"] is True

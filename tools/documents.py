@@ -56,6 +56,15 @@ asked for before it. Its format, parsed by read_log():
     > Start over, the summary is wrong.
     Failed: the person asked to start over.
 
+    ## V3 · 2026-10-13 15:02
+    Without a message.
+    Made automatically.
+
+"Made automatically." marks a version the document batch made
+(tools/cv_batch.py), with no click of the person. Every other version is the
+person's, the ones made before the mark existed (2026-10-22) included: the
+batch leaves alone a vacancy with a document of the person's (task 0087).
+
 A generation that found no vacancy to write for — the link is dead, or no
 description was ever fetched: an old vacancy, most likely gone — makes no
 files and leaves an error in the log instead (the owner, 2026-10-13); the
@@ -155,11 +164,13 @@ def vacancy_dir(prefix: str, vacancy_id: str, base: Optional[Path] = None) -> Pa
 # --- the log ----------------------------------------------------------------
 
 HEAD_RE = re.compile(r"^## V(\d+) · ([^·]+?)( · failed)?\s*$")
+AUTO_LINE = "Made automatically."
 ERROR_RE = re.compile(r"^## Error · (.+?)\s*$")
 
 
 def read_log(path: Path) -> List[dict]:
-    """[{"version", "at", "failed", "message", "failed_reason"}], oldest first."""
+    """[{"version", "at", "failed", "message", "failed_reason", "auto"}],
+    oldest first."""
     if not path.exists():
         return []
     entries: List[dict] = []
@@ -167,7 +178,8 @@ def read_log(path: Path) -> List[dict]:
         head = HEAD_RE.match(line)
         if head:
             entries.append({"version": int(head.group(1)), "at": head.group(2).strip(),
-                            "failed": bool(head.group(3)), "message": None, "failed_reason": None})
+                            "failed": bool(head.group(3)), "message": None, "failed_reason": None,
+                            "auto": False})
             continue
         if line.startswith("## "):
             entries.append(None)   # an error: not a version
@@ -181,6 +193,8 @@ def read_log(path: Path) -> List[dict]:
             entry["message"] = (entry["message"] or "") + "\n"
         elif line.startswith("Failed: "):
             entry["failed_reason"] = line[len("Failed: "):]
+        elif line == AUTO_LINE:
+            entry["auto"] = True
     return [e for e in entries if e is not None]
 
 
@@ -210,6 +224,8 @@ def render_log(kind: str, entries: List[dict]) -> str:
             lines += [f"> {line}" if line else ">" for line in message.splitlines()]
         else:
             lines.append("Without a message.")
+        if entry.get("auto"):
+            lines.append(AUTO_LINE)
         if entry.get("failed"):
             lines.append(f"Failed: {entry.get('failed_reason') or 'rejected as a whole'}")
         lines.append("")
@@ -261,17 +277,20 @@ class Document:
         return path if path.exists() else None
 
     def publish(self, files: List[Path], *, message: Optional[str], previous_failed: bool,
-                failed_reason: Optional[str], now: Optional[datetime] = None) -> dict:
+                failed_reason: Optional[str], now: Optional[datetime] = None,
+                auto: bool = False) -> dict:
         """Moves the current pair into Old versions (as "V<n>" or "V<n>
         failed"), copies the new files in as the current ones and appends the
-        new version to the log. Returns {"version", "files"}."""
+        new version to the log, "Made automatically." when `auto` (the
+        batch made it). Returns {"version", "files"}."""
         entries = self.entries()
         current = [self.current(ext) for ext in EXTENSIONS if self.current(ext).exists()]
         if current and not entries:
             # files with no log (put there by hand, or made before the log
             # existed): they are version 1
             made = datetime.fromtimestamp(current[0].stat().st_mtime).strftime("%Y-%m-%d %H:%M")
-            entries = [{"version": 1, "at": made, "failed": False, "message": None, "failed_reason": None}]
+            entries = [{"version": 1, "at": made, "failed": False, "message": None, "failed_reason": None,
+                        "auto": False}]
         version = max((e["version"] for e in entries), default=0) + 1
         if current:
             old = self.folder / OLD_VERSIONS
@@ -297,7 +316,8 @@ class Document:
             published.append(target)
         stamp = (now or datetime.now()).strftime("%Y-%m-%d %H:%M")
         entries.append({"version": version, "at": stamp, "failed": False,
-                        "message": (message or "").strip() or None, "failed_reason": None})
+                        "message": (message or "").strip() or None, "failed_reason": None,
+                        "auto": bool(auto)})
         # the errors in between are dropped: they made nothing, and the log
         # now ends with a version
         self.log_path.write_text(render_log(self.kind, entries), encoding="utf-8")
@@ -306,18 +326,21 @@ class Document:
 
 def state(prefix: str, vacancy_ids: List[str], base: Optional[Path] = None) -> dict:
     """{vacancy id: {"dir", "cv": versions, "letter": versions, "errors":
-    {kind: the error its log ends with}}} for the vacancies that have a
-    folder: what the app's buttons show."""
+    {kind: the error its log ends with}, "by_person": a version of either
+    kind not made automatically}} for the vacancies that have a folder: what
+    the app's buttons show, and what the batch leaves alone."""
     result = {}
     for vacancy_id in vacancy_ids:
         folder = vacancy_dir(prefix, vacancy_id, base)
         if not folder.is_dir():
             continue
         errors = {kind: last_error(folder / spec["log"]) for kind, spec in KINDS.items()}
+        logs = {kind: read_log(folder / spec["log"]) for kind, spec in KINDS.items()}
         result[vacancy_id] = {
             "dir": str(folder),
-            **{kind: len(read_log(folder / spec["log"])) for kind, spec in KINDS.items()},
+            **{kind: len(entries) for kind, entries in logs.items()},
             "errors": {kind: text for kind, text in errors.items() if text},
+            "by_person": any(not e["auto"] for entries in logs.values() for e in entries),
         }
     return result
 

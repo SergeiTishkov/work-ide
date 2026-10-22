@@ -102,8 +102,8 @@ def test_a_document_already_made_or_found_gone_is_not_made_again(isolated_data_d
     folder = documents.vacancy_dir("ftf", "new_w", tmp_path / "docs")
     built = tmp_path / "x.pdf"
     built.write_text("cv")
-    documents.Document(folder, "cv", "CV Alex").publish(
-        [built], message=None, previous_failed=False, failed_reason=None)
+    documents.Document(folder, "cv", "CV Alex").publish(   # the batch's CV
+        [built], message=None, previous_failed=False, failed_reason=None, auto=True)
     documents.Document(documents.vacancy_dir("ftf", "old_w", tmp_path / "docs"), "cv", "CV Alex").record_error(
         "Vacancy not found, possibly outdated: the link is dead.")
     documents.Document(documents.vacancy_dir("ftf", "old_w", tmp_path / "docs"), "letter",
@@ -127,3 +127,51 @@ def test_an_unknown_market_is_named(isolated_data_dir, tmp_path):
     _two_runs()
     with pytest.raises(cv_auto.AutoError, match="europe"):
         _pick(tmp_path, {"documents": ["cv"], "filters": [{"markets": ["europe"]}]})
+
+
+# The person's vacancies are left alone (the owner, 2026-10-22, task 0087):
+# feedback, a document of the person's or a queued CV or letter task, and
+# neither document is made.
+
+def _publish(tmp_path, vacancy_id, kind, auto):
+    built = tmp_path / f"{vacancy_id}-{kind}.pdf"
+    built.write_text(kind)
+    stem = "CV Alex" if kind == "cv" else "Cover Letter Alex"
+    documents.Document(documents.vacancy_dir("ftf", vacancy_id, tmp_path / "docs"), kind, stem).publish(
+        [built], message=None, previous_failed=False, failed_reason=None, auto=auto)
+
+
+def test_a_cv_of_the_persons_means_no_letter_either(isolated_data_dir, tmp_path):
+    _two_runs()
+    _publish(tmp_path, "new_w", "cv", auto=False)       # the person's CV
+    _publish(tmp_path, "old_w", "cv", auto=True)        # the batch's CV
+    kinds = {i["vacancy_id"]: i["documents"] for i in _pick(tmp_path)}
+    assert kinds == {"old_w": ["letter"], "old_uk_hot": ["cv", "letter"]}
+    with db.session() as conn:
+        assert cv_auto.left_alone(conn, "ftf", ["new_w", "old_w"], tmp_path / "docs") == {
+            "new_w": "the person made a document for it"}
+
+
+def test_a_queued_document_task_of_the_persons_leaves_the_vacancy_alone(isolated_data_dir, tmp_path):
+    import taskq
+    _two_runs()
+    with taskq.session() as tasks:
+        taskq.add(tasks, "letter", "ftf", vacancy_id="new_w", origin="app")
+        done = taskq.add(tasks, "cv", "ftf", vacancy_id="old_w", origin="app")["task"]
+        tasks.execute("UPDATE tasks SET state = 'failed' WHERE id = ?", (done["id"],))   # ended, made nothing
+        taskq.add(tasks, "cv", "other", vacancy_id="old_uk_hot", origin="app")   # another identity
+    assert _ids(_pick(tmp_path)) == ["old_uk_hot", "old_w"]
+    with db.session() as conn:
+        assert cv_auto.left_alone(conn, "ftf", ["new_w"], tmp_path / "docs") == {
+            "new_w": "the person generates a document for it"}
+
+
+def test_any_feedback_leaves_the_vacancy_alone(isolated_data_dir, tmp_path):
+    _two_runs()
+    with db.session() as conn:
+        conn.execute("UPDATE vacancy_identity SET feedback_status = 'applied' WHERE vacancy_id = 'new_w'")
+        conn.execute("UPDATE vacancy_identity SET feedback_status = 'rejected' WHERE vacancy_id = 'old_w'")
+        conn.commit()
+        assert cv_auto.left_alone(conn, "ftf", ["new_w", "old_w", "old_uk_hot"], tmp_path / "docs") == {
+            "new_w": "the person gave feedback", "old_w": "the person gave feedback"}
+    assert _ids(_pick(tmp_path)) == ["old_uk_hot"]
