@@ -749,10 +749,52 @@ def test_thresholds_let_plain_passing_vacancy_into_report():
         description_text="We are looking for a TypeScript and React developer to join our team.",
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    assert r["classification"] in ("long_shot", "worth_a_look", "hot_lead"), (
+    assert r["script_class"] in ("long_shot", "worth_a_look", "hot_lead"), (
         "a vacancy that passed every gate must reach the report rather than "
         f"low_priority (score={r['score']})"
     )
+
+
+def _read_by_ai(vacancy: dict, verdict: str) -> dict:
+    """The vacancy with a stored AI answer for its current text."""
+    import ai_screen
+
+    return {**vacancy, "_ai_screen": {"verdict": verdict, "reason": "test", "text_hash": ai_screen.text_hash(vacancy)}}
+
+
+def test_the_top_classes_wait_for_the_ai_read():
+    """The owner, 2026-10-22 (task 0078): the scripts' verdict alone does not
+    put a vacancy in the top; it waits in "not processed with AI" until the
+    cheap model has read its current text."""
+    v = make_vacancy(title="Senior .NET Developer", location_raw="Anywhere in the World",
+                     description_text="C# ASP.NET SQL Server legacy enterprise maintenance.")
+    unread = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert unread["classification"] == "ai_unscreened"
+    assert unread["script_class"] in ("hot_lead", "worth_a_look", "long_shot")
+
+    kept = score.score_vacancy(_read_by_ai(v, "keep"), CRITERIA, PROFILE)
+    assert kept["classification"] == unread["script_class"]
+    assert kept["script_class"] is None
+    assert kept["score"] == unread["score"]
+
+    assert score.score_vacancy(_read_by_ai(v, "reject"), CRITERIA, PROFILE)["classification"] == "rejected"
+
+    # An answer given for another text (the description arrived later) is no read.
+    stale = {**_read_by_ai(v, "keep"), "description_text": v["description_text"] + " More text."}
+    assert score.score_vacancy(stale, CRITERIA, PROFILE)["classification"] == "ai_unscreened"
+
+    # The classes below the top are not held: the model does not read them.
+    office = make_vacancy(title="Senior .NET Developer", location_raw="London, on-site",
+                          description_text="C# ASP.NET. Five days a week in our London office.")
+    assert score.score_vacancy(office, CRITERIA, PROFILE)["classification"] == "rejected"
+
+
+def test_an_identity_can_take_the_scripts_verdict_without_the_ai_read():
+    v = make_vacancy(title="Senior .NET Developer", location_raw="Anywhere in the World",
+                     description_text="C# ASP.NET SQL Server legacy enterprise maintenance.")
+    r = score.score_vacancy(v, {**CRITERIA, "ai_screen": {"required": False}}, PROFILE)
+    assert r["classification"] in ("hot_lead", "worth_a_look", "long_shot")
+    assert r["script_class"] is None
 
 
 def test_company_reputation_no_data_is_neutral():
@@ -893,7 +935,7 @@ def test_needs_manual_review_when_promising_vacancy_mentions_remote_but_unclear_
         ),
     )
     r = score.score_vacancy(v, CRITERIA, PROFILE)
-    assert r["classification"] in ("hot_lead", "worth_a_look", "long_shot")
+    assert r["script_class"] in ("hot_lead", "worth_a_look", "long_shot")
     assert r["needs_manual_review"] is True
 
 

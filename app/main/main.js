@@ -98,7 +98,7 @@ const workers = new WorkerKeeper({
 // A run that ended may have created the database, recorded a selection or
 // changed the base: the connections open again on the next read.
 tasks.onEvent((event) => {
-  if (event.type === 'finished' && ['collect', 'rest', 'linkedin', 'pipeline', 'clean', 'links'].includes(event.task.kind)) {
+  if (event.type === 'finished' && ['collect', 'rest', 'linkedin', 'pipeline', 'clean', 'links', 'ai'].includes(event.task.kind)) {
     store.closeAll();
     data.call('closeAll').catch(() => {});
   }

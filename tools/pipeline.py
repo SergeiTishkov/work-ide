@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import sqlite3
 import sys
 import time
 import traceback
@@ -495,9 +496,45 @@ def finalize(vacancies: dict, prev_companies: dict, state: dict,
     return _save_and_select(vacancies, companies, state, selection_kind)
 
 
+def unscreened_count(vacancies: dict) -> int:
+    """The vacancies waiting in "not processed with AI" (task 0078)."""
+    return sum(1 for v in vacancies.values()
+               if not v.get("duplicate_of")
+               and (v.get("computed") or {}).get("classification") == ai_screen.UNSCREENED)
+
+
+def queue_ai_read(vacancies: dict, state: dict) -> Optional[int]:
+    """When the run leaves vacancies waiting for the AI read — the model
+    failed, the brief could not be written, the run's read limit was reached
+    — the AI check is queued as a task of its own (`pipeline.py --ai`), so
+    the task service reads them without waiting for the next collection
+    (task 0078: on 2026-10-22 unread vacancies sat in the top with nothing
+    to say so). Not at the usage limit: the queue runs this run again after
+    the reset. Returns the queued task's id."""
+    waiting = unscreened_count(vacancies)
+    state.setdefault("last_ai_screen", {})["waiting"] = waiting
+    if not waiting:
+        return None
+    if AI_LIMIT is not None:
+        progress.log(f"-- {waiting} vacancies wait for the AI read, after the usage limit's reset")
+        return None
+    try:
+        with taskq.session() as conn:
+            added = taskq.add(conn, "ai", common.ACTIVE_IDENTITY, origin="auto")
+    except (sqlite3.Error, OSError) as exc:
+        progress.log(f"!! {waiting} vacancies wait for the AI read; the AI check could not be "
+                     f"queued: {type(exc).__name__}: {exc}")
+        return None
+    task_id = added["task"]["id"]
+    progress.log(f"!! {waiting} vacancies wait for the AI read; the AI check is "
+                 + (f"queued as task #{task_id}" if added["added"] else f"already queued (task #{task_id})"))
+    return task_id
+
+
 def _save_and_select(vacancies: dict, companies: dict, state: dict, selection_kind: str) -> int:
     """Saves the base and the state, records the selection. Returns the
     selection's id."""
+    queue_ai_read(vacancies, state)
     with progress.stage("save the knowledge base"):
         kb.save_vacancies(vacancies)
         kb.save_companies(companies)
@@ -904,6 +941,23 @@ def run_rest() -> dict:
             "collected": "nothing: the rest run fetches nothing"}
 
 
+def run_ai() -> dict:
+    """The AI check alone (task 0078): the vacancies waiting for the read
+    ("not processed with AI") and the stretches, then the top rescored with
+    the answers and a "rebuild" selection. Queued by queue_ai_read when a
+    run left vacancies unread. Nothing fetched; the base is not rescored."""
+    vacancies, companies, state = _load()
+    criteria, profile = score.load_criteria(), score.load_profile()
+    if ai_check_stage(vacancies, state):
+        top = screened_subset(vacancies)
+        with progress.stage(f"rescore the top, with the AI check ({progress.number(len(top))} vacancies)"):
+            rescore_all(top, criteria, profile, companies)
+    selection_id = _save_and_select(vacancies, companies, state, "rebuild")
+    return {"new_vacancies": 0, "total_in_kb": len(vacancies), "selection_id": selection_id,
+            "waiting_for_ai": unscreened_count(vacancies),
+            "collected": "nothing: the AI run fetches nothing"}
+
+
 # The links mode checks again what was not checked in this many hours.
 LINKS_RECHECK_HOURS = 6
 
@@ -925,6 +979,8 @@ def run_links() -> dict:
 
 
 def _run_mode(args, staged: Optional[dict]) -> dict:
+    if args.ai:
+        return run_ai()
     if args.links:
         return run_links()
     if args.linkedin:
@@ -957,6 +1013,8 @@ def main() -> None:
                            "the base, then merged when the base is free (see fetch_linkedin_apart)")
     mode.add_argument("--links", action="store_true",
                       help="only the links of the shortlist checked again (see run_links)")
+    mode.add_argument("--ai", action="store_true",
+                      help="only the AI check of what waits for it (see run_ai)")
     args = parser.parse_args()
     prefix = identity_mod.activate_or_exit(args.identity)
     if identity_mod.skip_if_inactive(prefix):
@@ -968,11 +1026,11 @@ def main() -> None:
     log_path = progress.open_log(common.DATA_DIR / "runs" / f"pipeline_{stamp}.log")
     started = time.monotonic()
     mode_name = ("top" if args.top else "rest" if args.rest else "linkedin" if args.linkedin
-                 else "links" if args.links else "full")
+                 else "links" if args.links else "ai" if args.ai else "full")
     progress.log(f"pipeline ({mode_name}) for '{common.ACTIVE_IDENTITY}' started; log: {log_path}")
     # Listed in the task queue like any other task (tools/taskq.py), whoever
     # started it; under the queue's worker it is that task already.
-    kind = mode_name if mode_name in ("rest", "linkedin", "links") else "pipeline"
+    kind = mode_name if mode_name in ("rest", "linkedin", "links", "ai") else "pipeline"
     with taskq.Registered(kind, common.ACTIVE_IDENTITY, log_path=log_path,
                           args={"mode": mode_name} if kind == "pipeline" else None):
         try:
@@ -1032,6 +1090,9 @@ def main() -> None:
             print(f"  the AI check stopped at the limit; run again after the reset: "
                   f"the answers given are kept")
             sys.exit(ai_limit.EXIT_CODE)
+        if args.ai and result.get("waiting_for_ai"):
+            # A failure the task list shows; the next run reads them again.
+            sys.exit(1)
 
 
 if __name__ == "__main__":

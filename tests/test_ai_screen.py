@@ -111,9 +111,35 @@ def test_one_failed_answer_does_not_stop_the_rest(isolated_data_dir):
         return {"is_job_posting": True, "work_arrangement": "remote", "location_ok": "yes",
                 "role_fit": "good", "verdict": "keep", "reason": "ok"}, 0.0
 
-    stats = ai_screen.screen(vacancies, "ftf", "brief", call=call)
+    pauses = []
+    stats = ai_screen.screen(vacancies, "ftf", "brief", call=call, pause=pauses.append)
     assert (stats["screened"], stats["errors"]) == (1, 1)
+    assert stats["retried"] == ai_screen.RETRY_ROUNDS, "the failed one was sent again, every round"
+    assert len(pauses) == ai_screen.RETRY_ROUNDS
     assert "_ai_screen" not in vacancies["a"] and vacancies["b"]["_ai_screen"]["verdict"] == "keep"
+
+
+def test_a_call_that_failed_once_is_read_on_the_retry(isolated_data_dir):
+    """Task 0078: a timeout or a broken answer is not the end of the read."""
+    vacancies = {"a": _record("a"), "b": _record("b")}
+    calls = []
+
+    def call(system_prompt, text, workdir=None):
+        calls.append(text)
+        if "example.com/a" in text and sum("example.com/a" in t for t in calls) == 1:
+            raise ai_screen.ScreenError("claude did not answer in 180 s")
+        return {"is_job_posting": True, "work_arrangement": "remote", "location_ok": "yes",
+                "role_fit": "good", "verdict": "keep", "reason": "ok"}, 0.0
+
+    stats = ai_screen.screen(vacancies, "ftf", "brief", call=call, pause=lambda _s: None)
+    assert (stats["screened"], stats["errors"], stats["retried"]) == (2, 0, 1)
+    assert vacancies["a"]["_ai_screen"]["verdict"] == "keep"
+
+
+def test_the_unscreened_class_is_read():
+    """What score.py holds in "not processed with AI" is what the model reads."""
+    keys = ai_screen.worklist({"a": _record("a", cls=ai_screen.UNSCREENED)}, {}, "digest")
+    assert keys == ["a"]
 
 
 def test_no_brief_no_check():

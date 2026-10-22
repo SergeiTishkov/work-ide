@@ -36,6 +36,7 @@
   'cleanup.class.hot_lead': 'Горячие',
   'cleanup.class.worth_a_look': 'Стоит посмотреть',
   'cleanup.class.long_shot': 'Дальний прицел',
+  'cleanup.class.ai_unscreened': 'Не обработано AI',
   'cleanup.class.remote_unconfirmed': 'Удалёнка не подтверждена',
   'cleanup.class.engagement_unconfirmed': 'Часы не подтверждены',
   'cleanup.class.low_priority': 'Низкий приоритет',
@@ -188,6 +189,7 @@
   'task.waiting_batch': 'Ждёт, пока пакет CV/CL доделает текущий документ',
   'task.kind.pipeline': 'Запуск пайплайна',
   'task.kind.links': 'Перепроверка ссылок шортлиста',
+  'task.kind.ai': 'Проверка AI того, что её ждёт',
   'task.kind.clean': 'Очистка',
   'task.kind.other': 'Задача: {kind}',
   'task.state.skipped': 'Пропущено',
@@ -282,6 +284,7 @@
   'class.hot_lead': '🔥 Горячие — смотреть в первую очередь',
   'class.worth_a_look': '👀 Стоит посмотреть',
   'class.long_shot': '🕰️ Дальний прицел',
+  'class.ai_unscreened': '⏳ Не обработано AI',
   'class.remote_unconfirmed': '🏢 Удалёнка не подтверждена',
   'class.engagement_unconfirmed': '⏱️ Часы не подтверждены',
 

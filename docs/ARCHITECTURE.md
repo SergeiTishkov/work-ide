@@ -1094,6 +1094,35 @@ missed run does.
   (`taskd.py install`) from system start; without, while the app's worker
   is up. Waking the computer for a schedule is not done.
 
+### Nothing reaches the top before the AI read (2026-10-22)
+
+The owner, 2026-10-22: the selection of the night before held 40 new
+vacancies, five times a usual week, and most were office jobs with "remote
+on Wednesdays if the manager agrees". The scripts had put them in the top
+classes; the AI check had never read them. The cause that night was a
+one-off repair (task 0076) that rescored the base with newer criteria (the
+ITAR fix of task 0073 freed 37 vacancies refused for "itar" inside
+"military") and recorded a selection without the AI step. Any rescore
+outside the pipeline's AI stage could do the same, and so could a run whose
+AI stage failed.
+
+- **A fifth class, `ai_unscreened`** ("Not processed with AI"), between the
+  long shots and "remote not confirmed". `score.py` puts there what the
+  scripts would put in a top class (`ai_screen.TOP_CLASSES`) while the
+  model has no answer for its current text; the scripts' class is kept in
+  `computed.script_class`. A "keep" moves it to that class, a "reject" out.
+  A new text (the description arrived) sends it back to wait. An identity
+  may take the scripts' verdict alone with `ai_screen: {required: false}`
+  in its criteria.
+- **A failed call is sent again**: `ai_screen.RETRY_ROUNDS` (2) more rounds
+  after `RETRY_PAUSE_SECONDS` (20); `errors` counts what failed every time.
+- **What a run leaves unread is queued**: when a run saves with vacancies
+  waiting, `pipeline.queue_ai_read` adds the task `ai` (`pipeline.py --ai`:
+  the AI check of what waits, the top rescored, a "rebuild" selection),
+  once per identity; at the usage limit the queue runs the run itself
+  again instead. An `ai` run that leaves vacancies waiting exits 1, so the
+  task list shows it failed. Every later run reads them too.
+
 ### The AI usage limit stops the AI work, and the queue waits for the reset (2026-10-21)
 
 The owner, 2026-10-20: when AI refuses because the limit is used up, the

@@ -33,6 +33,10 @@ import score  # noqa: E402
 
 from test_score import CRITERIA, PROFILE, make_vacancy  # noqa: E402
 
+# These tests are about the scripts' verdict; the wait for the AI read
+# (task 0078) is tested in test_score.py.
+CRITERIA = {**CRITERIA, "ai_screen": {"required": False}}
+
 GOOD_TEXT = ("Maintain and extend an ASP.NET Core and SQL Server platform in C#. "
              "Fully remote, we hire worldwide.")
 

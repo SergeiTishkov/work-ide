@@ -207,8 +207,8 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
         return Command([claude, "-p", f"/top {prefix}", "--output-format", "stream-json", "--verbose",
                         "--allowedTools", ",".join(ALLOWED_TOOLS)],
                        map_line=describe_event, follow_dir=common.identity_data_dir(prefix) / "runs")
-    if kind in ("rest", "linkedin", "pipeline"):
-        mode = {"rest": ["--rest"], "linkedin": ["--linkedin"]}.get(kind)
+    if kind in ("rest", "linkedin", "pipeline", "ai"):
+        mode = {"rest": ["--rest"], "linkedin": ["--linkedin"], "ai": ["--ai"]}.get(kind)
         if mode is None:
             mode = ["--top"] if args.get("mode") == "top" else []
             if args.get("skip_contracts"):   # the agent checked them just before (`/run`, step 3)

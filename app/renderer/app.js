@@ -55,11 +55,12 @@
     hot_lead: 'class.hot_lead',
     worth_a_look: 'class.worth_a_look',
     long_shot: 'class.long_shot',
+    ai_unscreened: 'class.ai_unscreened',
     remote_unconfirmed: 'class.remote_unconfirmed',
     engagement_unconfirmed: 'class.engagement_unconfirmed',
   };
   // Listed in "Category" whether they hold any or not.
-  const STABLE_CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'remote_unconfirmed'];
+  const STABLE_CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'ai_unscreened', 'remote_unconfirmed'];
   const FILTER_KEYS = {
     fresh: 'filter.fresh',
     earlier: 'filter.earlier',
@@ -1772,7 +1773,8 @@
   };
   const CLEANUP_CLASS_KEYS = {
     hot_lead: 'cleanup.class.hot_lead', worth_a_look: 'cleanup.class.worth_a_look',
-    long_shot: 'cleanup.class.long_shot', remote_unconfirmed: 'cleanup.class.remote_unconfirmed',
+    long_shot: 'cleanup.class.long_shot', ai_unscreened: 'cleanup.class.ai_unscreened',
+    remote_unconfirmed: 'cleanup.class.remote_unconfirmed',
     engagement_unconfirmed: 'cleanup.class.engagement_unconfirmed',
     low_priority: 'cleanup.class.low_priority', rejected: 'cleanup.class.rejected',
   };
@@ -2975,11 +2977,11 @@
     pending: '○',
   };
   // the tasks that run the pipeline: an identity's base changes when they end
-  const PIPELINE_KINDS = new Set(['collect', 'rest', 'linkedin', 'pipeline', 'clean', 'links']);
+  const PIPELINE_KINDS = new Set(['collect', 'rest', 'linkedin', 'pipeline', 'clean', 'links', 'ai']);
   const TASK_KIND_KEYS = {
     collect: 'task.kind.collect', rest: 'task.kind.rest', linkedin: 'task.kind.linkedin', cv: 'task.kind.cv',
     letter: 'task.kind.letter', reputation: 'task.kind.reputation', batch: 'task.kind.batch',
-    pipeline: 'task.kind.pipeline', clean: 'task.kind.clean', links: 'task.kind.links',
+    pipeline: 'task.kind.pipeline', clean: 'task.kind.clean', links: 'task.kind.links', ai: 'task.kind.ai',
   };
   // who added a task, when not this app (tools/taskq.py ORIGINS)
   const TASK_ORIGIN_KEYS = {

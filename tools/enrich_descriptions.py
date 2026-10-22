@@ -61,7 +61,10 @@ import common  # noqa: E402
 # part-time work parks there everything nobody called part-time, and the
 # vacancy page — LinkedIn's "Employment type", a schema.org employmentType —
 # is where that is most often settled.
-HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "remote_unconfirmed",
+#
+# `ai_unscreened` (task 0078) holds what the scripts put in the classes above
+# until the model reads it; the model reads the description.
+HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "ai_unscreened", "remote_unconfirmed",
                 "engagement_unconfirmed")
 
 # How many descriptions to fetch per run. A bound rather than a target: 251

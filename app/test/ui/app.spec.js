@@ -488,7 +488,7 @@ test('the keyboard: Enter or Space checks the row under the cursor and keeps the
   await page.keyboard.press('ArrowDown');   // the master row, then "Hot leads"
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveAttribute('data-state', 'off');
-  expect(await lastListing(page)).toEqual(['sharp', view({ fits: ['worth_a_look', 'long_shot', 'remote_unconfirmed'] })]);
+  expect(await lastListing(page)).toEqual(['sharp', view({ fits: ['worth_a_look', 'long_shot', 'ai_unscreened', 'remote_unconfirmed'] })]);
   await expect(page.getByTestId('fit-filter-menu')).toBeVisible();
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveClass(/cursor/);
   await page.keyboard.press(' ');

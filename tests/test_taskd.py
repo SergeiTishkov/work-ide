@@ -247,6 +247,7 @@ def test_the_commands_of_each_kind():
     assert collect.argv[:3] == ["claude", "-p", "/top ftf"] and "stream-json" in collect.argv
     assert collect.follow_dir.parts[-3:] == ("identities", "ftf", "runs")
     assert taskd.command(task("rest"), python=py).argv == [py, tools("pipeline.py"), "--identity", "ftf", "--rest"]
+    assert taskd.command(task("ai"), python=py).argv == [py, tools("pipeline.py"), "--identity", "ftf", "--ai"]
     assert taskd.command(task("linkedin"), python=py).argv[-1] == "--linkedin"
     assert taskd.command(task("pipeline", args={"mode": "top"}), python=py).argv[-1] == "--top"
     assert taskd.command(task("pipeline", args={"skip_contracts": True}), python=py).argv[-2:] == [

@@ -80,6 +80,7 @@ KINDS: Dict[str, tuple] = {
     "cv_batch": ("documents", ("desktop", "ai")),  # tools/cv_batch.py
     "reputation": ("reputation", ("ai",)),  # tools/reputation_lookup.py
     "links": ("collect", ()),               # pipeline.py --links: the shortlist's links again
+    "ai": ("collect", ("ai",)),             # pipeline.py --ai: what waits for the AI read (task 0078)
 }
 ACTIVE = ("queued", "running")
 ENDED = ("done", "failed", "stopped", "skipped", "interrupted")

@@ -9,7 +9,7 @@ const { execFile } = require('node:child_process');
 const AGES = ['today', 'week', 'month', 'older'];
 const STATUSES = ['new', 'applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer',
   'offered', 'started', 'declined', 'rejected', 'bugged', 'expired'];
-const CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'remote_unconfirmed',
+const CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'ai_unscreened', 'remote_unconfirmed',
   'engagement_unconfirmed', 'low_priority', 'rejected'];
 const IDENTITY_PATTERN = /^[a-z][a-z0-9]{2,9}$/;
 

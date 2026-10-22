@@ -33,6 +33,7 @@
   'cleanup.class.hot_lead': 'Hot leads',
   'cleanup.class.worth_a_look': 'Worth a look',
   'cleanup.class.long_shot': 'Long shots',
+  'cleanup.class.ai_unscreened': 'Not processed with AI',
   'cleanup.class.remote_unconfirmed': 'Remote not confirmed',
   'cleanup.class.engagement_unconfirmed': 'Hours not confirmed',
   'cleanup.class.low_priority': 'Low priority',
@@ -186,6 +187,7 @@
   'task.kind.pipeline': 'Pipeline run',
   'task.kind.clean': 'Clean-up',
   'task.kind.links': "Re-check the shortlist's links",
+  'task.kind.ai': 'AI check of what waits for it',
   'task.kind.other': 'Task: {kind}',
   'task.state.skipped': 'Skipped',
   'task.state.interrupted': 'Interrupted',
@@ -279,6 +281,7 @@
   'class.hot_lead': '🔥 Hot leads — look at these first',
   'class.worth_a_look': '👀 Worth a look',
   'class.long_shot': '🕰️ Long shots',
+  'class.ai_unscreened': '⏳ Not processed with AI',
   'class.remote_unconfirmed': '🏢 Remote not confirmed',
   'class.engagement_unconfirmed': '⏱️ Hours not confirmed',
 

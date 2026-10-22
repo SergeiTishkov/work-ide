@@ -36,6 +36,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -53,13 +54,22 @@ TIMEOUT_SECONDS = 180
 TEXT_LIMIT = 12000
 # The classes worth a model's reading: what the scripts kept as remote and
 # fitting. The rest are either out already or parked for a person.
-SCREENED_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "engagement_unconfirmed")
+TOP_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "engagement_unconfirmed")
+# Where score.py keeps a vacancy of those classes until the model has read
+# its current text (task 0078); the read moves it to its class or out.
+UNSCREENED = "ai_unscreened"
+SCREENED_CLASSES = TOP_CLASSES + (UNSCREENED,)
 # Besides them, the stretches (score.STRETCH_UNREAD, `screen_wanted`): remote
 # roles off the stack or level that only the model's read against the CV
 # decides. A budget of their own per run, highest score first, so a backlog
 # (about 1 500 the first time, 2026-10-20) is read over a few runs and does
 # not hold one up; $0.006 a read.
 STRETCH_LIMIT = 400
+# A posting whose call failed (a timeout, a broken answer) is sent again, up
+# to RETRY_ROUNDS more times, after a pause; what still fails waits in
+# ai_unscreened for the next read (task 0078).
+RETRY_ROUNDS = 2
+RETRY_PAUSE_SECONDS = 20
 
 SCHEMA = {
     "type": "object",
@@ -218,13 +228,15 @@ def worklist(vacancies: dict, stored: dict, brief_digest: str, classes=SCREENED_
 
 def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES,
            limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT,
-           workers: int = WORKERS, call=None) -> dict:
+           workers: int = WORKERS, call=None, pause=time.sleep) -> dict:
     """Screens what needs it and attaches every answer as `_ai_screen`.
-    Mutates `vacancies` in place; never raises for one posting. The usage
-    limit is not one posting's failure: the first refusal stops the screen,
-    no further call is sent, the answers already given are saved, and
-    ai_limit.UsageLimit is raised with the stats on it (task 0057). `call`
-    stands in for call_model (tests)."""
+    Mutates `vacancies` in place; never raises for one posting: a posting
+    whose call failed is sent again (RETRY_ROUNDS), and `errors` counts
+    those that failed every time. The usage limit is not one posting's
+    failure: the first refusal stops the screen, no further call is sent,
+    the answers already given are saved, and ai_limit.UsageLimit is raised
+    with the stats on it (task 0057). `call` and `pause` stand in for
+    call_model and time.sleep (tests)."""
     call = call or call_model
     import progress
 
@@ -261,9 +273,8 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
                 return None
             except Exception as exc:  # noqa: BLE001 — one posting must not stop the rest
                 with lock:
-                    stats["errors"] += 1
+                    failed.append(vid)
                     stats["last_error"] = str(exc)[:200]
-                    tick()
                 return None
             with lock:
                 stats["screened"] += 1
@@ -272,8 +283,21 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
                 tick()
             return vid, answer, text_hash(record)
 
-        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-            results = [r for r in pool.map(one, keys) if r]
+        results, todo = [], keys
+        for round_no in range(RETRY_ROUNDS + 1):
+            failed: list = []
+            with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+                results += [r for r in pool.map(one, todo) if r]
+            if not failed or limited or round_no == RETRY_ROUNDS:
+                break
+            stats["retried"] = stats.get("retried", 0) + len(failed)
+            progress.log(f"   ai screen: {len(failed)} calls failed ({stats['last_error'][:80]}); "
+                         f"sent again in {RETRY_PAUSE_SECONDS} s")
+            pause(RETRY_PAUSE_SECONDS)
+            todo = failed
+        stats["errors"] = len(failed)
+        for _ in failed:
+            tick()
     now = datetime.now(timezone.utc).isoformat()
     with db.session() as conn:
         conn.executemany(

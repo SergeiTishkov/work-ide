@@ -25,7 +25,7 @@ const LOG_LIMIT = 3000;
 // of it is what the step list needs (a collection logs a few MB at most).
 const STEP_KINDS = { collect: true, rest: false, linkedin: false, pipeline: false, links: false };
 const PROGRESS_LINE = /^\[\d\d:\d\d:\d\d\] /;
-const KINDS = new Set(['collect', 'rest', 'linkedin', 'clean', 'cv', 'letter', 'cv_batch', 'reputation', 'links']);
+const KINDS = new Set(['collect', 'rest', 'linkedin', 'clean', 'cv', 'letter', 'cv_batch', 'reputation', 'links', 'ai']);
 // What a schedule can start (tools/schedules.py WHAT), and the rest of its fields
 const SCHEDULE_WHAT = new Set(['collect', 'linkedin', 'rest', 'clean', 'cv_batch', 'links']);
 const SCHEDULE_MISSED = new Set(['catch_up', 'skip']);

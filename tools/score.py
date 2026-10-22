@@ -3160,6 +3160,21 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     if location_unknown and classification in ("hot_lead", "worth_a_look", "long_shot"):
         needs_review = True
 
+    # The owner, 2026-10-22: the scripts' verdict alone does not put a vacancy
+    # in the top classes; the cheap model's read does. A vacancy the scripts
+    # would put there waits in "not processed with AI" until the model has
+    # read its current text, then goes to the scripts' class ("keep") or out
+    # ("reject" is a dealbreaker above). On 2026-10-22 a rescore outside the
+    # pipeline's AI stage put 39 unread vacancies straight into the top
+    # (task 0078): office jobs in Redmond and Virginia Beach with "remote on
+    # Wednesdays if the manager agrees". Off per identity with
+    # `ai_screen: {required: false}`.
+    script_class = None
+    if ((criteria.get("ai_screen") or {}).get("required", True)
+            and classification in ai_screen.TOP_CLASSES and not screen):
+        script_class = classification
+        classification = ai_screen.UNSCREENED
+
     breakdown = {
         "remote_location_fit": rl_bd,
         "stack_fit": stack_bd,
@@ -3221,6 +3236,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         # the parts with their ranges, for the card's "Score" bars
         "score_parts": parts,
         "classification": classification,
+        # The class the scripts gave a vacancy that waits for the AI read.
+        "script_class": script_class,
         "dealbreakers": dealbreakers,
         "needs_manual_review": needs_review,
         # Can a contractor sitting where this person sits actually take the

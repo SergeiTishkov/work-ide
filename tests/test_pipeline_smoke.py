@@ -100,7 +100,11 @@ def test_full_pipeline_smoke(isolated_data_dir, monkeypatch):
     scores = {v["title"]: v["computed"]["classification"] for v in vacancies.values()}
     legacy_title = "Senior .NET Developer - Legacy Insurance Platform"
     startup_title = "Junior Crypto Web3 Rockstar Ninja"
-    assert scores[legacy_title] in ("hot_lead", "worth_a_look")
+    # The fixture has no CV, so the AI check cannot run: the scripts' top
+    # vacancy waits for it instead of reaching the top (task 0078).
+    assert scores[legacy_title] == "ai_unscreened"
+    by_title = {v["title"]: v for v in vacancies.values()}
+    assert by_title[legacy_title]["computed"]["script_class"] in ("hot_lead", "worth_a_look")
     assert scores[startup_title] == "rejected"  # on-site required = hard dealbreaker
 
     state = common.load_json(common.STATE_PATH, default={})
@@ -211,7 +215,8 @@ def test_ingest_manual_merges_into_same_kb_and_selects_again(isolated_data_dir, 
     assert len(vacancies) == 1
     v = list(vacancies.values())[0]
     assert v["source"] == "linkedin"
-    assert v["computed"]["classification"] in ("hot_lead", "worth_a_look")
+    assert v["computed"]["classification"] == "ai_unscreened"
+    assert v["computed"]["script_class"] in ("hot_lead", "worth_a_look")
 
     assert _listed_titles(result["selection_id"]) == {"Legacy VB.NET Maintenance Engineer"}
 
@@ -524,3 +529,45 @@ def test_the_links_run_checks_the_shortlist_only_and_records_a_rebuild(isolated_
     assert seen["kind"] == "rebuild" and seen["saved"] == ["a", "b"]
     assert seen["state"]["last_link_check"] == {"checked": 1, "dead": 0}
     assert result["selection_id"] == 7 and result["new_vacancies"] == 0
+
+
+def _one_good_record():
+    return [{
+        "source": "arbeitnow", "external_id": "job-1",
+        "title": "Senior .NET Developer - Legacy Insurance Platform",
+        "company": "Old Reliable Insurance Co", "url": "https://example.com/jobs/1",
+        "location_raw": "Remote - Anywhere", "remote": True, "tags": ["dotnet", "legacy"],
+        "description_html": "<p>Maintain legacy ASP.NET WebForms system. Contractor via Deel, part-time, "
+                            "flexible hours, no on-call.</p>",
+        "posted_at_epoch": 1700000000, "salary_raw": "$65/hour",
+    }]
+
+
+def test_a_run_that_leaves_vacancies_unread_queues_the_ai_check_and_the_ai_run_reads_them(
+        isolated_data_dir, monkeypatch):
+    """Task 0078: the AI check failing (here: no CV for the brief) leaves the
+    vacancy in "not processed with AI", queues the AI check as a task of its
+    own, once; the AI run reads it and moves it to the scripts' class."""
+    import ai_screen
+    import taskq
+
+    _disable_real_link_check(monkeypatch)
+    monkeypatch.setattr(pipeline, "FETCHERS", {"arbeitnow": fake_ok_source(_one_good_record())})
+    pipeline.run_pipeline()
+    pipeline.run_pipeline()
+    with taskq.session() as conn:
+        queued = [t for t in taskq.tasks(conn) if t["kind"] == "ai"]
+    assert [(t["identity"], t["state"], t["origin"]) for t in queued] == [("ftf", "queued", "auto")]
+
+    (vid, record), = kb.load_vacancies().items()
+    script_class = record["computed"]["script_class"]
+
+    def read(vacancies, state, limit=None):
+        v = vacancies[vid]
+        v["_ai_screen"] = {"verdict": "keep", "reason": "remote worldwide", "text_hash": ai_screen.text_hash(v)}
+        return True
+
+    monkeypatch.setattr(pipeline, "ai_check_stage", read)
+    result = pipeline.run_ai()
+    assert result["waiting_for_ai"] == 0
+    assert kb.load_vacancies()[vid]["computed"]["classification"] == script_class
