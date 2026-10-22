@@ -26,4 +26,4 @@ the command file.
 
 ## Items
 - DONE - The command rewritten; the rule tested
-- TO DO - The first review under the rule (2026-10-22)
+- DONE - The first review under the rule (2026-10-22): 51 items, tickets 0080-0085, no code changed
