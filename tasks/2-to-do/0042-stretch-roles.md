@@ -28,6 +28,45 @@ forward deployed titles to stretch and adds LinkedIn and HN keywords. The
 app shows "a stretch for the CV" or "another stack, fits the CV" with the
 model's reason. The scorer's time-zone reading goes to the model as a fact.
 
+## Review (2026-10-23)
+SHARP, the base of 2026-10-23 (82,504 vacancies), `score_breakdown.stretch_roles`
+and the AI answers:
+
+- 22,820 vacancies carry a stretch objection. 21,193 of them are refused for
+  something else as well (mostly location) and are never read; 801 wait for
+  the read alone, 130 of those wanted by the next run.
+- Read: 826. `cv_fit` "no" 712, "stretch" 109, "fits" 5.
+- In the list now (kept and not refused for another reason): 5 worth a
+  look, 2 long shot, 5 low priority; 1 hot lead (Camunda, Backend - Data
+  Layer, 66). The other 97 "stretch" reads are refused for location.
+  - Worth a look: Growth Minded Senior Data Engineer (35), Scopic FDE (33),
+    ElevenLabs Full-Stack Creative Agents (31), Deel Back-End Engineer (31),
+    Deel AI Engineer Backend (31).
+  - Long shot: Doit Lead Engineer Singapore (27), Oowlish Vue + Nest (22).
+- Work kind of the "stretch" reads: software 47, applied AI 31, data heavy
+  25, other 6. Data heavy was meant to stay out (Business above); the model
+  keeps it as a stretch (Growth Minded, Plexus).
+- Work kind of the "no" reads: other 392 (not development, crowdwork, ERP,
+  Salesforce, SAP), software 178 (mostly another main language: Java, Go,
+  Kotlin, Python), applied AI 60, ML research 56, data heavy 26.
+- The same posting on two boards was read differently on the same day
+  (2026-10-21): Deel "AI Engineer, Backend" and "Back-End Engineer", and Doit
+  "Lead Engineer - Singapore": one copy "stretch, keep", the other "no,
+  reject". The list shows the better-scored copy, so the kept one shows.
+- The three doubtful keeps of the dry run: Doit (above), Camunda Quality
+  ("no": production LLM work wanted), Big Wave (a stretch, refused for the US
+  market).
+
+Open questions for the owner:
+1. Another main language (Java, Go, Kotlin, Python backend): "no" now. Keep,
+   or read them as a stretch?
+2. Data heavy roles: the model keeps some as a stretch. Leave, or refuse
+   them by kind?
+3. `stretch_points` -4: the kept ones land at 22-35 (long shot to worth a
+   look). Keep the value?
+4. Two copies read differently: accept (the better copy shows), or read
+   duplicates once and share the answer?
+
 ## Items
 - DONE - Stretch objections read by the model instead of refused by keyword
 - DONE - `cv_fit` and `work_kind` in the screen; stretch points
@@ -37,6 +76,6 @@ model's reason. The scorer's time-zone reading goes to the model as a fact.
 - DONE - Merge the branch into main once the LinkedIn run has finished (7f77436 and 63a12f5 are on main)
 - DONE - Update the local sharp identity to template v28 (`templates.py update --identity sharp`; on v29 by 2026-10-21)
 - DONE - Apply the owner's personal stretch settings to the local identity (2026-10-21: `stretch_roles: {enabled: true, stretch_points: -4}` and `stretch_if` on the junior rule for data, ML/AI and forward deployed titles; until then the switch was off, and the base's forward roles stayed refused by title: 341 of 454, the owner asked why none showed)
-- TO DO - Full Python and UI suites on main after the merge
+- DONE - Full Python and UI suites on main after the merge (2026-10-23, at 554bee3: Python 1489 passed, 1 skipped, the language check failed on Russian in the texts of 0092-0094, fixed in 78a052d and then 11 passed; unit 99; UI 141)
 - DONE - Read the stretch backlog (SHARP, 2026-10-21): five `rest` runs screened 459, 443, 417, 400 and 114 vacancies and kept 26, 25, 6, 4 and 2 (1,833 read, 63 kept, USD 21.07). The estimate was 1,168: each run's description fetch (927, then 334) made more vacancies wait for a read. No stretch waits now
 - TO DO - Review the kept and rejected stretch roles with the owner; tune `stretch_points` and the doubtful kinds
