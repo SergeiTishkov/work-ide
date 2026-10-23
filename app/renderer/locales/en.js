@@ -234,7 +234,7 @@
   'run.claude_not_found': 'The claude command was not found. Install the Claude Code CLI and check PATH.',
 
   'filter.segment_legend': 'Region',
-  'filter.legend': 'Status',
+  'filter.legend': 'Application status',
   'filter.source_legend': 'Source',
   'filter.segment_all': 'All regions',
   'filter.source_all': 'All sources',

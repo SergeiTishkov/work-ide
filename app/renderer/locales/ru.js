@@ -237,7 +237,7 @@
   'run.claude_not_found': 'Не найдена команда claude. Установи Claude Code CLI и проверь PATH.',
 
   'filter.segment_legend': 'Регион',
-  'filter.legend': 'Статус',
+  'filter.legend': 'Статус отклика',
   'filter.source_legend': 'Источник',
   'filter.segment_all': 'Все регионы',
   'filter.source_all': 'Все источники',
