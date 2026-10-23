@@ -250,7 +250,7 @@
   'filter.company_kind.other': 'Остальные компании',
   'filter.age_legend': 'Возраст',
   'filter.age_all': 'Любой возраст',
-  'filter.text_legend': 'Поиск по тексту',
+  'filter.text_legend': 'Поиск',
   'filter.card_legend': 'Фильтры',
   'filter.show': 'Показать фильтры',
   'filter.hide': 'Скрыть фильтры',

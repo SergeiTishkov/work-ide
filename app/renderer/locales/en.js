@@ -247,7 +247,7 @@
   'filter.company_kind.other': 'Other companies',
   'filter.age_legend': 'Age',
   'filter.age_all': 'Any age',
-  'filter.text_legend': 'Search text',
+  'filter.text_legend': 'Search',
   'filter.card_legend': 'Filters',
   'filter.show': 'Show the filters',
   'filter.hide': 'Hide the filters',
