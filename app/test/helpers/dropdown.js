@@ -8,7 +8,8 @@ const { expect } = require('@playwright/test');
 
 const STATUSES = ['new', 'applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer', 'offered',
   'started', 'declined', 'rejected', 'bugged', 'expired'];
-// The single filters the app had before 2026-10-07, as rows of "Show".
+// The single filters the app had before 2026-10-07, as rows of "Freshness"
+// and "Status".
 function showRows(name) {
   const fresh = ['fresh_new', 'fresh'].includes(name) ? ['fresh'] : ['fresh', 'earlier'];
   const statuses = { fresh_new: ['new'], no_feedback: ['new'], all: STATUSES, fresh: STATUSES }[name] || [name];
@@ -17,8 +18,7 @@ function showRows(name) {
 
 // Leaves exactly `values` checked in the check list (null: every row), and
 // closes it. Only the rows whose testid starts with `rows` are touched: by
-// default the drop-down's own ("fit-filter": fit-option-...), so the kinds of
-// role under the classes (role-option-...) stay as they are.
+// default the drop-down's own ("fit-filter": fit-option-...).
 async function check(page, testid, values, rows = `${testid.replace(/-filter$/, '')}-option-`) {
   const menu = page.getByTestId(`${testid}-menu`);
   if (await menu.isHidden()) await page.getByTestId(testid).click();
@@ -42,10 +42,15 @@ async function settled(page) {
   await expect(page.locator('body')).not.toHaveAttribute('data-list-pending', /.*/);
 }
 
-// The old one-choice drop-downs: `value` alone ('' for every row; in "Show",
-// a filter name of before).
+// The old one-choice drop-downs: `value` alone ('' for every row; for
+// "filter", a filter name of before, set in "Freshness" and "Status").
+const FRESHNESS = ['fresh', 'earlier'];
 async function choose(page, testid, value) {
-  if (testid === 'filter') return check(page, testid, showRows(value));
+  if (testid === 'filter') {
+    const rows = showRows(value);
+    await check(page, 'fresh-filter', rows.filter((row) => FRESHNESS.includes(row)));
+    return check(page, testid, rows.filter((row) => !FRESHNESS.includes(row)));
+  }
   return check(page, testid, value === '' ? null : [value]);
 }
 

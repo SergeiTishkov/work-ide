@@ -1,5 +1,5 @@
 'use strict';
-// The four filters (2026-10-06): one width for all, a long option wraps onto a
+// The filters (2026-10-06; eight since task 0090, 2026-10-23): one width for all, a long option wraps onto a
 // second line inside the open list, and the keyboard works as on a <select>.
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -9,7 +9,8 @@ const { settled } = require('../helpers/dropdown');
 const en = require('../../renderer/locales/en.js');
 
 const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.html')).href;
-const BOXES = ['segment-filter', 'filter', 'age-filter', 'source-filter', 'company-filter', 'fit-filter'];
+const BOXES = ['segment-filter', 'fresh-filter', 'filter', 'age-filter', 'source-filter', 'company-filter',
+  'fit-filter', 'role-filter'];
 
 async function open(page) {
   await page.addInitScript(installMockApi, standardFixture());
@@ -20,8 +21,9 @@ async function open(page) {
 const calls = (page, name) =>
   page.evaluate((n) => window.__calls.filter((c) => c.name === n).map((c) => c.args), name);
 
-test('the six boxes are one width, in one row', async ({ page }) => {
-  await page.setViewportSize({ width: 1400, height: 600 });
+test('the eight boxes are one width, in one row on a wide window', async ({ page }) => {
+  // eight boxes of 205px with their gaps take 1724px; a narrower window wraps the row
+  await page.setViewportSize({ width: 1800, height: 600 });
   await open(page);
   const boxes = await Promise.all(BOXES.map((id) => page.getByTestId(id).boundingBox()));
   expect(new Set(boxes.map((b) => Math.round(b.width))).size).toBe(1);
@@ -44,23 +46,23 @@ test('the open list is the box\'s width, and a long option takes a second line',
 
 test('the keyboard: arrows move, Enter checks and leaves the list open, Escape closes', async ({ page }) => {
   await open(page);
-  await page.getByTestId('filter').focus();
+  await page.getByTestId('fresh-filter').focus();
   await page.keyboard.press('ArrowDown');
-  await expect(page.getByTestId('filter-menu')).toBeVisible();
-  await expect(page.getByTestId('filter-option-fresh')).toHaveClass(/cursor/);   // the first row on
+  await expect(page.getByTestId('fresh-filter-menu')).toBeVisible();
+  await expect(page.getByTestId('fresh-option-fresh')).toHaveClass(/cursor/);   // the first row on
   await page.keyboard.press('ArrowDown');   // fresh -> earlier
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('filter-option-earlier')).toHaveAttribute('data-state', 'on');
-  await expect(page.getByTestId('filter-menu')).toBeVisible();
-  await expect(page.getByTestId('filter-option-earlier')).toHaveClass(/cursor/);
+  await expect(page.getByTestId('fresh-option-earlier')).toHaveAttribute('data-state', 'on');
+  await expect(page.getByTestId('fresh-filter-menu')).toBeVisible();
+  await expect(page.getByTestId('fresh-option-earlier')).toHaveClass(/cursor/);
   await settled(page);
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', {
     segments: null, statuses: ['new'], fresh: ['fresh', 'earlier'], sources: null, fits: null, companies: null, ages: null,
     roles: null, text: '',
   }]);
-  await expect(page.getByTestId('filter-value')).toHaveText(en['filter.new']);
+  await expect(page.getByTestId('fresh-filter-value')).toHaveText(en['filter.fresh_all']);
   await page.keyboard.press('Escape');
-  await expect(page.getByTestId('filter-menu')).toBeHidden();
+  await expect(page.getByTestId('fresh-filter-menu')).toBeHidden();
 
   await page.getByTestId('fit-filter').click();
   await page.keyboard.press('Escape');
@@ -76,16 +78,16 @@ test('quick clicks ask for one list, and a spinner stands in for it until it com
   const before = (await calls(page, 'loadListing')).length;
   await page.evaluate(() => window.__holdListing());
   await page.getByTestId('filter').click();
-  await page.getByTestId('filter-option-earlier').click();
+  await page.getByTestId('filter-option-contacted').click();
   await page.getByTestId('filter-option-applied').click();
-  await expect(page.getByTestId('filter-option-earlier')).toHaveAttribute('data-state', 'on');
+  await expect(page.getByTestId('filter-option-contacted')).toHaveAttribute('data-state', 'on');
   await expect(page.getByTestId('filter-option-applied')).toHaveAttribute('data-state', 'on');
   await expect(page.getByTestId('list-loading')).toBeVisible();
   await expect(page.locator('article')).toHaveCount(0);
   await expect(page.getByTestId('filter-menu')).toBeVisible();   // the open list stays
   const asked = (await calls(page, 'loadListing')).slice(before);
   expect(asked).toEqual([['sharp', {
-    segments: null, statuses: ['new', 'applied'], fresh: ['fresh', 'earlier'], sources: null, fits: null, companies: null, ages: null,
+    segments: null, statuses: ['new', 'applied', 'contacted'], fresh: ['fresh'], sources: null, fits: null, companies: null, ages: null,
     roles: null, text: '',
   }]]);
   await page.evaluate(() => window.__releaseListing());
@@ -98,8 +100,8 @@ test("the rows under a group's master row stand in from it", async ({ page }) =>
   await open(page);
   await page.getByTestId('filter').click();
   const left = async (id) => (await page.getByTestId(id).locator('.check').boundingBox()).x;
-  expect(await left('filter-option-earlier')).toBeGreaterThan(await left('filter-master-fresh') + 8);
-  expect(await left('filter-option-new')).toBe(await left('filter-master-fresh'));   // a group of one row
+  expect(await left('filter-option-applied')).toBeGreaterThan(await left('filter-master-applications') + 8);
+  expect(await left('filter-option-new')).toBe(await left('filter-master-applications'));   // a group of one row
 });
 
 test('one list open at a time; a click elsewhere closes it', async ({ page }) => {

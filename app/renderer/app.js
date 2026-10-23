@@ -1,15 +1,16 @@
-// The renderer: identity tabs, four filter drop-downs (markets, what to show,
-// boards, classes), the vacancy rows with their answers, and the agent-run
-// controls.
+// The renderer: identity tabs, the filter drop-downs (markets, freshness,
+// status, age, boards, companies, classes, kinds of role), the vacancy rows
+// with their answers, and the agent-run controls.
 //
 // Everything it does to the world goes through window.api (main/preload.js);
 // the UI tests replace window.api with a mock and assert on the calls.
 (function () {
   const api = window.api;
 
-  // The "Show" drop-down (the owner, 2026-10-07): how fresh, then which
-  // statuses. A row is listed when both its freshness and its status are
-  // checked. "Not applied or denied" is one check box with no master row.
+  // "Freshness" and "Status" (the owner, 2026-10-07; two drop-downs since
+  // 2026-10-23, task 0090: one drop-down held two filters). A row is listed
+  // when both its freshness and its status are checked. "Not applied or
+  // denied" is one check box with no master row.
   const FRESHNESS = ['fresh', 'earlier'];
   const STATUS_GROUPS = [
     { key: 'new', statuses: ['new'] },
@@ -34,9 +35,10 @@
   const AGE_KEYS = {
     today: 'filter.age.today', week: 'filter.age.week', month: 'filter.age.month', older: 'filter.age.older',
   };
-  // The kinds of role, the "Category" drop-down's second group (task 0049,
-  // the owner, 2026-10-21; schemas/queries.sql, ROLE): on the CV's stack,
-  // another stack the CV fits, a stretch for the CV — the row's badge.
+  // The kinds of role, the "Role" drop-down (task 0049, the owner,
+  // 2026-10-21; under "Category" until task 0090; schemas/queries.sql, ROLE):
+  // on the CV's stack, another stack the CV fits, a stretch for the CV — the
+  // row's badge.
   const ROLES = ['stack', 'off_stack', 'stretch'];
   const ROLE_KEYS = {
     stack: 'filter.role.stack', off_stack: 'filter.role.off_stack', stretch: 'filter.role.stretch',
@@ -2072,21 +2074,36 @@
     });
   }
 
-  // How fresh, and which statuses, each row with how many it holds: the
-  // statuses counted under the chosen freshness, the freshness under the
+  const sumOf = (values, of) => values.reduce((n, value) => n + (of[value] || 0), 0);
+
+  // Fresh, from earlier runs, or both, each with how many it holds under the
   // chosen statuses.
+  function renderFreshFilter(view) {
+    const { counts } = state;
+    const options = FRESHNESS.map((value) => ({
+      value, label: t(FILTER_KEYS[value]), text: counted(t(FILTER_KEYS[value]), counts.fresh[value]),
+      testid: `fresh-option-${value}`, checked: view.fresh.includes(value),
+    }));
+    return checklist({
+      testid: 'fresh-filter', label: t('filter.fresh_legend'), labelTestid: 'fresh-label',
+      summary: summaryOf(t('filter.fresh_all'), options),
+      groups: [{
+        key: 'fresh', options,
+        master: { text: counted(t('filter.fresh_all'), sumOf(FRESHNESS, counts.fresh)), testid: 'fresh-option-all' },
+      }],
+      onToggle: (group, values) => changeView({ fresh: values }),
+    });
+  }
+
+  // Which statuses, each row with how many it holds under the chosen
+  // freshness.
   function renderShowFilter(view) {
     const { counts } = state;
     const option = (value, n, checked) => ({
       value, label: t(FILTER_KEYS[value]), text: counted(t(FILTER_KEYS[value]), n),
       testid: `filter-option-${value}`, checked,
     });
-    const sum = (values, of) => values.reduce((n, value) => n + (of[value] || 0), 0);
-    const freshness = {
-      key: 'fresh', label: t('filter.group.freshness'),
-      master: { text: counted(t('filter.all'), sum(FRESHNESS, counts.fresh)), testid: 'filter-master-fresh' },
-      options: FRESHNESS.map((f) => option(f, counts.fresh[f], view.fresh.includes(f))),
-    };
+    const sum = sumOf;
     const statusGroups = STATUS_GROUPS.map((group) => ({
       key: group.key, label: group.label && t(group.label),
       master: group.statuses.length > 1
@@ -2094,19 +2111,16 @@
       options: group.statuses.map((status) => option(status, counts.statuses[status], view.statuses.includes(status))),
     }));
     const parts = [];
-    if (view.fresh.length === 1) parts.push(t(FILTER_KEYS[view.fresh[0]]));
     for (const group of statusGroups) {
       const on = group.options.filter((o) => o.checked);
       if (on.length && on.length === group.options.length) parts.push(group.label || on[0].label);
       else parts.push(...on.map((o) => o.label));
     }
-    const nothing = !view.fresh.length || !view.statuses.length;
     return checklist({
       testid: 'filter', label: t('filter.legend'), labelTestid: 'filter-label',
-      summary: nothing ? t('filter.none') : parts.join(' · '),
-      groups: [freshness, ...statusGroups],
+      summary: !view.statuses.length ? t('filter.none') : parts.join(' · '),
+      groups: statusGroups,
       onToggle: (group, values) => {
-        if (group.key === 'fresh') return changeView({ fresh: values });
         const others = view.statuses.filter((status) => !group.options.some((o) => o.value === status));
         const chosen = new Set([...others, ...values]);
         return changeView({ statuses: STATUSES.filter((status) => chosen.has(status)) });
@@ -2118,11 +2132,13 @@
     const view = currentView();
     return el('div', { class: 'filters', testid: 'filters' },
       renderSegmentFilter(info, view),
+      renderFreshFilter(view),
       renderShowFilter(view),
       renderAgeFilter(view),
       renderSourceFilter(view),
       renderCompanyFilter(view),
       renderFitFilter(view),
+      renderRoleFilter(view),
       renderTextFilter(view));
   }
 
@@ -2186,9 +2202,6 @@
   // and its vacancies stayed hidden once they came back. Another class
   // (engagement_unconfirmed, the part-time search's) while it holds any or
   // is chosen.
-  // Under the classes, the kinds of role (task 0049, the owner, 2026-10-21):
-  // on the CV's stack, another stack the CV fits, a stretch for the CV, so
-  // the stretches can be shown alone or hidden. null in the view is every kind.
   function renderFitFilter(view) {
     const chosen = view.fits;
     const totals = state.classTotals;
@@ -2203,31 +2216,35 @@
         checked: !chosen || chosen.includes(cls),
       };
     });
-    const chosenRoles = view.roles;
-    const roleOptions = ROLES.map((role) => ({
-      value: role, label: t(ROLE_KEYS[role]), text: counted(t(ROLE_KEYS[role]), state.roles[role]),
-      testid: `role-option-${role}`, checked: !chosenRoles || chosenRoles.includes(role),
-    }));
-    const allRoles = ROLES.reduce((sum, role) => sum + (state.roles[role] || 0), 0);
-    // closed: the classes chosen, then the kinds of role chosen; either one
-    // alone when the other takes all
-    const parts = [];
-    if (chosen) parts.push(summaryOf(t('filter.fit_all'), options));
-    if (chosenRoles) parts.push(summaryOf(t('filter.role_all'), roleOptions));
-    let summary = parts.length ? parts.join(' · ') : t('filter.fit_all');
-    if (parts.includes(t('filter.none'))) summary = t('filter.none');
     return checklist({
-      testid: 'fit-filter', label: t('filter.fit_legend'), labelTestid: 'fit-label', summary,
+      testid: 'fit-filter', label: t('filter.fit_legend'), labelTestid: 'fit-label',
+      summary: !chosen ? t('filter.fit_all') : summaryOf(t('filter.fit_all'), options),
       groups: [{
         key: 'fits', options, whole: !chosen,
         master: { text: counted(t('filter.fit_all'), all), testid: 'fit-option-all' },
-      }, {
-        key: 'roles', options: roleOptions, whole: !chosenRoles,
-        master: { text: counted(t('filter.role_all'), allRoles), testid: 'role-option-all' },
       }],
-      onToggle: (group, values) => (group.key === 'roles'
-        ? changeView({ roles: values.length === ROLES.length ? null : values })
-        : changeView({ fits: values.length === options.length ? null : values })),
+      onToggle: (group, values) => changeView({ fits: values.length === options.length ? null : values }),
+    });
+  }
+
+  // The kinds of role (task 0049, the owner, 2026-10-21): on the CV's stack,
+  // another stack the CV fits, a stretch for the CV, so the stretches can be
+  // shown alone or hidden. null in the view is every kind.
+  function renderRoleFilter(view) {
+    const chosen = view.roles;
+    const options = ROLES.map((role) => ({
+      value: role, label: t(ROLE_KEYS[role]), text: counted(t(ROLE_KEYS[role]), state.roles[role]),
+      testid: `role-option-${role}`, checked: !chosen || chosen.includes(role),
+    }));
+    const all = ROLES.reduce((sum, role) => sum + (state.roles[role] || 0), 0);
+    return checklist({
+      testid: 'role-filter', label: t('filter.role_legend'), labelTestid: 'role-label',
+      summary: !chosen ? t('filter.role_all') : summaryOf(t('filter.role_all'), options),
+      groups: [{
+        key: 'roles', options, whole: !chosen,
+        master: { text: counted(t('filter.role_all'), all), testid: 'role-option-all' },
+      }],
+      onToggle: (group, values) => changeView({ roles: values.length === ROLES.length ? null : values }),
     });
   }
 

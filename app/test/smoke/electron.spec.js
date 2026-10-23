@@ -118,12 +118,12 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     // since start, so the page reloads, keeps the view and works. One click:
     // in the hidden window each takes about 2 s, and a row redrawn under it
     // (the check box, then the spinner, then the list) makes Playwright retry.
-    await check(window, 'filter', ['fresh', 'earlier', 'new']);
+    await check(window, 'fresh-filter', ['fresh', 'earlier']);
     await window.evaluate(() => { window.__beforeRefresh = true; });
     await window.getByTestId('menu-button').click();
     await window.getByTestId('refresh').click();
     await expect.poll(() => window.evaluate(() => window.__beforeRefresh)).toBeUndefined();
-    await expect(window.getByTestId('filter-option-earlier')).toHaveAttribute('data-state', 'on');
+    await expect(window.getByTestId('fresh-option-earlier')).toHaveAttribute('data-state', 'on');
     await expect(window.getByTestId('error')).toBeHidden();
 
     // "Identities" through the real IPC: the switch lands in the base

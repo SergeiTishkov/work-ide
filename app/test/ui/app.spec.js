@@ -31,15 +31,16 @@ async function command(page, testid) {
   return page.getByTestId(testid);
 }
 const lastListing = async (page) => { await settled(page); return (await calls(page, 'loadListing')).at(-1); };
-// "Show" closed: every status and both freshness rows checked; the start
+// "Status" closed: every status checked; the start
 const SHOW_ALL = [en['filter.new'], en['filter.group.applications'], en['filter.group.denied']].join(' · ');
-const SHOW_DEFAULT = `${en['filter.fresh']} · ${en['filter.new']}`;
+const SHOW_DEFAULT = en['filter.new'];
 
 test('opens on the first identity, every market, fresh vacancies not applied or denied', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('identity-tab-sharp')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('segment-filter-value')).toHaveText('Everything');
   await expect(page.getByTestId('filter-value')).toHaveText(SHOW_DEFAULT);
+  await expect(page.getByTestId('fresh-filter-value')).toHaveText(en['filter.fresh']);
   expect((await calls(page, 'loadListing'))[0]).toEqual(['sharp', VIEW]);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(3);   // a1, a2r, b1
   await expect(byId(page, 'a3')).toHaveCount(0);   // not fresh
@@ -377,13 +378,13 @@ test('an answer and its undo change the card at once, before the list loads agai
   expect((await calls(page, 'stepBack')).at(-1)).toEqual(['sharp', 'a1']);
 });
 
-test('"Show" counts the statuses under the freshness chosen, the freshness under the statuses', async ({ page }) => {
+test('"Status" counts under the freshness chosen, "Freshness" under the statuses', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('filter-option-new')).toContainText('(3)');   // a1, a2r, b1
   await expect(page.getByTestId('filter-option-bugged')).toContainText('(1)');   // x1
   await expect(page.getByTestId('filter-master-denied')).toContainText('(1)');
-  await expect(page.getByTestId('filter-option-earlier')).toContainText('(1)');   // a3
-  await expect(page.getByTestId('filter-master-fresh')).toContainText('(4)');
+  await expect(page.getByTestId('fresh-option-earlier')).toContainText('(1)');   // a3
+  await expect(page.getByTestId('fresh-option-all')).toContainText('(4)');
   await choose(page, 'filter', 'bugged');
   expect(await lastListing(page)).toEqual(['sharp', view({ statuses: ['bugged'], fresh: BOTH })]);
   await expect(byId(page, 'x1')).toBeVisible();
@@ -408,6 +409,7 @@ test('each identity keeps its own view', async ({ page }) => {
   await page.getByTestId('identity-tab-sharp').click();
   await expect(page.getByTestId('segment-filter-value')).toHaveText('United Kingdom');
   await expect(page.getByTestId('filter-value')).toHaveText(SHOW_ALL);
+  await expect(page.getByTestId('fresh-filter-value')).toHaveText(en['filter.fresh_all']);
   await page.getByTestId('identity-tab-partsharp').click();
   await expect(page.getByTestId('filter-value')).toHaveText(en['filter.applied']);
 });
@@ -449,22 +451,20 @@ test('a check list takes several rows; its master row is on, partly on or off', 
   await expect(page.getByTestId('segment-filter-menu')).toBeHidden();
 });
 
-test('"Show": freshness, not applied or denied, applications, denied; "All" checks a group', async ({ page }) => {
+test('"Status": not applied or denied, applications, denied; "All" checks a group', async ({ page }) => {
   await open(page);
   await page.getByTestId('filter').click();
   const menu = page.getByTestId('filter-menu');
   await expect(menu.locator('.dropdown-group-label'))
-    .toHaveText([en['filter.group.freshness'], en['filter.group.applications'], en['filter.group.denied']]);
+    .toHaveText([en['filter.group.applications'], en['filter.group.denied']]);
   const groups = await menu.locator('[role="group"]').evaluateAll((nodes) => nodes.map((group) => [
     ...group.querySelectorAll('[role="option"]')].map((o) => o.dataset.value || o.dataset.testid)));
   expect(groups).toEqual([
-    ['filter-master-fresh', 'fresh', 'earlier'],
     ['new'],
     ['filter-master-applications', 'applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer',
       'offered', 'started', 'declined'],
     ['filter-master-denied', 'rejected', 'bugged', 'expired'],
   ]);
-  await expect(page.getByTestId('filter-master-fresh')).toHaveAttribute('data-state', 'partial');
   await expect(page.getByTestId('filter-master-denied')).toHaveText(`${en['filter.all']} (1)`);
 
   await page.getByTestId('filter-master-denied').click();
@@ -472,19 +472,40 @@ test('"Show": freshness, not applied or denied, applications, denied; "All" chec
   expect(await lastListing(page)).toEqual(['sharp', view({ statuses: ['new', 'rejected', 'bugged', 'expired'] })]);
   await expect(byId(page, 'x1')).toBeVisible();
   await expect(page.getByTestId('filter-value'))
-    .toHaveText(`${en['filter.fresh']} · ${en['filter.new']} · ${en['filter.group.denied']}`);
+    .toHaveText(`${en['filter.new']} · ${en['filter.group.denied']}`);
 
   await page.getByTestId('filter-option-new').click();
   await expect(page.getByTestId('filter-option-new')).toHaveAttribute('data-state', 'off');
   await page.getByTestId('filter-option-expired').click();
   await expect(page.getByTestId('filter-master-denied')).toHaveAttribute('data-state', 'partial');
   await expect(page.getByTestId('filter-value'))
-    .toHaveText([en['filter.fresh'], en['filter.rejected'], en['filter.bugged']].join(' · '));
-  await page.getByTestId('filter-master-fresh').click();   // partly on: on
-  await expect(page.getByTestId('filter-master-fresh')).toHaveAttribute('data-state', 'on');
-  expect(await lastListing(page)).toEqual(['sharp', view({ statuses: ['rejected', 'bugged'], fresh: BOTH })]);
-  await page.getByTestId('filter-master-fresh').click();   // on: off
+    .toHaveText([en['filter.rejected'], en['filter.bugged']].join(' · '));
+  await page.getByTestId('filter-master-denied').click();   // partly on: on
+  await page.getByTestId('filter-master-denied').click();   // on: off
   await expect(page.getByTestId('filter-value')).toHaveText(en['filter.none']);
+  await expect(page.getByTestId('list-empty')).toBeVisible();
+});
+
+// The owner, 2026-10-23 (task 0090): "Status" and "Category" each held two
+// filters; freshness and the kind of role are drop-downs of their own.
+test('"Freshness" is a drop-down of its own: fresh, from earlier runs, or both', async ({ page }) => {
+  await open(page);
+  await expect(page.getByTestId('fresh-label')).toHaveText(en['filter.fresh_legend']);
+  await page.getByTestId('fresh-filter').click();
+  const master = page.getByTestId('fresh-option-all');
+  await expect(master).toHaveText(`${en['filter.fresh_all']} (4)`);
+  await expect(master).toHaveAttribute('data-state', 'partial');
+  await master.click();   // partly on: on
+  await expect(master).toHaveAttribute('data-state', 'on');
+  expect(await lastListing(page)).toEqual(['sharp', view({ fresh: BOTH })]);
+  await expect(byId(page, 'a3')).toBeVisible();   // from an earlier run
+  await expect(page.getByTestId('fresh-filter-value')).toHaveText(en['filter.fresh_all']);
+  await page.getByTestId('fresh-option-fresh').click();
+  expect(await lastListing(page)).toEqual(['sharp', view({ fresh: ['earlier'] })]);
+  await expect(page.getByTestId('fresh-filter-value')).toHaveText(en['filter.earlier']);
+  await page.getByTestId('fresh-option-earlier').click();
+  await expect(page.getByTestId('fresh-filter-value')).toHaveText(en['filter.none']);
+  await expect(page.getByTestId('filter-value')).toHaveText(en['filter.new']);   // the statuses keep theirs
   await expect(page.getByTestId('list-empty')).toBeVisible();
 });
 
@@ -820,7 +841,7 @@ test('in a class shown whole, an answer takes one off its count at once', async 
 test('"Not applied or denied" from every run lists every unanswered vacancy, fresh or not', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('filter-option-new')).toHaveText(`${en['filter.new']} (3)`);   // fresh ones
-  await check(page, 'filter', ['fresh', 'earlier', 'new']);
+  await check(page, 'fresh-filter', ['fresh', 'earlier']);
   expect(await lastListing(page)).toEqual(['sharp', view({ fresh: BOTH })]);
   await expect(page.getByTestId('filter-option-new')).toHaveText(`${en['filter.new']} (4)`);   // a1, a2r, a3, b1
   await expect(page.getByTestId('filter-value')).toHaveText(en['filter.new']);
@@ -1283,7 +1304,8 @@ test('"Company" sits between "Source" and "Category": all, the kinds, the interm
   await openCompanies(page);
   const order = await page.getByTestId('filters').locator('[data-dropdown]')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.dropdown));
-  expect(order).toEqual(['segment-filter', 'filter', 'age-filter', 'source-filter', 'company-filter', 'fit-filter']);
+  expect(order).toEqual(['segment-filter', 'fresh-filter', 'filter', 'age-filter', 'source-filter', 'company-filter',
+    'fit-filter', 'role-filter']);
   await expect(page.getByTestId('company-label')).toHaveText(en['filter.company_legend']);
   await expect(page.getByTestId('company-filter-value')).toHaveText(en['filter.company_all']);
   const rows = await page.getByTestId('company-filter-menu').locator('[role="option"]')
@@ -1856,20 +1878,23 @@ test('"Age" stands after "Status": today, a week, a month, older, each with its 
 });
 
 // task 0049 (the owner, 2026-10-21): b1 is a stretch, a2r another stack the CV fits, a1 on the stack
-test('"Category" shows the stretches alone or hides them, each kind of role with its count', async ({ page }) => {
+test('"Role" shows the stretches alone or hides them, each kind of role with its count', async ({ page }) => {
   await open(page);
-  await page.getByTestId('fit-filter').click();
+  await expect(page.getByTestId('role-label')).toHaveText(en['filter.role_legend']);
+  await page.getByTestId('role-filter').click();
   await expect(page.getByTestId('role-option-all')).toHaveText(`${en['filter.role_all']} (3)`);
   await expect(page.getByTestId('role-option-stack')).toHaveText(`${en['filter.role.stack']} (1)`);
   await expect(page.getByTestId('role-option-off_stack')).toHaveText(`${en['filter.role.off_stack']} (1)`);
   await expect(page.getByTestId('role-option-stretch')).toHaveText(`${en['filter.role.stretch']} (1)`);
+  await expect(page.getByTestId('fit-filter-menu').getByTestId('role-option-all')).toHaveCount(0);   // not in "Category"
   await page.keyboard.press('Escape');
 
-  await check(page, 'fit-filter', ['stretch'], 'role-option-');
+  await check(page, 'role-filter', ['stretch']);
   expect(await lastListing(page)).toEqual(['sharp', view({ roles: ['stretch'] })]);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(1);
   await expect(byId(page, 'b1')).toBeVisible();
-  await expect(page.getByTestId('fit-filter-value')).toHaveText(en['filter.role.stretch']);
+  await expect(page.getByTestId('role-filter-value')).toHaveText(en['filter.role.stretch']);
+  await expect(page.getByTestId('fit-filter-value')).toHaveText(en['filter.fit_all']);
   // the classes count under it, and the kinds of role keep their own numbers
   await page.getByTestId('fit-filter').click();
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveText(`${en['class.hot_lead']} (0)`);
@@ -1878,19 +1903,19 @@ test('"Category" shows the stretches alone or hides them, each kind of role with
   await page.keyboard.press('Escape');
 
   // hidden: every kind but the stretches
-  await check(page, 'fit-filter', ['stack', 'off_stack'], 'role-option-');
+  await check(page, 'role-filter', ['stack', 'off_stack']);
   expect((await lastListing(page))[1].roles).toEqual(['stack', 'off_stack']);
   await expect(byId(page, 'b1')).toHaveCount(0);
   await expect(byId(page, 'a1')).toBeVisible();
   await expect(byId(page, 'a2r')).toBeVisible();
 
-  await page.getByTestId('fit-filter').click();
+  await page.getByTestId('role-filter').click();
   await page.getByTestId('role-option-all').click();
   await expect(page.getByTestId('role-option-stretch')).toHaveAttribute('data-state', 'on');
   await page.keyboard.press('Escape');
   expect(await lastListing(page)).toEqual(['sharp', VIEW]);
   await expect(byId(page, 'b1')).toBeVisible();
-  await expect(page.getByTestId('fit-filter-value')).toHaveText(en['filter.fit_all']);
+  await expect(page.getByTestId('role-filter-value')).toHaveText(en['filter.role_all']);
 });
 
 test('the stub\'s text has one width, so the buttons after it stand in one column', async ({ page }) => {
