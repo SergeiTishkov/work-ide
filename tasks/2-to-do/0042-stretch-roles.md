@@ -52,7 +52,9 @@ and the AI answers:
 - The same posting on two boards was read differently on the same day
   (2026-10-21): Deel "AI Engineer, Backend" and "Back-End Engineer", and Doit
   "Lead Engineer - Singapore": one copy "stretch, keep", the other "no,
-  reject". The list shows the better-scored copy, so the kept one shows.
+  reject". Corrected 2026-10-24: the list shows the better-scored copy,
+  and that is the rejected one (the kept one lost 4 points as a stretch):
+  the kept copies are hidden. Task 0096.
 - The three doubtful keeps of the dry run: Doit (above), Camunda Quality
   ("no": production LLM work wanted), Big Wave (a stretch, refused for the US
   market).
