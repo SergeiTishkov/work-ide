@@ -67,6 +67,33 @@ Open questions for the owner:
 4. Two copies read differently: accept (the better copy shows), or read
    duplicates once and share the answer?
 
+The owner's answers (2026-10-24):
+1. Another main language is a stretch: "what if a magic vacancy with PHP
+   comes up? I'd gladly take it."
+2. Data heavy roles: left to the model; the owner tunes it later if needed.
+3. `stretch_points` -4 stays.
+4. Asked to explain first; open.
+
+Done for 1 (the local identity, outside git):
+- The "no" came from the SHARP brief, not from the shared prompt: the brief
+  turned point 5 of the template ("a stack that is neither .NET/C# nor
+  JS/TS" is out) into "main stack Python, Java/Spring, Go, Ruby, PHP... =
+  no" and "Node as the backend = no". The shared prompt already called
+  another mainstream stack a stretch.
+- `local-identities/sharp-.../sharp_identity.md`: a section "Another main
+  language is a stretch", over point 5 of the template: Java (Spring web
+  too), Kotlin, Go, Python, PHP, Ruby, Node as the backend are a stretch,
+  "5+ years of X" included; a "no" only for a specialist in the language or
+  its runtime, or work that is not development.
+- The brief rewritten (`tools/ai_brief.py --identity sharp`) and read: the
+  rule is in, nothing contradicts it. A first wording ("years of deep
+  expertise ... stays a no") let the brief keep "Java/Spring web = no" and
+  add "strong Python backend = no"; the section was reworded.
+- The refused reads are asked again because the brief changed (score.py
+  `screen_wanted`, ai_screen.worklist checks the brief's hash): the next
+  runs re-read the top classes and up to 400 refused or waiting stretches
+  a run.
+
 ## Items
 - DONE - Stretch objections read by the model instead of refused by keyword
 - DONE - `cv_fit` and `work_kind` in the screen; stretch points
@@ -78,4 +105,6 @@ Open questions for the owner:
 - DONE - Apply the owner's personal stretch settings to the local identity (2026-10-21: `stretch_roles: {enabled: true, stretch_points: -4}` and `stretch_if` on the junior rule for data, ML/AI and forward deployed titles; until then the switch was off, and the base's forward roles stayed refused by title: 341 of 454, the owner asked why none showed)
 - DONE - Full Python and UI suites on main after the merge (2026-10-23, at 554bee3: Python 1489 passed, 1 skipped, the language check failed on Russian in the texts of 0092-0094, fixed in 78a052d and then 11 passed; unit 99; UI 141)
 - DONE - Read the stretch backlog (SHARP, 2026-10-21): five `rest` runs screened 459, 443, 417, 400 and 114 vacancies and kept 26, 25, 6, 4 and 2 (1,833 read, 63 kept, USD 21.07). The estimate was 1,168: each run's description fetch (927, then 334) made more vacancies wait for a read. No stretch waits now
-- TO DO - Review the kept and rejected stretch roles with the owner; tune `stretch_points` and the doubtful kinds
+- DONE - Review the kept and rejected stretch roles with the owner; tune `stretch_points` and the doubtful kinds (2026-10-24: "Review" above; points and data heavy kept, another language made a stretch)
+- TO DO - Two copies of one posting read differently: the owner decides after the explanation (question 4)
+- TO DO - After the next runs, show the owner what the new brief kept among the other-language roles
