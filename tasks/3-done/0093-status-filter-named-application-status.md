@@ -8,7 +8,7 @@ The owner, 2026-10-23: name "Status" "Application Status".
 
 ## Implementation
 - Locales: `filter.legend` "Application status" (in the sentence case of
-  the other names), "Статус отклика".
+  the other names), and the same in Russian.
 
 ## Items
 - DONE - "Status" renamed "Application status"
