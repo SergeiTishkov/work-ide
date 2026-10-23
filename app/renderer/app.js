@@ -139,6 +139,8 @@
   // How often the pipeline indicator asks the databases. Tests shorten it.
   const POLL_MS = window.__WORK_IDE_POLL_MS || 5000;
   const SESSION_KEY = 'work-ide-view';
+  // whether the filters' card is shown under the search field (task 0091)
+  const FILTERS_KEY = 'work-ide-filters-open';
 
   const state = {
     identities: [],
@@ -221,6 +223,7 @@
     pipelines: {},
     openPicker: null,   // which top-bar drop-down is open: 'theme', 'language' or null
     taskViewOpen: false,   // the task list's gear menu
+    filtersOpen: readFiltersOpen(),   // the filters' card under the search field
   };
 
   // --- the view survives "Refresh" and a restart ----------------------------
@@ -2128,18 +2131,51 @@
     });
   }
 
+  // The search field on top, its button showing the drop-downs under it in
+  // a card of their own, four columns of two (the owner, 2026-10-23, task
+  // 0091). The card is as wide as the field; it is shown until the button
+  // hides it again, across a refresh and a restart.
   function renderFilters(info) {
     const view = currentView();
-    return el('div', { class: 'filters', testid: 'filters' },
-      renderSegmentFilter(info, view),
-      renderFreshFilter(view),
-      renderShowFilter(view),
-      renderAgeFilter(view),
-      renderSourceFilter(view),
-      renderCompanyFilter(view),
-      renderFitFilter(view),
-      renderRoleFilter(view),
-      renderTextFilter(view));
+    return el('div', { class: 'search-block', testid: 'search-block' },
+      renderTextFilter(view),
+      state.filtersOpen && el('fieldset', { class: 'filters', testid: 'filters' },
+        el('legend', { testid: 'filters-legend' }, t('filter.card_legend')),
+        renderSegmentFilter(info, view),
+        renderFreshFilter(view),
+        renderShowFilter(view),
+        renderAgeFilter(view),
+        renderSourceFilter(view),
+        renderCompanyFilter(view),
+        renderFitFilter(view),
+        renderRoleFilter(view)));
+  }
+
+  function readFiltersOpen() {
+    try {
+      return localStorage.getItem(FILTERS_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  function toggleFilters() {
+    state.filtersOpen = !state.filtersOpen;
+    if (!state.filtersOpen) state.openDropdown = null;
+    try {
+      localStorage.setItem(FILTERS_KEY, state.filtersOpen ? '1' : '0');
+    } catch {
+      // storage unavailable: the next start has the card hidden
+    }
+    render();
+  }
+
+  // a funnel of three lines, the longest on top
+  function filtersIcon() {
+    const icon = el('span', { class: 'filters-icon', 'aria-hidden': 'true' });
+    icon.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" '
+      + 'stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"/></svg>';
+    return icon;
   }
 
   // Words to look for in the title, company, board, link, country and
@@ -2153,8 +2189,14 @@
       oninput: (event) => changeView({ text: event.target.value }),
     });
     input.value = view.text || '';
+    const toggle = el('button', {
+      class: `filters-toggle${state.filtersOpen ? ' pressed' : ''}`, type: 'button', testid: 'filters-toggle',
+      title: t(state.filtersOpen ? 'filter.hide' : 'filter.show'), 'aria-label': t('filter.card_legend'),
+      'aria-pressed': state.filtersOpen ? 'true' : 'false', 'aria-expanded': state.filtersOpen ? 'true' : 'false',
+      onclick: toggleFilters,
+    }, filtersIcon());
     return el('span', { class: 'field text-filter' },
-      input, el('label', { for: 'text-filter-input' }, t('filter.text_legend')));
+      input, el('label', { for: 'text-filter-input' }, t('filter.text_legend')), toggle);
   }
 
   // The panel is drawn anew on every change, the text field with it: the

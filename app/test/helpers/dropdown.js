@@ -20,6 +20,7 @@ function showRows(name) {
 // closes it. Only the rows whose testid starts with `rows` are touched: by
 // default the drop-down's own ("fit-filter": fit-option-...).
 async function check(page, testid, values, rows = `${testid.replace(/-filter$/, '')}-option-`) {
+  await showFilters(page);
   const menu = page.getByTestId(`${testid}-menu`);
   if (await menu.isHidden()) await page.getByTestId(testid).click();
   for (let guard = 0; guard < 40; guard += 1) {
@@ -35,6 +36,13 @@ async function check(page, testid, values, rows = `${testid.replace(/-filter$/, 
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await settled(page);
+}
+
+// The drop-downs live in a card the search field's button shows (task 0091).
+async function showFilters(page) {
+  const toggle = page.getByTestId('filters-toggle');
+  if (await toggle.getAttribute('aria-pressed') !== 'true') await toggle.click();
+  await expect(page.getByTestId('filters')).toBeVisible();
 }
 
 // Waits for the list a drop-down change asked for.
@@ -63,4 +71,4 @@ const VIEW = {
 const BOTH = ['fresh', 'earlier'];
 const view = (change = {}) => ({ ...VIEW, ...change });
 
-module.exports = { choose, check, settled, showRows, STATUSES, VIEW, BOTH, view };
+module.exports = { choose, check, settled, showFilters, showRows, STATUSES, VIEW, BOTH, view };

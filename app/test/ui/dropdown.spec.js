@@ -1,5 +1,6 @@
 'use strict';
-// The filters (2026-10-06; eight since task 0090, 2026-10-23): one width for all, a long option wraps onto a
+// The filters (2026-10-06; eight since task 0090, 2026-10-23; in a card
+// under the search field since task 0091): one width for all, a long option wraps onto a
 // second line inside the open list, and the keyboard works as on a <select>.
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -12,22 +13,73 @@ const PAGE = pathToFileURL(path.join(__dirname, '..', '..', 'renderer', 'index.h
 const BOXES = ['segment-filter', 'fresh-filter', 'filter', 'age-filter', 'source-filter', 'company-filter',
   'fit-filter', 'role-filter'];
 
-async function open(page) {
-  await page.addInitScript(installMockApi, standardFixture());
+async function open(page, fixture = standardFixture()) {
+  await page.addInitScript(installMockApi, fixture);
   await page.goto(PAGE);
-  await expect(page.getByTestId('filter')).toBeVisible();
+  await expect(page.getByTestId('text-filter')).toBeVisible();
 }
 
 const calls = (page, name) =>
   page.evaluate((n) => window.__calls.filter((c) => c.name === n).map((c) => c.args), name);
 
-test('the eight boxes are one width, in one row on a wide window', async ({ page }) => {
-  // eight boxes of 205px with their gaps take 1724px; a narrower window wraps the row
-  await page.setViewportSize({ width: 1800, height: 600 });
+test('the eight boxes are one width, four columns of two, in a card as wide as the search field', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 700 });
   await open(page);
   const boxes = await Promise.all(BOXES.map((id) => page.getByTestId(id).boundingBox()));
   expect(new Set(boxes.map((b) => Math.round(b.width))).size).toBe(1);
-  expect(new Set(boxes.map((b) => Math.round(b.y))).size).toBe(1);
+  const rows = [...new Set(boxes.map((b) => Math.round(b.y)))];
+  expect(rows).toHaveLength(2);
+  expect(boxes.filter((b) => Math.round(b.y) === rows[0])).toHaveLength(4);
+  const card = await page.getByTestId('filters').boundingBox();
+  const search = await page.getByTestId('text-filter').boundingBox();
+  expect(Math.round(search.width)).toBe(Math.round(card.width));
+  expect(Math.round(search.x)).toBe(Math.round(card.x));
+  await expect(page.getByTestId('filters-legend')).toHaveText(en['filter.card_legend']);
+});
+
+test('the filters are hidden at the start; the button in the search field shows them, pressed', async ({ page }) => {
+  await open(page, { ...standardFixture(), filtersHidden: true });
+  const toggle = page.getByTestId('filters-toggle');
+  await expect(page.getByTestId('filters')).toHaveCount(0);
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(toggle).toHaveAttribute('title', en['filter.show']);
+  // the button sits inside the field, at its right edge
+  const field = await page.getByTestId('text-filter').boundingBox();
+  const button = await toggle.boundingBox();
+  expect(button.x + button.width).toBeLessThanOrEqual(field.x + field.width);
+  expect(button.x + button.width).toBeGreaterThan(field.x + field.width - 16);
+  expect(button.y).toBeGreaterThan(field.y);
+  expect(button.y + button.height).toBeLessThan(field.y + field.height);
+
+  await toggle.click();
+  await expect(page.getByTestId('filters')).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle).toHaveClass(/pressed/);
+  await expect(toggle).toHaveAttribute('title', en['filter.hide']);
+
+  // kept across a reload, shown or hidden
+  await page.reload();
+  await expect(page.getByTestId('filters')).toBeVisible();
+  await page.getByTestId('filters-toggle').click();
+  await expect(page.getByTestId('filters')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId('text-filter')).toBeVisible();
+  await expect(page.getByTestId('filters')).toHaveCount(0);
+  await expect(page.getByTestId('filters-toggle')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('hiding the filters keeps what they chose; the search field works with them hidden', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('fit-filter').click();
+  await expect(page.getByTestId('fit-filter-menu')).toBeVisible();
+  await page.getByTestId('filters-toggle').click();   // an open list closes with its card
+  await expect(page.getByTestId('fit-filter-menu')).toHaveCount(0);
+  const before = (await calls(page, 'loadListing')).length;
+  await page.getByTestId('text-filter').fill('company b');
+  await expect.poll(async () => (await calls(page, 'loadListing')).length).toBeGreaterThan(before);
+  expect((await calls(page, 'loadListing')).at(-1)[1].text).toBe('company b');
+  await page.getByTestId('filters-toggle').click();
+  await expect(page.getByTestId('fit-filter')).toBeVisible();
 });
 
 test('the open list is the box\'s width, and a long option takes a second line', async ({ page }) => {

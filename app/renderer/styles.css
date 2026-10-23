@@ -180,7 +180,21 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
    edge, over the chosen value. The label's background is split at its middle:
    the page's colour above the border, the field's below, so the line looks
    cut where the name crosses it. */
-.filters { margin: 8px 0 14px; display: flex; flex-wrap: wrap; gap: 14px 12px; align-items: center; }
+/* The search field, and under it the filters' card as wide as it: four
+   columns of two drop-downs, in a frame like a field's, named on its top
+   edge (task 0091). */
+.search-block {
+  --field-width: 205px; --filters-gap: 12px; --filters-pad: 14px;
+  width: min(100%, calc(4 * var(--field-width) + 3 * var(--filters-gap) + 2 * var(--filters-pad) + 2px));
+  margin: 8px 0 14px; display: flex; flex-direction: column; gap: 14px;
+}
+.filters {
+  margin: 0; min-width: 0; padding: 18px var(--filters-pad) var(--filters-pad);
+  border: 1px solid var(--border); border-radius: 6px;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px var(--filters-gap);
+}
+.filters legend { padding: 0 4px; margin-left: -4px; font-size: 11.5px; line-height: 1; color: var(--muted); }
+.filters .field { width: auto; min-width: 0; }
 .field { position: relative; display: inline-flex; width: 205px; }
 .field label {
   position: absolute; left: 9px; top: 0; transform: translateY(-50%);
@@ -194,11 +208,25 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 }
 .dropdown-button:hover:not(:disabled) { border-color: var(--muted); }
 /* the text field (renderTextFilter): the same box, typed into */
-.field.text-filter { width: 260px; }
+.field.text-filter { width: 100%; }
 .text-filter-input {
   width: 100%; font: inherit; color: var(--text); background: var(--surface);
-  border: 1px solid var(--border); border-radius: 6px; padding: 10px 10px 8px;
+  border: 1px solid var(--border); border-radius: 6px; padding: 10px 46px 8px 10px;
 }
+/* the button in the field's right corner: pressed while the card is shown */
+.filters-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 30px; height: 30px; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); background: transparent; border: 1px solid var(--border); cursor: pointer;
+}
+.filters-toggle:hover { color: var(--text); border-color: var(--muted); }
+.filters-toggle.pressed {
+  color: var(--accent); background: var(--accent-soft); border-color: var(--accent);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25);
+}
+.filters-toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+.filters-icon { display: flex; }
 .text-filter-input:hover { border-color: var(--muted); }
 .text-filter-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .text-filter-input:focus + label { color: var(--accent); }

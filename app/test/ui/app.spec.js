@@ -1178,12 +1178,12 @@ test('the menu closes on a click elsewhere', async ({ page }) => {
   await expect(page.getByTestId('menu')).toHaveCount(0);
 });
 
-test('the text field after the drop-downs narrows the list by words, together with them', async ({ page }) => {
+test('the text field above the drop-downs narrows the list by words, together with them', async ({ page }) => {
   await open(page);
-  const order = await page.getByTestId('filters').locator('[data-dropdown], [data-testid="text-filter"]')
-    .evaluateAll((nodes) => nodes.map((n) => n.dataset.dropdown || n.dataset.testid));
-  expect(order.at(-1)).toBe('text-filter');
-  await expect(page.getByTestId('filters')).toContainText(en['filter.text_legend']);
+  const above = await page.getByTestId('text-filter').boundingBox();
+  const card = await page.getByTestId('filters').boundingBox();
+  expect(above.y + above.height).toBeLessThan(card.y);
+  await expect(page.getByTestId('search-block')).toContainText(en['filter.text_legend']);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(3);   // a1, a2r, b1
 
   // typed key by key: each key redraws the panel, the field keeps the focus and the caret

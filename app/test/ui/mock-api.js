@@ -10,6 +10,16 @@ function installMockApi(fixture) {
   window.__calls = calls;
   window.__setPipeline = (identity, status) => { data.pipelines = { ...(data.pipelines || {}), [identity]: status }; };
   window.__WORK_IDE_POLL_MS = 50;
+  // The filters' card shown, as most tests work in it; once only, so a test
+  // that hides it finds it hidden after a reload (fixture.filtersHidden: the
+  // app's own start, the card hidden).
+  try {
+    if (!fixture.filtersHidden && localStorage.getItem('work-ide-filters-open') === null) {
+      localStorage.setItem('work-ide-filters-open', '1');
+    }
+  } catch {
+    // a page without storage starts with the card hidden
+  }
   window.__holdListing = () => { data.holdListing = true; };
 
   function record(name, args) {

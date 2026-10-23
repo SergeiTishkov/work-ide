@@ -34,6 +34,16 @@ test('the locale holds no text the renderer no longer uses', () => {
   assert.deepEqual(unused, []);
 });
 
+// A key written twice keeps its later text and drops the earlier one with
+// no error: 2026-10-23 a new "filter.legend" ("Filters") renamed "Status".
+test('no key is written twice in a locale file', () => {
+  for (const language of Object.keys(LOCALES)) {
+    const source = fs.readFileSync(path.join(RENDERER, 'locales', `${language}.js`), 'utf8');
+    const keys = [...source.matchAll(/^\s*'([^']+)':/gm)].map(([, key]) => key);
+    assert.deepEqual(keys.filter((key, i) => keys.indexOf(key) !== i), [], language);
+  }
+});
+
 test('no text is empty', () => {
   for (const [language, texts] of Object.entries(LOCALES)) {
     assert.deepEqual(Object.entries(texts).filter(([, v]) => !String(v).trim()).map(([k]) => k), [], language);
