@@ -182,10 +182,11 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
    cut where the name crosses it. */
 /* The search field, and under it the filters' card as wide as it: four
    columns of two drop-downs, in a frame like a field's, named on its top
-   edge (task 0091). */
+   edge (task 0091). At least 80% of the page's width; a window narrower
+   than 1440px gets more, the whole width at 1440px and below (task 0095). */
 .search-block {
-  --field-width: 205px; --filters-gap: 12px; --filters-pad: 14px;
-  width: min(100%, calc(4 * var(--field-width) + 3 * var(--filters-gap) + 2 * var(--filters-pad) + 2px));
+  --filters-gap: 12px; --filters-pad: 14px;
+  width: max(80%, min(100%, 1440px));
   margin: 8px 0 14px; display: flex; flex-direction: column; gap: 14px;
 }
 .filters {

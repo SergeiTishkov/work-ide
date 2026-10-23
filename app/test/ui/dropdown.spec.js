@@ -37,6 +37,26 @@ test('the eight boxes are one width, four columns of two, in a card as wide as t
   await expect(page.getByTestId('filters-legend')).toHaveText(en['filter.card_legend']);
 });
 
+test('the search field and the card take at least 80% of the page, the whole of a narrower window', async ({ page }) => {
+  // task 0095: 80% on a full screen, more as the window narrows, all of it at 1440px and below
+  const share = async () => page.getByTestId('search-block').evaluate((node) => {
+    const style = getComputedStyle(node.parentElement);
+    const room = node.parentElement.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return node.getBoundingClientRect().width / room;
+  });
+  await page.setViewportSize({ width: 2400, height: 700 });
+  await open(page);
+  expect(await share()).toBeCloseTo(0.8, 2);
+  await page.setViewportSize({ width: 1700, height: 700 });
+  expect(await share()).toBeGreaterThan(0.8);
+  expect(await share()).toBeLessThan(1);
+  await page.setViewportSize({ width: 1200, height: 700 });
+  expect(await share()).toBeCloseTo(1, 2);
+  const card = await page.getByTestId('filters').boundingBox();
+  const search = await page.getByTestId('text-filter').boundingBox();
+  expect(Math.round(search.width)).toBe(Math.round(card.width));
+});
+
 test('the filters are hidden at the start; the button in the search field shows them, pressed', async ({ page }) => {
   await open(page, { ...standardFixture(), filtersHidden: true });
   const toggle = page.getByTestId('filters-toggle');
