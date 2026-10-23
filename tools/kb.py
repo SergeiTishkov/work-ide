@@ -104,6 +104,10 @@ def merge_vacancy(kb: dict, normalized: dict, computed: dict) -> str:
     for key in LEARNED_KEYS:
         if key in existing:
             record[key] = existing[key]
+    # The person's answer, loaded for this run: a re-fetched copy they
+    # answered stays the canonical one (mark_duplicates).
+    if existing.get("_feedback"):
+        record["_feedback"] = existing["_feedback"]
     for key in FILLED_LATER_KEYS:
         if not record.get(key) and existing.get(key):
             record[key] = existing[key]
@@ -128,13 +132,43 @@ def merge_vacancy(kb: dict, normalized: dict, computed: dict) -> str:
     return "updated"
 
 
+# The facts whose presence makes one copy of a posting better filled than
+# another (mark_duplicates).
+FILLED_FACTS = ("salary_raw", "employment_types", "workplace_type", "posted_at",
+                "apply_url", "company_url", "location_raw", "tags")
+
+
+def _filled(record: dict) -> tuple:
+    """How well a copy is filled, best first when sorted: the person's own
+    answer on it, a text long enough to have been read, the facts it has, the
+    length of its text, the earliest seen. Nothing the scoring or the model
+    made of it."""
+    text = len(record.get("description_text") or "")
+    return (
+        not record.get("_feedback"),
+        text < score.TEXT_READ_MIN_CHARS,
+        -sum(1 for key in FILLED_FACTS if record.get(key)),
+        -text,
+        record.get("first_seen") or "",
+    )
+
+
 def mark_duplicates(vacancies: dict) -> int:
     """Marks near-duplicates — the same vacancy posted twice. Observed in
     practice: We Work Remotely sometimes returns one post under two different
-    URLs. Records count as duplicates only on an EXACT match of the normalised
-    (company, title) pair. The canonical record is the one with the best score
-    (ties broken by earliest first_seen); the rest get a top-level
-    "duplicate_of" field and drop out of the report.
+    URLs, and LinkedIn posts one job once for each country. Records count as
+    duplicates only on an EXACT match of the normalised (company, title) pair.
+    The canonical record is the best-filled copy (_filled); the rest get a
+    top-level "duplicate_of" field and drop out of the report, the description
+    fetch, the link check and the AI read: only the canonical is worked on.
+
+    The owner, 2026-10-24 (task 0096): "pick the best-filled one and work
+    with it alone, whatever happens: a rescore, the AI, a stretch". Until then
+    the best score chose, and the work on a copy moved the choice: a copy kept
+    as a stretch lost 4 points, its twin became canonical, was read, and was
+    refused; neither showed (Deel, Doit, 2026-10-21). Copies hardly differ in
+    reach: of 918 groups with two read copies, 849 had the same location
+    verdict, and the other 69 differed in the location field only.
 
     Note: fuzzy title comparison is deliberately NOT used. On real data it
     produced serious false positives — "Software Engineer - Manchester" and
@@ -163,12 +197,7 @@ def mark_duplicates(vacancies: dict) -> int:
     for ids in by_key.values():
         if len(ids) < 2:
             continue
-        ids.sort(
-            key=lambda vid: (
-                -(vacancies[vid].get("computed", {}).get("score", 0)),
-                vacancies[vid].get("first_seen") or "",
-            )
-        )
+        ids.sort(key=lambda vid: (_filled(vacancies[vid]), vid))
         canonical = ids[0]
         for vid in ids[1:]:
             vacancies[vid]["duplicate_of"] = canonical

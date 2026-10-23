@@ -25,7 +25,7 @@ Until 2026-10-05 each identity had its own file, and the same posting fetched
 by two searches was stored, checked and read twice. Now `vacancies` holds what
 a posting IS — what the source said, what its page said, whether its link is
 alive — and `vacancy_identity` what one identity made of it: the score and
-class, the near-duplicate mark (the best-scored copy depends on the scorer),
+class, the near-duplicate mark (the copy the person answered comes first),
 the rows shown in the app, the person's answer and the application funnel.
 `load_vacancies()` returns the facts with the active identity's `computed` on
 top; a vacancy that identity has not scored yet comes without it and is scored
@@ -1359,6 +1359,22 @@ Replaced by a strict exact match on the normalised (company, title) pair. If
 smarter deduplication is ever needed, do it by comparing (company, city or
 location, title with the geographic token removed) rather than a bare fuzzy
 ratio over the whole string.
+
+### The best-scored copy as the canonical one (until 2026-10-24)
+`kb.mark_duplicates` kept the best-scored copy of a posting and hid the rest
+from the list, the description fetch and the AI. The work on a copy then moved
+the choice: the Israel copy of Deel's "AI Engineer, Backend" was read as a
+stretch, lost 4 points, the UAE copy (35) became canonical, was read in a later
+run, and the model said "no": the kept copy was hidden and the canonical one
+refused, so neither showed (the same for two more, 2026-10-21). Unread copies,
+"remote unconfirmed" for want of a text, were also counted as hidden listed
+vacancies (948 for SHARP) behind a read refusal. Since task 0096 the canonical
+is the best-filled copy (`kb._filled`): the one the person answered, a read
+text, more facts, a longer text, the earliest seen; nothing the scoring or the
+model made of it. Measured before the change: of 918 groups with two read
+copies, 849 had the same location verdict, and the other 69 differed in the
+location field ("Remote" on an aggregator against "Remote, United Kingdom" at
+the employer), not in the employer's offer.
 
 ### rapidfuzz / feedparser / beautifulsoup4 as dependencies
 Considered for fuzzy string comparison, RSS parsing and HTML cleaning

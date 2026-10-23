@@ -132,23 +132,60 @@ def test_build_companies_does_not_duplicate_vacancy_ids_on_rebuild(isolated_data
 
 def test_mark_duplicates_collapses_exact_title_company_repost(isolated_data_dir):
     vacancies = {}
-    computed_low = dict(DUMMY_COMPUTED, score=30)
-    computed_high = dict(DUMMY_COMPUTED, score=55)
-    kb.merge_vacancy(
-        vacancies,
-        make_normalized(vid_suffix="1", company="Acme Corp", title="Senior .NET Developer"),
-        computed_low,
-    )
-    kb.merge_vacancy(
-        vacancies,
-        make_normalized(vid_suffix="2", company="Acme Corp", title="Senior .NET Developer"),
-        computed_high,
-    )
+    kb.merge_vacancy(vacancies, make_normalized(vid_suffix="1"), DUMMY_COMPUTED)
+    kb.merge_vacancy(vacancies, make_normalized(vid_suffix="2"), DUMMY_COMPUTED)
     marked = kb.mark_duplicates(vacancies)
     assert marked == 1
-    # the canonical record is the one with the higher score
-    assert vacancies["vac-2"].get("duplicate_of") is None
-    assert vacancies["vac-1"].get("duplicate_of") == "vac-2"
+    assert vacancies["vac-1"].get("duplicate_of") is None   # equal: the id decides
+    assert vacancies["vac-2"].get("duplicate_of") == "vac-1"
+
+
+def _copy(vacancies, suffix, *, text="", score=70, **facts):
+    record = dict(make_normalized(vid_suffix=suffix), description_text=text, **facts)
+    kb.merge_vacancy(vacancies, record, dict(DUMMY_COMPUTED, score=score))
+    return f"vac-{suffix}"
+
+
+def test_the_canonical_copy_is_the_best_filled_not_the_best_scored(isolated_data_dir):
+    # task 0096: the score moved with the work on a copy (a stretch at -4) and
+    # the read, kept copy went under the twin the model then refused
+    vacancies = {}
+    unread = _copy(vacancies, "1", text="short card", score=90, salary_raw="$100k")
+    read = _copy(vacancies, "2", text="x" * 700, score=10)
+    kb.mark_duplicates(vacancies)
+    assert vacancies[read].get("duplicate_of") is None
+    assert vacancies[unread]["duplicate_of"] == read
+    # whatever the scoring or the model does next, the choice stays
+    vacancies[read]["computed"]["score"] = 0
+    vacancies[read]["_ai_screen"] = {"verdict": "reject"}
+    kb.mark_duplicates(vacancies)
+    assert vacancies[read].get("duplicate_of") is None
+
+
+def test_among_read_copies_more_facts_then_a_longer_text_win(isolated_data_dir):
+    vacancies = {}
+    long_text = _copy(vacancies, "1", text="x" * 5000)
+    more_facts = _copy(vacancies, "2", text="x" * 800, salary_raw="$100k", workplace_type="remote")
+    kb.mark_duplicates(vacancies)
+    assert vacancies[more_facts].get("duplicate_of") is None
+    assert vacancies[long_text]["duplicate_of"] == more_facts
+    shorter = _copy(vacancies, "3", text="x" * 700, salary_raw="$100k", workplace_type="remote")
+    kb.mark_duplicates(vacancies)
+    assert vacancies[shorter]["duplicate_of"] == more_facts
+
+
+def test_the_copy_the_person_answered_stays_the_shown_one(isolated_data_dir):
+    vacancies = {}
+    answered = _copy(vacancies, "1", text="")
+    filled = _copy(vacancies, "2", text="x" * 5000, salary_raw="$100k")
+    vacancies[answered]["_feedback"] = "applied"
+    kb.mark_duplicates(vacancies)
+    assert vacancies[answered].get("duplicate_of") is None
+    assert vacancies[filled]["duplicate_of"] == answered
+    # the source serves the answered copy again in a later run
+    kb.merge_vacancy(vacancies, make_normalized(vid_suffix="1"), DUMMY_COMPUTED)
+    kb.mark_duplicates(vacancies)
+    assert vacancies[answered].get("duplicate_of") is None
 
 
 def test_mark_duplicates_ignores_different_companies_or_titles(isolated_data_dir):

@@ -135,6 +135,18 @@ def test_feedback_stays_out_of_vacancy_records(isolated_data_dir):
     assert _feedback("a1")["status"] == "rejected" and _feedback("b2") is None
 
 
+def test_the_answer_is_loaded_for_duplicates_and_never_saved_as_a_fact(isolated_data_dir):
+    """kb.mark_duplicates keeps the answered copy; the answer stays the app's."""
+    kb.save_vacancies({"a1": _vacancy("a1"), "b2": _vacancy("b2")})
+    _set_feedback("a1", "applied")
+    records = kb.load_vacancies()
+    assert records["a1"]["_feedback"] == "applied" and "_feedback" not in records["b2"]
+    kb.save_vacancies(records)
+    with db.session() as conn:
+        data = conn.execute("SELECT data FROM vacancies WHERE id = 'a1'").fetchone()[0]
+    assert "_feedback" not in json.loads(data)
+
+
 def test_feedback_written_during_a_pipeline_save_is_not_lost(isolated_data_dir):
     kb.save_vacancies({"a1": _vacancy("a1"), "b2": _vacancy("b2")})
 

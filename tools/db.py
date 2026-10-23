@@ -54,8 +54,9 @@ FEEDBACK_STATUSES = ("new", "applied", "rejected", "bugged", "expired",
 PER_IDENTITY_KEYS = ("computed", "duplicate_of")
 
 # Copied onto a record for one scoring pass (kb.attach_company_reputation);
-# the company table is where they live.
-TRANSIENT_KEYS = ("_company_reputation", "_company_intel", "_ai_screen")
+# the company table is where they live. `_feedback`: the person's answer when
+# it is not "new" (load_vacancies), for kb.mark_duplicates.
+TRANSIENT_KEYS = ("_company_reputation", "_company_intel", "_ai_screen", "_feedback")
 
 
 class SchemaVersionError(RuntimeError):
@@ -260,6 +261,12 @@ def load_vacancies() -> dict:
             "LEFT JOIN vacancy_identity vi ON vi.vacancy_id = v.id AND vi.identity_id = ?",
             (prefix,))
         records = {vid: join_record(data, computed, dup) for vid, data, computed, dup in rows}
+        # The copy the person answered stays the one shown (kb.mark_duplicates).
+        for vid, status in conn.execute(
+                "SELECT vacancy_id, feedback_status FROM vacancy_identity "
+                "WHERE identity_id = ? AND feedback_status != 'new'", (prefix,)):
+            if vid in records:
+                records[vid]["_feedback"] = status
         # The cheap model's answers (tools/ai_screen.py), for score.py to read.
         for vid, th, bh, result in conn.execute(
                 "SELECT vacancy_id, text_hash, brief_hash, result FROM ai_screens WHERE identity_id = ?",

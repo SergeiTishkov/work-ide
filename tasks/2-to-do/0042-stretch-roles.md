@@ -108,5 +108,5 @@ Done for 1 (the local identity, outside git):
 - DONE - Full Python and UI suites on main after the merge (2026-10-23, at 554bee3: Python 1489 passed, 1 skipped, the language check failed on Russian in the texts of 0092-0094, fixed in 78a052d and then 11 passed; unit 99; UI 141)
 - DONE - Read the stretch backlog (SHARP, 2026-10-21): five `rest` runs screened 459, 443, 417, 400 and 114 vacancies and kept 26, 25, 6, 4 and 2 (1,833 read, 63 kept, USD 21.07). The estimate was 1,168: each run's description fetch (927, then 334) made more vacancies wait for a read. No stretch waits now
 - DONE - Review the kept and rejected stretch roles with the owner; tune `stretch_points` and the doubtful kinds (2026-10-24: "Review" above; points and data heavy kept, another language made a stretch)
-- TO DO - Two copies of one posting read differently: the owner decides after the explanation (question 4)
+- DONE - Two copies of one posting read differently: the owner decides after the explanation (question 4; 2026-10-24: the best-filled copy alone, task 0096)
 - TO DO - After the next runs, show the owner what the new brief kept among the other-language roles

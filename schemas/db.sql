@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS vacancy_identity (
   score                 INTEGER,
   class                 TEXT,
   -- The canonical record when this one is a near-duplicate (kb.mark_duplicates):
-  -- the canonical one is the best-scored, so it depends on the identity.
+  -- the best-filled copy; the one the person answered first, so it depends on
+  -- the identity.
   duplicate_of          TEXT,
   -- report.vacancy_view() as JSON: what a row in the app shows. Latest version.
   view                  TEXT,

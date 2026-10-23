@@ -1,4 +1,4 @@
-# 0096 A rejected copy can hide a listed copy of the same posting
+# 0096 The canonical copy of a duplicate is the best filled, not the best scored
 
 Source: the agent, 2026-10-24, explaining duplicates to the owner (task 0042)
 Scope: tools
@@ -52,12 +52,43 @@ Measured on SHARP, 2026-10-24 (6,979 groups, 23,205 copies):
 So a class-first rule would be wrong: it would put an unread copy (remote
 unconfirmed for want of text) above the read one refused for what it says.
 
+The owner, 2026-10-24: "in a duplicated vacancy pick one, the best
+filled, and work with it alone, whatever happens: a re-read by the AI, a
+stretch score, anything."
+
 ## Implementation
-Proposed: the canonical is the copy that knows the most: a read text
-before none, an AI answer before none; among equals, a listed class before
-low priority before rejected; then the score; then the first seen. The
-Deel and Doit copies (both read, both answered) then show the kept one;
-Akkodis keeps its read refusal.
+- `tools/kb.py`, `mark_duplicates`: the canonical is the best-filled copy
+  (`_filled`): the copy the person answered (applied, rejected, bugged…);
+  then a text of 600+ characters (`score.TEXT_READ_MIN_CHARS`, read) before
+  a shorter one; then more facts among `FILLED_FACTS` (salary, employment
+  types, workplace type, posted date, apply URL, company URL, location,
+  tags); then the longer text; then the first seen; then the id. Nothing
+  the scoring, the class or the model made of a copy takes part, so a
+  rescore, a stretch's points or an AI answer cannot move the choice. A
+  copy's own facts can: a later fetch that reads a copy's page makes it
+  better filled.
+- `tools/db.py`, `load_vacancies`: the person's answer when it is not
+  "new" comes as the transient `_feedback` (never saved into the facts,
+  `TRANSIENT_KEYS`). `kb.merge_vacancy` keeps it when the source serves the
+  copy again in the same run.
+- Tests: `tests/test_kb.py` (fill beats score and stays after a rescore and
+  an AI refusal; facts, then the text length; the answered copy stays, also
+  after a re-fetch), `tests/test_db.py` (loaded, not saved).
+- Docs: `schemas/db.sql`, `docs/ARCHITECTURE.md` (the rule, and "The
+  best-scored copy as the canonical one" among the things tried).
+
+Counted on the base before the next run (read-only, 2026-10-24): the
+canonical changes in 667 of 6,979 SHARP groups and 510 of 4,985 PARTSHARP.
+SHARP: 650 from one unlisted copy to another; 68 to a read copy from an
+unread one; 3 to the copy the person answered (the "bugged" ones that were
+hidden duplicates); 7 to a listed copy; 7 from a listed copy to a refused
+one: in all 7 the listed copy was unread ("remote unconfirmed" for want of
+a text) and the new one is read and says office, on site or French (Accenture
+France, CreateFuture, FR Consultancy, Methods, VirtueTech, Ivalua; Incedo's
+new copy has more facts and says on site). The next run marks the groups
+again; a new canonical without a text gets its description fetched and read
+in the runs that follow, within the usual limits.
 
 ## Items
-- TO DO - The owner decides
+- DONE - The owner decides (2026-10-24: the best-filled copy, whatever happens)
+- DONE - The canonical by fill, in `kb.mark_duplicates`, with the person's answer first

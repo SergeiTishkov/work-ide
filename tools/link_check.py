@@ -7,7 +7,7 @@ unambiguously "dead" — they are the only statuses sites use for "this page is
 gone" without ambiguity. Everything else (timeouts, 403/429/999 from anti-bot
 protection, 5xx) is marked "unknown" and is NOT hidden from the report — better
 to show a doubtful link by mistake than to hide a real vacancy by mistake (the
-same principle as in kb.mark_duplicates).
+same principle as the exact match of kb.mark_duplicates).
 
 Links are checked no more often than once per `recheck_after_hours` hours per
 vacancy, so as not to hammer the same job boards on every pipeline run.
