@@ -30,6 +30,12 @@ ever served it, "<keyword> @ <place>", kept across runs. tools/linkedin_yield.py
 lists the searches (or keywords, or countries) by how many shortlisted
 vacancies they alone found.
 
+The second paced run (2026-10-22, 0041 "Measured"): 920 queries, 6:42 of
+fetch, 7:10 in all, no 429; 19,460 new vacancies, of them 1 long shot and
+142 remote unconfirmed for SHARP, and 17,405 rejected because the employer
+never states the work is remote (the guest search ignores f_WT). It is the
+first full run with `found_by`.
+
 Plan: after one or two full runs with `found_by`, cut the searches and the
 countries whose `alone` is 0, with the numbers shown to the owner first.
 Candidates from the counts above: the eleven countries with nothing
