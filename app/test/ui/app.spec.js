@@ -1878,7 +1878,7 @@ test('"Age" stands after "Status": today, a week, a month, older, each with its 
 });
 
 // task 0049 (the owner, 2026-10-21): b1 is a stretch, a2r another stack the CV fits, a1 on the stack
-test('"Role" shows the stretches alone or hides them, each kind of role with its count', async ({ page }) => {
+test('"CV fit" shows the stretches alone or hides them, each kind of role with its count', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('role-label')).toHaveText(en['filter.role_legend']);
   await page.getByTestId('role-filter').click();
