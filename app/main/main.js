@@ -182,6 +182,7 @@ function registerIpc(window) {
   handle('enable-schedule', (id, on) => tasks.enableSchedule(id, Boolean(on)));
   handle('remove-schedule', (id) => tasks.removeSchedule(id));
   handle('next-runs', (cron) => tasks.nextRuns(cron));
+  handle('worker-registration', async () => ({ ...(await workers.registration()), folder: toolsRoot }));
   handle('documents-state', async (identity, ids) =>
     documentsState(await documentsRoot(), identity, Array.isArray(ids) ? ids.slice(0, 5000) : []));
   handle('open-documents-dir', async (identity, vacancyId) => {

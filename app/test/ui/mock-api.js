@@ -489,6 +489,12 @@ function installMockApi(fixture) {
       if (at >= 0) schedules.splice(at, 1);
       return { removed: at >= 0 };
     },
+    // { background, desktop, folder } (main/workers.js); data.workers
+    // overrides it, registered by default.
+    async workerRegistration() {
+      record('workerRegistration', []);
+      return { background: true, desktop: true, folder: 'C:\work-ide', ...(data.workers || {}) };
+    },
     async nextRuns(cron) {
       record('nextRuns', [cron]);
       const fields = String(cron).trim().split(/\s+/);

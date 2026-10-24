@@ -286,7 +286,9 @@ The project is succeeding if:
   cover letters and their batches, a reputation lookup: the agent adds them
   with `tools/taskq.py` and follows them (the `run-task` skill), and never
   starts them as a process of its own. The queue's workers
-  (`tools/taskd.py`, started by Task Scheduler) run them outside any
+  (`tools/taskd.py`, started by Task Scheduler; the person registers them
+  once with `WorkIDE-Background-Setup.cmd` in the repository folder and
+  removes them with `WorkIDE-Background-Remove.cmd`) run them outside any
   session, so a task survives the session ending, the app closing and
   another Windows user signing in, and the app's panel lists every task
   with who added it (task 0056). Measured before the queue: a collection

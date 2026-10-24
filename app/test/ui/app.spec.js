@@ -2058,6 +2058,21 @@ test.describe('"Task scheduler…"', () => {
     await expect(page.getByTestId('scheduler-dialog')).toBeVisible();
   }
 
+  test('without the workers in Task Scheduler it names the setup script in the root folder', async ({ page }) => {
+    await open(page, { ...standardFixture(), schedules: SCHEDULES, workers: { desktop: false } });
+    await (await command(page, 'open-scheduler')).click();
+    const note = page.getByTestId('scheduler-service');
+    await expect(note).toHaveAttribute('data-set', 'no');
+    await expect(note).toHaveText(en['scheduler.service_off'].replace('{folder}', 'C:\work-ide'));
+  });
+
+  test('with the workers registered it names the removal script', async ({ page }) => {
+    await openScheduler(page);
+    const note = page.getByTestId('scheduler-service');
+    await expect(note).toHaveAttribute('data-set', 'yes');
+    await expect(note).toContainText('WorkIDE-Background-Remove.cmd');
+  });
+
   test('lists the schedules: what, for whom, when, the next and the last run; on/off and delete', async ({ page }) => {
     await openScheduler(page);
     const first = page.getByTestId('schedule-1');

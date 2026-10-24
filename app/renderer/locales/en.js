@@ -70,6 +70,8 @@
   'menu.scheduler': 'Task scheduler…',
   'scheduler.title': 'Task scheduler',
   'scheduler.explain': 'A schedule queues ordinary tasks at its times: they show in the panel below and run like any other. It is due while the task service runs; a computer that is off or asleep is not woken.',
+  'scheduler.service_off': 'The task service is not set up, so a schedule runs only while a worker happens to be running, and a night run is missed. Run WorkIDE-Background-Setup.cmd from the Work IDE folder ({folder}) once: it asks for administrator rights.',
+  'scheduler.service_on': 'The task service is set up in Windows Task Scheduler. WorkIDE-Background-Remove.cmd in the Work IDE folder ({folder}) removes it.',
   'scheduler.empty': 'No schedules yet.',
   'scheduler.add': 'Add a schedule',
   'scheduler.edit_title': 'Change the schedule',

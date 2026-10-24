@@ -230,6 +230,33 @@ more thing, optional: a parent CV — everything you have done at work in one
 long file — makes Generate CV much better for each vacancy. Put it in
 `documents/` whenever you like and I will add it to the profile." Then leave it.
 
+## Step 6c. Tell them how the work runs in the background
+
+Collections, LinkedIn, the rest of the base, CVs and cover letters run in the
+task queue, worked by two processes Windows Task Scheduler keeps running
+(`tools/taskd.py`, CLAUDE.md "Long work runs in the task queue"). Check:
+
+```bash
+python tools/taskd.py status      # "scheduled": registered or "not registered"
+```
+
+**Not registered: tell the person about the two scripts in the repository
+folder**, in a few lines:
+
+- `WorkIDE-Background-Setup.cmd`: double-click it once. Windows asks for
+  administrator rights; it registers both workers for the signed-in user and
+  stores no password. The workers start at once, and a missed scheduled run
+  is caught up then (hours of work, AI reads included). Without them a
+  schedule (the app's Menu → "Task scheduler…") is due only while a worker
+  happens to run: on 2026-10-24 the 01:00 collection did not run for this
+  reason, the app's worker had ended the day before.
+- `WorkIDE-Background-Remove.cmd`: removes them. The queue and the schedules
+  stay; workers running then keep going until a restart or a sign-out.
+
+The agent does not run them: they need the person's administrator rights, on
+their machine. **Registered:** say so in one line, and that the removal script
+is there. The app's "Task scheduler…" page says the same.
+
 ## Step 7. The first run
 
 ```bash
@@ -341,6 +368,10 @@ A new identity gets its own `data/identities/<prefix>/` folder (insights,
 state, run logs). The vacancy base is shared by every identity: its first run
 scores everything the others have already fetched, then fetches what its own
 search asks for.
+
+**6. Tell them about the background setup**, as in step 6c: `taskd.py
+status`, and the two scripts in the repository folder if the workers are not
+registered. A schedule for "every active identity" covers the new one too.
 
 ## Checking the isolation
 

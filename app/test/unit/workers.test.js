@@ -51,6 +51,16 @@ test('nothing waiting, or a background worker alive: the app starts nothing', as
   assert.deepEqual(await keeper({ live: [{ role: 'background' }] }).k.check(), []);
 });
 
+test("the scheduler's page asks Task Scheduler afresh: the setup script may have just run", async () => {
+  const registered = {};
+  const { k } = keeper({ registered });
+  assert.deepEqual(await k.registration(), { background: false, desktop: false });
+  registered[TASK_NAMES.background] = true;
+  registered[TASK_NAMES.desktop] = true;
+  assert.deepEqual(await k.isRegistered(), { background: false, desktop: false });   // check() keeps its answer
+  assert.deepEqual(await k.registration(), { background: true, desktop: true });
+});
+
 test('under the fake runner Task Scheduler is not asked', async () => {
   const { k, ran, spawned } = keeper({ env: { WORK_IDE_FAKE_RUNNER: '1' } });
   await k.check();

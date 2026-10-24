@@ -39,10 +39,18 @@ class WorkerKeeper {
     if (this.registered) return this.registered;
     const out = {};
     for (const [role, name] of Object.entries(TASK_NAMES)) {
-      out[role] = (await this.run(['/Query', '/TN', name])).ok;
+      out[role] = Boolean((await this.run(['/Query', '/TN', name])).ok);
     }
     this.registered = out;
     return out;
+  }
+
+  // Asked afresh: the scheduler's page says whether the setup script is still
+  // to be run, and the owner may have just run it (or the removal one).
+  async registration() {
+    if (this.env.WORK_IDE_FAKE_RUNNER === '1') return { background: false, desktop: false };
+    this.registered = null;
+    return this.isRegistered();
   }
 
   recently(role) {

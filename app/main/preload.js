@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld('api', {
   enableSchedule: (id, on) => call('enable-schedule', id, on),
   removeSchedule: (id) => call('remove-schedule', id),
   nextRuns: (cron) => call('next-runs', cron),
+  // { background, desktop, folder }: are the workers registered with Task Scheduler
+  workerRegistration: () => call('worker-registration'),
   // { type: 'tasks', tasks } | { type: 'log', id, text } | { type: 'finished', task }
   onTaskEvent: (listener) => {
     const wrapped = (_event, payload) => listener(payload);

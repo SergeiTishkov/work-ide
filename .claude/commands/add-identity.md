@@ -39,6 +39,10 @@ identity splits an accumulated base into two incomplete ones.
    ahead of the copy.
 6. Run it, and check the isolation: `python tools/kb.py stats --identity <each>`
    — the numbers must differ.
+7. **Tell them about the background setup** (`docs/ONBOARDING.md`, step 6c):
+   `python tools/taskd.py status`; if the workers are not registered, name
+   `WorkIDE-Background-Setup.cmd` and `WorkIDE-Background-Remove.cmd` in the
+   repository folder. Do not run them yourself.
 
 ## A similar search for another country — clone it
 

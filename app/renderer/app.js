@@ -1409,14 +1409,37 @@
   };
 
   function openScheduler() {
-    state.scheduler = { list: null, error: null, form: null };
+    state.scheduler = { list: null, error: null, form: null, service: null };
     renderModals();
     loadSchedules();
+    loadService();
   }
 
   function closeScheduler() {
     state.scheduler = null;
     renderModals();
+  }
+
+  // Whether Task Scheduler runs the queue's workers: without them a schedule
+  // is due only while a worker happens to run (the 01:00 collection of
+  // 2026-10-24 did not run). The page names the script in the root folder.
+  async function loadService() {
+    const s = state.scheduler;
+    if (!s) return;
+    try {
+      s.service = await api.workerRegistration();
+    } catch {
+      s.service = null;
+    }
+    if (state.scheduler === s) renderModals();
+  }
+
+  function renderService(service) {
+    if (!service) return null;
+    const set = Boolean(service.background && service.desktop);
+    return el('p', {
+      class: set ? 'muted' : 'cleanup-error', testid: 'scheduler-service', 'data-set': set ? 'yes' : 'no',
+    }, t(set ? 'scheduler.service_on' : 'scheduler.service_off', { folder: service.folder }));
   }
 
   async function loadSchedules() {
@@ -1708,6 +1731,7 @@
     el('div', { class: 'popup scheduler', role: 'dialog', 'aria-modal': 'true', testid: 'scheduler-dialog' },
       el('h2', {}, t('scheduler.title')),
       el('p', { class: 'muted' }, t('scheduler.explain')),
+      renderService(s.service),
       s.error && el('p', { class: 'cleanup-error', testid: 'scheduler-error' }, s.error),
       body));
   }

@@ -209,7 +209,8 @@ Collections, CVs and the rest run in the task queue (`data/tasks.sqlite`,
 worker from your sign-in for what needs Word. They go on when the app is
 closed and while another Windows user is signed in. Register them once:
 double-click `WorkIDE-Background-Setup.cmd` in the repository folder (Windows
-asks for administrator rights), or from a PowerShell run as administrator:
+asks for administrator rights; `WorkIDE-Background-Remove.cmd` removes them), or
+from a PowerShell run as administrator:
 
 ```powershell
 .venv\Scripts\python tools\taskd.py install

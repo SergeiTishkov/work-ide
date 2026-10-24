@@ -103,6 +103,13 @@ from reality and folders cannot.
     added at any time** and makes the CV for each vacancy better
     (`docs/ONBOARDING.md`, step 6b). Do not press.
 
+11. **Tell them about the background setup** (`docs/ONBOARDING.md`, step 6c):
+    `python tools/taskd.py status`; if the workers are not registered, name
+    the two scripts in the repository folder: `WorkIDE-Background-Setup.cmd`
+    (once, asks for administrator rights; without it a scheduled collection
+    does not run) and `WorkIDE-Background-Remove.cmd`. Do not run them
+    yourself.
+
 ## What not to do
 
 - Do not start a search until the identity is filled in.
