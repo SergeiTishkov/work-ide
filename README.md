@@ -207,8 +207,9 @@ Collections, CVs and the rest run in the task queue (`data/tasks.sqlite`,
 `tools/taskq.py`), worked by two processes Task Scheduler keeps running
 (`tools/taskd.py`): a background worker from system start, and a desktop
 worker from your sign-in for what needs Word. They go on when the app is
-closed and while another Windows user is signed in. Register them once,
-from a PowerShell run as administrator in the repository folder:
+closed and while another Windows user is signed in. Register them once:
+double-click `WorkIDE-Background-Setup.cmd` in the repository folder (Windows
+asks for administrator rights), or from a PowerShell run as administrator:
 
 ```powershell
 .venv\Scripts\python tools\taskd.py install

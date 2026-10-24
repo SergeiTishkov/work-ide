@@ -748,8 +748,10 @@ run started by the agent or a terminal. Decided with the owner, 2026-10-21
   user is active. Each claims, in a transaction, the tasks its
   capabilities allow; a worker that lacks one leaves the task queued with
   the reason ("the owner's sign-in: Word needs a desktop session").
-  Registering the S4U task needs an elevated PowerShell, once:
-  `python tools\taskd.py install`.
+  Registering the S4U task needs elevation, once:
+  `WorkIDE-Background-Setup.cmd` (it asks for it and passes the signed-in
+  user as `--user`, since the elevated copy may run as another
+  administrator), or `python tools\taskd.py install`.
 - **Slots:** collect (the top, the rest of the base, a full pipeline, a
   clean-up), linkedin, documents, reputation; one task each at a time.
   "Collect" is a group: the top and LinkedIn side by side, the rest after

@@ -580,6 +580,15 @@ def test_install_without_elevation_says_how(capsys):
     assert ["schtasks", "/Run", "/TN", taskd.TASK_NAMES["desktop"]] in calls
 
 
+def test_install_registers_the_workers_for_the_named_user(monkeypatch):
+    # WorkIDE-Background-Setup.cmd: the elevated copy may run as another administrator
+    users = []
+    monkeypatch.setattr(taskd, "task_xml", lambda role, **kw: users.append(kw["user"]) or "<Task/>")
+    run = lambda argv, **kw: subprocess.CompletedProcess(argv, 0, "SUCCESS", "")  # noqa: E731
+    assert taskd.install(["background", "desktop"], run=run, user="PC\owner") == 0
+    assert users == ["PC\owner", "PC\owner"]
+
+
 @pytest.mark.parametrize("stdout,stderr,expected", [
     ('{"type":"result","is_error":false,"result":"OK"}', "", True),
     ('{"type":"result","is_error":true,"result":"Not logged in"}', "", False),

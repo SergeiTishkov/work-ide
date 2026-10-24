@@ -2,7 +2,7 @@
 The workers that run the task queue (task 0056): tools/taskq.py holds the
 tasks, this runs them, outside the app.
 
-    python tools/taskd.py install          # once, from an elevated PowerShell
+    python tools/taskd.py install          # once, elevated (WorkIDE-Background-Setup.cmd)
     python tools/taskd.py status
     python tools/taskd.py run --role desktop   # what Task Scheduler starts
     python tools/taskd.py probe            # does `claude` answer here?
@@ -1000,20 +1000,26 @@ def _schtasks(*args: str, run=subprocess.run) -> subprocess.CompletedProcess:
                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
-def install(roles: Sequence[str], run=subprocess.run) -> int:
+def install(roles: Sequence[str], run=subprocess.run, user: Optional[str] = None) -> int:
+    """user: whose session the workers run in, DOMAIN\\name. By default the
+    one running this; WorkIDE-Background-Setup.cmd passes the one who
+    double-clicked it, since the elevated copy may run as another
+    administrator."""
     python = python_executable()
+    user = user or _user()
     failed = False
     for role in roles:
         with tempfile.TemporaryDirectory() as tmp:
             xml = Path(tmp) / f"{role}.xml"
-            xml.write_text(task_xml(role, root=common.ROOT, python=python, user=_user()), encoding="utf-16")
+            xml.write_text(task_xml(role, root=common.ROOT, python=python, user=user), encoding="utf-16")
             done = _schtasks("/Create", "/TN", TASK_NAMES[role], "/XML", str(xml), "/F", run=run)
         if done.returncode != 0:
             failed = True
             print(f"{role}: not registered: {(done.stderr or done.stdout).strip()}")
             if role == "background":
                 print("  A task that runs whether the user is signed in or not (S4U) is registered "
-                      "from an elevated PowerShell (Run as administrator):\n"
+                      "elevated: double-click WorkIDE-Background-Setup.cmd, or from a PowerShell run as "
+                      "administrator (Run as administrator):\n"
                       f"  cd {common.ROOT}; .venv\\Scripts\\python tools\\taskd.py install")
             continue
         print(f"{role}: registered as '{TASK_NAMES[role]}'")
@@ -1059,6 +1065,7 @@ def main(argv=None) -> int:
                    help="end after this long with nothing to do")
     p = sub.add_parser("install", help="register the workers with Task Scheduler")
     p.add_argument("--role", choices=ROLES, action="append")
+    p.add_argument("--user", help="DOMAIN\\name whose session the workers run in (default: this one)")
     p = sub.add_parser("uninstall", help="remove the workers from Task Scheduler")
     p.add_argument("--role", choices=ROLES, action="append")
     sub.add_parser("status", help="registered tasks and live workers")
@@ -1069,7 +1076,7 @@ def main(argv=None) -> int:
     if args.command == "start":
         return start(args.role, args.idle_exit)
     if args.command == "install":
-        return install(args.role or list(ROLES))
+        return install(args.role or list(ROLES), user=args.user)
     if args.command == "uninstall":
         return uninstall(args.role or list(ROLES))
     if args.command == "status":
