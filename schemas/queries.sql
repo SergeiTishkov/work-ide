@@ -56,6 +56,12 @@
 -- run must not make an application disappear. Their freshness is counted the
 -- same way as everyone's.
 --
+-- NOT LISTED. "Remote not confirmed" (remote_unconfirmed) never comes from
+-- the selection (the owner, 2026-10-24, task 0098: "I never look at these
+-- vacancies, take them out of the app"). The class stays in the data: the
+-- selection holds it, the clean-up can delete by it, and an application
+-- with that class is still listed.
+--
 -- LIMIT. The LIST shows vacancies without feedback up to section_limit per
 -- class, ranked AFTER the filter, so "fresh" shows the top of the fresh ones.
 -- :shown ('{"hot_lead": 25}') raises a class's limit: "Show more" and the
@@ -139,6 +145,7 @@ in_markets AS (
   FROM selection_items i
   WHERE i.selection_id = :selection_id AND i.selection_id IN (SELECT id FROM runs)
     AND i.segment IN (SELECT value FROM json_each(:segments))
+    AND i.class <> 'remote_unconfirmed'
   GROUP BY i.vacancy_id
 ),
 candidates AS (

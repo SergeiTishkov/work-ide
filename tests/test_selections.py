@@ -332,6 +332,22 @@ def test_fit_narrows_the_listing_counts_and_sources_to_one_class(isolated_data_d
                                                    fit="worth_a_look")) == []
 
 
+def test_remote_unconfirmed_stays_in_the_selection_and_is_never_listed(isolated_data_dir):
+    """Task 0098: the owner never looks at "Remote not confirmed"; an
+    application of that class is still listed."""
+    sel = _store({"a": _vacancy("a"), "r": _vacancy("r", classification="remote_unconfirmed"),
+                  "p": _vacancy("p", classification="remote_unconfirmed")})
+    _set_feedback("p", "applied", selection_id=sel)
+    with db.session() as conn:
+        held = {vid for (vid,) in conn.execute(
+            "SELECT vacancy_id FROM selection_items WHERE selection_id = ?", (sel,))}
+        assert held == {"a", "r", "p"}
+        rows = selections.listing(conn, sel, _view("full", "all"), expanded=_all_classes())
+        assert sorted(_ids(rows)) == ["a", "p"]
+        assert selections.class_totals(conn, sel, _view("full", "no_feedback")) == {"hot_lead": 1}
+        assert _count(conn, sel, _view("full", "no_feedback")) == 1
+
+
 def test_row_view_is_the_vacancy_view(isolated_data_dir):
     v = _vacancy("a", "London, United Kingdom")
     sel = _store({"a": v})

@@ -6,7 +6,7 @@ const { DatabaseSync } = require('node:sqlite');
 const {
   Store, SchemaMismatchError, nowIso, NEW, VIEW_STATUSES, FRESHNESS,
 } = require('../../main/store');
-const { SCHEMA_DIR, standardDatabase, tempDir } = require('../helpers/fixture-db');
+const { SCHEMA_DIR, createDatabase, standardDatabase, tempDir } = require('../helpers/fixture-db');
 
 function setup() {
   const file = standardDatabase(path.join(tempDir(), 'test.sqlite'));
@@ -35,6 +35,22 @@ function count(store, identity, view) {
   assert.equal(byStatus, byFresh, JSON.stringify(view));
   return byStatus;
 }
+
+test('"Remote not confirmed" is neither listed nor counted (task 0098)', () => {
+  const file = createDatabase(path.join(tempDir(), 'test.sqlite'), {
+    vacancies: [
+      { id: 'h1', score: 50, class: 'hot_lead' },
+      { id: 'r1', score: 60, class: 'remote_unconfirmed' },
+    ],
+    segments: [{ slug: 'full', name: 'Everything', isDefault: true, everything: true }],
+    selections: [{ kind: 'run', items: ['h1', 'r1'] }],
+  });
+  const store = new Store({ schemaDir: SCHEMA_DIR, databasePathOf: (p) => (p === 'test' ? file : null) });
+  const all = v('full', 'all');
+  assert.deepEqual(store.listing('test', all, { expanded: ['hot_lead', 'remote_unconfirmed'] }).map((r) => r.id), ['h1']);
+  assert.equal(count(store, 'test', all), 1);
+  assert.deepEqual(store.classTotals('test', all), { hot_lead: 1 });
+});
 
 test('segments of the latest selection, default marked', () => {
   const { store } = setup();

@@ -291,7 +291,6 @@
   'class.worth_a_look': '👀 Worth a look',
   'class.long_shot': '🕰️ Long shots',
   'class.ai_unscreened': '⏳ Not processed with AI',
-  'class.remote_unconfirmed': '🏢 Remote not confirmed',
   'class.engagement_unconfirmed': '⏱️ Hours not confirmed',
 
   'list.empty': 'Nothing here.',

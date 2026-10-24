@@ -294,7 +294,6 @@
   'class.worth_a_look': '👀 Стоит посмотреть',
   'class.long_shot': '🕰️ Дальний прицел',
   'class.ai_unscreened': '⏳ Не обработано AI',
-  'class.remote_unconfirmed': '🏢 Удалёнка не подтверждена',
   'class.engagement_unconfirmed': '⏱️ Часы не подтверждены',
 
   'list.empty': 'Здесь пусто.',

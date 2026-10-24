@@ -58,11 +58,13 @@
     worth_a_look: 'class.worth_a_look',
     long_shot: 'class.long_shot',
     ai_unscreened: 'class.ai_unscreened',
-    remote_unconfirmed: 'class.remote_unconfirmed',
     engagement_unconfirmed: 'class.engagement_unconfirmed',
   };
-  // Listed in "Category" whether they hold any or not.
-  const STABLE_CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'ai_unscreened', 'remote_unconfirmed'];
+  // Listed in "Identity fit" whether they hold any or not.
+  const STABLE_CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'ai_unscreened'];
+  // Never listed (schemas/queries.sql, NOT LISTED; task 0098), also when a
+  // view saved before still names it.
+  const UNLISTED_CLASSES = ['remote_unconfirmed'];
   const FILTER_KEYS = {
     fresh: 'filter.fresh',
     earlier: 'filter.earlier',
@@ -2273,7 +2275,8 @@
     const totals = state.classTotals;
     const order = Object.keys(CLASS_KEYS);
     const classes = [...order, ...Object.keys(totals).filter((cls) => !order.includes(cls))]
-      .filter((cls) => STABLE_CLASSES.includes(cls) || totals[cls] || (chosen && chosen.includes(cls)));
+      .filter((cls) => STABLE_CLASSES.includes(cls) || totals[cls] || (chosen && chosen.includes(cls)))
+      .filter((cls) => !UNLISTED_CLASSES.includes(cls));
     const all = Object.values(totals).reduce((sum, n) => sum + n, 0);
     const options = classes.map((cls) => {
       const name = CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls;

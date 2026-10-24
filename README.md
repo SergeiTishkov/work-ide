@@ -123,7 +123,8 @@ It opens a window over the knowledge base:
   (the markets of the latest selection), **Show**, **Source** (the job boards)
   and **Category** (the classes, and under them the kinds of role: on the
   stack, another stack that fits the CV, a stretch for the CV, so the
-  stretches can be listed alone or hidden). Several rows can be checked at once; each
+  stretches can be listed alone or hidden). "Remote not confirmed" is not
+  listed at all; the class stays in the base. Several rows can be checked at once; each
   group's top row checks or clears the whole group, and shows a dash when only
   part of it is checked. **Show** has four groups: freshness (fresh, from
   earlier runs), *not applied or denied*, the applications and the denied
