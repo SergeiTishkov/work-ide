@@ -179,3 +179,46 @@ def test_the_scorers_time_zone_window_is_sent_to_the_model_outside_the_hash():
     assert "is inside it" in sent.splitlines()[0]
     assert ai_screen.text_hash(record) == plain_hash
     assert ai_screen.model_message(_record()) == ai_screen.message(_record())
+
+
+def test_the_persons_languages_come_from_the_profile():
+    profile = {"owner": {"languages": ["English", "Russian (native)", {"name": "German"}, "english"]}}
+    assert ai_screen.person_languages(profile) == ["english", "russian", "german"]
+    assert ai_screen.person_languages({}) == []
+
+
+def test_the_program_compares_the_named_languages_with_the_persons():
+    """Task 0084: the model names the languages, the program decides."""
+    mine = ["english", "russian"]
+
+    def refusal(written, required=()):
+        return ai_screen.language_refusal(
+            {"posting_languages": list(written), "required_languages": list(required)}, mine)
+
+    assert refusal(["polish"]) == "posting written in Polish"
+    assert refusal(["Finnish"]) == "posting written in Finnish"
+    assert refusal(["japanese", "english"]) is None, "an English version is enough"
+    assert refusal(["english"], ["english", "spanish", "Spanish"]) == "requires Spanish"
+    assert refusal(["russian"], ["russian"]) is None
+    assert refusal([], []) is None, "nothing named, nothing decided"
+    assert ai_screen.language_refusal({"verdict": "keep"}, mine) is None, "an answer from before the fields"
+    assert ai_screen.language_refusal({"posting_languages": ["polish"]}, []) is None, "no languages in the profile"
+    assert ai_screen.language_refusal(None, mine) is None
+
+
+def test_the_system_prompt_names_the_persons_languages_and_its_hash_covers_them(isolated_data_dir):
+    with db.session():
+        pass
+    seen = []
+
+    def call(system_prompt, text, workdir=None):
+        seen.append(system_prompt.read_text(encoding="utf-8"))
+        return {"is_job_posting": True, "work_arrangement": "remote", "location_ok": "yes",
+                "role_fit": "good", "posting_languages": ["english"], "required_languages": [],
+                "verdict": "keep", "reason": "ok"}, 0.0
+
+    ai_screen.screen({"a": _record("a")}, "ftf", "brief", call=call)
+    assert "The person reads, writes and speaks only: English, Russian." in seen[0], "from the fixture profile"
+    assert ai_screen.brief_hash("brief", ["english"]) != ai_screen.brief_hash("brief", ["english", "russian"])
+    assert ai_screen.brief_hash("brief", []) == ai_screen.brief_hash("brief")
+    assert {"posting_languages", "required_languages"} <= set(ai_screen.SCHEMA["required"])

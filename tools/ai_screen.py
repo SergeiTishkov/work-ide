@@ -18,6 +18,14 @@ The answer only ever REMOVES: a "reject" becomes the dealbreaker
 the classes below are never sent: the owner, 2026-10-17, "after the remote
 check, no further processing for them".
 
+The model also names the languages the posting is written in and the ones it
+requires (task 0084); the program, not the model, compares them with the
+person's languages from the profile (`owner.languages`), named in the system
+prompt: no language of the text among the person's, or a required one
+outside them, is a refusal (`language_refusal`). On 2026-10-25 the model had
+kept two postings written entirely in Polish: the prompt's reasons to reject
+did not include language.
+
 Answers are stored per identity in the `ai_screens` table (schemas/db.sql), with the hash of
 the brief and of the text the model read. score.py uses an answer only while
 the text is the same; the pipeline asks again when the text or the brief
@@ -32,6 +40,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -80,12 +89,14 @@ SCHEMA = {
         "role_fit": {"type": "string", "enum": ["good", "partial", "poor"]},
         "cv_fit": {"type": "string", "enum": ["fits", "stretch", "no"]},
         "work_kind": {"type": "string", "enum": ["software", "applied_ai", "ml_research", "data_heavy", "other"]},
+        "posting_languages": {"type": "array", "items": {"type": "string"}},
+        "required_languages": {"type": "array", "items": {"type": "string"}},
         "verdict": {"type": "string", "enum": ["keep", "reject"]},
         "reason": {"type": "string"},
         "quote": {"type": "string"},
     },
     "required": ["is_job_posting", "work_arrangement", "location_ok", "role_fit", "cv_fit", "work_kind",
-                 "verdict", "reason"],
+                 "posting_languages", "required_languages", "verdict", "reason"],
     "additionalProperties": False,
 }
 
@@ -141,13 +152,69 @@ def model_message(record: dict) -> str:
     return f"time-zone window, checked by a program: {fact}\n" + message(record)
 
 
+def _language(name) -> str:
+    """The first word, lower case: "English", "russian (native)", "Norwegian
+    Bokmal" -> "english", "russian", "norwegian"."""
+    word = re.match(r"[^\W\d_]+", str(name or "").strip())
+    return word.group(0).lower() if word else ""
+
+
+def person_languages(profile: dict) -> list:
+    """The languages the person works in, from the profile's owner.languages."""
+    out = []
+    for entry in (profile.get("owner") or {}).get("languages") or []:
+        name = _language(entry.get("name") if isinstance(entry, dict) else entry)
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def languages_section(languages) -> str:
+    """The part of the system prompt that names the person's languages."""
+    if not languages:
+        return ""
+    names = ", ".join(name.capitalize() for name in languages)
+    return ("\n# The person's languages, from their profile\n\n"
+            f"The person reads, writes and speaks only: {names}. Every other language is one "
+            "they do not know, however easy it is for you to read.\n")
+
+
+def language_refusal(screen: Optional[dict], languages) -> Optional[str]:
+    """The program's verdict on the model's language fields: why the posting
+    is out, or None. Out when none of the languages the text is written in is
+    the person's (a bilingual text with an English half is not out for an
+    English speaker), or when it requires one they do not know. An answer
+    without the fields (given before 2026-10-25) or a profile without
+    languages decides nothing."""
+    if not screen or not languages:
+        return None
+    allowed = set(languages)
+    written = [_language(x) for x in screen.get("posting_languages") or ()]
+    written = [x for x in written if x]
+    if written and not allowed.intersection(written):
+        return "posting written in " + ", ".join(x.capitalize() for x in dict.fromkeys(written))
+    required = [_language(x) for x in screen.get("required_languages") or ()]
+    outside = [x for x in dict.fromkeys(required) if x and x not in allowed]
+    if outside:
+        return "requires " + ", ".join(x.capitalize() for x in outside)
+    return None
+
+
 def text_hash(record: dict) -> str:
     """The hash of what the model reads: an answer is valid while it holds."""
     return hashlib.sha256(message(record).encode("utf-8")).hexdigest()[:16]
 
 
-def brief_hash(brief: str) -> str:
-    return hashlib.sha256((PROMPT_PATH.read_text(encoding="utf-8") + brief).encode("utf-8")).hexdigest()[:16]
+def system_prompt_text(brief: str, languages=()) -> str:
+    return PROMPT_PATH.read_text(encoding="utf-8") + "\n" + brief + "\n" + languages_section(languages)
+
+
+def brief_hash(brief: str, languages=()) -> str:
+    """The hash of the system prompt: the prompt file, the brief and the
+    person's languages. Without languages it is the hash it was before they
+    were added."""
+    text = PROMPT_PATH.read_text(encoding="utf-8") + brief + languages_section(languages)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
 def load(conn, prefix: str) -> dict:
@@ -228,7 +295,7 @@ def worklist(vacancies: dict, stored: dict, brief_digest: str, classes=SCREENED_
 
 def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES,
            limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT,
-           workers: int = WORKERS, call=None, pause=time.sleep) -> dict:
+           workers: int = WORKERS, call=None, pause=time.sleep, languages=None) -> dict:
     """Screens what needs it and attaches every answer as `_ai_screen`.
     Mutates `vacancies` in place; never raises for one posting: a posting
     whose call failed is sent again (RETRY_ROUNDS), and `errors` counts
@@ -236,7 +303,8 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
     failure: the first refusal stops the screen, no further call is sent,
     the answers already given are saved, and ai_limit.UsageLimit is raised
     with the stats on it (task 0057). `call` and `pause` stand in for
-    call_model and time.sleep (tests)."""
+    call_model and time.sleep (tests). `languages` defaults to the identity's
+    profile."""
     call = call or call_model
     import progress
 
@@ -244,7 +312,9 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
     if not brief.strip():
         stats["skipped"] = "no brief"
         return stats
-    digest = brief_hash(brief)
+    if languages is None:
+        languages = person_languages(common.load_profile(prefix))
+    digest = brief_hash(brief, languages)
     with db.session() as conn:
         stored = load(conn, prefix)
     keys = worklist(vacancies, stored, digest, classes, limit, stretch_limit)
@@ -254,7 +324,7 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
     tick = progress.Progress(len(keys), "ai screen")
     with tempfile.TemporaryDirectory() as workdir:
         system_prompt = Path(workdir) / "screen_prompt.md"
-        system_prompt.write_text(PROMPT_PATH.read_text(encoding="utf-8") + "\n" + brief + "\n", encoding="utf-8")
+        system_prompt.write_text(system_prompt_text(brief, languages), encoding="utf-8")
 
         def one(vid):
             record = vacancies[vid]

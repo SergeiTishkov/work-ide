@@ -241,7 +241,11 @@ Three things cannot be carried over from somebody else's identity — they are a
    The phrase "us only" is total disqualification for a resident of Georgia and
    a plus for a resident of the US. Table: `config/derivation/regions.yaml`.
 2. **Language filters.** What goes into the filter is the languages a person
-   does **not** know. Table: `config/derivation/languages.yaml`.
+   does **not** know. Table: `config/derivation/languages.yaml`. Where the
+   screening model reads the posting, only the employer's explicit words
+   ("fluent german") refuse by script; the model names the posting's
+   languages and the ones it requires, and the languages in the profile
+   (`owner.languages`) decide (task 0084, `tools/ai_screen.py`).
 3. **Ambiguous place names.** They depend on where the person lives. Starting
    points: `config/derivation/ambiguous_places.yaml`.
 

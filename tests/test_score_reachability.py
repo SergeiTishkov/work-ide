@@ -227,7 +227,8 @@ LANGUAGE = SHARP["language_requirement_signal"]
      "eksterne systemer.", "scandinavian"),
 ])
 def test_a_posting_written_in_another_language_is_detected(text, language):
-    criteria = {**CRITERIA, "language_requirement_signal": {
+    # Refused on the guess only where no model reads the posting (task 0084).
+    criteria = {**CRITERIA, "ai_screen": {"required": False}, "language_requirement_signal": {
         **CRITERIA["language_requirement_signal"],
         "foreign_language_posting_indicators": LANGUAGE["foreign_language_posting_indicators"]}}
     result = _score(text, criteria=criteria)

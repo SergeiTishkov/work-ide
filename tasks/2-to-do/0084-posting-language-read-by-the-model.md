@@ -61,16 +61,17 @@ Related: task 0074 (Polish phrases), cancelled for this one.
   (`ai_screen: {required: false}`); with the model they are recorded and do
   not refuse. The employer's own words ("fluent german", "German C1") still
   refuse. The script refusal says the script.
-- The bare "deutschkenntnisse" stops refusing ("Deutschkenntnisse von
-  Vorteil" is a wish): the SHARP and PARTSHARP templates, a version step,
-  config/derivation/languages.yaml.
+- The bare "deutschkenntnisse" was to stop refusing ("Deutschkenntnisse von
+  Vorteil" is a wish). Measured first: the four vacancies it alone refused
+  asked for "C1/C2", "verhandlungssicher", "fließend"; none with a wish
+  was refused for it alone. It stays; the templates do not change.
 - The re-read is limited: answers the model gave as "reject" under the
   previous prompt stay (new fields can only add a reason to refuse); the
   kept ones and the vacancies the gate no longer refuses are read.
 
 ## Items
-- TO DO - Language fields and the program's refusal in the AI screen; prompt; tests
-- TO DO - The language gate's guesses do not refuse where the model reads; the script label; tests
-- TO DO - Templates without the bare "deutschkenntnisse", version step
-- TO DO - Docs: ARCHITECTURE, the language tables
+- DONE - Language fields and the program's refusal in the AI screen; the person's languages in the system prompt and the brief hash; prompt; tests
+- DONE - The language gate's guesses do not refuse where the model reads; the script label; tests
+- DONE - The bare "deutschkenntnisse": measured, stays (no template change)
+- DONE - Docs: ARCHITECTURE, IDENTITIES, config/derivation/languages.yaml
 - TO DO - Rescore and a limited re-read; measure what moved (the three records above, the two Scalo, the two freelancermap "(m/f/d)")

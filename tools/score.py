@@ -1794,10 +1794,23 @@ def _score_language_fit(text: str, criteria: dict):
     # and none of them could catch a different script even in principle.
     script_detail = _check_unreadable_script(text, cfg)
 
-    gate_triggered = (bool(explicit_hits) or german_market_flagged
-                      or bool(foreign_language_hits) or bool(script_detail))
+    # Frequent words, the gender marker and the share of a script are
+    # guesses about the language; the explicit requirement is the employer's
+    # own words. Where the screening model reads the posting, it names the
+    # languages and the person's languages decide (ai_screen.language_refusal,
+    # task 0084), so the guesses are recorded and refuse nothing. Measured
+    # 2026-10-25 over SHARP's base: of 170 vacancies refused with language
+    # as the only reason, English texts refused for one "(m/f/d)" ("Senior
+    # C#/.NET Engineer (m/f/d) Healthcare, Remote", German "nice-to-have"),
+    # and texts with an English half ("[NL] ..." then English, "English
+    # version is below"). Without the model the guesses still refuse.
+    guessed = german_market_flagged or bool(foreign_language_hits) or bool(script_detail)
+    guesses_refuse = not (criteria.get("ai_screen") or {}).get("required", True)
+    gate_triggered = bool(explicit_hits) or (guessed and guesses_refuse)
     return gate_triggered, {
         "gate_triggered": gate_triggered,
+        "guessed_other_language": guessed,
+        "guesses_refuse": guesses_refuse,
         "explicit_requirement_hits": explicit_hits,
         "german_market_indicator_hits": german_market_hits,
         "german_market_flagged": german_market_flagged,
@@ -2983,10 +2996,12 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     language_mismatch, language_bd = _score_language_fit(text, criteria)
     if language_mismatch:
         foreign = language_bd.get("foreign_language_posting_hits") or {}
+        script = language_bd.get("unreadable_script") or {}
         reason = (
             ", ".join(language_bd["explicit_requirement_hits"])
+            or ("posting appears to be in German" if language_bd.get("german_market_flagged") else "")
             or ("posting appears to be written in " + ", ".join(foreign) if foreign else "")
-            or "posting appears to be in German"
+            or f"posting is written in the {script.get('script')} script"
         )
         dealbreakers.append(f"language: {reason}")
 
@@ -3036,6 +3051,12 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     rejected_by_model = bool(screen and screen.get("verdict") == "reject")
     if rejected_by_model:
         dealbreakers.append(f"ai: {(screen.get('reason') or 'the screening model turned it down').strip()}")
+    # The languages the model named against the person's (task 0084): the
+    # program decides, whatever the model's verdict.
+    language_refused = ai_screen.language_refusal(screen, ai_screen.person_languages(profile))
+    if language_refused:
+        dealbreakers.append(f"ai: language: {language_refused}")
+        rejected_by_model = True
 
     # The model's read of a stretch: "fits" or "stretch" lifts the objections
     # ("stretch" at a cost in points), anything else leaves the vacancy
@@ -3199,7 +3220,8 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         "stretch_roles": stretch_bd,
         "ai_screen": ({k: screen.get(k) for k in ("verdict", "reason", "quote", "work_arrangement",
                                                    "location_ok", "role_fit", "is_job_posting",
-                                                   "cv_fit", "work_kind")}
+                                                   "cv_fit", "work_kind", "posting_languages",
+                                                   "required_languages")}
                       if screen else {}),
         "raw_total_before_clamp": raw_total,
     }

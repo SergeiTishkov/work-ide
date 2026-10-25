@@ -18,6 +18,13 @@
 #  written entirely in this language". It is needed because many postings
 #  contain no explicit "German required" phrase while being written in German;
 #  for somebody who does not speak it, that is the same stop signal.
+#
+#  Since 2026-10-25 (task 0084) market_indicator_keywords and the share of
+#  another script are guesses that refuse only where no screening model reads
+#  the posting (`ai_screen: {required: false}`). Where it reads, the model
+#  names the posting's languages and the required ones, and the person's
+#  languages decide (tools/ai_screen.py). requirement_phrases still refuse:
+#  they are the employer's own words.
 # =============================================================================
 
 schema_version: 1

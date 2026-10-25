@@ -235,7 +235,9 @@ positives. All three below are now genuine dealbreakers (`classification =
    german") and the heuristic "this whole vacancy is written in German"
    (frequent words plus the standard German markup "m/w/d"/"w/m/d", a threshold
    of 3+ matches) — many vacancies from German boards (arbeitnow) contain no
-   English phrase about language at all, being entirely in German.
+   English phrase about language at all, being entirely in German. Since
+   2026-10-25 the heuristic refuses only where no model reads the posting:
+   see "The model names the languages, the person's languages decide".
 
 3. **A strict stack relevance gate instead of a soft one.** It used to be
    `stack_points > 0` (low priority on failure). A real bug found: "LESS" (the
@@ -1161,6 +1163,47 @@ AI stage failed.
   once per identity; at the usage limit the queue runs the run itself
   again instead. An `ai` run that leaves vacancies waiting exits 1, so the
   task list shows it failed. Every later run reads them too.
+
+### The model names the languages, the person's languages decide (2026-10-25)
+
+The owner, 2026-10-25 (task 0084): a posting written in a language the
+person does not know is out, and so is one written in theirs that requires
+another. "I would rather throw out a few wrong vacancies by hand than lose
+the vacancy of my dreams without ever knowing."
+
+Measured over SHARP's base that day: the model had kept 126 postings, two
+of them written entirely in Polish (the prompt's reasons to reject did not
+include language); the language gate had refused 170 with language as the
+only reason, among them English texts refused for one "(m/f/d)" (a remote
+C#/.NET contract with German "nice-to-have", score 34) and texts with an
+English half.
+
+- **The model names, the program decides.** The AI check's schema has
+  `posting_languages` (what the text is written in; both halves of a
+  bilingual text) and `required_languages` (a wish is not a requirement).
+  The system prompt names the person's languages from the profile
+  (`owner.languages`); the brief hash covers them.
+  `ai_screen.language_refusal` refuses a posting with no language of the
+  person's, or with a required one outside them, whatever the model's
+  verdict: "ai: language: posting written in Polish", "ai: language:
+  requires Spanish".
+- **The gate's guesses refuse only without the model.** Frequent words, the
+  German gender marker and the share of another script are recorded in
+  `language_requirement_signal` (`guessed_other_language`) and refuse only
+  under `ai_screen: {required: false}`. The employer's words
+  (`explicit_requirement_keywords` and `_patterns`) still refuse. The bare
+  "deutschkenntnisse" stays among them: the four vacancies it alone refused
+  that day asked for "C1/C2", "verhandlungssicher", "fließend".
+- **The re-read was limited.** Answers the model gave as "reject" under the
+  previous prompt were stamped with the new brief hash: the new fields can
+  only add a reason to refuse. The kept ones and the vacancies the gate
+  stopped refusing were read again.
+
+**Alternatives not taken.** More phrase lists per language (task 0074,
+Polish): each adds refusals, and a posting that slips through is one the
+person sees. A check of the share of English (and Russian) function words
+(proposed in task 0084): turned down by the owner, because another person's
+languages may be ones such a check handles badly, and it refuses by a guess.
 
 ### The AI usage limit stops the AI work, and the queue waits for the reset (2026-10-21)
 

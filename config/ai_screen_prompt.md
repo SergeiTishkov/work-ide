@@ -53,9 +53,22 @@ Answer with the structured output only.
   "applied_ai" (building on existing models and their APIs), "ml_research"
   (training models, research), "data_heavy" (data engineering or data
   science as the main work), "other".
+- `posting_languages`: the languages the posting's text is written in, as
+  lower-case English names ("english", "polish", "german"). A text with
+  parts in two languages (an English version below a Japanese one, "[NL]"
+  then "[EN]") names both. Tool, product and company names do not count:
+  "Deutsche Bank", "C#" or a German city in an English text do not make it
+  German. With no text, judge by the title.
+- `required_languages`: the languages the posting requires of the
+  candidate, as lower-case English names, including the language it is
+  written in when it asks for fluency in it. A language it only wishes for
+  ("a plus", "nice to have", "von Vorteil", "preferred") is not required.
+  Empty when it requires none.
 - `verdict`: "reject" ONLY when at least one is clearly true: it is not a job
   posting; the work is hybrid or onsite; location_ok is "no"; cv_fit is
-  "no". Otherwise "keep". When in doubt, "keep".
+  "no"; none of `posting_languages` is a language the person knows (the
+  section on their languages below); a language in `required_languages` is
+  not one they know. Otherwise "keep". When in doubt, "keep".
 - `reason`: one short sentence for the person, in English, naming the fact
   that decided the verdict.
 - `quote`: the exact words of the posting that show it, at most 200

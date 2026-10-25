@@ -4,6 +4,9 @@ import score
 
 CRITERIA = score.load_criteria()
 PROFILE = score.load_profile()
+# The language gate's guesses (frequent words, the gender marker, a script)
+# refuse only where no model reads the posting (task 0084).
+NO_AI_CRITERIA = {**CRITERIA, "ai_screen": {"required": False}}
 
 
 def make_vacancy(**overrides):
@@ -789,6 +792,46 @@ def test_the_top_classes_wait_for_the_ai_read():
     assert score.score_vacancy(office, CRITERIA, PROFILE)["classification"] == "rejected"
 
 
+def _read_languages(vacancy: dict, written, required=()) -> dict:
+    """The vacancy with a stored "keep" that names the posting's languages."""
+    import ai_screen
+
+    return {**vacancy, "_ai_screen": {"verdict": "keep", "reason": "test",
+                                      "posting_languages": list(written),
+                                      "required_languages": list(required),
+                                      "text_hash": ai_screen.text_hash(vacancy)}}
+
+
+def test_the_persons_languages_decide_on_the_languages_the_model_named():
+    """Task 0084, the owner 2026-10-25: a posting written in none of the
+    person's languages is out, and so is one that requires a language they do
+    not know; the model only names the languages. On 2026-10-25 the model had
+    kept two Scalo postings written entirely in Polish."""
+    v = make_vacancy(title="Fullstack .NET Developer (Angular)", location_raw="Anywhere in the World",
+                     description_text="C# ASP.NET SQL Server legacy enterprise maintenance.")
+    kept = score.score_vacancy(_read_languages(v, ["english"]), CRITERIA, PROFILE)
+    assert kept["classification"] in ("hot_lead", "worth_a_look", "long_shot")
+    assert kept["score_breakdown"]["ai_screen"]["posting_languages"] == ["english"]
+
+    polish = score.score_vacancy(_read_languages(v, ["Polish"]), CRITERIA, PROFILE)
+    assert polish["classification"] == "rejected"
+    assert "ai: language: posting written in Polish" in polish["dealbreakers"]
+
+    # An English half is enough to read it; a language it only wishes for is
+    # not in required_languages at all.
+    bilingual = score.score_vacancy(_read_languages(v, ["dutch", "english"]), CRITERIA, PROFILE)
+    assert bilingual["classification"] == kept["classification"]
+
+    spanish = score.score_vacancy(_read_languages(v, ["english"], ["english", "spanish"]), CRITERIA, PROFILE)
+    assert "ai: language: requires Spanish" in spanish["dealbreakers"]
+
+    russian = score.score_vacancy(_read_languages(v, ["russian"], ["russian"]), CRITERIA, PROFILE)
+    assert russian["classification"] == kept["classification"]
+
+    # An answer given before the fields existed decides nothing about language.
+    assert score.score_vacancy(_read_by_ai(v, "keep"), CRITERIA, PROFILE)["classification"] == kept["classification"]
+
+
 def test_an_identity_can_take_the_scripts_verdict_without_the_ai_read():
     v = make_vacancy(title="Senior .NET Developer", location_raw="Anywhere in the World",
                      description_text="C# ASP.NET SQL Server legacy enterprise maintenance.")
@@ -1078,9 +1121,14 @@ def test_language_requirement_german_market_heuristic_rejects_german_language_po
             "Ihr Profil: gute Kenntnisse. Bewerbung an unser Unternehmen. Vollzeit, Homeoffice moeglich."
         ),
     )
-    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    r = score.score_vacancy(v, NO_AI_CRITERIA, PROFILE)
     assert r["classification"] == "rejected"
-    assert any(d.startswith("language:") for d in r["dealbreakers"])
+    assert "language: posting appears to be in German" in r["dealbreakers"]
+
+    # Where the model reads the posting, the guess is recorded and refuses nothing.
+    read = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert not any(d.startswith("language:") for d in read["dealbreakers"])
+    assert read["score_breakdown"]["language_requirement_signal"]["guessed_other_language"] is True
 
 
 def test_language_requirement_english_posting_not_flagged():
@@ -1294,7 +1342,7 @@ def test_posting_written_in_spanish_is_rejected():
             "Conocimientos principales: WordPress avanzado, HTML, CSS y JavaScript."
         ),
     )
-    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    r = score.score_vacancy(v, NO_AI_CRITERIA, PROFILE)
     assert r["classification"] == "rejected"
     assert any(d.startswith("language:") for d in r["dealbreakers"])
 
@@ -1307,7 +1355,7 @@ def test_posting_written_in_polish_is_rejected():
             "webowych w React i TypeScript. Wymagania: doswiadczenie z AWS."
         ),
     )
-    r = score.score_vacancy(v, CRITERIA, PROFILE)
+    r = score.score_vacancy(v, NO_AI_CRITERIA, PROFILE)
     assert r["classification"] == "rejected"
 
 
@@ -2142,8 +2190,10 @@ def test_a_posting_in_an_unreadable_script_is_rejected():
             "הדוק עם צוותי הנדסה ופיתוח C# .NET"
         ),
     )
-    r = score.score_vacancy(v, CRITERIA, PROFILE)
-    assert any("language" in d for d in r["dealbreakers"]), r["dealbreakers"]
+    r = score.score_vacancy(v, NO_AI_CRITERIA, PROFILE)
+    assert "language: posting is written in the hebrew script" in r["dealbreakers"], r["dealbreakers"]
+    read = score.score_vacancy(v, CRITERIA, PROFILE)
+    assert not any(d.startswith("language:") for d in read["dealbreakers"]), read["dealbreakers"]
 
 
 def test_a_few_foreign_words_do_not_disqualify_an_english_posting():
