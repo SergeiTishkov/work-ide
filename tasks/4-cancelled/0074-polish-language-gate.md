@@ -1,6 +1,7 @@
 # 0074 A posting that asks for Polish alone is not refused
 
 Source: the agent, 2026-10-22, scoring the justjoin.it fetcher
+Cancelled: the owner, 2026-10-25: more phrases only add refusals, and a Polish posting that slips through is one the person sees and turns down; the language read moves to the screening model (task 0084)
 Scope: config
 
 ## Business
