@@ -69,9 +69,45 @@ Related: task 0074 (Polish phrases), cancelled for this one.
   previous prompt stay (new fields can only add a reason to refuse); the
   kept ones and the vacancies the gate no longer refuses are read.
 
+## Results, 2026-10-25, SHARP
+The re-read: 1729 "reject" answers carried over to the new brief hash; the
+whole base rescored (the first rescore ran outside the queue, and an AI
+task that loaded the base before its save wrote the old scores back over
+it; the second held the collect slot). The model read 623 vacancies in two
+AI tasks (#28: 356, $4.61; #33: 267, $3.80): 514 refused, 109 kept, no
+errors. The estimate was about 320; the rest are vacancies the gate's
+guesses no longer refuse, which rose into the classes the model reads.
+PARTSHARP is turned off; its AI task was skipped.
+
+The list the app shows (hot_lead, worth_a_look, long_shot): 107 before, 87
+after; 6 in, 32 out.
+- The model's language refusals: 261 vacancies, "posting written in X" or
+  "requires X"; German, Dutch, French, Italian, Polish, Spanish, Japanese,
+  Norwegian, Swedish, Portuguese, Mandarin. About 95 of them looked at by
+  title and the named languages: no wrong one.
+- Scalo f9a18ba3 ("posting written in Polish") and SCALO ff8e02cc
+  ("requires Polish"): out of the list.
+- Keil "C# / .NET Developer (m/f/d) – November – 6 months" 73ceb1b1 and
+  145b0ebe: English, refused before by "(m/f/d)"; back in worth_a_look.
+- LichtBlick b459c1d7 and Fennoa 4312bcc2: refused, as before. Crédit
+  Agricole 8254e4da: remote_unconfirmed, a card with no text, not read
+  (task 0085).
+- Dropon 7a7d2d73: read as dutch + english, no language refusal; refused
+  for hybrid work in Ghent.
+- Into the list wrongly: four justjoin.it postings written in Polish
+  (3e6e4de1, 35ecb1c9, afe63a3d, 4025f4c3). The site puts an English line
+  at the top ("Languages: English skills required (English B2)"), and the
+  model named english beside polish. Task 0099.
+- Out of the list on other grounds: 30 of the 121 kept answers in the list,
+  read again, came back "reject" for location, stack, level or part time.
+  Task 0100.
+- 258 vacancies the gate guessed to be in another language are in
+  remote_unconfirmed, which the app does not list and the model does not
+  read; before they were rejected.
+
 ## Items
 - DONE - Language fields and the program's refusal in the AI screen; the person's languages in the system prompt and the brief hash; prompt; tests
 - DONE - The language gate's guesses do not refuse where the model reads; the script label; tests
 - DONE - The bare "deutschkenntnisse": measured, stays (no template change)
 - DONE - Docs: ARCHITECTURE, IDENTITIES, config/derivation/languages.yaml
-- TO DO - Rescore and a limited re-read; measure what moved (the three records above, the two Scalo, the two freelancermap "(m/f/d)")
+- DONE - Rescore and a limited re-read; measure what moved (the three records above, the two Scalo, the two freelancermap "(m/f/d)")
