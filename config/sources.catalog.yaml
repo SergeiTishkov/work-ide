@@ -23,6 +23,10 @@
 #  `site` is the website the vacancies come from, as a person knows it: the
 #  app's "Source" drop-down shows it instead of the source's code name.
 #
+#  `paid: true` marks a board that asks the job seeker to pay before it
+#  assesses an application (the owner, 2026-10-26, task 0101). The app's
+#  "Source" drop-down lists such boards under "Paid", the rest under "Free".
+#
 #  How to read params_schema: it lists the parameters the fetcher accepts from
 #  an identity, with their type and meaning. The full description for building
 #  your own identity is in docs/BUILDING_BLOCKS.md.
@@ -33,6 +37,7 @@ schema_version: 1
 sources:
   - name: weworkremotely
     site: "weworkremotely.com"
+    paid: true
     kind: rss_multi
     remote_only: true
     urls:
@@ -305,6 +310,7 @@ sources:
 
   - name: freelancermap
     site: "freelancermap.de"
+    paid: true
     kind: html_embedded_json
     remote_only: false
     params_schema:

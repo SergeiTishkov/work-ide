@@ -318,7 +318,7 @@ def shared_config(name: str) -> Path:
 # source cannot change these. A stale URL is a bug for everybody rather than
 # somebody's preference, and a board does not stop being remote-only because
 # one identity says so.
-CATALOG_FACTS = ("url", "urls", "kind", "remote_only", "workplace_hidden", "site")
+CATALOG_FACTS = ("url", "urls", "kind", "remote_only", "workplace_hidden", "site", "paid")
 
 
 def source_catalog() -> dict:
@@ -364,6 +364,12 @@ def source_sites() -> dict:
     """{source name: its website} from the catalogue — what a person calls
     the board (`site`), where the code calls it by its name."""
     return {name: s["site"] for name, s in source_catalog().items() if s.get("site")}
+
+
+def paid_sources() -> list:
+    """The boards that ask the job seeker to pay before they assess an
+    application (`paid: true` in the catalogue, task 0101)."""
+    return sorted(name for name, s in source_catalog().items() if s.get("paid"))
 
 
 def ensure_dirs() -> None:

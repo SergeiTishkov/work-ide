@@ -118,6 +118,11 @@ SELECT display_name AS value FROM identities WHERE id = :identity;
 -- with every selection (selections.write_source_sites).
 SELECT value FROM meta WHERE key = 'source_sites';
 
+-- name: paid_sources
+-- [source name] as JSON: the boards that ask the job seeker to pay (`paid:
+-- true` in the catalogue, task 0101), written with the websites.
+SELECT value FROM meta WHERE key = 'paid_sources';
+
 -- name: view_pool
 -- Not a query of its own: the common start of the view queries below.
 runs AS (

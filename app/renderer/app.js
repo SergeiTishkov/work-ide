@@ -436,6 +436,8 @@
     // a chosen board the view has emptied keeps its website on the list
     state.sourceSites = state.sourceSites || {};
     for (const s of sources) if (s.site) state.sourceSites[s.source] = s.site;
+    state.paidSources = state.paidSources || new Set();
+    for (const s of sources) if (s.paid) state.paidSources.add(s.source);
     info.pending = pending;
     render();
     await loadDocs(state.active, listing.map((item) => item.id));
@@ -2323,33 +2325,58 @@
   // a later run brings too) only when no board known to be hidden is off the
   // list (task 0048: a hidden board the other drop-downs emptied came back
   // ticked after a click on another one).
+  // All of them on top; under it the free boards and the paid ones — those
+  // that ask the job seeker to pay before they assess an application (the
+  // owner, 2026-10-26, task 0101) — each with its boards; a kind with no
+  // board has no row.
   function renderSourceFilter(view) {
     const chosen = view.sources;
     const sources = state.sources.filter((s) => s.source);
     for (const source of chosen || []) {
       if (!sources.some((s) => s.source === source)) {
-        sources.push({ source, site: (state.sourceSites || {})[source] || null, total: 0 });
+        sources.push({
+          source, site: (state.sourceSites || {})[source] || null,
+          paid: Boolean(state.paidSources && state.paidSources.has(source)), total: 0,
+        });
       }
     }
     const all = state.sources.reduce((sum, s) => sum + s.total, 0);
-    const options = sources.map((s) => ({
+    const option = (s) => ({
       value: s.source, label: s.site || s.source, text: counted(s.site || s.source, s.total),
       testid: `source-option-${s.source}`, checked: !chosen || chosen.includes(s.source),
-    }));
+    });
+    const groups = [['free', false, 'filter.source_free'], ['paid', true, 'filter.source_paid']].map(([key, paid, name]) => {
+      const members = sources.filter((s) => Boolean(s.paid) === paid);
+      return {
+        key, options: members.map(option), whole: !chosen,
+        master: {
+          text: counted(t(name), members.reduce((sum, s) => sum + s.total, 0)),
+          testid: `source-kind-${key}`,
+        },
+      };
+    }).filter((group) => group.options.length);
+    const options = groups.flatMap((group) => group.options);
+    const on = options.filter((o) => o.checked);
+    let topMark = 'partial';
+    if (!chosen || on.length === options.length) topMark = 'on';
+    else if (!on.length) topMark = 'off';
     return checklist({
       testid: 'source-filter', label: t('filter.source_legend'), labelTestid: 'source-label',
       summary: !chosen ? t('filter.source_all') : summaryOf(t('filter.source_all'), options),
-      groups: [{
-        key: 'sources', options, whole: !chosen,
-        master: {
-          text: counted(t('filter.source_all'), all), testid: 'source-option-all',
-          toggle: () => changeView({ sources: chosen ? null : [] }),
-        },
-      }],
+      nested: true,
+      top: {
+        text: counted(t('filter.source_all'), all), testid: 'source-option-all', mark: topMark,
+        toggle: () => changeView({ sources: chosen ? null : [] }),
+      },
+      groups,
+      // the boards of the other kind keep their ticks
       onToggle: (group, values) => {
+        const mine = group.options.map((o) => o.value);
+        const shown = options.map((o) => o.value)
+          .filter((value) => (mine.includes(value) ? values.includes(value) : on.some((o) => o.value === value)));
         const known = state.seenSources[state.active] || new Set();
         const hiddenAside = [...known].some((source) => !options.some((o) => o.value === source));
-        changeView({ sources: values.length === options.length && !hiddenAside ? null : values });
+        changeView({ sources: shown.length === options.length && !hiddenAside ? null : shown });
       },
     });
   }

@@ -553,6 +553,16 @@ def test_a_selection_carries_the_websites_of_the_sources(isolated_data_dir):
     assert sites["mycareersfuture"] == "mycareersfuture.gov.sg"
 
 
+def test_a_selection_carries_the_paid_boards(isolated_data_dir):
+    """The owner, 2026-10-26 (task 0101): freelancermap.de and
+    weworkremotely.com ask for payment before they assess an application;
+    the "Source" drop-down lists them apart."""
+    _store(_by_source())
+    with db.session() as conn:
+        (value,) = conn.execute(selections.load_queries()["paid_sources"]).fetchone()
+    assert json.loads(value) == ["freelancermap", "weworkremotely"]
+
+
 def test_every_automatic_source_in_the_catalogue_names_its_website():
     import common
 

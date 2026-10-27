@@ -21,4 +21,4 @@ two subcategories of sources, paid and free."
   `app/test/ui/app.spec.js`.
 
 ## Items
-- TO DO - The catalogue fact, meta, the store, the drop-down; tests
+- DONE - The catalogue fact, meta, the store, the drop-down; tests

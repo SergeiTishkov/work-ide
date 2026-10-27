@@ -1243,6 +1243,41 @@ test('a source hidden, then emptied by another drop-down, stays hidden after a c
   await expect.poll(async () => (await lastListing(page))[1].sources).toBeNull();
 });
 
+// The owner, 2026-10-26 (task 0101): the boards that ask for payment apart.
+test('"Source" lists the free boards and the paid ones under "All sources"', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.paidSources = ['devitjobs'];
+  await open(page, fixture);
+  await page.getByTestId('source-filter').click();
+  await expect(page.getByTestId('source-option-all')).toHaveText(`${en['filter.source_all']} (3)`);
+  await expect(page.getByTestId('source-kind-free')).toHaveText(`${en['filter.source_free']} (2)`);
+  await expect(page.getByTestId('source-kind-paid')).toHaveText(`${en['filter.source_paid']} (1)`);
+  const rows = page.getByTestId('source-filter-menu').locator('[role="option"]');
+  await expect(rows).toHaveText([/^All sources/, /^Free/, /^linkedin\.com/, /^Paid/, /^devitjobs/]);
+
+  // the paid ones off: the free ones stay
+  await page.getByTestId('source-kind-paid').click();
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'off');
+  await expect(page.getByTestId('source-kind-free')).toHaveAttribute('data-state', 'on');
+  await expect(page.getByTestId('source-option-all')).toHaveAttribute('data-state', 'partial');
+  await expect.poll(async () => (await lastListing(page))[1].sources).toEqual(['linkedin']);
+  // a free board off keeps the paid one off
+  await page.getByTestId('source-option-linkedin').click();
+  await expect(page.getByTestId('source-option-all')).toHaveAttribute('data-state', 'off');
+  await expect.poll(async () => (await lastListing(page))[1].sources).toEqual([]);
+  await page.getByTestId('source-option-devitjobs').click();
+  await expect.poll(async () => (await lastListing(page))[1].sources).toEqual(['devitjobs']);
+  await page.getByTestId('source-option-all').click();
+  await expect.poll(async () => (await lastListing(page))[1].sources).toBeNull();
+});
+
+test('with no paid board, "Source" has no "Paid" row', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('source-filter').click();
+  await expect(page.getByTestId('source-kind-free')).toHaveText(`${en['filter.source_free']} (3)`);
+  await expect(page.getByTestId('source-kind-paid')).toHaveCount(0);
+});
+
 test('the status filter and the source apply together', async ({ page }) => {
   await open(page);
   await choose(page, 'source-filter', 'linkedin');

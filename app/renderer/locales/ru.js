@@ -243,6 +243,8 @@
   'filter.source_legend': 'Источник',
   'filter.segment_all': 'Все регионы',
   'filter.source_all': 'Все источники',
+  'filter.source_free': 'Бесплатные',
+  'filter.source_paid': 'Платные',
   'filter.company_legend': 'Компания',
   'filter.company_all': 'Все компании',
   'filter.company_except': 'Все, кроме: {list}',

@@ -312,7 +312,9 @@ function installMockApi(fixture) {
         totals.set(row.view.source, (totals.get(row.view.source) || 0) + 1);
       }
       const sites = { linkedin: 'linkedin.com', devitjobs: 'devitjobs.uk, devitjobs.com' };
-      return [...totals].map(([source, total]) => ({ source, site: sites[source] || null, total }))
+      // fixture.paidSources: the boards the selection recorded as paid (task 0101)
+      const paid = new Set(data.paidSources || []);
+      return [...totals].map(([source, total]) => ({ source, site: sites[source] || null, paid: paid.has(source), total }))
         .sort((a, b) => b.total - a.total || a.source.localeCompare(b.source));
     },
     // fixture.cleanupReply: what tools/cleanup.py answers; the count by default

@@ -442,10 +442,10 @@ test('the source narrows the listing, the counts and the class totals', () => {
 test('the source list counts each board under the status filter', () => {
   const { store } = setup();
   assert.deepEqual(store.sources('test', v('full', 'all')),
-    [{ source: 'linkedin', site: null, total: 20 }, { source: 'devitjobs', site: null, total: 3 }]);
-  assert.deepEqual(store.sources('test', v('full', 'fresh_new')), [{ source: 'devitjobs', site: null, total: 3 }]);
+    [{ source: 'linkedin', site: null, paid: false, total: 20 }, { source: 'devitjobs', site: null, paid: false, total: 3 }]);
+  assert.deepEqual(store.sources('test', v('full', 'fresh_new')), [{ source: 'devitjobs', site: null, paid: false, total: 3 }]);
   store.setFeedback('test', 'old00', 'applied');
-  assert.deepEqual(store.sources('test', v('full', 'applied')), [{ source: 'linkedin', site: null, total: 1 }]);
+  assert.deepEqual(store.sources('test', v('full', 'applied')), [{ source: 'linkedin', site: null, paid: false, total: 1 }]);
   assert.deepEqual(store.listing('test', v('full', 'applied', { source: 'devitjobs' })), []);
   assert.equal(count(store, 'test', v('full', 'applied', { source: 'linkedin' })), 1);
   assert.equal(count(store, 'test', v('full', 'applied', { source: 'devitjobs' })), 0);
@@ -476,7 +476,19 @@ test('each board comes with its website when the selection recorded them', () =>
     .run(JSON.stringify({ linkedin: 'linkedin.com' }));
   db.close();
   assert.deepEqual(store.sources('test', v('full', 'all')),
-    [{ source: 'linkedin', site: 'linkedin.com', total: 20 }, { source: 'devitjobs', site: null, total: 3 }]);
+    [{ source: 'linkedin', site: 'linkedin.com', paid: false, total: 20 },
+      { source: 'devitjobs', site: null, paid: false, total: 3 }]);
+  store.closeAll();
+});
+
+// The owner, 2026-10-26 (task 0101): boards that ask for payment are listed apart.
+test('each board says whether it is paid, as the selection recorded', () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  db.prepare("INSERT INTO meta (key, value) VALUES ('paid_sources', ?)").run(JSON.stringify(['devitjobs']));
+  db.close();
+  assert.deepEqual(store.sources('test', v('full', 'all')).map((s) => [s.source, s.paid]),
+    [['linkedin', false], ['devitjobs', true]]);
   store.closeAll();
 });
 

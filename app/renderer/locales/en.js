@@ -240,6 +240,8 @@
   'filter.source_legend': 'Source',
   'filter.segment_all': 'All regions',
   'filter.source_all': 'All sources',
+  'filter.source_free': 'Free',
+  'filter.source_paid': 'Paid',
   'filter.company_legend': 'Company',
   'filter.company_all': 'All companies',
   'filter.company_except': 'All except: {list}',

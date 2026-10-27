@@ -154,13 +154,15 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
 
 
 def write_source_sites(conn) -> None:
-    """The catalogue's websites, for the app's "Source" drop-down: the app
-    reads the database only, never the YAML."""
-    conn.execute(
-        "INSERT INTO meta (key, value) VALUES ('source_sites', ?) "
-        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        (json.dumps(common.source_sites(), ensure_ascii=False, sort_keys=True),),
-    )
+    """The catalogue's websites and its paid boards (task 0101), for the
+    app's "Source" drop-down: the app reads the database only, never the
+    YAML."""
+    for key, value in (("source_sites", common.source_sites()), ("paid_sources", common.paid_sources())):
+        conn.execute(
+            "INSERT INTO meta (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, json.dumps(value, ensure_ascii=False, sort_keys=True)),
+        )
 
 
 def write_company_kinds(conn) -> None:

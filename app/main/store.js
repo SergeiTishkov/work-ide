@@ -256,8 +256,9 @@ class Store {
     return Object.fromEntries(rows.map((r) => [r.class, r.total]));
   }
 
-  // [{ source, site, total }], largest first, the chosen boards aside: the
-  // "Source" drop-down.
+  // [{ source, site, paid, total }], largest first, the chosen boards aside:
+  // the "Source" drop-down. `paid`: the board asks the job seeker to pay
+  // before it assesses an application (task 0101).
   sources(identity, view) {
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db, identity);
@@ -265,7 +266,8 @@ class Store {
     const { sources, ...params } = this.viewParams(db, identity, selection, view);   // the boards aside
     const rows = db.prepare(this.queries.view_sources).all(params);
     const sites = this.sourceSites(db);
-    return rows.map((r) => ({ source: r.source, site: sites[r.source] || null, total: r.total }));
+    const paid = this.paidSources(db);
+    return rows.map((r) => ({ source: r.source, site: sites[r.source] || null, paid: paid.has(r.source), total: r.total }));
   }
 
   // The "Show" drop-down's numbers: { statuses: { status: n } } under the
@@ -341,6 +343,18 @@ class Store {
       return JSON.parse(row.value);
     } catch {
       return {};
+    }
+  }
+
+  // The paid boards' names; a database whose selection predates task 0101
+  // has none, and every board is free.
+  paidSources(db) {
+    const row = db.prepare(this.queries.paid_sources).get();
+    if (!row || !row.value) return new Set();
+    try {
+      return new Set(JSON.parse(row.value));
+    } catch {
+      return new Set();
     }
   }
 
