@@ -52,7 +52,8 @@ def test_the_worklist_is_the_top_classes_without_a_current_answer():
     digest = "b" * 16
     stored = {"done": {"verdict": "keep", "text_hash": ai_screen.text_hash(vacancies["done"]), "brief_hash": digest}}
     assert ai_screen.worklist(vacancies, stored, digest) == ["hot", "look"]
-    assert ai_screen.worklist(vacancies, stored, "c" * 16) == ["hot", "look", "done"], "a new brief asks again"
+    assert ai_screen.worklist(vacancies, stored, "c" * 16) == ["hot", "look"], "a new brief keeps the answer"
+    assert ai_screen.worklist(vacancies, stored, "c" * 16, reread=True) == ["hot", "look", "done"],         "the re-read the owner asked for asks again"
     vacancies["done"]["description_text"] += " Hybrid, 2 days in the office."
     assert "done" in ai_screen.worklist(vacancies, stored, digest), "a new text asks again"
 

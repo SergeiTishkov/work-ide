@@ -1050,7 +1050,12 @@ strong model, kept in the local identity and rewritten when the CV changes.
   work time zones out in UTC offsets and that hiring elsewhere through an
   employer of record is not "no"; asked again, both were kept and three
   rejects from the control sample stayed rejected. The prompt is part of
-  `brief_hash`, so a prompt change reads the top again.
+  `brief_hash`, kept beside each answer. Until 2026-10-28 a prompt or brief
+  change read the top again; since task 0103 the answers stay and only a
+  re-read the owner asked for (`pipeline.py --ai --reread`) reads them again:
+  after a language-only prompt change, 30 of 121 kept vacancies came back
+  rejected on other grounds (task 0100), and the owner keeps the list empty,
+  so what it held before a change has been seen.
 - 2026-10-20, the same misreading again: "CET ±3 hours" taken to exclude
   UTC+4 in 3 of 4 Proxify postings, both with the rule above and with the
   window spelled out as "UTC−2 to UTC+4". Now `ai_screen.model_message` puts

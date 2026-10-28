@@ -296,6 +296,17 @@ The project is succeeding if:
   in (the owner, 2026-10-20), and the panel never showed a run the agent
   started. A session a worker started for a task (`taskq.py current`
   names it) is that task and does the work itself.
+- **A change does not send the existing vacancies to the AI again.** After
+  a change to the pipeline, the screening prompt or the brief, the stored
+  answers of the screening model stay; the change applies to vacancies read
+  from then on. The agent offers the re-read, with its cost, and starts it
+  (`taskq.py add ai --identity <prefix> --args '{"reread": true}'`) only on
+  the owner's explicit "yes, read them again" (the owner, 2026-10-28, task
+  0103). The owner keeps the list empty and applies at once, a re-read costs
+  tokens, and the model's verdicts drift: after a language-only prompt
+  change, 30 of 121 kept vacancies came back rejected on other grounds
+  (task 0100). The scorer's rescoring of the base is not covered: it costs
+  nothing and every rest run does it.
 - **Dead links are not shown to a person.** Confirmed explicitly (2026-07-30):
   every vacancy link in the report must be checked, and a vacancy with an
   unambiguously broken link (404/410) is removed from the shortlist rather than
