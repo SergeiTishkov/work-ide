@@ -30,6 +30,16 @@ def test_strip_html_unescapes_entities():
     assert "Salary" in text and "benefits" in text
 
 
+def test_remote_from_is_kept_apart_from_the_location():
+    from normalize import normalize_record
+
+    raw = {"source": "jobicy", "external_id": "1", "title": "Engineer", "company": "LastPass",
+           "url": "https://jobicy.com/jobs/1", "location_raw": "Portugal", "remote_from": "Portugal"}
+    record = normalize_record(raw)
+    assert record["location_raw"] == "Portugal" and record["remote_from"] == "Portugal"
+    assert normalize_record({**raw, "remote_from": ""})["remote_from"] is None
+
+
 def test_normalize_record_rejects_missing_required_fields():
     assert normalize.normalize_record({}) is None
     assert normalize.normalize_record({"source": "x", "title": "y"}) is None

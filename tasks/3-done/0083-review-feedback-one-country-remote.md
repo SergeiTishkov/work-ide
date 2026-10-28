@@ -38,18 +38,23 @@ Two rules meet here:
   "Denmark".
 
 ## Implementation
-For the owner to decide first: is a remote posting whose location field
-names only countries the person is not in, with no word of hiring elsewhere,
-refused by the scripts, or left to the AI check?
-- Either way: the Jobicy fetcher keeps the region as `Remote from: <list>`
-  in `location_raw` (as `fetch_dataart.py` does), and the screening prompt
-  says that a location field naming countries on a remote posting limits it
-  to them unless the text says it hires elsewhere. A test on the LastPass
-  and Oowlish records.
-- If refused by the scripts: a verdict `country_only` in
-  `_structured_location`, a dealbreaker in score.py, the 2026-08-05 comment
-  rewritten with the owner's new word; tests.
+The owner's decision (2026-10-28): left to the AI check, not refused by the
+scripts. Among the AI-kept top on that day, vacancies whose location names
+one place: 13 applied, 4 marked bugged, 5 rejected (2 for the stack), 7
+new, 13 expired. A script rule refusing them would have taken out the 13
+the person applied to.
+
+What remained: the Jobicy fetcher dropped "Remote from". Jobicy's page says
+"Remote from: Portugal"; the record had location "Portugal", and the model
+kept LastPass (9f951777) and bf2f8959 ("Portugal, USA"), both marked bugged
+with that page markup. Now the fetcher sends `remote_from` beside
+`location_raw`, and the model's message has the line "remote work allowed
+from (the board says): Portugal". `location_raw` stays bare: with the
+prefix in it the scorer read 64 of 574 Jobicy records differently
+("Australia" no longer refused, for one). The prompt is unchanged. The
+answers already given stay; a Jobicy posting the board still lists gets the
+line on its next fetch, and its new text is read again.
 
 ## Items
-- TO DO - The owner decides: refused by the scripts, or left to the AI check
-- TO DO - Jobicy keeps "Remote from"; the screening prompt reads a country-only location as a limit
+- DONE - The owner decides: left to the AI check (2026-10-28)
+- DONE - Jobicy sends "Remote from" to the model (`remote_from`), with tests
