@@ -14,12 +14,16 @@ language the posting is written in. Before 0084 the gate's Polish word list
 refused all four.
 
 ## Implementation
-`config/ai_screen_prompt.md`, `posting_languages`: a language is named when
-the duties or the requirements are written in it; a job board's label line,
-a heading or one sentence in another language do not count. A test with a
-justjoin.it-shaped text is not possible without the model; the prompt hash
-changes, so the re-read follows the 0084 limit (rejects carried over).
+`config/ai_screen_prompt.md`, `posting_languages`: a language counts when
+the duties or the requirements are written in it; a text with versions in
+two or more languages still names each, so a posting with an English
+version stays (the owner, 2026-10-28). A job board's label line, a heading,
+technology terms or one sentence in another language do not count. A test
+of the wording needs the model, so there is none.
+
+The four were answered by the owner already (one marked bugged, three
+rejected); under task 0103 the prompt change reads nothing again.
 
 ## Items
-- TO DO - The owner agrees
-- TO DO - The prompt line; the limited re-read; the four records out
+- DONE - The owner agrees (2026-10-28), with the rule that a text given in several languages keeps each of them
+- DONE - The prompt line
