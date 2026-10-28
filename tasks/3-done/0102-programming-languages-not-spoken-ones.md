@@ -26,4 +26,7 @@ as well (Harvey twice, Händlerbund, Jobot).
 ## Items
 - DONE - The owner agrees (2026-10-28)
 - DONE - The prompt line, the program's check, tests
-- TO DO - The five records rescored
+- DONE - The five records rescored (2026-10-28, the scorer, no new read):
+  ElevenLabs 2f95b4ed lost "requires Python" and went to low_priority with
+  score 1; the other four lost the language reason and stay rejected for
+  location
