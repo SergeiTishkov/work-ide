@@ -1,7 +1,6 @@
 # 0074 A posting that asks for Polish alone is not refused
 
 Source: the agent, 2026-10-22, scoring the justjoin.it fetcher
-Cancelled: the owner, 2026-10-25: more phrases only add refusals, and a Polish posting that slips through is one the person sees and turns down; the language read moves to the screening model (task 0084)
 Scope: config
 
 ## Business
@@ -12,9 +11,13 @@ justjoin.it lists the languages an offer asks for; 35 of its 118 remote
 without English passes: SHARP's criteria and config/derivation/languages.yaml
 name no Polish phrases. The person does not speak Polish.
 
-## Implementation
-Polish phrases in config/derivation/languages.yaml and in the templates'
-language gate, the way German is handled; a template version step.
+Closed as done without a change of its own (the owner, 2026-10-28): task
+0084 solved it. The screening model names the languages a posting is
+written in and requires, and the program refuses one the person does not
+know; no Polish phrases were added. Checked on 2026-10-28 in SHARP's base:
+of 30 postings the model read with Polish, the 26 that require Polish or
+are written in Polish alone are refused for language; the 4 kept are
+written in Polish and English and require English only (task 0099).
 
 ## Items
-- TO DO - Count the offers in the base that ask for Polish alone after a few runs; add the phrases if any reach the shortlist
+- DONE - Solved by task 0084; checked on 30 postings with Polish (2026-10-28)
