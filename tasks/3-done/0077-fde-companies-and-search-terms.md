@@ -34,4 +34,5 @@ the search.
 - DONE - FDE companies' boards checked and added to the template's ATS targets
 - DONE - FDE titles added to the LinkedIn and HN keywords, template and the owner's sources file
 - DONE - Template sharp v31, local identity updated
-- TO DO - After the next full run: per-query statistics for the three new LinkedIn words (task 0050's follow-up); keep the ones that bring vacancies the others do not
+- DONE - After five full runs with `found_by` (2026-10-28, tools/linkedin_yield.py): none of the three new LinkedIn words found a shortlisted vacancy alone. "deployment strategist" served 17 166, none shortlisted (out in task 0050); "applied AI engineer" 2 shortlisted and "AI deployment engineer" 3 (with their "remote" forms), all found by other searches too: the owner took both out, template sharp v33
+- DONE - The 26 company boards, checked the same day: 4 568 postings in the base, none shortlisted (4 517 rejected, 51 low priority); of 402 forward deployed titles, 347 refused on location; the AI check read 375 and kept 9. The boards stay
