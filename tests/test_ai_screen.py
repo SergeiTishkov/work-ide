@@ -182,6 +182,16 @@ def test_the_scorers_time_zone_window_is_sent_to_the_model_outside_the_hash():
     assert ai_screen.model_message(_record()) == ai_screen.message(_record())
 
 
+def test_the_boards_remote_from_reaches_the_model():
+    """Task 0083: Jobicy says "Remote from: Portugal"; the model was given a
+    bare "Portugal" and kept LastPass (9f951777) as open to the person."""
+    record = {**_record(), "location_raw": "Portugal", "remote_from": "Portugal"}
+    assert "remote work allowed from (the board says): Portugal" in ai_screen.message(record)
+    plain = _record()
+    assert ai_screen.message({**plain, "remote_from": None}) == ai_screen.message(plain), \
+        "a record without it reads, and hashes, as before"
+
+
 def test_the_persons_languages_come_from_the_profile():
     profile = {"owner": {"languages": ["English", "Russian (native)", {"name": "German"}, "english"]}}
     assert ai_screen.person_languages(profile) == ["english", "russian", "german"]

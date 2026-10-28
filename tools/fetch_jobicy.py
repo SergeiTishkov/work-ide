@@ -95,6 +95,12 @@ def _to_common_schema(item: dict) -> Optional[dict]:
         "company": company,
         "url": url,
         "location_raw": (item.get("jobGeo") or "").strip(),
+        # The same jobGeo as Jobicy's page labels it, "Remote from: Portugal"
+        # (task 0083): for the screening model, which took a bare "Portugal"
+        # on a remote posting as no limit. location_raw stays bare: with
+        # "Remote from: " before it the scorer no longer read 64 of 574
+        # Jobicy records' countries the same way (measured 2026-10-28).
+        "remote_from": (item.get("jobGeo") or "").strip(),
         "remote": True,  # Jobicy is a remote-only board by definition
         "employment_types": item.get("jobType"),
         "tags": tags,

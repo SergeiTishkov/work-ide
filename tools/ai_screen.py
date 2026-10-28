@@ -115,6 +115,9 @@ def message(record: dict) -> str:
         "title": record.get("title"),
         "company": record.get("company"),
         "location": record.get("location_raw"),
+        # Only Jobicy sends it (task 0083); absent, the line is left out, so
+        # the text hash of every other record stays as it was.
+        "remote work allowed from (the board says)": record.get("remote_from"),
         "board": record.get("source"),
         "url": record.get("url"),
         "tags": record.get("tags") or [],

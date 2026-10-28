@@ -153,6 +153,10 @@ def normalize_record(raw: dict) -> Optional[dict]:
         # tools/linkedin_yield.py). None from a board that is not searched.
         "found_by": [str(q).strip() for q in raw.get("found_by") or [] if str(q).strip()] or None,
         "location_raw": plain(raw.get("location_raw")),
+        # Where a remote-only board says the work may be done from (Jobicy's
+        # "Remote from"), for the screening model; None from other boards.
+        # The scorer reads location_raw (task 0083).
+        "remote_from": plain(raw.get("remote_from")) or None,
         "remote": remote,
         # Where the employer or the board says the work happens: "remote",
         # "hybrid", "on-site", or None for "nobody said". A separate field from
