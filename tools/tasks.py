@@ -4,7 +4,7 @@
   python tools/tasks.py find <words>              tasks whose text has every word
   python tools/tasks.py new <stage> <slug> <title> --scope "tools, docs"
                                                   a new task with the next number;
-                                                  stage is triage or to-do
+                                                  stage is potential, triage or to-do
   python tools/tasks.py log <number>              the commits that name the task
 
 Every commit names its task with a "Task: NNNN" line, checked by
@@ -19,7 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TASKS = ROOT / "tasks"
-STAGES = {"triage": "1-triage", "to-do": "2-to-do", "done": "3-done", "cancelled": "4-cancelled"}
+STAGES = {"potential": "0-potential", "triage": "1-triage", "to-do": "2-to-do", "done": "3-done", "cancelled": "4-cancelled"}
 NAME = re.compile(r"^(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -100,8 +100,8 @@ def find(words):
 
 
 def new(stage: str, slug: str, title: str, source: str, business: str, scope: str) -> Path:
-    if stage not in ("triage", "to-do"):
-        raise SystemExit("a new task starts in triage or to-do")
+    if stage not in ("potential", "triage", "to-do"):
+        raise SystemExit("a new task starts in potential, triage or to-do")
     if not SLUG.match(slug):
         raise SystemExit("the slug is a few lowercase English words joined by hyphens")
     errors = scope_errors(scope)
@@ -131,7 +131,7 @@ def main(argv=None):
     p_find = sub.add_parser("find")
     p_find.add_argument("words", nargs="+")
     p_new = sub.add_parser("new")
-    p_new.add_argument("stage", choices=("triage", "to-do"))
+    p_new.add_argument("stage", choices=("potential", "triage", "to-do"))
     p_new.add_argument("slug")
     p_new.add_argument("title")
     p_new.add_argument("--source", default="the owner")

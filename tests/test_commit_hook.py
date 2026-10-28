@@ -83,6 +83,19 @@ def test_a_triage_task_does_not_cover_work_outside_tasks(repo):
     assert not ok and "triage" in err
 
 
+def test_a_potential_task_does_not_cover_work_outside_tasks(repo):
+    _write(repo, "tools/a.py", "y\n")
+    _write(repo, "tasks/0-potential/0005-check-it.md", "# 0005 Check it, checked\n")
+    ok, err = _commit(repo, "Act on the check\n\nTask: 0005")
+    assert not ok and "potential" in err
+
+
+def test_a_potential_task_file_alone_needs_no_task_line(repo):
+    _write(repo, "tasks/0-potential/0005-check-it.md", "# 0005 Check it\n")
+    ok, err = _commit(repo, "Tasks: a question to check")
+    assert ok, err
+
+
 def test_a_cancelled_task_does_not_cover_work_outside_tasks(repo):
     _write(repo, "tools/a.py", "y\n")
     _write(repo, "tasks/4-cancelled/0004-not-wanted.md", "# 0004 Not wanted\n")

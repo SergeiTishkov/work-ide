@@ -1483,7 +1483,8 @@ process is exactly the constraint wanted.
 ## Further development
 
 The list of work, done and waiting, is `tasks/` (format in `tasks/README.md`):
-ideas nobody has agreed to yet are in `tasks/1-triage/`, agreed work in
+questions the owner checks in practice before deciding are in
+`tasks/0-potential/`, ideas nobody has agreed to yet in `tasks/1-triage/`, agreed work in
 `tasks/2-to-do/`, work decided against in `tasks/4-cancelled/`. The candidates this section listed until 2026-10-20 were
 either done (the role-complexity gate, the regional dealbreaker) or dropped:
 Dice.com answers 403 (`docs/SOURCES.md`); the region list is extended as
