@@ -96,6 +96,32 @@ Done for 1 (the local identity, outside git):
   runs re-read the top classes and up to 400 refused or waiting stretches
   a run.
 
+## Another main language under the new brief (2026-10-28)
+SHARP, the answers since the brief of 2026-10-24 (2026-10-24 to 2026-10-27),
+development roles whose reason or title names another language (Java,
+Spring, Kotlin, Go, Python, Django, PHP, Laravel, Ruby, Rails, Node,
+NestJS, Scala, Elixir, Rust): 280.
+- `cv_fit` "stretch": 207 (67 kept, 140 refused for something else, mostly
+  location); "fits": 14 (3 kept); "no": 59.
+- The 70 kept, by class now: hot lead 13, worth a look 11 (one hidden copy
+  in each), long shot 21, low priority 23, refused by the scorer 2 (one by
+  task 0102, one for a US payroll). Among
+  the hot leads: Aubrant Technical Lead (Python, 69), Sticker Mule (Go, 67),
+  Toggl (Go, 50), Deel Full Stack (Node, 49), Curotec (Ruby on Rails, 49),
+  Meedan (Ruby/Python, 43), Teravision (Go/Node, 41), Metorial (Go, 40),
+  Dremio (Java, 40), Toptal Sage X3 (Python/Node/PHP, 40), Stripe (Go/Java,
+  39), DoiT (Go, 38). Worth a look: RevenueCat (Python), UpGuard Senior Web
+  Developer (Node), Yooli (NestJS), Proxify (Node), Deel Back-End (Node/
+  Python), Playson, TOTVS, Customer.io (Go, two).
+- The "no" answers: mostly Rust, Elixir, Scala, C++ or a specialist field
+  (security, Kubernetes, IAM). Against the rule, a mainstream language read
+  as "no" with no other reason: UpGuard "Software Engineer (Multiple
+  Levels)" (Go), KeyPartners "Senior Python Developer", Mirantis (Go).
+- Found on the way: "python", "php", "scala" in `required_languages`
+  became language refusals (task 0084's check); ElevenLabs "Full-Stack
+  Engineer (Backend Leaning)" (2f95b4ed), kept by the model, was refused by
+  it alone. Task 0102.
+
 ## Items
 - DONE - Stretch objections read by the model instead of refused by keyword
 - DONE - `cv_fit` and `work_kind` in the screen; stretch points
@@ -109,4 +135,4 @@ Done for 1 (the local identity, outside git):
 - DONE - Read the stretch backlog (SHARP, 2026-10-21): five `rest` runs screened 459, 443, 417, 400 and 114 vacancies and kept 26, 25, 6, 4 and 2 (1,833 read, 63 kept, USD 21.07). The estimate was 1,168: each run's description fetch (927, then 334) made more vacancies wait for a read. No stretch waits now
 - DONE - Review the kept and rejected stretch roles with the owner; tune `stretch_points` and the doubtful kinds (2026-10-24: "Review" above; points and data heavy kept, another language made a stretch)
 - DONE - Two copies of one posting read differently: the owner decides after the explanation (question 4; 2026-10-24: the best-filled copy alone, task 0096)
-- TO DO - After the next runs, show the owner what the new brief kept among the other-language roles
+- DONE - After the next runs, show the owner what the new brief kept among the other-language roles (2026-10-28, above)
