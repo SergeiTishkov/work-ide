@@ -562,7 +562,7 @@ def test_a_run_that_leaves_vacancies_unread_queues_the_ai_check_and_the_ai_run_r
     (vid, record), = kb.load_vacancies().items()
     script_class = record["computed"]["script_class"]
 
-    def read(vacancies, state, limit=None):
+    def read(vacancies, state, limit=None, reread=False):
         v = vacancies[vid]
         v["_ai_screen"] = {"verdict": "keep", "reason": "remote worldwide", "text_hash": ai_screen.text_hash(v)}
         return True

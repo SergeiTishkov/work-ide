@@ -269,10 +269,12 @@ def call_model(system_prompt: Path, text: str, *, model: str = MODEL, claude: st
 
 
 def worklist(vacancies: dict, stored: dict, brief_digest: str, classes=SCREENED_CLASSES,
-             limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT) -> list:
-    """Top-class vacancies with no answer for their current text and brief,
-    highest score first; then the stretches waiting for a read, up to
-    `stretch_limit`."""
+             limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT,
+             reread: bool = False) -> list:
+    """Top-class vacancies with no answer for their current text, highest
+    score first; then the stretches waiting for a read, up to
+    `stretch_limit`. An answer given under another prompt or brief stays
+    (the owner, 2026-10-28, task 0103); `reread` asks those again."""
     todo, stretches = [], []
     for vid, record in vacancies.items():
         computed = record.get("computed") or {}
@@ -282,7 +284,8 @@ def worklist(vacancies: dict, stored: dict, brief_digest: str, classes=SCREENED_
         if not top and not computed.get("screen_wanted"):
             continue
         answer = stored.get(vid)
-        if answer and answer.get("text_hash") == text_hash(record) and answer.get("brief_hash") == brief_digest:
+        if (answer and answer.get("text_hash") == text_hash(record)
+                and (not reread or answer.get("brief_hash") == brief_digest)):
             continue
         (todo if top else stretches).append((computed.get("score") or 0, vid))
     todo.sort(reverse=True)
@@ -295,7 +298,8 @@ def worklist(vacancies: dict, stored: dict, brief_digest: str, classes=SCREENED_
 
 def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES,
            limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT,
-           workers: int = WORKERS, call=None, pause=time.sleep, languages=None) -> dict:
+           workers: int = WORKERS, call=None, pause=time.sleep, languages=None,
+           reread: bool = False) -> dict:
     """Screens what needs it and attaches every answer as `_ai_screen`.
     Mutates `vacancies` in place; never raises for one posting: a posting
     whose call failed is sent again (RETRY_ROUNDS), and `errors` counts
@@ -304,7 +308,8 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
     the answers already given are saved, and ai_limit.UsageLimit is raised
     with the stats on it (task 0057). `call` and `pause` stand in for
     call_model and time.sleep (tests). `languages` defaults to the identity's
-    profile."""
+    profile. `reread` reads again the answers given under another prompt or
+    brief (worklist)."""
     call = call or call_model
     import progress
 
@@ -317,7 +322,7 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
     digest = brief_hash(brief, languages)
     with db.session() as conn:
         stored = load(conn, prefix)
-    keys = worklist(vacancies, stored, digest, classes, limit, stretch_limit)
+    keys = worklist(vacancies, stored, digest, classes, limit, stretch_limit, reread)
     stats["considered"] = len(keys)
     lock = threading.Lock()
     limited: list = []   # the UsageLimit that stopped the screen
