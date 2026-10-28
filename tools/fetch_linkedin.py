@@ -569,7 +569,8 @@ def fetch(keywords: Optional[List[str]] = None,
           posted_within_days: Optional[int] = POSTED_WITHIN_DAYS,
           split_at_ceiling: bool = True,
           timeout: int = common.DEFAULT_TIMEOUT,
-          query_stats_to: Optional[Path] = None):
+          query_stats_to: Optional[Path] = None,
+          skip_locations: Optional[List[str]] = None):
     """Walks (keyword × country) pairs and returns (records, note).
 
     keywords/locations come from <prefix>_sources.yaml -> params. Locations
@@ -578,7 +579,8 @@ def fetch(keywords: Optional[List[str]] = None,
     page until its list ends; a pair that reaches the guest search's ceiling
     is split into narrower queries (split_at_ceiling, see SPLIT_REGIONS).
     query_stats_to: a file for what each query brought (query_stats_path),
-    rewritten after every pair.
+    rewritten after every pair. skip_locations: countries of the market tiers
+    LinkedIn does not search (task 0050); they stay markets for the scoring.
     """
     import markets
     import progress
@@ -586,6 +588,8 @@ def fetch(keywords: Optional[List[str]] = None,
     profile = common.load_profile()
     keywords = keywords or (profile.get("tech_stack", {}).get("core") or [])[:3]
     locations = locations or markets.target_locations(profile)
+    skipped = set(skip_locations or ())
+    locations = [location for location in locations if location not in skipped]
 
     if not keywords or not locations:
         return [], "nothing to query: the keyword or country list is empty"

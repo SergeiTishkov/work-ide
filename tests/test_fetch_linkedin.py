@@ -245,6 +245,16 @@ def test_a_query_at_the_ceiling_is_split_into_narrower_ones(monkeypatch):
     assert "1 at the ceiling" in note
 
 
+def test_skipped_countries_are_not_searched(monkeypatch):
+    """Task 0050: countries whose searches found nothing for the shortlist in
+    five runs are left out of LinkedIn's walk, not out of the markets."""
+    calls = []
+    _quiet(monkeypatch, _ceiling_search(calls))
+    fetch_linkedin.fetch(keywords=["C#"], locations=["Iceland", "France"], enrich_limit=0,
+                         split_at_ceiling=False, skip_locations=["France"])
+    assert {location for _, location, _ in calls} == {"Iceland"}
+
+
 def test_the_ceiling_costs_one_request_not_a_walk_to_max_pages(monkeypatch):
     calls = []
     _quiet(monkeypatch, _ceiling_search(calls))

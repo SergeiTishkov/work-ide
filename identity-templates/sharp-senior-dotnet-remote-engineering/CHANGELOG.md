@@ -6,6 +6,18 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V32 — "deployment strategist" out of LinkedIn, 2026-10-28
+
+**Removed** (`sharp_sources.yaml` → `linkedin.params.keywords`): "deployment
+strategist". In five runs with `found_by` its two forms served 17 166
+vacancies, none of them shortlisted, at 84 queries a run (task 0050). If you
+keep your own sources file, remove it there: a template update does not
+reach it.
+
+**Added** (`linkedin` fetcher): `params.skip_locations`, countries of the
+market tiers the LinkedIn walk leaves out; they stay markets for the
+scoring. Empty in the template.
+
 ## V31 — forward deployed companies and titles, 2026-10-22
 
 **Added** (`sharp_ats_targets.yaml`): 26 careers boards of companies that

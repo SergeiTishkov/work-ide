@@ -87,11 +87,15 @@ sources:
       # reads deeper. Three words are 84 more pairs; the per-query statistics
       # after a run say which to keep. "Solutions engineer" is not here: the
       # criteria refuse it as a pre-sales title.
+      #
+      # 2026-10-28 (task 0050): "deployment strategist" out. In five runs with
+      # `found_by` (tools/linkedin_yield.py) its two forms served 17 166
+      # vacancies, none of them shortlisted, and took 84 queries a run.
       keywords: [".NET developer", "C# developer", "ASP.NET",
                  "senior .NET engineer", "contract C# developer",
                  ".NET architect", "forward deployed engineer",
                  "forward engineer", "AI engineer", "applied AI engineer",
-                 "AI deployment engineer", "deployment strategist"]
+                 "AI deployment engineer"]
       # Every page of every (word x country) pair, postings of the last week
       # (measured 2026-10-03: ten cards a page and at most 100 per query to an
       # anonymous request; a query that reaches that ceiling is split by the
@@ -104,6 +108,8 @@ sources:
       enrich_limit: 0
     # Locations are not set: they come from profile.target_markets (the market
     # tiers). That way the country list lives in one place and does not drift.
+    # skip_locations: [<country>, ...] leaves countries of the tiers out of
+    # the LinkedIn walk only; they stay markets for the scoring (task 0050).
 
   - name: devitjobs
     enabled: true
