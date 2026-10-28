@@ -451,7 +451,7 @@ history.
   than any other.
 - `docs/VACANCY_CHECKLIST.md` — the mandatory manual checklist for candidates.
 - `tasks/` — the list of work: one file per task, the folder its stage
-  (`1-triage`, `2-to-do`, `3-done`, `4-cancelled`). The format is
+  (`0-potential`, `1-triage`, `2-to-do`, `3-done`, `4-cancelled`). The format is
   `tasks/README.md`.
 
 **Identity-level documents** (in its folder, with its prefix):
@@ -490,11 +490,13 @@ use it before the first edit of any change and before every commit.
   (`python tools/tasks.py find <words>`). Work the owner asks for that has no
   task gets one in `tasks/2-to-do/` first, a one-line fix included; an idea
   of the agent's own goes to `tasks/1-triage/` and waits for the owner. A
+  question the owner will check in practice before deciding goes to
+  `tasks/0-potential/`; from there it moves to any stage the owner names. A
   fix to what a done task delivered is a new task, not a reopened one.
 - Every commit carries a `Task: NNNN` line and changes that task's file in
   the same commit: the items it finishes marked DONE, the work it does added
   as items, the file moved to `tasks/3-done/` with its last item. A task in
-  `1-triage/` covers no work outside `tasks/`.
+  `0-potential/` or `1-triage/` covers no work outside `tasks/`.
 - The one kind of commit with no task: one that changes task files only
   (writing, planning, moving tasks). A change to the task system itself —
   `tasks/README.md`, the hook, its tests, `tools/tasks.py` — has a task.

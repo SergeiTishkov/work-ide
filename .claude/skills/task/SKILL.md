@@ -28,6 +28,11 @@ python tools/tasks.py find <two or three words of the change>
 - **A task in `1-triage/` covers it** — triage is not agreed work. If the
   owner has now asked for it, move the file to `2-to-do/` (same number) as
   part of the first commit. If the owner has not, do not start: ask.
+- **A task in `0-potential/` covers it** — a question the owner checks in
+  practice. When the owner has decided, move the file to the stage they
+  name (to-do, done, triage or cancelled) as part of the first commit; a
+  decision to close it at once goes straight to `3-done/` with the work.
+  Until then, do not start: ask.
 - **A task in `4-cancelled/` covers it** — the owner decided against it. Do
   not start: ask. If the owner wants it after all, move it back to `2-to-do/`
   and drop its `Cancelled:` line.
@@ -43,7 +48,8 @@ python tools/tasks.py find <two or three words of the change>
   that scope to the `Scope:` line.
 
   `to-do` when the owner asked for it, `triage` when it is the agent's own
-  idea (and then stop and ask, as above). Fill `## Business` with what the
+  idea (and then stop and ask, as above), `potential` when it is a question
+  the owner will check in practice before deciding. Fill `## Business` with what the
   person needs and why, in English, before writing code; replace the
   "Work out the plan" item with the items as soon as the plan is known.
 

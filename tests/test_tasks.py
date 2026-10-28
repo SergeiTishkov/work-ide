@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import tasks as tasks_tool  # noqa: E402
 
 TASKS = ROOT / "tasks"
-STAGES = ("1-triage", "2-to-do", "3-done", "4-cancelled")
+STAGES = ("0-potential", "1-triage", "2-to-do", "3-done", "4-cancelled")
 NAME = re.compile(r"^(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
 MARK = re.compile(r"^(?:- |### )(TO DO|DONE) - \S")
 # a line that means to be a mark but is spelled another way
@@ -29,7 +29,7 @@ def _lines(path):
     return path.read_text(encoding="utf-8").splitlines()
 
 
-def test_no_folder_but_the_four_stages():
+def test_no_folder_but_the_five_stages():
     assert set(p.name for p in TASKS.iterdir() if p.is_dir()) <= set(STAGES)
 
 
@@ -123,6 +123,8 @@ def test_a_new_task_goes_into_a_stage_git_did_not_keep(tmp_path, monkeypatch):
     monkeypatch.setattr(tasks_tool, "TASKS", tmp_path)
     path = tasks_tool.new("triage", "an-idea", "An idea", "the agent", "Why.", "tools")
     assert path.parent == tmp_path / "1-triage" and path.is_file()
+    path = tasks_tool.new("potential", "a-question", "A question", "the owner", "Why.", "tools")
+    assert path.parent == tmp_path / "0-potential" and path.name.startswith("0001-")
 
 
 def test_a_new_task_needs_a_scope_from_the_list(tmp_path, monkeypatch):
