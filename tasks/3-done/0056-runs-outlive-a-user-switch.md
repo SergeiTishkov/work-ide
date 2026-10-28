@@ -34,6 +34,12 @@ What the owner wants:
 
 Other operating systems are not needed now (the owner, 2026-10-21).
 
+Closed 2026-10-28 by the owner without reproducing the user switch and the
+30-minute battery sleep: the service has run every task of a week, and the
+owner did not want to spend time on that check. Note for that case: while a
+task runs the worker asks Windows to stay awake, and a closed lid puts the
+laptop to sleep regardless.
+
 ## Implementation
 **The queue is SQLite, a file of its own** (`data/tasks.sqlite`, WAL): the
 tasks, their steps, their state and who runs them; logs are files beside
@@ -104,5 +110,4 @@ the task must appear in the queue and run there.
 - DONE - Agent infrastructure: the `run-task` skill, the CLAUDE.md and RUNBOOK rules, `/top` and `/run` add their long step to the queue unless `taskq.py current` names the session's own task; the `pipeline` kind takes `skip_contracts`
 - DONE - Docs: README (the task service, registering the workers), ARCHITECTURE (the task service, the in-memory queue it replaced, what was not taken), IDENTITIES
 - DONE - Subagent check (2026-10-21, dry runs on the real identities): asked to collect, the agent ran `taskq.py current`, chose `taskq.py collect <p>`, a background `wait`, saw no worker registered and named `taskd.py install`, and did not run the pipeline itself; asked for a CV and a clean-up, it chose `taskq.py add cv` and `add clean`, and pointed out that the skill's clean-up example read `older` as "before the last run" (it is more than 30 days): the example now names the filter values from `cleanup.py --help` and a dry run first
-- TO DO - End-to-end check: tasks from the app, the agent, a terminal and a schedule all appear, run, and end with the right state
-- TO DO - Reproduce the user switch and the 30-minute battery sleep with the service; record what happens
+- DONE - End-to-end check, from a week of real use (2026-10-21 to 2026-10-28, 50 tasks): from the app 9 CVs and letters (8 done, 1 failed: the model's letter had no greeting and no closing), from the agent 12, from the schedule 23 (22 done, 1 failed: cv_batch #25, `PermissionError` replacing `data/cv_batch.json`), 4 AI reads queued by themselves, 2 runs started by hand that registered themselves; LinkedIn #22 was interrupted, queued again and finished on its second attempt. Stopping a task by hand is covered by the tests only
