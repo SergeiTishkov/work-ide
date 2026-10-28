@@ -15,7 +15,8 @@ as well (Harvey twice, Händlerbund, Jobot).
 ## Implementation
 - `config/ai_screen_prompt.md`, `required_languages` and
   `posting_languages`: human languages only (English, German, Polish);
-  never a programming language.
+  never a programming language. Under task 0103 the prompt change reads
+  nothing again.
 - `tools/ai_screen.py`, `language_refusal`: a name that is a technology of
   `config/tech_vocabulary.yaml` (its canonical names: Python, Go, PHP,
   Scala) is not a language the posting requires, so an answer already
@@ -23,5 +24,6 @@ as well (Harvey twice, Händlerbund, Jobot).
 - Tests: `tests/test_ai_screen.py`, the five names above.
 
 ## Items
-- TO DO - The owner agrees
-- TO DO - The prompt line, the program's check, tests; the five records rescored
+- DONE - The owner agrees (2026-10-28)
+- DONE - The prompt line, the program's check, tests
+- TO DO - The five records rescored

@@ -63,7 +63,8 @@ Answer with the structured output only.
   candidate, as lower-case English names, including the language it is
   written in when it asks for fluency in it. A language it only wishes for
   ("a plus", "nice to have", "von Vorteil", "preferred") is not required.
-  Empty when it requires none.
+  Empty when it requires none. Both fields name human languages only: a
+  programming language (Python, Go, PHP, Scala) is never one of them.
 - `verdict`: "reject" ONLY when at least one is clearly true: it is not a job
   posting; the work is hybrid or onsite; location_ok is "no"; cv_fit is
   "no"; none of `posting_languages` is a language the person knows (the

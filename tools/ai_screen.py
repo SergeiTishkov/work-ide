@@ -48,6 +48,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -159,6 +160,22 @@ def _language(name) -> str:
     return word.group(0).lower() if word else ""
 
 
+@lru_cache(maxsize=1)
+def _technologies() -> frozenset:
+    """The technologies of config/tech_vocabulary.yaml, as _language reads
+    them ("Python", "Node.js" -> "python", "node"). The model named "python",
+    "php" and "scala" as required languages (task 0102); none of them is one
+    a person speaks."""
+    data = common.load_yaml(ROOT / "config" / "tech_vocabulary.yaml") or {}
+    return frozenset(filter(None, map(_language, data.get("technologies") or ())))
+
+
+def _languages(names) -> list:
+    """The human languages among the model's names, as _language reads them."""
+    tech = _technologies()
+    return [x for x in map(_language, names or ()) if x and x not in tech]
+
+
 def person_languages(profile: dict) -> list:
     """The languages the person works in, from the profile's owner.languages."""
     out = []
@@ -183,18 +200,18 @@ def language_refusal(screen: Optional[dict], languages) -> Optional[str]:
     """The program's verdict on the model's language fields: why the posting
     is out, or None. Out when none of the languages the text is written in is
     the person's (a bilingual text with an English half is not out for an
-    English speaker), or when it requires one they do not know. An answer
+    English speaker), or when it requires one they do not know. A
+    technology named there (task 0102) is not a language. An answer
     without the fields (given before 2026-10-25) or a profile without
     languages decides nothing."""
     if not screen or not languages:
         return None
     allowed = set(languages)
-    written = [_language(x) for x in screen.get("posting_languages") or ()]
-    written = [x for x in written if x]
+    written = _languages(screen.get("posting_languages"))
     if written and not allowed.intersection(written):
         return "posting written in " + ", ".join(x.capitalize() for x in dict.fromkeys(written))
-    required = [_language(x) for x in screen.get("required_languages") or ()]
-    outside = [x for x in dict.fromkeys(required) if x and x not in allowed]
+    required = _languages(screen.get("required_languages"))
+    outside = [x for x in dict.fromkeys(required) if x not in allowed]
     if outside:
         return "requires " + ", ".join(x.capitalize() for x in outside)
     return None

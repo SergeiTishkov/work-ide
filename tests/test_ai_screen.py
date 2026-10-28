@@ -207,6 +207,28 @@ def test_the_program_compares_the_named_languages_with_the_persons():
     assert ai_screen.language_refusal(None, mine) is None
 
 
+def test_a_programming_language_is_not_a_language_the_posting_requires():
+    """Task 0102: the model named "python" (four answers), "php" and "scala"
+    as required languages; ElevenLabs' full-stack posting was kept by the
+    model and refused for "requires Python" alone."""
+    mine = ["english", "russian"]
+    for name in ("python", "Python", "php", "scala", "Go", "node.js"):
+        screen = {"posting_languages": ["english"], "required_languages": ["english", name]}
+        assert ai_screen.language_refusal(screen, mine) is None, name
+    assert ai_screen.language_refusal(
+        {"posting_languages": ["english"], "required_languages": ["python", "german"]}, mine) == "requires German"
+    assert ai_screen.language_refusal({"posting_languages": ["python"]}, mine) is None
+
+
+def test_no_human_language_reads_as_a_technology():
+    technologies = ai_screen._technologies()
+    assert {"python", "php", "scala", "go"} <= technologies
+    spoken = ("english", "german", "polish", "french", "spanish", "dutch", "italian", "portuguese",
+              "russian", "ukrainian", "swedish", "danish", "norwegian", "finnish", "czech", "hungarian",
+              "romanian", "turkish", "arabic", "hebrew", "japanese", "chinese", "korean", "greek")
+    assert not technologies.intersection(spoken)
+
+
 def test_the_system_prompt_names_the_persons_languages_and_its_hash_covers_them(isolated_data_dir):
     with db.session():
         pass
