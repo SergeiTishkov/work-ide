@@ -54,11 +54,16 @@ Answer with the structured output only.
   (training models, research), "data_heavy" (data engineering or data
   science as the main work), "other".
 - `posting_languages`: the languages the posting's text is written in, as
-  lower-case English names ("english", "polish", "german"). A text with
-  parts in two languages (an English version below a Japanese one, "[NL]"
-  then "[EN]") names both. Tool, product and company names do not count:
-  "Deutsche Bank", "C#" or a German city in an English text do not make it
-  German. With no text, judge by the title.
+  lower-case English names ("english", "polish", "german"). A language
+  counts when the duties or the requirements are written in it. A text with
+  versions in two or more languages (an English version below a Japanese
+  one, "[NL]" then "[EN]") names each of them. A job board's label line
+  ("Languages: English skills required (English B2)."), a heading,
+  technology terms or a single sentence in another language do not count:
+  a Polish text that starts with such an English line is Polish. Tool,
+  product and company names do not count either: "Deutsche Bank", "C#" or
+  a German city in an English text do not make it German. With no text,
+  judge by the title.
 - `required_languages`: the languages the posting requires of the
   candidate, as lower-case English names, including the language it is
   written in when it asks for fluency in it. A language it only wishes for
