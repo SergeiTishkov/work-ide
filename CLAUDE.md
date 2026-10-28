@@ -485,7 +485,11 @@ use it before the first edit of any change and before every commit.
   A task that turned out to need no commit is deleted (`git rm`, a commit of
   task files only); history is not rewritten, and its number is not reused.
   A task the owner decided against moves to `tasks/4-cancelled/` with a
-  `Cancelled:` line, and covers no work.
+  `Cancelled:` line, and covers no work. A task done in spirit (its problem
+  solved by other work, its purpose reached another way) goes to
+  `tasks/3-done/` instead, its text rewritten first: the proposed measures
+  removed, why it needs no change of its own and which work solved it
+  (the owner, 2026-10-28; `tasks/README.md`).
 - Before starting, find the task the work belongs to
   (`python tools/tasks.py find <words>`). Work the owner asks for that has no
   task gets one in `tasks/2-to-do/` first, a one-line fix included; an idea
