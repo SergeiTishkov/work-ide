@@ -1,6 +1,7 @@
 # 0100 Kept answers read again come back "reject" for a quarter of the list
 
 Source: task 0084's measurement, 2026-10-25: sharp
+Cancelled: the owner, 2026-10-28: the list is kept empty and applied to at once, so a re-read only touches vacancies already seen; and since task 0103 a prompt change reads nothing again unless the owner asks for it
 Scope: tools
 
 ## Business
