@@ -6,6 +6,15 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V33 — two more FDE words out of LinkedIn, 2026-10-28
+
+**Removed** (`sharp_sources.yaml` → `linkedin.params.keywords`): "applied AI
+engineer" and "AI deployment engineer". In five runs with `found_by` every
+shortlisted vacancy they served (2 and 3) was found by other searches as
+well; they took 56 queries a run (task 0077). The HN keywords stay. If you
+keep your own sources file, remove them there: a template update does not
+reach it.
+
 ## V32 — "deployment strategist" out of LinkedIn, 2026-10-28
 
 **Removed** (`sharp_sources.yaml` → `linkedin.params.keywords`): "deployment
