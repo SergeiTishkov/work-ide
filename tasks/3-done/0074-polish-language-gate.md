@@ -15,9 +15,10 @@ Closed as done without a change of its own (the owner, 2026-10-28): task
 0084 solved it. The screening model names the languages a posting is
 written in and requires, and the program refuses one the person does not
 know; no Polish phrases were added. Checked on 2026-10-28 in SHARP's base:
-of 30 postings the model read with Polish, the 26 that require Polish or
-are written in Polish alone are refused for language; the 4 kept are
-written in Polish and English and require English only (task 0099).
+of 32 postings the model read with Polish, the 26 that require Polish or
+are written in Polish alone are refused for language; the other 6 are
+written in Polish and English and require English only: 2 refused on other
+grounds, 4 kept (task 0099).
 
 ## Items
-- DONE - Solved by task 0084; checked on 30 postings with Polish (2026-10-28)
+- DONE - Solved by task 0084; checked on 32 postings with Polish (2026-10-28)
