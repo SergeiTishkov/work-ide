@@ -46,4 +46,11 @@ run, so nothing is cut on the old numbers alone.
 - DONE - From the per-query statistics of the first run, find what share of the pairs brought nothing new; write the plan here
 - DONE - Each LinkedIn vacancy records the searches that served it (`found_by`), merged across runs
 - DONE - tools/linkedin_yield.py: shortlisted vacancies each search, keyword or country found alone
-- TO DO - After a full run with `found_by`, show the owner the searches with nothing found alone and cut the ones agreed
+- DONE - After a full run with `found_by`, show the owner the searches with nothing found alone and cut the ones agreed (2026-10-28):
+  five runs with `found_by`, 9 shortlisted vacancies from LinkedIn. The run of
+  2026-10-27: 865 queries, 10:55 of fetch, 415 x 429. Twenty countries found
+  nothing shortlisted and took 5.1 of the 10.9 hours; the owner cut seven
+  (France, Japan, Italy, Belgium, South Korea, New Zealand, Australia) with
+  `skip_locations` and kept the rest. "deployment strategist" (both forms,
+  17 166 served, 0 shortlisted) out of the keywords, template V32. Other
+  keywords stay: every shortlisted vacancy was found by several searches.
