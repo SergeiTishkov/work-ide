@@ -1,7 +1,6 @@
 # 0100 Kept answers read again come back "reject" for a quarter of the list
 
 Source: task 0084's measurement, 2026-10-25: sharp
-Cancelled: the owner, 2026-10-28: the list is kept empty and applied to at once, so a re-read only touches vacancies already seen; and since task 0103 a prompt change reads nothing again unless the owner asks for it
 Scope: tools
 
 ## Business
@@ -21,13 +20,11 @@ CV and letter were made for four of the thirty on the same day (cv_batch
 #26: infraMOD, Enode, GRASWALD AI, Crossing Hurdles). The same text and
 the same CV gave "keep" before; only the prompt's language part changed.
 
-## Implementation
-For the owner to choose:
-- a prompt change that only adds a reason to refuse keeps a "keep" answer
-  and asks only that reason (a narrower question);
-- a "reject" that reverses a "keep" is asked a second time, and the
-  vacancy leaves only on two;
-- nothing changes; a re-read is a fresh opinion.
+Closed as done without a change of its own (the owner, 2026-10-28): task
+0103 solved it. A prompt or brief change no longer reads the answered
+vacancies again; a re-read happens only when the owner asks for it, and the
+owner keeps the list empty and applies at once, so a re-read would touch
+vacancies already seen.
 
 ## Items
-- TO DO - The owner chooses
+- DONE - Solved by task 0103: no re-read after a prompt change without the owner's yes
