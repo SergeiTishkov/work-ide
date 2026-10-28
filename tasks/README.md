@@ -10,7 +10,7 @@ folder a file sits in is its stage.
 | `1-triage/` | TRIAGE | Ideas nobody has agreed to yet: the agent's own backlog, sources noticed in passing, offers made in a conversation. The owner decides whether each goes to TO DO or is cancelled. |
 | `2-to-do/` | TO DO | Work the owner wants, with at least one item still to do. |
 | `3-done/` | DONE | Work finished: every item is DONE. Written from the git history up to 2026-10-20. |
-| `4-cancelled/` | CANCELLED | Work the owner decided not to do (2026-10-21), from any stage: the file stays as it stood, with a `Cancelled:` line under `Source:` saying who decided, when and why. Its TO DO items stay; nothing is done under it. |
+| `4-cancelled/` | CANCELLED | Work the owner decided not to do (2026-10-21), on purpose, from any stage: the file stays as it stood, with a `Cancelled:` line under `Source:` saying who decided, when and why. Its TO DO items stay; nothing is done under it. |
 
 A task moves by moving its file. Its number stays.
 
@@ -97,7 +97,14 @@ The procedure is the `task` skill (`.claude/skills/task/SKILL.md`).
   check in practice.
 - A task that turned out to need no commit is deleted (`git rm`, in a commit
   of task files only). A task the owner decided against is not deleted: it
-  moves to `4-cancelled/` with its `Cancelled:` line. History is not rewritten, and the number is not
+  moves to `4-cancelled/` with its `Cancelled:` line.
+- A task done in spirit goes to `3-done/`, not to `4-cancelled/` (the owner,
+  2026-10-28, task 0080): its problem is solved by other work, or its purpose
+  is reached another way than its items say. Cancelled is only for work the
+  owner does not want. Before the move the text is rewritten so that a later
+  agent does not take the old plan for work still owed: the proposed
+  measures are removed, the Business says why no change of its own is
+  needed and which work solved it, and the items are what was checked. History is not rewritten, and the number is not
   handed out again: `tools/tasks.py next` reads it from git history.
 - The commit message has a line `Task: NNNN`, and the commit changes that
   task's file: the item it finishes marked DONE, the work it does added as an

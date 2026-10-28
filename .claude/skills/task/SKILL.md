@@ -33,6 +33,13 @@ python tools/tasks.py find <two or three words of the change>
   name (to-do, done, triage or cancelled) as part of the first commit; a
   decision to close it at once goes straight to `3-done/` with the work.
   Until then, do not start: ask.
+- **A task turns out done in spirit** — other work solved its problem, or
+  its purpose is reached another way than its items say. It goes to
+  `3-done/`, not to `4-cancelled/` (that is for work the owner does not
+  want). Rewrite it first, so a later agent does not take the old plan for
+  work still owed: remove the proposed measures, say in the Business why no
+  change of its own is needed and which work solved it, and list what was
+  checked as DONE items. A commit of the task file only.
 - **A task in `4-cancelled/` covers it** — the owner decided against it. Do
   not start: ask. If the owner wants it after all, move it back to `2-to-do/`
   and drop its `Cancelled:` line.
