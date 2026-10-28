@@ -1,4 +1,4 @@
-# 0105 Does a language in the title stress expertise?
+# 0105 Does a programming language in the title stress expertise?
 
 Source: the owner, 2026-10-28, with the language rule of the sharp identity
 Scope: identity:sharp
