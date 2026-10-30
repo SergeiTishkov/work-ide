@@ -6,6 +6,12 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V18 — placeholders instead of pay figures, 2026-10-30
+
+**Changed** (`partsharp_profile.yaml` → `goal`, comments only): the example
+ranges for `target_compensation` are `[<min>, <max>]`. Nothing to change
+locally.
+
 ## V17 — ITAR as a word, 2026-10-22
 
 **Changed** (`partsharp_criteria.yaml` → `remote_location_fit.hard_dealbreakers.keywords`):

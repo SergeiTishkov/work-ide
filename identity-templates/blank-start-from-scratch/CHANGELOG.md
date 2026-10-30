@@ -2,6 +2,13 @@
 
 New versions go on TOP.
 
+## V7 — placeholders instead of pay figures, 2026-10-30
+
+**Changed** (comments only): the example ranges in `blank_profile.yaml` →
+`goal.target_compensation` are `[<min>, <max>]`, and the note on intensity
+against pay in `blank_criteria.yaml` names no amounts. Nothing to change
+locally.
+
 ## V6 — ITAR as a word, 2026-10-22
 
 **Changed** (`blank_criteria.yaml` → `remote_location_fit.hard_dealbreakers.keywords`):

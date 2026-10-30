@@ -83,9 +83,9 @@ goal:
   # mean something to you; an empty range simply sits out the comparison.
   #
   #   target_compensation:
-  #     monthly_parttime_usd:  [5000, 8000]    # "$5-8k/month"
-  #     annual_parttime_usd:   [60000, 96000]  # "$60k-96k/year"
-  #     hourly_contractor_usd: [55, 130]       # "$55-130/hour"
+  #     monthly_parttime_usd:  [<min>, <max>]   # a month
+  #     annual_parttime_usd:   [<min>, <max>]   # a year
+  #     hourly_contractor_usd: [<min>, <max>]   # an hour
   #
   # The unit is US dollars: vacancies quote sums in anything at all, and
   # converting once here is simpler than in every comparison.

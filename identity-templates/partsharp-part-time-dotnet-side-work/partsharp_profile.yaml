@@ -68,8 +68,8 @@ goal:
   # Pay expectations are personal. Only the SHAPE is here:
   #
   #   target_compensation:
-  #     hourly_contractor_usd: [60, 150]
-  #     annual_parttime_usd:   [125000, 300000]   # full-time equivalent
+  #     hourly_contractor_usd: [<min>, <max>]
+  #     annual_parttime_usd:   [<min>, <max>]   # full-time equivalent
   #
   # The graded tiers that actually rank pay are in partsharp_criteria.yaml ->
   # compensation_signal.hourly_equivalent_tiers.

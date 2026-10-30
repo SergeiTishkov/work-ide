@@ -119,22 +119,10 @@ goal:
   ai_tools_note: >
     AI tools (Claude/Cursor/Copilot) are used actively in the work.
 
-  # Pay expectations are personal: they depend on the person and their
-  # circumstances rather than on the kind of search.
-  # Pay expectations. The amounts are personal — only the SHAPE the scoring
-  # expects is here. Filled in in the local identity.
-  #
-  # Three ranges, because vacancies quote money in different ways and the
-  # comparison has to be against a comparable figure. Fill in the ones that
-  # mean something to you; an empty range simply sits out the comparison.
-  #
-  #   target_compensation:
-  #     monthly_parttime_usd:  [5000, 8000]    # "$5-8k/month"
-  #     annual_parttime_usd:   [60000, 96000]  # "$60k-96k/year"
-  #     hourly_contractor_usd: [55, 130]       # "$55-130/hour"
-  #
-  # The unit is US dollars: vacancies quote sums in anything at all, and
-  # converting once here is simpler than in every comparison.
+  # High pay is one of the goals of this search (purpose above). The amounts
+  # are personal and are filled in in the local identity; the shape the
+  # scoring reads is described in the blank template (blank_profile.yaml ->
+  # goal.target_compensation).
   target_compensation: {}
 
 employment_type_priority:

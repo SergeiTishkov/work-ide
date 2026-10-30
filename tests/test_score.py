@@ -2156,8 +2156,8 @@ def test_an_unfamiliar_compensation_shape_does_not_crash_the_run():
     """
     profile = json.loads(json.dumps(PROFILE))
     profile["goal"]["target_compensation"] = {"currency": "USD",
-                                              "monthly_min": 5000,
-                                              "monthly_target": 8000}
+                                              "monthly_min": 4000,
+                                              "monthly_target": 6000}
     v = make_vacancy(title="Senior .NET Developer",
                      description_text="C# and ASP.NET role. $120,000 - $150,000 per year.")
     result = score.score_vacancy(v, CRITERIA, profile)
@@ -2167,11 +2167,11 @@ def test_an_unfamiliar_compensation_shape_does_not_crash_the_run():
 def test_a_filled_compensation_range_still_penalises_a_low_offer():
     """Tolerating the shape must not mean the comparison stopped working."""
     profile = json.loads(json.dumps(PROFILE))
-    profile["goal"]["target_compensation"] = {"annual_parttime_usd": [60000, 96000]}
+    profile["goal"]["target_compensation"] = {"annual_parttime_usd": [48000, 72000]}
     low = make_vacancy(title="Senior .NET Developer",
                        description_text="C# and ASP.NET. Salary $20,000 - $25,000 per year.")
     fit = make_vacancy(title="Senior .NET Developer",
-                       description_text="C# and ASP.NET. Salary $70,000 - $90,000 per year.")
+                       description_text="C# and ASP.NET. Salary $50,000 - $70,000 per year.")
     low_points = score.score_vacancy(low, CRITERIA, profile)["score_breakdown"]["compensation_signal"]["points"]
     fit_points = score.score_vacancy(fit, CRITERIA, profile)["score_breakdown"]["compensation_signal"]["points"]
     assert low_points < fit_points
