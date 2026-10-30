@@ -63,7 +63,7 @@ owner:
 target_regions:
   # Confirmed by the owner explicitly (2026-07-30). The US and Canada are the
   # priority (the "dream"), but the real, dependable option is a contract with
-  # a company in Israel or the UAE at about $5k a month: a lower ceiling but a
+  # a company in Israel or the UAE at lower pay: a lower ceiling but a
   # higher probability of actually being hired. Both are equally valid to the
   # system — not "plan B is worse" but "the same quality, a different chance".
   dream:
@@ -106,12 +106,12 @@ goal:
     in its "ageing", well-documented edition.
   target_compensation:
     currency: USD
-    # Confirmed by the owner explicitly (2026-07-30): the guide is $5000-8000 a
-    # month at 2-4 hours a day. $7-8k is preferable but not at the cost of
-    # calm: guaranteed dull, easy work at $5k beats stressful work at $8k.
-    monthly_parttime_usd: [5000, 8000]
-    annual_parttime_usd: [60000, 96000]  # = monthly_parttime_usd * 12, to compare with annual ranges
-    hourly_contractor_usd: [55, 130]  # $5-8k/month at 44-88 h/month (2-4 h x ~22 working days)
+    # Test values. The upper end is preferable but not at the cost of calm:
+    # guaranteed dull, easy work at the lower end beats stressful work at the
+    # upper.
+    monthly_parttime_usd: [4000, 6000]
+    annual_parttime_usd: [48000, 72000]  # = monthly_parttime_usd * 12, to compare with annual ranges
+    hourly_contractor_usd: [45, 136]  # $4-6k/month at 44-88 h/month (2-4 h x ~22 working days)
     priority_note: >
       The priority is strict: guaranteed low intensity and stress matter more
       than higher pay. If a vacancy is plainly calm (low low_intensity risk,

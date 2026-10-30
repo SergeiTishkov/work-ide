@@ -6,6 +6,14 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V34 — no pay figures in the template, 2026-10-30
+
+**Changed** (`sharp_profile.yaml` → `goal`): the comment above
+`target_compensation` no longer gives example amounts. It says that high pay
+is one of the goals of this search; the amounts are filled in in the local
+identity, and the shape is described in the blank template. Nothing to change
+locally.
+
 ## V33 — two more FDE words out of LinkedIn, 2026-10-28
 
 **Removed** (`sharp_sources.yaml` → `linkedin.params.keywords`): "applied AI

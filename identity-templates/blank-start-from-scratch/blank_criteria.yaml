@@ -33,8 +33,8 @@ weights:
 # IMPORTANT (confirmed by the owner explicitly, 2026-07-30):
 # low_intensity_signal (20) deliberately weighs twice compensation_signal (10),
 # and its range (-20..+20) is four times as wide as compensation_signal's
-# (about +2..+10). That is deliberate: "I will take guaranteed dull, easy work
-# at $5k a month over stressful work at $8k". Do not level these weights, even
+# (about +2..+10). That is deliberate: guaranteed dull, easy work at lower
+# pay beats stressful work at higher pay. Do not level these weights, even
 # when tempted to "fix" the low score of a well-paid but stressful vacancy —
 # it is working as intended.
 
