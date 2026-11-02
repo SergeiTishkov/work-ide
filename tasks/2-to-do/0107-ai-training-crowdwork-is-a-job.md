@@ -17,8 +17,10 @@ The owner, 2026-11-02: "Краудворк по обучению ИИ являе
 person can mark it "not for me" themselves). The AI check keeps it, and the
 person decides.
 
-The rule comes from the brief (`config/ai_brief_prompt.md` and the brief
-written from it), not from the scripts.
+The rule comes from the AI check, not from the scripts: it is in
+`config/ai_screen_prompt.md` (`is_job_posting` is false for "AI training
+crowdwork") and in `config/ai_brief_prompt.md` (the brief lists crowdwork
+for training AI models as not a posting).
 
 ## Items
 - TO DO - Work out the plan and write it here as the next items
