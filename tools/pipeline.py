@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
+import re
 import sqlite3
 import sys
 import time
@@ -359,12 +360,13 @@ AI_LIMIT: Optional[ai_limit.UsageLimit] = None
 
 
 def ai_check_stage(vacancies: dict, state: dict, limit: Optional[int] = None,
-                   reread: bool = False) -> bool:
+                   reread: bool = False, since: Optional[str] = None) -> bool:
     """The screening brief (rewritten when the CV or the identity changed),
     then the cheap model on the top classes (tools/ai_screen.py). True when
     an answer was added, so the caller rescores. Never raises; the usage
     limit is kept in AI_LIMIT. `reread`: the answers given under another
-    prompt or brief are read again (task 0103)."""
+    prompt or brief are read again (task 0103), with `since` only for the
+    vacancies first seen from that day."""
     global AI_LIMIT
     prefix = common.ACTIVE_IDENTITY
     if AI_LIMIT is not None:
@@ -383,7 +385,8 @@ def ai_check_stage(vacancies: dict, state: dict, limit: Optional[int] = None,
         return False
     try:
         with progress.stage("AI check of the top") as st:
-            stats = ai_screen.screen(vacancies, prefix, ai_brief.load(prefix), limit=limit, reread=reread)
+            stats = ai_screen.screen(vacancies, prefix, ai_brief.load(prefix), limit=limit,
+                                       reread=reread, since=since)
             st.note = _stats_note(stats)
     except ai_limit.UsageLimit as exc:
         AI_LIMIT = exc
@@ -944,16 +947,17 @@ def run_rest() -> dict:
             "collected": "nothing: the rest run fetches nothing"}
 
 
-def run_ai(reread: bool = False) -> dict:
+def run_ai(reread: bool = False, since: Optional[str] = None) -> dict:
     """The AI check alone (task 0078): the vacancies waiting for the read
     ("not processed with AI") and the stretches, then the top rescored with
     the answers and a "rebuild" selection. Queued by queue_ai_read when a
     run left vacancies unread. Nothing fetched; the base is not rescored.
     `reread`: the answered ones are read again under the current prompt and
-    brief, only when the owner asked for it (task 0103)."""
+    brief, only when the owner asked for it (task 0103); `since`
+    (YYYY-MM-DD) keeps that to the vacancies first seen from that day."""
     vacancies, companies, state = _load()
     criteria, profile = score.load_criteria(), score.load_profile()
-    if ai_check_stage(vacancies, state, reread=reread):
+    if ai_check_stage(vacancies, state, reread=reread, since=since):
         top = screened_subset(vacancies)
         with progress.stage(f"rescore the top, with the AI check ({progress.number(len(top))} vacancies)"):
             rescore_all(top, criteria, profile, companies)
@@ -985,7 +989,7 @@ def run_links() -> dict:
 
 def _run_mode(args, staged: Optional[dict]) -> dict:
     if args.ai:
-        return run_ai(reread=args.reread)
+        return run_ai(reread=args.reread, since=args.since)
     if args.links:
         return run_links()
     if args.linkedin:
@@ -1023,9 +1027,15 @@ def main() -> None:
     parser.add_argument("--reread", action="store_true",
                         help="with --ai: read again the answers given under another prompt or brief "
                              "(only when the owner asked for it, task 0103)")
+    parser.add_argument("--since", metavar="YYYY-MM-DD",
+                        help="with --reread: only the vacancies first seen on or after that day")
     args = parser.parse_args()
     if args.reread and not args.ai:
         parser.error("--reread goes with --ai")
+    if args.since and not args.reread:
+        parser.error("--since goes with --reread")
+    if args.since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):
+        parser.error("--since is a date, YYYY-MM-DD")
     prefix = identity_mod.activate_or_exit(args.identity)
     if identity_mod.skip_if_inactive(prefix):
         return

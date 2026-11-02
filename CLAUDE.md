@@ -300,7 +300,8 @@ The project is succeeding if:
   a change to the pipeline, the screening prompt or the brief, the stored
   answers of the screening model stay; the change applies to vacancies read
   from then on. The agent offers the re-read, with its cost, and starts it
-  (`taskq.py add ai --identity <prefix> --args '{"reread": true}'`) only on
+  (`taskq.py add ai --identity <prefix> --args '{"reread": true}'`, with
+  `"since": "YYYY-MM-DD"` for the vacancies first seen from that day) only on
   the owner's explicit "yes, read them again" (the owner, 2026-10-28, task
   0103). The owner keeps the list empty and applies at once, a re-read costs
   tokens, and the model's verdicts drift: after a language-only prompt

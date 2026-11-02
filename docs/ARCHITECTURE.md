@@ -1052,7 +1052,8 @@ strong model, kept in the local identity and rewritten when the CV changes.
   rejects from the control sample stayed rejected. The prompt is part of
   `brief_hash`, kept beside each answer. Until 2026-10-28 a prompt or brief
   change read the top again; since task 0103 the answers stay and only a
-  re-read the owner asked for (`pipeline.py --ai --reread`) reads them again:
+  re-read the owner asked for (`pipeline.py --ai --reread`, `--since
+  YYYY-MM-DD` for the vacancies first seen from that day) reads them again:
   after a language-only prompt change, 30 of 121 kept vacancies came back
   rejected on other grounds (task 0100), and the owner keeps the list empty,
   so what it held before a change has been seen.

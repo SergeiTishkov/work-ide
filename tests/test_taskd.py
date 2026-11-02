@@ -254,6 +254,10 @@ def test_the_commands_of_each_kind():
     assert taskd.command(task("rest"), python=py).argv == [py, tools("pipeline.py"), "--identity", "ftf", "--rest"]
     assert taskd.command(task("ai"), python=py).argv == [py, tools("pipeline.py"), "--identity", "ftf", "--ai"]
     assert taskd.command(task("ai", args={"reread": True}), python=py).argv[-2:] == ["--ai", "--reread"]
+    assert taskd.command(task("ai", args={"reread": True, "since": "2026-10-26"}), python=py).argv[-4:] == [
+        "--ai", "--reread", "--since", "2026-10-26"]
+    with pytest.raises(ValueError):
+        taskd.command(task("ai", args={"reread": True, "since": "2026-10-26; rm"}), python=py)
     assert taskd.command(task("linkedin"), python=py).argv[-1] == "--linkedin"
     assert taskd.command(task("pipeline", args={"mode": "top"}), python=py).argv[-1] == "--top"
     assert taskd.command(task("pipeline", args={"skip_contracts": True}), python=py).argv[-2:] == [
