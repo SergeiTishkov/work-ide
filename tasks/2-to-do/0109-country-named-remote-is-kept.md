@@ -64,8 +64,8 @@ limit. After that the brief is rewritten (`tools/ai_brief.py --identity
 sharp --force`).
 
 ## Items
-- TO DO - `config/ai_brief_prompt.md` and `config/ai_screen_prompt.md`: location refuses only on a limit the text states; the sentence on naming one country goes; tests
-- TO DO - The principle (positive prejudice: keep when in doubt, the person rejects by hand) written where the brief and the screening read it, and in the identity's description
+- DONE - `config/ai_brief_prompt.md` and `config/ai_screen_prompt.md`: location refuses only on a limit the text states; the sentence on naming one country goes; a country with no stated limit is `location_ok` "unclear", which does not reject; tests
+- DONE - The principle (positive prejudice: keep when in doubt, the person rejects by hand) written at the top of both prompts and in the sharp template's description ("Keep when in doubt", V35; hard disqualifier 2 now says "a residency requirement the posting states")
 - TO DO - Rewrite the sharp brief and check that it no longer says a named country is unreachable
 - TO DO - After the next collections: where the country-named postings land against the worldwide ones in the classes, and whether the reachability bonus (30) still puts the worldwide ones first; tune it with the owner if not
 - TO DO - Ask the owner whether to read again the remote postings already rejected on location (about 1 100, roughly $15-20); only on an explicit yes

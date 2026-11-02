@@ -72,6 +72,19 @@ def test_stretches_waiting_for_a_read_follow_the_top_within_their_own_budget():
     assert ai_screen.worklist(vacancies, {}, digest, classes=(), stretch_limit=0) == []
 
 
+def test_the_prompts_refuse_only_for_what_the_posting_states():
+    """The owner, 2026-11-02 (tasks 0107-0109): keep when in doubt. A country
+    merely named is not a limit, and AI-training crowdwork is a job."""
+    brief = ai_brief.PROMPT_PATH.read_text(encoding="utf-8")
+    screen_prompt = ai_screen.PROMPT_PATH.read_text(encoding="utf-8")
+    assert "naming one country, without saying it hires abroad, is not" not in brief
+    assert "stays reachable" in brief
+    flat = " ".join(screen_prompt.split())
+    assert "a list of many roles, AI training crowdwork)" not in flat
+    assert "crowdwork for training AI models (reviewing or writing code" in flat
+    assert 'with no such limit stated is not "no": answer "unclear"' in flat
+
+
 def test_answers_are_stored_attached_and_valid_only_for_their_text(isolated_data_dir):
     with db.session():
         pass

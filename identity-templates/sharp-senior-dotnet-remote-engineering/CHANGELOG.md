@@ -6,6 +6,20 @@ New versions go on TOP. A section's number must match `version` in
 Entries are written so that you can tell whether a change affects your local
 settings: what changed, where and why.
 
+## V35 — keep when in doubt; AI-training crowdwork is a job, 2026-11-02
+
+**Turned off** (`sharp_criteria.yaml` → `ai_training_crowdwork_gate`): the
+gate is `{}`. Paid work producing training data for AI models reaches the
+list; the person turns it down by hand (task 0107). If your local criteria
+set the gate, remove it there to follow.
+
+**Added** (`sharp_identity.md` → "Keep when in doubt"): the pipeline refuses
+a posting for what its text states. On location only a stated limit refuses;
+a country merely named does not (task 0109). A language named as one of
+several the employer accepts is not a requirement (task 0108). Hard
+disqualifier 2 now says "a residency requirement the posting states". The
+AI brief is rewritten from this description.
+
 ## V34 — no pay figures in the template, 2026-10-30
 
 **Changed** (`sharp_profile.yaml` → `goal`): the comment above
