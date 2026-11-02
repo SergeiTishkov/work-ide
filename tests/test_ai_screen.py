@@ -72,6 +72,45 @@ def test_stretches_waiting_for_a_read_follow_the_top_within_their_own_budget():
     assert ai_screen.worklist(vacancies, {}, digest, classes=(), stretch_limit=0) == []
 
 
+def test_a_reread_since_a_day_asks_again_only_what_was_first_seen_from_it():
+    """The owner asked to read again one week (2026-11-02): the answers of
+    older vacancies stay, and the week's rejected stretches are all read,
+    whatever the stretch budget."""
+    def seen(record, day):
+        record["first_seen"] = f"{day}T10:00:00+00:00"
+        return record
+
+    def rejected(vid, day, score_):
+        record = seen(_record(vid, "rejected", score_=score_), day)
+        record["computed"]["screen_wanted"] = True
+        return record
+
+    vacancies = {"old": seen(_record("old", "hot_lead", score_=60), "2026-10-20"),
+                 "new": seen(_record("new", "worth_a_look", score_=40), "2026-10-26"),
+                 "old_no": rejected("old_no", "2026-10-25", 30),
+                 "no1": rejected("no1", "2026-10-27", 20), "no2": rejected("no2", "2026-10-28", 25),
+                 "waiting": rejected("waiting", "2026-10-01", 5)}
+    stored = {vid: {"verdict": "keep", "text_hash": ai_screen.text_hash(v), "brief_hash": "b" * 16}
+              for vid, v in vacancies.items() if vid != "waiting"}
+    assert ai_screen.worklist(vacancies, stored, "c" * 16, stretch_limit=0, reread=True,
+                              since="2026-10-26") == ["new", "no2", "no1"]
+    assert ai_screen.worklist(vacancies, stored, "c" * 16, stretch_limit=1, reread=True,
+                              since="2026-10-26") == ["new", "no2", "no1", "waiting"]
+
+
+def test_the_prompts_refuse_only_for_what_the_posting_states():
+    """The owner, 2026-11-02 (tasks 0107-0109): keep when in doubt. A country
+    merely named is not a limit, and AI-training crowdwork is a job."""
+    brief = ai_brief.PROMPT_PATH.read_text(encoding="utf-8")
+    screen_prompt = ai_screen.PROMPT_PATH.read_text(encoding="utf-8")
+    assert "naming one country, without saying it hires abroad, is not" not in brief
+    assert "stays reachable" in brief
+    flat = " ".join(screen_prompt.split())
+    assert "a list of many roles, AI training crowdwork)" not in flat
+    assert "crowdwork for training AI models (reviewing or writing code" in flat
+    assert 'with no such limit stated is not "no": answer "unclear"' in flat
+
+
 def test_answers_are_stored_attached_and_valid_only_for_their_text(isolated_data_dir):
     with db.session():
         pass

@@ -290,12 +290,15 @@ def call_model(system_prompt: Path, text: str, *, model: str = MODEL, claude: st
 
 def worklist(vacancies: dict, stored: dict, brief_digest: str, classes=SCREENED_CLASSES,
              limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT,
-             reread: bool = False) -> list:
+             reread: bool = False, since: Optional[str] = None) -> list:
     """Top-class vacancies with no answer for their current text, highest
     score first; then the stretches waiting for a read, up to
     `stretch_limit`. An answer given under another prompt or brief stays
-    (the owner, 2026-10-28, task 0103); `reread` asks those again."""
-    todo, stretches = [], []
+    (the owner, 2026-10-28, task 0103); `reread` asks those again, and with
+    `since` (YYYY-MM-DD) only for vacancies first seen on or after that day.
+    The stretches read again under `since` come on top of `stretch_limit`:
+    the owner named the window, and the limit would cut it."""
+    todo, stretches, again = [], [], []
     for vid, record in vacancies.items():
         computed = record.get("computed") or {}
         if record.get("duplicate_of"):
@@ -303,23 +306,32 @@ def worklist(vacancies: dict, stored: dict, brief_digest: str, classes=SCREENED_
         top = computed.get("classification") in classes
         if not top and not computed.get("screen_wanted"):
             continue
+        fresh = reread and (not since or (record.get("first_seen") or "") >= since)
         answer = stored.get(vid)
-        if (answer and answer.get("text_hash") == text_hash(record)
-                and (not reread or answer.get("brief_hash") == brief_digest)):
+        current = answer and answer.get("text_hash") == text_hash(record)
+        if current and (not fresh or answer.get("brief_hash") == brief_digest):
             continue
-        (todo if top else stretches).append((computed.get("score") or 0, vid))
+        entry = (computed.get("score") or 0, vid)
+        if top:
+            todo.append(entry)
+        elif since and answer:
+            again.append(entry)
+        else:
+            stretches.append(entry)
     todo.sort(reverse=True)
     stretches.sort(reverse=True)
+    again.sort(reverse=True)
     keys = [vid for _, vid in todo]
     keys = keys[:limit] if limit else keys
     extra = [vid for _, vid in stretches]
-    return keys + (extra[:stretch_limit] if stretch_limit is not None else extra)
+    return (keys + [vid for _, vid in again]
+            + (extra[:stretch_limit] if stretch_limit is not None else extra))
 
 
 def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES,
            limit: Optional[int] = None, stretch_limit: Optional[int] = STRETCH_LIMIT,
            workers: int = WORKERS, call=None, pause=time.sleep, languages=None,
-           reread: bool = False) -> dict:
+           reread: bool = False, since: Optional[str] = None) -> dict:
     """Screens what needs it and attaches every answer as `_ai_screen`.
     Mutates `vacancies` in place; never raises for one posting: a posting
     whose call failed is sent again (RETRY_ROUNDS), and `errors` counts
@@ -329,7 +341,8 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
     with the stats on it (task 0057). `call` and `pause` stand in for
     call_model and time.sleep (tests). `languages` defaults to the identity's
     profile. `reread` reads again the answers given under another prompt or
-    brief (worklist)."""
+    brief, `since` limits that to the vacancies first seen from that day
+    (worklist)."""
     call = call or call_model
     import progress
 
@@ -342,7 +355,7 @@ def screen(vacancies: dict, prefix: str, brief: str, *, classes=SCREENED_CLASSES
     digest = brief_hash(brief, languages)
     with db.session() as conn:
         stored = load(conn, prefix)
-    keys = worklist(vacancies, stored, digest, classes, limit, stretch_limit, reread)
+    keys = worklist(vacancies, stored, digest, classes, limit, stretch_limit, reread, since)
     stats["considered"] = len(keys)
     lock = threading.Lock()
     limited: list = []   # the UsageLimit that stopped the screen

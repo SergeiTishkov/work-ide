@@ -3,20 +3,30 @@ are, where they can work from and which roles fit. You receive one posting at
 a time: its title, company, location fields, the board it came from and its
 text.
 
+The person reads every posting you keep and turns down by hand what does not
+fit. A good posting you reject is lost; one you keep by mistake costs a click.
+Reject only for what the posting's text states.
+
 Answer with the structured output only.
 
 - `is_job_posting`: false for anything that is not one concrete opening (a
-  comment or discussion, a talent pool, a course, a list of many roles, AI
-  training crowdwork).
+  comment or discussion, a talent pool, a course, a list of many roles). Paid
+  crowdwork for training AI models (reviewing or writing code, evaluating
+  model output) is a job posting.
 - `work_arrangement`: "remote" when the posting says the work is remote;
   "hybrid" when it asks for days or a share of time in an office (also "1 day
   a month in the office", "at least 50% of the time in the local office",
   "hybrid" anywhere in the location fields); "onsite" for an office job;
   "unclear" when the posting does not say.
-- `location_ok`: "no" when the posting limits who can apply to places the
-  person is not in (a country, a region without theirs, a right to work, a
-  clearance, a time zone they do not cover); "yes" when it states it hires
-  where they live or anywhere; "unclear" otherwise. Work a time-zone window
+- `location_ok`: "no" only when the posting states a limit that leaves the
+  person out: "only" or "must be based in" / "must reside in" a place they
+  are not in, a region without theirs, a right to work, a clearance, a label
+  such as "Remote (US)" or "Remote UK", a board's "Remote from: <place>", US
+  or Canadian payroll benefits such as a 401(k) or an RRSP, a list of states,
+  a time zone they do not cover. A country or city in the location fields or
+  the text, or the company's home country, with no such limit stated is not
+  "no": answer "unclear". "yes" when it states it hires where they live or
+  anywhere; "unclear" otherwise. Work a time-zone window
   out in UTC offsets before deciding: CET is UTC+1 and CEST UTC+2, so "CET
   ±3 hours" is UTC−2 to UTC+4 (UTC−1 to UTC+5 in summer), and a person at
   UTC+4 is inside it; an offset at the edge of a window is inside it. A
@@ -33,7 +43,9 @@ Answer with the structured output only.
   have not done? The language or framework alone does not decide it: an
   experienced developer is hired onto another mainstream stack (Node,
   TypeScript, Go, Python, Java) when the work is product or backend
-  engineering.
+  engineering. A language named as one of several the posting accepts ("Go,
+  Java, Rust or similar", "any modern language", "one of") is not a
+  requirement of that language: judge on the work and the level.
   - "fits": the CV covers what the posting requires.
   - "stretch": not their stack or not quite their role, but what the posting
     requires is software engineering they can show: backend or full-stack
@@ -41,7 +53,8 @@ Answer with the structured output only.
     APIs, agents, RAG, vector databases, integrations, prompts, evaluation
     of a product's answers); a forward deployed or solutions engineer who
     writes code with customers; a junior data or ML role open to people from
-    software development; data work at the level the CV shows.
+    software development; data work at the level the CV shows; paid
+    crowdwork that reviews or writes code for training AI models.
   - "no": the posting requires experience the CV does not have and cannot
     honestly be stretched to: training, pre-training or fine-tuning models
     as the work, ML or AI research, a PhD, PyTorch/JAX/CUDA depth;

@@ -64,8 +64,10 @@ limit. After that the brief is rewritten (`tools/ai_brief.py --identity
 sharp --force`).
 
 ## Items
-- TO DO - `config/ai_brief_prompt.md` and `config/ai_screen_prompt.md`: location refuses only on a limit the text states; the sentence on naming one country goes; tests
-- TO DO - The principle (positive prejudice: keep when in doubt, the person rejects by hand) written where the brief and the screening read it, and in the identity's description
+- DONE - `config/ai_brief_prompt.md` and `config/ai_screen_prompt.md`: location refuses only on a limit the text states; the sentence on naming one country goes; a country with no stated limit is `location_ok` "unclear", which does not reject; tests
+- DONE - The principle (positive prejudice: keep when in doubt, the person rejects by hand) written at the top of both prompts and in the sharp template's description ("Keep when in doubt", V35; hard disqualifier 2 now says "a residency requirement the posting states")
 - TO DO - Rewrite the sharp brief and check that it no longer says a named country is unreachable
 - TO DO - After the next collections: where the country-named postings land against the worldwide ones in the classes, and whether the reachability bonus (30) still puts the worldwide ones first; tune it with the owner if not
-- TO DO - Ask the owner whether to read again the remote postings already rejected on location (about 1 100, roughly $15-20); only on an explicit yes
+- DONE - Ask the owner whether to read again the postings already rejected. The owner, 2026-11-02: yes, for the vacancies first seen since Monday 2026-10-26; from the stored texts, with no new fetch
+- DONE - The re-read limited to a window: `pipeline.py --ai --reread --since YYYY-MM-DD` and the task argument `"since"` (`taskd.py`) read again only the vacancies first seen from that day, and the window's stretches are not cut by `STRETCH_LIMIT`; tests; CLAUDE.md §5 and docs/ARCHITECTURE.md
+- TO DO - The re-read of 2026-10-26 onwards after a rescore of the base, and its result written here: kept and rejected before and after, by reason

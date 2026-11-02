@@ -2020,50 +2020,14 @@ talent_pipeline_gate:
     - "no specific opening"
     - "speculative application"
 
-ai_training_crowdwork_gate:
-  # A genre that appeared on the boards in 2024-2026: a platform hires
-  # developers not to build software but to produce training data for models —
-  # writing reference solutions, labelling, rating answers, assembling RL
-  # environments. The title meanwhile is ordinary: "Senior Software Engineer".
-  #
-  # Why this is a gate rather than a penalty: piecework with no project, team
-  # or product is not what somebody looking for a steady position wants.
-  # Measured 2026-08-05: such postings took four of the top nine positions,
-  # including the first, because they list every language at once, write "no
-  # set schedules" (which reads as low intensity) and quote an hourly rate.
-  #
-  # The markers are long and unambiguous: one is enough to reject, so each must
-  # be something an honest product company would never write about itself.
-  # Short ones ("ai", "training") would catch half the market.
-  keywords:
-    - "not a traditional software engineering role"
-    # Wordings of the same genre found 2026-08-05: the same platform came back
-    # as "Freelance Agent Evaluation Engineer" with rewritten text. A gate that
-    # catches one edition of a text catches an edition, not a genre.
-    #
-    - "project-based ai opportunities"
-    - "agent evaluation"
-    - "evaluating and improving ai"
-    - "testing, evaluating, and improving ai"
-    - "improving ai systems"
-    - "ai training data"
-    - "reinforcement learning environments"
-    - "ai training project"
-    - "ai trainer"
-    - "ai tutor"
-    - "help train and improve"
-    - "train and improve next-generation"
-    - "training data for ai"
-    - "improve ai models"
-    - "ai model's ability"
-    - "no minimum time or task commitments"
-    - "no minimum time commitment"
-    - "connects specialists with ai projects"
-    - "rate ai responses"
-    - "evaluate model responses"
-    - "rate model responses"
-    - "annotate training data"
-    - "data labeling project"
+ai_training_crowdwork_gate: {}
+  # Off since 2026-11-02 (task 0107). It rejected paid work producing training
+  # data for models (reference solutions, code review, rating answers) behind
+  # an engineering title: measured 2026-08-05, such postings took four of the
+  # top nine positions. The owner, 2026-11-02: AI-training crowdwork is work,
+  # and the person turns it down by hand when it does not suit. The person
+  # had applied to five such postings in October. The keyword list it used is
+  # in the history of this file (V34 and before).
 
 mobile_role_gate:
   # Mobile development behind a neutral title. A real finding, 2026-08-05:

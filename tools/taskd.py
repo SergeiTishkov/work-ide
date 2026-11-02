@@ -266,6 +266,11 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
                 mode.append("--skip-contracts")
         elif kind == "ai" and args.get("reread"):   # the owner asked for the re-read (task 0103)
             mode = [*mode, "--reread"]
+            since = args.get("since")
+            if since is not None:
+                if not (isinstance(since, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", since)):
+                    raise ValueError(f"since is a date, YYYY-MM-DD: {since!r}")
+                mode = [*mode, "--since", since]
         return Command([python, tool("pipeline.py"), "--identity", _identity(task), *mode], map_line=pipeline_line)
     if kind == "clean":
         argv = [python, tool("cleanup.py"), "--identity", _identity(task), "--json"]

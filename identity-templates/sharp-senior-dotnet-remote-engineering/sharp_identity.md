@@ -26,6 +26,24 @@ person who lives outside the US and the EU.
 
 Set by the owner on 2026-10-05.
 
+### Keep when in doubt
+
+The pipeline leans to keeping a posting. The person reads what the search
+keeps and turns down by hand what does not suit; a good posting the search
+drops is lost. A posting is refused for what its text states, not for what
+it leaves unsaid:
+- on location, only for a limit the text states ("only", "must be based in",
+  a right to work, a label such as "Remote (US)", US payroll benefits, a time
+  zone not covered). A remote posting that names one country with no such
+  limit is kept; the reachability bonus ranks the ones open to anyone above
+  it;
+- on stack, a language named as one of several the employer accepts ("Go,
+  Java, Rust or similar") is not a requirement of that language;
+- paid crowdwork for training AI models is a job like any other.
+
+Set by the owner on 2026-11-02 (tasks 0107-0109), after a week in which the
+AI check kept 14 of 445 postings and rejected 383 on location.
+
 ## Who it is for
 
 A senior developer in .NET/C# (and JS/TS). The stack and the level are
@@ -51,7 +69,8 @@ words of boilerplate, and the vacancy surfaces in the shortlist regardless.
 
 1. **Not remote work.** A vacancy nobody called remote goes to its own section
    to be checked by hand; hybrid and office work is a refusal.
-2. **A hard residency requirement in a country the person does not live in.**
+2. **A residency requirement the posting states, for a country the person does
+   not live in.** A country merely named is not one.
    `US only`, `remote LATAM`, `Canada only`, **`EU Remote`**, a US or Canadian
    retirement plan among the benefits — all equally out of reach. The list is
    incomplete in principle; there are endlessly many countries.
