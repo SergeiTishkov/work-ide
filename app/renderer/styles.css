@@ -354,6 +354,7 @@ button.open { margin-right: 6px; color: var(--accent); border-color: var(--accen
 button.copy, button.cv { padding: 2px 8px; font-size: 0.85em; color: var(--muted); white-space: nowrap; }
 button.cv.letter { margin-right: 10px; }
 button.cv.done { color: var(--applied); border-color: var(--applied); }
+button.cv .spinner { display: inline-block; vertical-align: -1px; margin-right: 6px; }
 .cv-result { margin: 8px 0 0 38px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; }
 .cv-result.failed { border-color: var(--danger); color: var(--danger); }
 .cv-head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
