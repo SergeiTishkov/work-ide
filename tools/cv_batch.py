@@ -32,7 +32,8 @@ The app shows the batch in its task panel from data/:
 
     cv_batch.json   the status: pid, state (running, finished, stopped,
                     crashed), holding, identities, total, index, made,
-                    failed, gone, the document in work, log_offset — where
+                    failed, gone, the document in work, the documents
+                    still waiting (while running), log_offset — where
                     this batch's lines begin in the log
     cv_batch.log    one line per event, appended across batches
     cv_batch.STOP   --stop, or the panel's ✕: stop after the current document
@@ -143,6 +144,8 @@ class Batch:
         self.where = where
         self.sleep = sleep
         self.status: dict = {}
+        self.work: list = []   # (prefix, item, kind), the batch's whole list
+        self.index = 0         # how many of it are taken
 
     def log(self, text: str) -> None:
         line = f"{datetime.now():%Y-%m-%d %H:%M:%S}  {text}"
@@ -153,6 +156,10 @@ class Batch:
 
     def save(self, **changes) -> None:
         self.status.update(changes)
+        # the documents still to come, for their cards in the app (task 0111)
+        self.status["waiting"] = [
+            {"identity": prefix, "vacancy_id": item["vacancy_id"], "kind": kind}
+            for prefix, item, kind in self.work[self.index:]] if self.status.get("state") == "running" else []
         tmp = self.where["status"].with_suffix(".json.tmp")
         tmp.write_text(json.dumps(self.status, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(tmp, self.where["status"])
@@ -197,29 +204,28 @@ class Batch:
         self.save()
         self.log(f"start: {' '.join(r['identity'] for r in requests)}")
         try:
-            work: list = []
+            work = self.work
             self.add(work, requests + take_pending(where), plan)
-            index = 0
             while True:
-                while index < len(work):
+                while self.index < len(work):
                     if where["stop"].exists():
                         where["stop"].unlink(missing_ok=True)
-                        self.log(f"stopped before {index + 1}/{len(work)}")
+                        self.log(f"stopped before {self.index + 1}/{len(work)}")
                         self.save(state="stopped", current=None, ended_at=_now())
                         return self.status
                     self.wait_for_the_app()
                     if where["stop"].exists():
                         continue
-                    prefix, item, kind = work[index]
-                    index += 1
+                    prefix, item, kind = work[self.index]
+                    self.index += 1
                     why = check(prefix, item) if check else None
                     if why:
                         self.status["left_alone"] += 1
-                        self.log(f"left alone [{index}/{len(work)}] {prefix} {kind} {item['vacancy_id']}: {why}")
+                        self.log(f"left alone [{self.index}/{len(work)}] {prefix} {kind} {item['vacancy_id']}: {why}")
                         self.save()
                     else:
-                        self.step(index, len(work), prefix, item, kind, generate)
-                    if index == len(work):
+                        self.step(self.index, len(work), prefix, item, kind, generate)
+                    if self.index == len(work):
                         self.add(work, take_pending(where), plan)
                 s = self.status
                 self.log(f"finished: {s['made']} made, {s['gone']} gone, {s['failed']} failed, "

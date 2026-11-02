@@ -33,11 +33,12 @@ def _status(where):
 
 def test_the_status_follows_each_document_and_ends_finished(tmp_path):
     where = cv_batch.paths(tmp_path)
-    seen = []
+    seen, waiting = [], []
 
     def generate(prefix, item, kind):
         status = _status(where)
         seen.append((status["index"], status["total"], status["current"]["vacancy_id"], kind))
+        waiting.append([(w["identity"], w["vacancy_id"], w["kind"]) for w in status["waiting"]])
         if item["vacancy_id"] == "a2":
             return {"ok": False, "error": "Vacancy not found, possibly outdated: the link is dead."}
         if prefix == "partsharp":
@@ -46,6 +47,11 @@ def test_the_status_follows_each_document_and_ends_finished(tmp_path):
 
     status = cv_batch.Batch(where).run(_ask("sharp", "partsharp"), _plan, generate)
     assert seen == [(1, 4, "a1", "cv"), (2, 4, "a1", "letter"), (3, 4, "a2", "cv"), (4, 4, "b1", "letter")]
+    # what is still to come, for the cards in the app (task 0111)
+    assert waiting == [[("sharp", "a1", "letter"), ("sharp", "a2", "cv"), ("partsharp", "b1", "letter")],
+                       [("sharp", "a2", "cv"), ("partsharp", "b1", "letter")],
+                       [("partsharp", "b1", "letter")], []]
+    assert _status(where)["waiting"] == []
     assert (status["state"], status["made"], status["gone"], status["failed"]) == ("finished", 2, 1, 1)
     assert status["current"] is None and status["pid"] == os.getpid()
     assert status["identities"] == ["sharp", "partsharp"]

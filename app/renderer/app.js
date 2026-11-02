@@ -763,13 +763,34 @@
     if (own) return own;
     // the document the CV/CL batch is making now
     const current = batchCurrent();
-    return current && current.identity === identity && current.kind === kind && current.vacancyId === vacancyId
-      ? { ...current, state: 'running', origin: 'external' } : null;
+    if (current && current.identity === identity && current.kind === kind && current.vacancyId === vacancyId) {
+      return { ...current, state: 'running', origin: 'external' };
+    }
+    // a document further down the batch's list (task 0111): the person can
+    // still ask for it with instructions, and the batch then leaves it alone
+    return batchWaiting().has(`${identity}/${kind}/${vacancyId}`)
+      ? { identity, kind, vacancyId, state: 'queued', origin: 'external', inBatch: true } : null;
+  }
+
+  function runningBatch() {
+    return state.tasks.find((task) => task.kind === 'batch' && task.state === 'running') || null;
   }
 
   function batchCurrent() {
-    const batch = state.tasks.find((task) => task.kind === 'batch' && task.state === 'running');
+    const batch = runningBatch();
     return batch ? batch.current : null;
+  }
+
+  // Looked up for every card on every render: a set, built once per batch
+  // update (a batch may hold a thousand documents).
+  const waitingSets = new WeakMap();
+  function batchWaiting() {
+    const batch = runningBatch();
+    if (!batch) return new Set();
+    if (!waitingSets.has(batch)) {
+      waitingSets.set(batch, new Set((batch.waiting || []).map((w) => `${w.identity}/${w.kind}/${w.vacancyId}`)));
+    }
+    return waitingSets.get(batch);
   }
 
   async function enqueue(request) {
@@ -2801,7 +2822,9 @@
   // 2026-10-12): the first click opens a field for instructions to this one
   // document, the second click on the same button queues it with whatever
   // the field holds, empty included. While queued or generating the button
-  // says so. Once the vacancy has the document it reads "CV is generated" /
+  // says so, with a spinner while generating; a document waiting in the
+  // CV/CL batch reads "In the batch…" and can still be asked for by hand
+  // (task 0111). Once the vacancy has the document it reads "CV is generated" /
   // "Cover letter is generated" — for good, since every vacancy has its own
   // folder (2026-10-13) — and still makes a new version when pressed.
   const DOC_KINDS = {
@@ -2825,18 +2848,29 @@
   // vacancy's folder, so it stays whatever is generated elsewhere.
   function docButton(item, kind) {
     const k = DOC_KINDS[kind];
-    const task = findTask(state.active, kind, item.id);
+    const found = findTask(state.active, kind, item.id);
+    const inBatch = Boolean(found && found.inBatch);
+    const task = inBatch ? null : found;
     const docs = state.docs[`${state.active}/${item.id}`] || {};
     const done = !task && docs[kind] > 0;
     const gone = !task && !done && (docs.errors || {})[kind];
     const classes = [k.css, docFormOpen(item, kind) && 'pressed', done && 'done'].filter(Boolean).join(' ');
-    const label = !task ? (done ? t(k.done) : t(k.generate))
-      : task.state === 'running' ? t(k.generating) : t('action.queued');
+    const running = Boolean(task && task.state === 'running');
+    const label = inBatch ? t('action.in_batch')
+      : !task ? (done ? t(k.done) : t(k.generate))
+        : running ? t(k.generating) : t('action.queued');
     return el('button', {
       class: classes, testid: k.button, disabled: Boolean(task),
-      title: gone || (task && task.state === 'queued' ? t('cv.queued_hint') : null),
+      'data-state': inBatch ? 'batch' : task ? task.state : null,
+      title: inBatch ? t('cv.in_batch_hint') : gone || (task && task.state === 'queued' ? t('cv.queued_hint') : null),
       onclick: () => askDoc(item, kind),
-    }, label);
+    }, running && el('span', { class: 'spinner small', testid: `${k.button}-spinner` }), label);
+  }
+
+  // A task of the card's own for this document; the batch's list is not one.
+  function ownDocTask(identity, kind, item) {
+    const task = findTask(identity, kind, item.id);
+    return task && !task.inBatch ? task : null;
   }
 
   function docFormOpen(item, kind) {
@@ -2844,7 +2878,7 @@
   }
 
   function askDoc(item, kind) {
-    if (findTask(state.active, kind, item.id)) return;
+    if (ownDocTask(state.active, kind, item)) return;
     if (docFormOpen(item, kind)) return generateDoc(item, kind, state.cvFor.draft || '');
     state.cvFor = { identity: state.active, id: item.id, kind, draft: '' };
     render();
@@ -2883,7 +2917,7 @@
 
   function generateDoc(item, kind, instructions) {
     const identity = state.active;
-    if (findTask(identity, kind, item.id)) return;
+    if (ownDocTask(identity, kind, item)) return;
     const view = viewOf(item);
     state.cvFor = null;
     state.cvResults.delete(`${identity}/${item.id}/${kind}`);

@@ -1836,6 +1836,7 @@ test('the CV/CL batch is one task: its progress, its document on the card, its l
     identity: 'sharp, partsharp',
     progress: { index: 8, total: 971, made: 6, failed: 1, gone: 0 },
     current: { identity: 'sharp', kind: 'cv', vacancyId: 'a1', title: 'Senior .NET Developer a1', company: 'Company a1' },
+    waiting: [{ identity: 'sharp', kind: 'letter', vacancyId: 'a1' }],
   }, ['start: sharp partsharp', '[8/971] sharp cv a1']));
   const task = page.getByTestId('task-batch');
   await expect(task).toHaveAttribute('data-state', 'running');
@@ -1845,6 +1846,15 @@ test('the CV/CL batch is one task: its progress, its document on the card, its l
   const row = byId(page, 'a1');
   await expect(row.getByTestId('btn-generate-cv')).toHaveText(en['action.generating_cv']);
   await expect(row.getByTestId('btn-generate-cv')).toBeDisabled();
+  await expect(row.getByTestId('btn-generate-cv-spinner')).toBeVisible();
+  // the batch's next document shows on its card, and can still be asked for by hand (task 0111)
+  await expect(row.getByTestId('btn-generate-letter')).toHaveText(en['action.in_batch']);
+  await expect(row.getByTestId('btn-generate-letter')).toHaveAttribute('title', en['cv.in_batch_hint']);
+  await expect(row.getByTestId('btn-generate-letter')).toBeEnabled();
+  await row.getByTestId('btn-generate-letter').click();
+  await expect(row.getByTestId('letter-form')).toBeVisible();
+  await row.getByTestId('letter-instructions-cancel').click();
+  await expect(byId(page, 'b1').getByTestId('btn-generate-letter')).toHaveText(en['action.generate_letter']);
   await expect(page.getByTestId('task-log')).toContainText('[8/971] sharp cv a1');
   await expect(page.getByTestId('task-log-title')).toContainText(en['task.kind.batch']);
 
@@ -1856,6 +1866,7 @@ test('the CV/CL batch is one task: its progress, its document on the card, its l
   await expect.poll(async () => (await calls(page, 'documentsState')).some(([who, ids]) => who === 'sharp'
     && ids.length === 1 && ids[0] === 'a1')).toBe(true);   // the document it made shows on the card
   await expect(row.getByTestId('btn-generate-cv')).toBeEnabled();
+  await expect(row.getByTestId('btn-generate-letter')).toHaveText(en['action.generate_letter']);
 
   await task.hover();
   await task.getByTestId('task-cancel').click();

@@ -129,12 +129,13 @@ test('a pipeline run started by hand: its own log, read with the prefix the step
   }
 });
 
-test('a running CV/CL batch shows its progress and the document it makes', () => {
+test('a running CV/CL batch shows its progress, the document it makes and the ones waiting', () => {
   const f = fixture();
   try {
     f.client.readBatch = () => ({
       state: 'running', holding: true, index: 3, total: 10, made: 2, failed: 0, gone: 1,
       current: { identity: 'sharp', vacancy_id: 'v1', kind: 'cv', title: 'Dev', company: 'Acme' },
+      waiting: [{ identity: 'sharp', vacancy_id: 'v1', kind: 'letter' }],
     });
     f.add({ kind: 'cv_batch', slot: 'documents', state: 'running' });
     f.add({ kind: 'cv_batch', slot: 'documents', state: 'queued' });
@@ -143,7 +144,9 @@ test('a running CV/CL batch shows its progress and the document it makes', () =>
     assert.deepEqual(running.progress, { index: 3, total: 10, made: 2, failed: 0, gone: 1 });
     assert.equal(running.holding, true);
     assert.deepEqual(running.current, { identity: 'sharp', vacancyId: 'v1', kind: 'cv', title: 'Dev', company: 'Acme' });
+    assert.deepEqual(running.waiting, [{ identity: 'sharp', vacancyId: 'v1', kind: 'letter' }]);
     assert.equal(queued.progress, null);
+    assert.deepEqual(queued.waiting, []);
   } finally {
     f.done();
   }

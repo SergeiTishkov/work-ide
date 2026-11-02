@@ -171,7 +171,7 @@ class QueueClient {
     const status = task.state === 'running' ? this.readBatch() : null;
     const number = (value) => (Number.isFinite(value) ? value : 0);
     if (!status || BATCH_STATES[status.state] !== 'running') {
-      return { progress: null, holding: false, current: null };
+      return { progress: null, holding: false, current: null, waiting: [] };
     }
     return {
       progress: {
@@ -183,6 +183,9 @@ class QueueClient {
         identity: status.current.identity, vacancyId: status.current.vacancy_id, kind: status.current.kind,
         title: status.current.title || '', company: status.current.company || '',
       } : null,
+      // the documents still to come, for their cards (task 0111)
+      waiting: (Array.isArray(status.waiting) ? status.waiting : [])
+        .map((w) => ({ identity: w.identity, vacancyId: w.vacancy_id, kind: w.kind })),
     };
   }
 
