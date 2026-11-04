@@ -15,9 +15,11 @@ The answer's exact shape at the limit was not captured on this machine
 (2026-10-21: no refused call in any log). The recogniser takes the wordings
 Claude Code is known to print: "Claude AI usage limit reached|<epoch>",
 "5-hour limit reached ∙ resets 3pm", "You've hit your limit · resets 5pm
-(Europe/Berlin)", "Your limit will reset at 5pm". It looks only at an
-answer that failed (`is_error`, or a non-zero exit), so a posting or a CV
-that mentions a limit is never read as one.
+(Europe/Berlin)", "Your limit will reset at 5pm". The first real refusal
+on this machine (2026-11-03, task 0112) read "You've hit your weekly limit
+· resets Nov 4, 10pm (Asia/Tbilisi)". It looks only at an answer that
+failed (`is_error`, or a non-zero exit), so a posting or a CV that
+mentions a limit is never read as one.
 """
 from __future__ import annotations
 
@@ -32,13 +34,16 @@ EXIT_CODE = 75
 MARK = "AI usage limit reached"
 
 _LIMIT = re.compile(
-    r"usage limit reached|hit your (?:usage )?limit|"
+    r"usage limit reached|hit your (?:[\w-]+ )?limit|"
     r"(?:5-hour|five-hour|session|daily|weekly|opus|sonnet)(?: usage)? limit (?:reached|hit)|"
     r"limit will reset|out of (?:extra )?usage",
     re.I)
 _EPOCH = re.compile(r"\|\s*(\d{10})\b")
 _ISO = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?")
-_CLOCK = re.compile(r"\bresets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?(?:\s*\(([A-Za-z_]+/[A-Za-z_/]+)\))?",
+_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+# "resets 3pm", "resets at 17:00", "resets Nov 4, 10pm (Asia/Tbilisi)"
+_CLOCK = re.compile(r"\bresets?\s+(?:at\s+|on\s+)?(?:([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(?:at\s+)?)?"
+                    r"(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?(?:\s*\(([A-Za-z_]+/[A-Za-z_/]+)\))?",
                     re.I)
 _IN = re.compile(r"\bresets?\s+in\s+(\d+)\s*(h|hours?|m|min|minutes?)\b", re.I)
 
@@ -81,14 +86,24 @@ def reset_time(text: str, now: Optional[datetime] = None) -> Optional[datetime]:
         amount, unit = int(found.group(1)), found.group(2).lower()
         return now + (timedelta(hours=amount) if unit.startswith("h") else timedelta(minutes=amount))
     found = _CLOCK.search(text)
-    if found:
-        hour, minute, half, zone = int(found.group(1)), int(found.group(2) or 0), found.group(3), found.group(4)
+    if found and (found.group(1) is None or found.group(1).lower() in _MONTHS):
+        month, day = found.group(1), found.group(2)
+        hour, minute, half, zone = int(found.group(3)), int(found.group(4) or 0), found.group(5), found.group(6)
         if half:
             hour = hour % 12 + (12 if half.lower().startswith("p") else 0)
         if hour > 23 or minute > 59:
             return None
         tz = _zone(zone)
         here = now.astimezone(tz) if tz else now.astimezone()
+        if month:
+            try:
+                moment = here.replace(month=_MONTHS.index(month.lower()) + 1, day=int(day),
+                                      hour=hour, minute=minute, second=0, microsecond=0)
+            except ValueError:
+                return None
+            if moment < here - timedelta(days=180):   # "resets Jan 2" said in December
+                moment = moment.replace(year=moment.year + 1)
+            return moment.astimezone(timezone.utc)
         moment = here.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if moment <= here:
             moment += timedelta(days=1)

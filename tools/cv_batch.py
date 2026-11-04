@@ -58,6 +58,8 @@ import taskq  # noqa: E402
 TOOLS = {"cv": "cv_tailor.py", "letter": "cover_letter.py"}
 GONE = "Vacancy not found"   # cv_tailor.GONE, without importing the model code
 HOLD_POLL_SECONDS = 2
+REPLACE_ATTEMPTS = 20
+REPLACE_PAUSE_SECONDS = 0.1
 
 
 def paths(data_root: Optional[Path] = None) -> dict:
@@ -162,7 +164,17 @@ class Batch:
             for prefix, item, kind in self.work[self.index:]] if self.status.get("state") == "running" else []
         tmp = self.where["status"].with_suffix(".json.tmp")
         tmp.write_text(json.dumps(self.status, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.replace(tmp, self.where["status"])
+        # Windows refuses the replace while another process has the file
+        # open, and the app reads it every second (2026-11-03: the batch
+        # crashed on "[WinError 5] Access is denied", task 0112)
+        for attempt in range(REPLACE_ATTEMPTS):
+            try:
+                os.replace(tmp, self.where["status"])
+                return
+            except PermissionError:
+                if attempt == REPLACE_ATTEMPTS - 1:
+                    raise
+                time.sleep(REPLACE_PAUSE_SECONDS)
 
     def add(self, work: list, requests: List[dict], plan: Callable[[str], list]) -> None:
         for req in requests:

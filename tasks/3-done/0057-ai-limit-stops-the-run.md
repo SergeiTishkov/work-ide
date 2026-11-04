@@ -49,3 +49,10 @@ it has, the waiting tasks start again from where they stopped.
 - DONE - The task service checks for the reset (reset time, else every 8 hours) with one minimal `claude -p` call in a thread, one worker at a time, and resumes the waiting tasks; a tool run by hand records the limit in the queue too (`taskq.block_ai`)
 - DONE - Tests (`tests/test_ai_limit.py`, `tests/test_taskd.py`, `tests/test_taskq.py`, `tests/test_cv_tailor.py`, a UI test): one refused call stops the screen, no further calls are sent; the wordings, the reset times, other limits not taken for it; the worker's requeue, the exit code, the check at the reset
 - DONE - Docs: ARCHITECTURE "The AI usage limit stops the AI work, and the queue waits for the reset", RUNBOOK step 1
+
+## Later
+2026-11-03: the first real refusal, "You've hit your weekly limit · resets
+Nov 4, 10pm (Asia/Tbilisi)", was not recognised, as the first item allowed
+for: the collection, LinkedIn, the AI run and the CV/CL batch each counted
+every refused call as an error. The wording and the dated reset time are
+taken since task 0112.

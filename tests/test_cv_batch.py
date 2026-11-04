@@ -31,6 +31,25 @@ def _status(where):
     return json.loads(where["status"].read_text(encoding="utf-8"))
 
 
+def test_a_status_file_held_open_by_the_app_is_replaced_a_moment_later(tmp_path, monkeypatch):
+    """2026-11-03: Windows refused the replace while the app read the file,
+    and the batch crashed (task 0112)."""
+    where = cv_batch.paths(tmp_path)
+    where["status"].parent.mkdir(parents=True, exist_ok=True)
+    real, refusals = cv_batch.os.replace, []
+
+    def replace(src, dst):
+        if len(refusals) < 2:
+            refusals.append(dst)
+            raise PermissionError(5, "Access is denied")
+        real(src, dst)
+
+    monkeypatch.setattr(cv_batch.os, "replace", replace)
+    monkeypatch.setattr(cv_batch, "REPLACE_PAUSE_SECONDS", 0)
+    cv_batch.Batch(where).save(state="running")
+    assert len(refusals) == 2 and _status(where)["state"] == "running"
+
+
 def test_the_status_follows_each_document_and_ends_finished(tmp_path):
     where = cv_batch.paths(tmp_path)
     seen, waiting = [], []
