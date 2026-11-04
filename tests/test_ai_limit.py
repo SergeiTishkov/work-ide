@@ -26,6 +26,8 @@ def _done(stdout="", stderr="", code=0):
     ("You've hit your limit · resets 3pm (UTC)", None),   # the clock: checked below
     ("Claude usage limit reached. Your limit will reset at 5pm", None),
     ("Weekly limit reached", None),
+    # the first real refusal on this machine, 2026-11-03 (task 0112)
+    ("claude: You've hit your weekly limit · resets Nov 4, 10pm (Asia/Tbilisi)", None),   # the date: below
 ])
 def test_the_wordings_of_the_limit_are_recognised(text, resets):
     limit = ai_limit.recognise(text, now=NOW)
@@ -40,6 +42,19 @@ def test_a_reset_clock_time_is_the_next_one_ahead():
     assert later.astimezone().hour == 15
     passed = ai_limit.reset_time("resets 1am", now=NOW)
     assert NOW < passed < NOW + timedelta(days=1)
+
+
+def test_a_reset_time_with_a_date_is_that_day():
+    # the zone is read in local time when the machine has no tz database
+    # (Windows without tzdata), so the check is of the local clock
+    def local(text, now=NOW):
+        moment = ai_limit.reset_time(text, now=now).astimezone()
+        return moment.year, moment.month, moment.day, moment.hour
+
+    assert local("claude: You've hit your weekly limit · resets Nov 4, 10pm") == (2026, 11, 4, 22)
+    assert local("resets Jan 2, 1pm", now=datetime(2026, 12, 30, 10, 0, tzinfo=timezone.utc)) == (2027, 1, 2, 13)
+    assert ai_limit.reset_time("resets Feb 31, 1pm (UTC)", now=NOW) is None
+    assert ai_limit.reset_time("resets Day 4, 1pm (UTC)", now=NOW) is None
 
 
 @pytest.mark.parametrize("text", [
