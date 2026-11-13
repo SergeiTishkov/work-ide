@@ -125,8 +125,8 @@ accumulated data, reports, housekeeping files.
 
 It does **not** apply to documents a person brought with them — CVs, portfolios,
 covering letters in `local-identities/<prefix>/documents/`. Those keep their own
-names: `CV Ivan Petrov Software Engineer.pdf`, not `ivpt_cv.pdf`. The code does
-not read them (the path comes from `profile.owner.cv_files`, just a string), so
+names: `CV Ivan Petrov Software Engineer.pdf`, not `ivpt_cv.pdf`. The code finds
+them by the path written in the profile (`owner.cv_files`, `cv.parent`), so
 renaming buys nothing while breaking how the owner recognises and finds them.
 
 ### Requirements for a prefix
@@ -328,35 +328,36 @@ repository?"*
 
 ## The CV per vacancy: `cv:`
 
-**Generate CV** (tools/cv_tailor.py) starts from the CV named in
-`owner.primary_cv`: the tailored files get its file name, and its `.docx`
-beside it (or one in `owner.cv_files`) is the common CV. An optional `cv:`
-section in the local profile adds the rest:
+**Generate CV** (tools/cv_tailor.py) and **Generate Cover Letter** start from
+one document: the **parent CV**, named in the `cv:` section of the local
+profile. It is the person's whole working life in one CV-shaped document —
+every job, project and result, longer than any CV they would send. Every
+tailored CV is cut from it to fit one vacancy, in its layout; nothing else is
+read. Without `cv.parent` there is nothing to tailor and the tool says so.
 
 ```yaml
 cv:
-  parent: "documents/Master CV Ivan Petrov.docx"  # every achievement: .docx, .md or .txt
-  common: "documents/My CV.docx"     # only when it is not beside primary_cv
+  parent: "documents/Parent CV Ivan Petrov.docx"  # .docx, .md or .txt
+  output_name: "CV Ivan Petrov"      # optional; by default the parent's name
+                                     # without a leading "Parent" or "Master"
   model: opus                        # the claude CLI model
-  target_pages: 3                    # cut lower-priority bullets above this
-  max_pages: 3                       # never above this (2-3 pages)
+  target_pages: 2                    # cut lower-priority bullets above this
+  max_pages: 3                       # never above this
 ```
 
-Paths are relative to the identity folder.
+Paths are relative to the identity folder. Each identity sets its own
+`cv.parent`; two identities of one person may point at the same file.
 
-**The parent CV** is optional and can be added at any time. It is one document
-with every achievement of the person's working life — far longer than any CV,
-never sent to anyone. When it is set, the two CVs have different jobs:
+The model may reword, reorder, stress and cut to fit the vacancy; the names,
+contacts, location line, companies, titles, dates, numbers and technologies
+stay as the parent CV has them, and a fact check in code reports any that do
+not. The person's languages (`owner.languages`, with a level:
+`{name: Russian, level: native}`) are given to the model, which adds one to
+the location line only when the vacancy asks for that language.
 
-- the parent CV is **where the facts come from**: any job, bullet, number or
-  skill in it may go into a tailored CV when the vacancy calls for it;
-- the common CV is **the example**: of the layout, and of what to include
-  first when the vacancy asks for nothing in particular.
-
-The fact check accepts what either CV holds. Without `cv.parent` the CV is
-tailored from the common CV alone, and the result says so and that a parent CV
-can be added. Each identity sets its own `cv.parent`; two identities of one
-person may point at the same file.
+Until 2026-11-14 a **common CV** (`owner.primary_cv`) was read beside the
+parent CV as the example of the layout; it is gone (task 0113,
+`docs/ARCHITECTURE.md`, "Rejected approaches").
 
 ### Where the documents go
 

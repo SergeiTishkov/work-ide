@@ -1455,7 +1455,7 @@ test('"Generate CV" sits between "Copy URL" and "Generate Cover Letter" and open
     ok: true, pages: 3, docx: '/docs/sharp/a1/CV.docx', pdf: '/docs/sharp/a1/CV.pdf',
     findings: [{ kind: 'term', text: 'Kafka', where: 'Skills', message: 'not found in either CV' }],
     warnings: [], removed_for_length: ['Contoso: Fixed flaky tests.'],
-    report: { gaps: ['Kubernetes'], from_parent: ['interviewed Go developers'], notes: [] },
+    report: { gaps: ['Kubernetes'], stretched: ['Summary: SQL Server for the PostgreSQL ask'], notes: [] },
   };
   await open(page, fixture);
   const row = byId(page, 'a1');
@@ -1487,7 +1487,7 @@ test('"Generate CV" sits between "Copy URL" and "Generate Cover Letter" and open
   await expect(row.getByTestId('cv-summary')).toHaveText(en['cv.ready_pages'].replace('{pages}', '3'));
   await expect(row.getByTestId('cv-findings')).toContainText('Kafka');
   await expect(row.getByTestId('cv-gaps')).toContainText('Kubernetes');
-  await expect(row.getByTestId('cv-from-parent')).toContainText('interviewed Go developers');
+  await expect(row.getByTestId('cv-stretched')).toContainText('SQL Server for the PostgreSQL ask');
   await expect(row.getByTestId('cv-removed')).toContainText('Contoso: Fixed flaky tests.');
   await expect(row.getByTestId('cv-notes')).toHaveCount(0);   // empty lists are not shown
 
@@ -1585,7 +1585,7 @@ test('"Generate Cover Letter" works as "Generate CV" does, apart from it, and qu
   fixture.letterReply = {
     ok: true, pages: 1, docx: '/docs/sharp/a1/Cover Letter.docx', pdf: '/docs/sharp/a1/Cover Letter.pdf',
     findings: [{ kind: 'term', text: 'Kafka', where: 'letter', message: 'not found in either CV' }],
-    warnings: [], report: { gaps: ['Kubernetes'], from_parent: [], notes: ['the recipient is guessed'] },
+    warnings: [], report: { gaps: ['Kubernetes'], stretched: [], notes: ['the recipient is guessed'] },
   };
   await open(page, fixture);
   const row = byId(page, 'a1');
@@ -1765,10 +1765,10 @@ test('instructions half typed outlive a re-render and stay with their card', asy
 
 test('a failed CV generation says why, on its card', async ({ page }) => {
   const fixture = standardFixture();
-  fixture.cvReply = { ok: false, error: 'the common CV is missing' };
+  fixture.cvReply = { ok: false, error: 'the parent CV is missing' };
   await open(page, fixture);
   await byId(page, 'a1').getByTestId('btn-generate-cv').dblclick();
-  await expect(byId(page, 'a1').getByTestId('cv-result')).toHaveText(new RegExp(`${en['cv.failed']}: the common CV is missing`));
+  await expect(byId(page, 'a1').getByTestId('cv-result')).toHaveText(new RegExp(`${en['cv.failed']}: the parent CV is missing`));
   await expect(byId(page, 'a2r').getByTestId('cv-result')).toHaveCount(0);
   await expect(byId(page, 'a1').getByTestId('btn-generate-cv')).toBeEnabled();
 });

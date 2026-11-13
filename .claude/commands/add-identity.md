@@ -23,10 +23,9 @@ identity splits an accumulated base into two incomplete ones.
    themselves, a prefix, the questionnaire. Reuse nothing from the existing
    identity, even for the same person — the two identities' goals differ by
    definition.
-2. There is no need to copy the CV: point at the file already on disk. The
-   same for a parent CV (`cv.parent`); if the person has none, offer it as
-   optional (`docs/ONBOARDING.md`, step 2) and remind them at the end that it
-   can be added later (step 6b).
+2. There is no need to copy the CV: point `cv.parent` at the file already on
+   disk. If the person has none, remind them at the end that Generate CV
+   needs it and it can be added later (`docs/ONBOARDING.md`, step 6b).
 3. `python tools/templates.py clone <template> <new> "<expansion>"` — or, if the
    new search resembles an existing one, clone the identity itself (below).
 4. **Tell the person that commands without `--identity` will now refuse.** With

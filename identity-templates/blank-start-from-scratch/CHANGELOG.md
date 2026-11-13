@@ -2,6 +2,17 @@
 
 New versions go on TOP.
 
+## V8 — the parent CV is the one CV source, 2026-11-14
+
+**Changed** (`blank_questionnaire.yaml`): `person.parent_cv` is no longer
+optional beside an "ordinary CV as the example": Generate CV and Generate
+Cover Letter read the parent CV alone (`cv.parent`), and the person's CV
+becomes it unless they give a longer file. `person.cv_location` drives
+`profile.cv.parent` too. `blank_profile.yaml`: a language may carry a level
+(`{name: German, level: native}`). Locally: set `cv.parent` if it is not set,
+and drop `owner.primary_cv` and `cv.common`, which nothing reads any more
+(docs/IDENTITIES.md, "The CV per vacancy").
+
 ## V7 — placeholders instead of pay figures, 2026-10-30
 
 **Changed** (comments only): the example ranges in `blank_profile.yaml` →

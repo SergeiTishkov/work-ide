@@ -8,15 +8,16 @@ A cover letter for one vacancy, as .docx and .pdf.
 
 The sibling of cv_tailor.py, with the same inputs (the owner, 2026-10-12: a
 "Generate Cover Letter" button beside "Generate CV", behaving the same): the
-common CV, the parent CV when the profile names one (cv.parent), the vacancy
-from the shared base and the person's instructions for this one letter. The
-letter is in English unless the instructions ask for another language.
+parent CV (cv.parent, the one source since 2026-11-14), the person's
+languages from the profile, the vacancy from the shared base and the
+person's instructions for this one letter. The letter is in English unless
+the instructions ask for another language.
 
 The model (`claude -p`, no tools, LETTER_SCHEMA) writes the letter; then,
 without the model:
 
   1. check_facts() looks up the name, the contacts, every number and every
-     technology the letter names in the two CVs and the person's messages
+     technology the letter names in the parent CV and the person's messages
      (cv_tailor.person_text) and lists what it cannot find.
      It does not block: the list goes to the person with the files.
   2. cv_docx.render_letter() writes the .docx under the CV's header (a
@@ -25,7 +26,7 @@ without the model:
      LibreOffice) converts it to .pdf and counts the pages. More than one page
      is a warning, nothing is cut.
   3. The files go into the vacancy's folder of documents beside its CV
-     (tools/documents.py) as "<the common CV's name with CV turned into Cover
+     (tools/documents.py) as "<the CV's output name with CV turned into Cover
      Letter>.docx/.pdf" ("CV Ivan Petrov.pdf" -> "Cover Letter Ivan
      Petrov.pdf"), versioned as the CV is, with "Cover Letter log.md".
 
@@ -57,13 +58,14 @@ MAX_PAGES = 1
 LETTER_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["name", "headline", "tagline", "contacts", "date", "recipient", "greeting", "paragraphs",
-                 "closing", "technologies", "previous_version", "report"],
+    "required": ["name", "headline", "tagline", "location", "contacts", "date", "recipient", "greeting",
+                 "paragraphs", "closing", "technologies", "previous_version", "report"],
     "properties": {
-        "name": _string("exactly as in the common CV"),
+        "name": _string("exactly as in the CV"),
         "headline": _string("the title line under the name"),
         "tagline": _string("the stack line under the headline"),
-        "contacts": cv_tailor.CONTENT_SCHEMA["properties"]["contacts"],
+        "location": cv_tailor.CONTENT_SCHEMA["properties"]["location"],
+        "contacts": cv_tailor.CONTACTS_SCHEMA,
         "date": _string("today's date as written in the letter"),
         "recipient": _strings("the address block, from the vacancy only"),
         "greeting": _string(),
@@ -73,9 +75,10 @@ LETTER_SCHEMA = {
         "previous_version": cv_tailor.PREVIOUS_VERSION_SCHEMA,
         "report": {
             "type": "object", "additionalProperties": False,
-            "required": ["covered", "gaps", "from_parent", "from_instructions", "notes"],
+            "required": ["covered", "gaps", "stretched", "from_instructions", "notes"],
             "properties": {
-                "covered": _strings(), "gaps": _strings(), "from_parent": _strings(),
+                "covered": _strings(), "gaps": _strings(),
+                "stretched": cv_tailor.CONTENT_SCHEMA["properties"]["report"]["properties"]["stretched"],
                 "from_instructions": _strings(), "notes": _strings(),
             },
         },
@@ -84,26 +87,24 @@ LETTER_SCHEMA = {
 
 
 def letter_stem(cv_stem: str) -> str:
-    """The output name: the common CV's name with "CV" turned into "Cover
+    """The output name: the CV's output name with "CV" turned into "Cover
     Letter", or "Cover Letter" in front when the name has no "CV" in it."""
     if re.search(r"\bCV\b", cv_stem):
         return re.sub(r"\bCV\b", "Cover Letter", cv_stem, count=1)
     return f"Cover Letter {cv_stem}".strip()
 
 
-def build_message(common_text: str, parent_text: Optional[str], vacancy: dict,
-                  instructions: Optional[str] = None, today: Optional[date] = None, *,
-                  log_text: str = "", previous_text: Optional[str] = None, version: int = 1) -> str:
+def build_message(cv_text: str, vacancy: dict, instructions: Optional[str] = None,
+                  today: Optional[date] = None, *, languages: Optional[list] = None, log_text: str = "",
+                  previous_text: Optional[str] = None, version: int = 1) -> str:
     description = (vacancy.get("description_text") or "").strip()
     if len(description) > cv_tailor.DESCRIPTION_LIMIT:
         description = description[:cv_tailor.DESCRIPTION_LIMIT] + "\n[cut]"
     today = today or date.today()
     parts = [f"Today is {today.day} {today.strftime('%B %Y')}.", "",
-             "<common_cv>", common_text.strip(), "</common_cv>", ""]
-    if parent_text:
-        parts += ["<parent_cv>", parent_text.strip(), "</parent_cv>", ""]
-    else:
-        parts += ["There is no parent CV this time: work from the common CV alone.", ""]
+             "<parent_cv>", cv_text.strip(), "</parent_cv>", ""]
+    if languages:
+        parts += ["The person's languages, from their profile: " + ", ".join(languages) + ".", ""]
     parts += cv_tailor.history_parts(log_text, previous_text, version, "cover letter")
     instructions = (instructions or "").strip()
     if instructions:
@@ -132,32 +133,27 @@ def validate_content(content: dict) -> list:
     return problems
 
 
-def check_facts(content: dict, common_text: str, parent_text: Optional[str],
-                person: str = "") -> dict:
-    """The name and contacts in the common CV; every number of the letter and
-    every technology it names in either CV. What the person wrote (`person`,
-    cv_tailor.person_text) counts as a source for all of them: their word
-    outranks the CVs (the owner, 2026-10-22). Kinds: name, contact, number,
-    term — as in cv_tailor.check_facts."""
+def check_facts(content: dict, cv_text: str, person: str = "", languages: Optional[list] = None) -> dict:
+    """The name, the contacts, the location line, every number of the letter
+    and every technology it names, looked up in the parent CV. What the
+    person wrote (`person`, cv_tailor.person_text) counts as a source for all
+    of them: their word outranks the CV (the owner, 2026-10-22). Kinds: name,
+    contact, location, number, term — as in cv_tailor.check_facts."""
     normalize = cv_tailor.normalize
-    sources = normalize(common_text + "\n" + (parent_text or "") + "\n" + person)
-    common_norm = normalize(common_text + "\n" + person)
-    source_numbers = set(cv_tailor._numbers(common_text + "\n" + (parent_text or "") + "\n" + person))
-    findings = []
+    raw = cv_text + "\n" + person + "\n" + "\n".join(languages or [])
+    sources = normalize(raw)
+    source_numbers = set(cv_tailor._numbers(raw))
+    header = cv_tailor.check_facts({"name": content.get("name", ""), "contacts": content.get("contacts"),
+                                    "location": content.get("location", "")}, cv_text, person, languages)
+    findings = [f for f in header["findings"] if f["kind"] in ("name", "contact", "location")]
 
     def add(kind, text, where, message):
         findings.append({"kind": kind, "text": text, "where": where, "message": message})
 
-    if normalize(content.get("name", "")) not in common_norm:
-        add("name", content.get("name", ""), "header", "the name is not written this way in the common CV")
-    for contact in content.get("contacts") or []:
-        value = contact.get("value", "")
-        if value and normalize(value) not in common_norm:
-            add("contact", value, "header", "this contact is not in the common CV")
     for index, paragraph in enumerate(content.get("paragraphs") or [], 1):
         for number in cv_tailor._numbers(paragraph):
             if number not in source_numbers:
-                add("number", number, f"paragraph {index}", f"the number is not in the CVs: \"{paragraph[:90]}\"")
+                add("number", number, f"paragraph {index}", f"the number is not in the CV: \"{paragraph[:90]}\"")
     seen = set()
     for term in content.get("technologies") or []:
         key = normalize(term)
@@ -165,7 +161,7 @@ def check_facts(content: dict, common_text: str, parent_text: Optional[str],
             continue
         seen.add(key)
         if not cv_tailor._contains_term(sources, term):
-            add("term", term, "letter", "this technology is not named in the CVs or the person's messages")
+            add("term", term, "letter", "this technology is not named in the CV or the person's messages")
     return {"findings": findings, "not_checked": []}
 
 
@@ -182,19 +178,14 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
     say(f"Cover letter V{earlier['version']}: {vacancy.get('title', vacancy_id)} — {vacancy.get('company', '')}")
     if instructions and instructions.strip():
         say(f"message: {instructions.strip()}")
-    common_text = cv_docx.read_cv_text(settings["common"])
-    parent_text = None
+    cv_text = cv_tailor.read_parent(settings)
+    languages = settings.get("languages") or []
     warnings = []
-    if settings.get("parent"):
-        if Path(settings["parent"]).exists():
-            parent_text = cv_docx.read_cv_text(settings["parent"])
-        else:
-            warnings.append(f"the parent CV {settings['parent']} does not exist; the common CV alone was used")
 
     workdir = archive_root / vacancy_id / cv_tailor._stamp()
     workdir.mkdir(parents=True, exist_ok=True)
     if content is None:
-        message = build_message(common_text, parent_text, vacancy, instructions, today, **earlier)
+        message = build_message(cv_text, vacancy, instructions, today, languages=languages, **earlier)
         (workdir / "model_input.md").write_text(message, encoding="utf-8")
         say(f"asking the model ({settings['model']}), a minute or two")
         if model_call is None:
@@ -211,8 +202,8 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
 
     warnings += cv_tailor.layout_warnings(content)
 
-    facts = check_facts(content, common_text, parent_text,
-                        cv_tailor.person_text(instructions, earlier.get("log_text", "")))
+    facts = check_facts(content, cv_text, cv_tailor.person_text(instructions, earlier.get("log_text", "")),
+                        languages)
     stem = letter_stem(settings["output_stem"])
     docx_path = workdir / f"{stem}.docx"
     pdf_path = workdir / f"{stem}.pdf"

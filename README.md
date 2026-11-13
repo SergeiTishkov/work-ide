@@ -168,11 +168,11 @@ It opens a window over the knowledge base:
   `Old versions/`, and a log keeps every request, so the next version builds
   on them) —
   and lists below the card what to check before sending: claims the fact
-  check could not find in your CVs, the vacancy's requirements with no
-  evidence, what came from the parent CV (an optional file with every
-  achievement of your working life, `cv.parent` in the profile; your own CV
-  stays the example of the layout and of what goes in first), what was cut
-  for length. The CV is 2-3 pages. The first
+  check could not find in your CV, the vacancy's requirements with no
+  evidence, what was worded toward the vacancy, what was cut for length.
+  Every tailored CV is cut from one file, your parent CV (`cv.parent` in the
+  profile: a CV with every job, project and result, however long), in its
+  layout. The CV is 2 pages, 3 at most. The first
   click opens a field for instructions to this one CV (what to stress, the
   language); the second click generates with what the field holds, empty
   included. The CV is in English unless the instructions ask for another

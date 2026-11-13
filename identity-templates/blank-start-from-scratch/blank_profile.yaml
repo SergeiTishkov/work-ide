@@ -48,7 +48,9 @@ owner:
   # not extend to somebody else's documents, see CLAUDE.md §5).
   cv_files: []           # paths to CV files in documents/
   # Languages: the filter gets the ones the person does NOT know
-  # (see config/derivation/languages.yaml).
+  # (see config/derivation/languages.yaml). A level is optional and goes into
+  # a tailored CV when a vacancy asks for the language:
+  #     languages: [English, {name: German, level: native}]
   languages: []           # the languages you speak
   # Residency is usually personal: another person with the same search lives
   # somewhere else. BUT if the search is tied to a country in substance ("I am

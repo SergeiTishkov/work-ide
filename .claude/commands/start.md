@@ -34,10 +34,10 @@ from reality and folders cannot.
    of the three will do. Without it there is no way to assemble a stack or a
    level.
 
-   Then offer, once and as optional, a **parent CV**: every achievement of their
-   working life in one long file. Generate CV draws on it for the CV of each
-   vacancy; the ordinary CV stays the example of the layout and of what goes
-   in first. "Later" is a full answer. `docs/ONBOARDING.md`, step 2.
+   Their CV (a .docx, .md or .txt) becomes the **parent CV** (`cv.parent`):
+   Generate CV cuts every tailored CV from it, so say once that the more it
+   holds — every job, project and result, however long — the better each CV.
+   "Later" is a full answer. `docs/ONBOARDING.md`, step 2.
 
 3. **Show the templates and help them choose.**
    `python tools/templates.py list`
@@ -100,8 +100,8 @@ from reality and folders cannot.
    the person.
 
 10. **No parent CV yet (`cv.parent` not set)? Say in one line that it can be
-    added at any time** and makes the CV for each vacancy better
-    (`docs/ONBOARDING.md`, step 6b). Do not press.
+    added at any time** and that Generate CV needs it (`docs/ONBOARDING.md`,
+    step 6b). Do not press.
 
 11. **Tell them about the background setup** (`docs/ONBOARDING.md`, step 6c):
     `python tools/taskd.py status`; if the workers are not registered, name
