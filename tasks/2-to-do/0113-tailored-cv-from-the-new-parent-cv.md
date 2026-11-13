@@ -22,7 +22,8 @@ parent CV adds the following:
   that are not tools. The owner keeps that line on purpose: it holds
   keywords that appear nowhere else in the CV.
 - **A location line in the header.** It is the fourth line of the left
-  column, under the stack line: city, country, time zone, "Remote".
+  column, under the stack line: city, country, time zone, "Remote" and
+  the English level ("Fluent English").
 - **LinkedIn and GitHub in the contacts.** They come next to email and
   phone.
 - **A third Summary paragraph about the person's AI work.** Summary also
@@ -78,6 +79,22 @@ The rules the owner agreed for generation, with the reasons given:
   the defects figure, which stays in every version.
 - **G5, length.** The parent CV may be longer than 4 pages. A tailored CV
   is 2-3 pages and keeps what the vacancy asks for.
+- **G6, languages.**
+  - English is written as "Fluent English" at the end of the location line,
+    and the generator keeps it there.
+  - "Russian (native)" is added only when the vacancy asks for Russian or
+    mentions it. Otherwise Russian is not written, and Belarusian never is.
+  - Reasons, from the owner's vacancies in the base on 2026-11-13. Of the 62
+    the owner applied to, none asked for C1. Of the 91 waiting for an
+    answer:
+    - 12 asked for B2 or Upper-Intermediate;
+    - 14 asked for C1 or higher, from six companies, mostly talent
+      marketplaces that test English on a call;
+    - 8 said "fluent" or "excellent" with no level;
+    - 57 said nothing about English.
+  - "Fluent" is the word vacancies use most and names no CEFR level.
+  - One waiting vacancy (GR8 Tech) asks for "B2+ Ukrainian/Russian": that is
+    the case for adding Russian.
 
 Two further decisions from the review that the generator must respect:
 
@@ -180,10 +197,30 @@ line: 10 pt, not bold, under the stack line.
 - "· B2B contractor" is appended only when the vacancy text explicitly says
   contract, B2B or contractor. Otherwise B2B never appears.
 
+- The line ends with the English level, "Fluent English" (G6). If the
+  line with the B2B suffix no longer fits one line of the half-page column,
+  the English level moves to its own line under it.
+
 The fact check accepts the line only if it equals the parent CV's line,
 with or without that suffix. The cover letter header shows the same line.
 - TO DO - Schema `location`, prompt rule G1, header rendering with the column break; the fact check; tests
+- TO DO - The English level keeps its place; with the B2B suffix, a line too long for the column moves it to its own line; tests
 - TO DO - Check the cover letter header with the location line
+
+### TO DO - 4a. Russian only when the vacancy asks for it (G6)
+The parent CV does not mention Russian.
+- When the vacancy text asks for Russian or mentions it (for example
+  "B2+ Ukrainian/Russian"), the tailored CV adds "Russian (native)" after
+  the English level.
+- If that line gets too long, the languages go on a line of their own under
+  the location line.
+- `report.notes` says that Russian was added and why.
+- Belarusian is never added.
+
+The fact check needs Russian as a known fact. It can come from the local
+profile (the identity's languages) or from a line in the parent CV that the
+renderer does not print. That choice is part of this sub-ticket.
+- TO DO - Prompt rule, where the fact "Russian, native" comes from, rendering; tests: a vacancy asking for Russian gets it, a plain vacancy does not
 
 ### TO DO - 5. Contacts and skill categories from the parent CV
 Contacts come from the parent CV when it has them: LinkedIn and GitHub as
@@ -239,7 +276,7 @@ be dropped yet. The rule matters as soon as a public version is generated
 Ask the owner whether a public mode is wanted before building it.
 - TO DO - Ask the owner whether the generator should make public versions; if yes, the marker and the public mode, with tests
 
-### DONE - 9. Length 2-3 pages (G5)
+### TO DO - 9. Length 2-3 pages (G5)
 This already holds and needs no change:
 - `cv.target_pages` is 3 and `cv.max_pages` is 3, set by the owner on
   2026-10-12 when the parent CV came in;
