@@ -102,6 +102,46 @@ Two further decisions from the review that the generator must respect:
   reads dates overlapping a full-time job as a second job.
 - **Projects carry no "project for a friend" or "client project" labels.**
 
+## Decisions of 2026-11-14
+
+The owner settled the open questions and changed several rules above. Where
+this section and the text above differ, this section holds.
+
+- **The common CV is removed.** The parent CV is the one source of tailored
+  CVs and cover letters, and their layout. The owner asked to delete the
+  common CV and the old master CV from the identity's `documents/` and to
+  clean the common CV out of the documentation, "so that it is certainly not
+  used". The output files keep the name "CV Sergei Tishkov Software
+  Engineer": the parent CV's file name without the leading "Parent".
+- **English is "English B2+"** (overrides G6's "Fluent English"). The owner
+  changed it in the parent CV: "Fluent English" read as an overstatement.
+  The generator keeps the location line as the parent CV writes it.
+- **Russian comes from the profile** (sub-ticket 4a): `owner.languages` with
+  a level (`{name: Russian, level: native}`); the model adds it to the
+  location line only when the vacancy asks for Russian.
+- **Tailoring is free in form, fixed in facts.** The owner: fit the CV to
+  the vacancy as far as it is true; mirror the vacancy's keywords; a small
+  reach is fine, inventing is not. Fixed: name, contacts, location line,
+  companies, titles, dates, every number, which technologies were used.
+  Free: selection, order and wording. The Summary is written per vacancy (a
+  management ask → the juniors the person managed; a PostgreSQL ask → SQL
+  Server); its two strongest figures stay as numbers, with free words around
+  them (replaces sub-ticket 6's "word for word"). Each reach is listed in
+  `report.stretched` for the person to check; `check_facts()` checks the
+  hard facts only.
+- **Projects: placement and form by vacancy type.** Before or after the
+  jobs; full, compact (a few bullets and one Technologies line) or none. For
+  a plain .NET vacancy they may be cut to compact or dropped. A job of
+  little relevance may be one paragraph with 2-3 technologies inline.
+- **G3: the agent decides** the Technologies categories and their order by
+  vacancy type; no fixed rule.
+- **G4: the public mode is not built.** Every generated CV goes to an
+  employer.
+- **G5: 2 pages, 3 at most** (`target_pages` 2, `max_pages` 3).
+- **The Innowise management bullet is the owner's own edit** to the parent
+  CV, outside the repository: the person managed and mentored a junior
+  developer there during a project handover.
+
 ## Implementation
 In outline. Each sub-ticket gives the detail.
 
@@ -128,8 +168,11 @@ In outline. Each sub-ticket gives the detail.
 The person's own messages still outrank all of this (task 0086).
 
 ## Items
-- TO DO - Settle the open choice with the owner before code: the common CV stays the layout model and the parent CV fills in what it lacks, or the common CV is first rebuilt from the new parent CV (then several sub-tickets shrink)
-- TO DO - Confirm G3 with the owner (it is still a proposal) before sub-ticket 7
+- DONE - Settle the open choice with the owner: the common CV is removed, the parent CV is the one source (Decisions of 2026-11-14)
+- DONE - Confirm G3 with the owner: the agent decides (Decisions of 2026-11-14)
+- TO DO - The parent CV the one source in code: `cv_tailor`, `cover_letter`, `ai_brief`, the prompts, the free-form tailoring with `report.stretched`, the app's report label; tests
+- TO DO - The common CV cleaned out of the docs, the onboarding commands and the blank template (V8)
+- TO DO - After the owner adds the Innowise bullet: generate the same two vacancies with the new code and show the before/after pair
 
 ## Sub-tickets
 
