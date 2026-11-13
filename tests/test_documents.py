@@ -136,3 +136,22 @@ def test_a_version_the_batch_made_is_marked_and_the_rest_are_the_persons(tmp_pat
     doc.publish([_new(tmp_path, "x.pdf", "two")], message="Shorter.", previous_failed=False, failed_reason=None)
     assert [e["auto"] for e in documents.read_log(folder / "CV log.md")] == [True, False]
     assert documents.state("sharp", ["v1"], tmp_path)["v1"]["by_person"] is True
+
+
+def test_a_version_made_anew_is_marked_and_the_models_log_starts_from_it(tmp_path):
+    """Task 0114: the regeneration after the parent CV became the one source."""
+    folder = tmp_path / "sharp" / "v1"
+    doc = documents.Document(folder, "cv", "CV Alex")
+    doc.publish([_new(tmp_path, "x.pdf", "one")], message="Stress Azure.", previous_failed=False,
+                failed_reason=None)
+    doc.publish([_new(tmp_path, "x.pdf", "two")], message=None, previous_failed=False,
+                failed_reason=None, auto=True, anew=True)
+    log = (folder / "CV log.md").read_text(encoding="utf-8")
+    assert "Made automatically.\nMade anew: the earlier versions were not given to the model.\n" in log
+    assert [(e["version"], e["anew"]) for e in documents.read_log(folder / "CV log.md")] == [(1, False), (2, True)]
+    assert (folder / "Old versions" / "CV Alex V1.pdf").read_text() == "one"
+    for_model = doc.log_text()
+    assert for_model.startswith("# CV log\n\n## V2 · ") and "Stress Azure." not in for_model
+    doc.publish([_new(tmp_path, "x.pdf", "three")], message="Shorter.", previous_failed=False, failed_reason=None)
+    assert "## V2 · " in doc.log_text() and "## V3 · " in doc.log_text() and "## V1 · " not in doc.log_text()
+    assert "## V1 · " in (folder / "CV log.md").read_text(encoding="utf-8")   # the file keeps everything

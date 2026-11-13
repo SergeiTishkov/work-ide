@@ -36,5 +36,5 @@ log nor the previous version.
 - One queue task per vacancy, added by the agent.
 
 ## Items
-- TO DO - `--anew` in `cv_tailor.py`, the queue passing `anew` and `auto`; tests
+- DONE - `--anew` in `cv_tailor.py`, the queue passing `anew` and `auto`; tests
 - TO DO - Queue the regeneration of SHARP's active vacancies and check the results
