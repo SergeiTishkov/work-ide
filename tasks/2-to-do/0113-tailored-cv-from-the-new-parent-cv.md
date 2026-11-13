@@ -171,7 +171,7 @@ The person's own messages still outrank all of this (task 0086).
 - DONE - Settle the open choice with the owner: the common CV is removed, the parent CV is the one source (Decisions of 2026-11-14)
 - DONE - Confirm G3 with the owner: the agent decides (Decisions of 2026-11-14)
 - DONE - The parent CV the one source in code: `cv_tailor`, `cover_letter`, `ai_brief`, the prompts, the free-form tailoring with `report.stretched`, the app's report label; tests
-- TO DO - The common CV cleaned out of the docs, the onboarding commands and the blank template (V8)
+- DONE - The common CV cleaned out of the docs, the onboarding commands and the blank template (V8)
 - TO DO - After the owner adds the Innowise bullet: generate the same two vacancies with the new code and show the before/after pair
 
 ## Sub-tickets

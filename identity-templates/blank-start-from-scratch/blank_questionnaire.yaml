@@ -101,24 +101,27 @@ answers:
       (which does not reach git). Where did you put it?
     note_for_agent: >
       The file is copied under its own name. Do not rename it — the prefix rule
-      applies only to files the project creates (CLAUDE.md §5).
+      applies only to files the project creates (CLAUDE.md §5). A .docx, .md or
+      .txt is also the parent CV (person.parent_cv) unless the person gives a
+      longer file for that.
     answer: null
-    drives: ["profile.owner.cv_files"]
+    drives: ["profile.owner.cv_files", "profile.cv.parent"]
 
   - id: person.parent_cv
     personal: true   # the answer goes into the local identity, not here
     tier: later
     q: >
-      Optional: a parent CV — every achievement of your working life in one
-      long file (every job, project, number and episode you remember, however
-      long). Nobody receives it; "Generate CV" draws on it to tailor a CV to
-      each vacancy, while your ordinary CV stays the example of the layout and
-      of what goes in first. Have one, want to make one, or later?
+      "Generate CV" cuts every tailored CV from one file, your parent CV, in
+      its layout: a CV with everything in it — every job, project, number and
+      episode you remember, however long. Your CV above becomes it; the more
+      you add to it, the better each tailored CV. Or would you rather give a
+      separate, longer file for that?
     note_for_agent: >
-      Optional, and "later" is a full answer. A yes: the file goes into
-      documents/ under its own name and its path into cv.parent. When the
-      identity is finished without one, remind the person in one line that it
-      can be added at any time (docs/ONBOARDING.md, step 6b).
+      The parent CV is the one source of Generate CV and Generate Cover Letter
+      (since 2026-11-14, task 0113): .docx, .md or .txt, its path in
+      cv.parent. Without one, Generate CV is not available; "later" is a full
+      answer — remind the person in one line at the end (docs/ONBOARDING.md,
+      step 6b).
     answer: null
     drives: ["profile.cv.parent"]
 
