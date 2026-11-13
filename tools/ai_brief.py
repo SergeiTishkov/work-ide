@@ -58,8 +58,8 @@ def _read(path: Path) -> str:
 
 
 def documents(prefix: str) -> dict:
-    """{name: text} of what the brief is written from (the hashed part)."""
-    import cv_docx
+    """{name: text} of what the brief is written from (the hashed part). The
+    CV is the parent CV (cv.parent), the one CV the tailored ones come from."""
     import cv_tailor
     import identity as identity_mod
 
@@ -72,7 +72,7 @@ def documents(prefix: str) -> dict:
     }
     try:
         settings = cv_tailor.cv_settings(common.load_profile(prefix), folder)
-        docs["CV"] = cv_docx.read_cv_text(settings["common"])
+        docs["CV"] = cv_tailor.read_parent(settings)
     except Exception as exc:  # noqa: BLE001 — a brief without the CV says so
         raise BriefError(f"the CV could not be read: {exc}")
     return docs

@@ -6,15 +6,16 @@ A CV tailored to one vacancy, as .docx and .pdf.
     python tools/cv_tailor.py --identity sharp --vacancy ID --json   # for the app
     python tools/cv_tailor.py --identity sharp --vacancy ID --instructions "Lead with Azure"
 
-Three sources go to the model (`claude -p`, no tools, structured output):
+What goes to the model (`claude -p`, no tools, structured output):
 
-  * the COMMON CV — the one the person sends by default (owner.primary_cv in
-    the profile; its .docx twin from owner.cv_files is read);
-  * the PARENT CV — every achievement of the person's working life, far
-    longer than one CV (cv.parent in the profile; .md, .txt or .docx;
-    optional, and can be added at any time). When it is there, it is where
-    the facts come from, and the common CV is the example of the layout and
-    of what to include first when the vacancy asks for nothing special;
+  * the PARENT CV (cv.parent in the profile; .docx, .md or .txt): every
+    achievement of the person's working life, longer than any one CV. It is
+    the one source: the facts, the header, the contacts, the skill
+    categories and the projects come from it. The owner, 2026-11-14: the
+    common CV that was the example of the layout before is gone, and every
+    tailored CV is cut from the parent CV to fit the vacancy;
+  * the person's languages from the profile (owner.languages), for the
+    languages a vacancy asks for;
   * the vacancy's text from the shared base;
   * the person's instructions for this one CV, when given (`--instructions`,
     typed in the app under "Generate CV"). The CV is in English unless they
@@ -23,22 +24,26 @@ Three sources go to the model (`claude -p`, no tools, structured output):
 The model returns the CV as JSON (CONTENT_SCHEMA) plus a report for the
 person. Then, without the model:
 
-  1. check_facts() compares every company, title, date range, number and
-     technology with the two CVs and the person's messages (this one and the
-     log's) and lists what it cannot find there. It does not block: the list
-     goes to the person with the files. The person's word outranks the CVs
-     (the owner, 2026-10-22): what they state in a message is a source.
-  2. cv_docx renders the .docx in the common CV's layout; Word converts it to
-     .pdf and counts the pages (cv_convert).
-  3. fit_length() cuts the bullets the model marked least needed (priority 3,
-     then 2; oldest jobs first) until the CV fits cv.target_pages (3); with
-     only priority-1 bullets left it may stay at cv.max_pages (3 as well
-     unless the profile raises it), and only past that do priority-1 bullets
-     of the oldest jobs go. The owner, 2026-10-12: a CV is 2-3 pages.
+  1. check_facts() compares every company, title, date range, number,
+     project, location and technology with the parent CV and the person's
+     messages (this one and the log's) and lists what it cannot find there.
+     It does not block: the list goes to the person with the files. The
+     person's word outranks the CV (the owner, 2026-10-22): what they state
+     in a message is a source.
+  2. cv_docx renders the .docx in the parent CV's layout; Word converts it
+     to .pdf and counts the pages (cv_convert).
+  3. fit_length() cuts the bullets the model marked least needed (priority
+     3, then 2; the section printed second first, then its oldest job or
+     last project) until the CV fits cv.target_pages (2); with only
+     priority-1 bullets left it may stay at cv.max_pages (3), and only past
+     that do priority-1 bullets and then whole projects go. The owner,
+     2026-11-14: a CV is 2 pages, a third only when what the vacancy needs
+     does not fit in two.
   4. The files go into the vacancy's folder of documents (tools/documents.py:
-     <folder>/<identity>/<vacancy id>/) under the common CV's own name. The
-     current pair moves into "Old versions" as V<n> (or "V<n> failed", when
-     the model reads the person's message as a rejection of it), and "CV
+     <folder>/<identity>/<vacancy id>/) under the output name (cv.output_name,
+     or the parent CV's file name without a leading "Parent" or "Master").
+     The current pair moves into "Old versions" as V<n> (or "V<n> failed",
+     when the model reads the person's message as a rejection of it), and "CV
      log.md" gets the new version and its message. The model gets that log
      and the current version's text with every new version, so earlier
      corrections stay made. Nothing moves until everything succeeded.
@@ -81,23 +86,29 @@ PROMPT_PATH = ROOT / "config" / "cv_tailor_prompt.md"
 
 DEFAULTS = {
     "model": "opus",
-    "target_pages": 3,
-    # Was 4 until 2026-10-12, when the parent CV came in: it is longer than
-    # any CV, and the owner wants the result at 2-3 pages.
+    # The owner, 2026-11-14: two pages, a third only when what the vacancy
+    # needs does not fit in two (3 and 3 from 2026-10-12, 4 before that).
+    "target_pages": 2,
     "max_pages": 3,
 }
 CLAUDE_TIMEOUT_SECONDS = 900
 DESCRIPTION_LIMIT = 20000
-MAX_FIT_ROUNDS = 8
+MAX_FIT_ROUNDS = 10
 
 # The printed page: A4 at the margins of cv_docx.LAYOUT, in points.
 PAGE_HEIGHT_PT = cv_docx.LAYOUT["page_height_cm"] / 2.54 * 72
 MARGIN_PT = cv_docx.LAYOUT["margin_cm"] / 2.54 * 72
 BODY_HEIGHT_PT = PAGE_HEIGHT_PT - 2 * MARGIN_PT
-# A bullet line at 11 pt Arial, single spacing, and how many characters fit
-# in it on the A4 body width: measured on the owner's CV, 2026-10-06.
-BULLET_LINE_PT = 12.65
-BULLET_LINE_CHARS = 92
+# A bullet line at 10 pt Arial, single spacing, and how many characters fit
+# in it on the A4 body width beside the bullet indent: scaled from the
+# 11 pt measure on the owner's CV (2026-10-06: 12.65 pt, 92 characters).
+BULLET_LINE_PT = 11.5
+BULLET_LINE_CHARS = 100
+BULLET_SPACE_PT = cv_docx.LAYOUT["bullet_space_pt"]
+# Two pages of the layout hold about this much plain text (the owner's parent
+# CV: about 16,500 characters on 5 pages, 2026-11-14). Told to the model as
+# the budget; the page count after rendering is what decides.
+CHARS_PER_PAGE = 3300
 
 
 def _string(description: str = "") -> dict:
@@ -109,6 +120,11 @@ def _strings(description: str = "") -> dict:
     if description:
         schema["description"] = description
     return schema
+
+
+def _object(properties: dict) -> dict:
+    return {"type": "object", "additionalProperties": False,
+            "required": list(properties), "properties": properties}
 
 
 # The model's verdict on the version before this one (tools/documents.py):
@@ -123,77 +139,57 @@ PREVIOUS_VERSION_SCHEMA = {
     },
 }
 
-CONTENT_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": ["name", "headline", "tagline", "contacts", "summary", "skills",
-                 "experience", "sections", "previous_version", "report"],
-    "properties": {
-        "name": _string("exactly as in the common CV"),
-        "headline": _string("the title line under the name"),
-        "tagline": _string("the stack line under the headline"),
-        "contacts": {
-            "type": "array",
-            "items": {
-                "type": "object", "additionalProperties": False,
-                "required": ["label", "value"],
-                "properties": {"label": _string(), "value": _string()},
-            },
-        },
-        "summary": _strings("1-2 paragraphs"),
-        "skills": {
-            "type": "array",
-            "items": {
-                "type": "object", "additionalProperties": False,
-                "required": ["category", "items"],
-                "properties": {"category": _string(), "items": _strings()},
-            },
-        },
-        "experience": {
-            "type": "array",
-            "items": {
-                "type": "object", "additionalProperties": False,
-                "required": ["dates", "title", "company", "context", "bullets", "tech_stack"],
-                "properties": {
-                    "dates": _string("as in the CVs, e.g. 'July 2024 – November 2025'"),
-                    "title": _string(),
-                    "company": _string(),
-                    "context": _string(),
-                    "bullets": {
-                        "type": "array",
-                        "items": {
-                            "type": "object", "additionalProperties": False,
-                            "required": ["text", "priority", "source"],
-                            "properties": {
-                                "text": _string(),
-                                "priority": {"type": "integer", "enum": [1, 2, 3]},
-                                "source": {"type": "string", "enum": ["common", "parent"]},
-                            },
-                        },
-                    },
-                    "tech_stack": _strings(),
-                },
-            },
-        },
-        "sections": {
-            "type": "array",
-            "items": {
-                "type": "object", "additionalProperties": False,
-                "required": ["heading", "lines"],
-                "properties": {"heading": _string(), "lines": _strings()},
-            },
-        },
-        "previous_version": PREVIOUS_VERSION_SCHEMA,
-        "report": {
-            "type": "object", "additionalProperties": False,
-            "required": ["jd_keywords", "covered", "gaps", "from_parent", "from_instructions", "notes"],
-            "properties": {
-                "jd_keywords": _strings(), "covered": _strings(), "gaps": _strings(),
-                "from_parent": _strings(), "from_instructions": _strings(), "notes": _strings(),
-            },
-        },
-    },
+BULLETS_SCHEMA = {
+    "type": "array",
+    "items": _object({"text": _string(),
+                      "priority": {"type": "integer", "enum": [1, 2, 3]}}),
 }
+
+CONTACTS_SCHEMA = {"type": "array", "items": _object({"label": _string(), "value": _string()})}
+
+CONTENT_SCHEMA = _object({
+    "name": _string("exactly as in the CV"),
+    "headline": _string("the title line under the name"),
+    "tagline": _string("the stack line under the headline"),
+    "location": _string("the CV's location line, with only the additions the rules allow"),
+    "contacts": CONTACTS_SCHEMA,
+    "summary": _strings("1-3 paragraphs"),
+    "skills": {"type": "array", "items": _object({"category": _string(), "items": _strings()})},
+    "projects": _object({
+        "placement": {"type": "string", "enum": ["before_experience", "after_experience"]},
+        "form": {"type": "string", "enum": ["full", "compact", "none"]},
+        "items": {"type": "array", "description": "the projects when form is full, else empty",
+                  "items": _object({
+                      "title": _string("exactly as in the CV"),
+                      "link": _string("exactly as in the CV, or empty"),
+                      "intro": _string(),
+                      "bullets": BULLETS_SCHEMA,
+                      "tech_stack": _strings(),
+                      "extra_lines": {"type": "array",
+                                      "items": _object({"label": _string(), "items": _strings()})},
+                  })},
+        "compact": _object({"bullets": BULLETS_SCHEMA, "tech_stack": _strings()}),
+    }),
+    "experience": {
+        "type": "array",
+        "items": _object({
+            "dates": _string("as in the CV, e.g. 'July 2024 – November 2025'"),
+            "title": _string(),
+            "company": _string(),
+            "context": _string("the project line, or the whole job as one paragraph"),
+            "bullets": BULLETS_SCHEMA,
+            "tech_stack": _strings(),
+        }),
+    },
+    "sections": {"type": "array", "items": _object({"heading": _string(), "lines": _strings()})},
+    "previous_version": PREVIOUS_VERSION_SCHEMA,
+    "report": _object({
+        "vacancy_type": {"type": "string", "enum": ["ai", "engineering", "mixed"]},
+        "jd_keywords": _strings(), "covered": _strings(), "gaps": _strings(),
+        "stretched": _strings("each place worded toward the vacancy beyond the CV's own words"),
+        "from_instructions": _strings(), "notes": _strings(),
+    }),
+})
 
 
 class TailorError(RuntimeError):
@@ -227,37 +223,58 @@ def refuse_gone(vacancy: dict, document) -> None:
 
 # --- inputs -----------------------------------------------------------------
 
-def cv_settings(profile: dict, identity_dir: Path) -> dict:
-    """Where the CVs are and the length limits, from the resolved profile.
+READABLE = (".docx", ".md", ".txt", ".markdown")
 
-    owner.primary_cv names the common CV; its file name (without the
-    extension) is the name of the output files. The text is read from a .docx
-    (or .md/.txt): the primary one when it is one, else the first .docx in
-    owner.cv_files. cv.common overrides that choice, cv.parent names the
-    parent CV. Paths are relative to the identity's folder."""
-    owner = profile.get("owner") or {}
+
+def output_stem(parent: str) -> str:
+    """The name of the output files from the parent CV's file name: "Parent
+    CV Ivan Petrov" -> "CV Ivan Petrov". A tailored CV goes out as the
+    person's CV, not as their parent CV."""
+    stem = re.sub(r"^(parent|master)\s+", "", Path(parent).stem, flags=re.IGNORECASE).strip()
+    return stem or "CV"
+
+
+def person_languages(profile: dict) -> List[str]:
+    """owner.languages as written for a CV: "Russian (native)" from
+    {name: Russian, level: native}, a plain name as it is."""
+    out = []
+    for entry in (profile.get("owner") or {}).get("languages") or []:
+        if isinstance(entry, dict):
+            name = (entry.get("name") or "").strip()
+            level = str(entry.get("level") or "").strip()
+            if name:
+                out.append(f"{name} ({level})" if level else name)
+        elif str(entry).strip():
+            out.append(str(entry).strip())
+    return out
+
+
+def cv_settings(profile: dict, identity_dir: Path) -> dict:
+    """Where the parent CV is, the output name and the length limits, from
+    the resolved profile. cv.parent names the parent CV (relative to the
+    identity's folder); cv.output_name overrides the output name."""
     cv = profile.get("cv") or {}
-    primary = owner.get("primary_cv") or ""
-    if not primary:
-        raise TailorError("the profile names no owner.primary_cv: there is no common CV to start from")
-    readable = (".docx", ".md", ".txt")
-    common_path = cv.get("common")
-    if not common_path:
-        candidates = [primary] + list(owner.get("cv_files") or [])
-        common_path = next((c for c in candidates if Path(c).suffix.lower() in readable), None)
-    if not common_path:
-        raise TailorError(
-            f"no .docx of the common CV: owner.primary_cv is {primary}, and owner.cv_files has "
-            "no .docx (the CV is read from a .docx; set cv.common to one)")
-    parent = cv.get("parent")
+    parent = cv.get("parent") or ""
+    if not parent:
+        raise TailorError("the profile names no cv.parent: there is no CV to tailor from "
+                          "(cv.parent: the person's CV with everything in it, .docx, .md or .txt)")
+    if Path(parent).suffix.lower() not in READABLE:
+        raise TailorError(f"cv.parent is {parent}: the CV is read from a .docx, .md or .txt")
     return {
-        "output_stem": Path(primary).stem,
-        "common": (identity_dir / common_path).resolve(),
-        "parent": (identity_dir / parent).resolve() if parent else None,
+        "output_stem": cv.get("output_name") or output_stem(parent),
+        "parent": (identity_dir / parent).resolve(),
+        "languages": person_languages(profile),
         "model": cv.get("model") or DEFAULTS["model"],
         "target_pages": int(cv.get("target_pages") or DEFAULTS["target_pages"]),
         "max_pages": int(cv.get("max_pages") or DEFAULTS["max_pages"]),
     }
+
+
+def read_parent(settings: dict) -> str:
+    path = Path(settings["parent"])
+    if not path.exists():
+        raise TailorError(f"the parent CV {path} does not exist (cv.parent in the profile)")
+    return cv_docx.read_cv_text(path)
 
 
 def load_vacancy(db_path: Path, vacancy_id: str) -> dict:
@@ -286,24 +303,25 @@ def history_parts(log_text: str, previous_text: Optional[str], version: int, wha
     return parts
 
 
-def build_message(common_text: str, parent_text: Optional[str], vacancy: dict,
-                  instructions: Optional[str] = None, *, log_text: str = "",
+def build_message(cv_text: str, vacancy: dict, instructions: Optional[str] = None, *,
+                  languages: Optional[List[str]] = None, target_pages: int = DEFAULTS["target_pages"],
+                  max_pages: int = DEFAULTS["max_pages"], log_text: str = "",
                   previous_text: Optional[str] = None, version: int = 1) -> str:
     description = (vacancy.get("description_text") or "").strip()
     if len(description) > DESCRIPTION_LIMIT:
         description = description[:DESCRIPTION_LIMIT] + "\n[cut]"
+    budget = target_pages * CHARS_PER_PAGE
     parts = [
-        f"The common CV is {len(common_text)} characters long as plain text.",
+        f"The parent CV is {len(cv_text)} characters long as plain text. The tailored CV is "
+        f"{target_pages} pages, {max_pages} at most; {target_pages} pages of the layout hold about "
+        f"{budget:,} characters of plain text.",
         "",
-        "<common_cv>", common_text.strip(), "</common_cv>",
+        "<parent_cv>", cv_text.strip(), "</parent_cv>",
         "",
     ]
-    if parent_text:
-        parts += ["<parent_cv>", parent_text.strip(), "</parent_cv>", "",
-                  "Both CVs are given: the facts come from both; the common CV shows the layout "
-                  "and what to include first when the vacancy asks for nothing special.", ""]
-    else:
-        parts += ["There is no parent CV this time: work from the common CV alone.", ""]
+    if languages:
+        parts += ["The person's languages, from their profile (a fact, not printed unless the rules "
+                  "say so): " + ", ".join(languages) + ".", ""]
     parts += history_parts(log_text, previous_text, version, "CV")
     instructions = (instructions or "").strip()
     if instructions:
@@ -378,15 +396,18 @@ def clean_text(value):
 
 
 HEADER_LINE_LIMIT = 45
+LOCATION_LINE_LIMIT = 58
 
 
 def layout_warnings(content: dict) -> List[str]:
-    """Lines the layout cannot hold well: the header column is half a page
-    wide in 12 pt bold, about 45 characters."""
+    """Lines the layout cannot hold well: the header's left column is about
+    half a page wide, 45 characters in 12 pt bold, 58 in the 10 pt location
+    line."""
     warnings = []
-    for key in ("headline", "tagline"):
+    for key, limit in (("headline", HEADER_LINE_LIMIT), ("tagline", HEADER_LINE_LIMIT),
+                       ("location", LOCATION_LINE_LIMIT)):
         value = content.get(key) or ""
-        if len(value) > HEADER_LINE_LIMIT:
+        if len(value) > limit:
             warnings.append(f"the {key} is {len(value)} characters and wraps in the header: \"{value}\"")
     return warnings
 
@@ -405,9 +426,16 @@ def validate_content(content: dict) -> List[str]:
         for b_index, bullet in enumerate(job.get("bullets") or []):
             if not isinstance(bullet, (dict, str)) or not cv_docx.bullet_text(bullet).strip():
                 problems.append(f"experience[{index}].bullets[{b_index}] has no text")
+        if not (job.get("context") or "").strip() and not job.get("bullets"):
+            problems.append(f"experience[{index}] has neither a context nor bullets")
     for index, group in enumerate(content.get("skills") or []):
         if not isinstance(group.get("items"), list):
             problems.append(f"skills[{index}].items is not a list")
+    projects = cv_docx.projects_of(content)
+    if projects["form"] == "full":
+        for index, project in enumerate(projects["items"]):
+            if not (project.get("title") or "").strip():
+                problems.append(f"projects.items[{index}].title is missing or empty")
     return problems
 
 
@@ -465,56 +493,81 @@ def person_text(instructions: Optional[str], log_text: str = "") -> str:
     return "\n".join(t for t in ((instructions or "").strip(), (log_text or "").strip()) if t)
 
 
-def check_facts(content: dict, common_text: str, parent_text: Optional[str],
-                person: str = "") -> dict:
-    """Every factual claim in the tailored CV, looked up in the two source CVs
-    and in what the person wrote (`person`, see person_text). The person's word
-    outranks the CVs where it speaks; the rest is checked as without it.
+def check_facts(content: dict, cv_text: str, person: str = "", languages: Optional[List[str]] = None) -> dict:
+    """Every factual claim in the tailored CV, looked up in the parent CV, in
+    what the person wrote (`person`, see person_text) and in their languages
+    from the profile. The person's word outranks the CV where it speaks; the
+    rest is checked as without it. Wording is free (the owner, 2026-11-14:
+    the CV is fitted to the vacancy as far as it is true); what is checked
+    are the facts an employer can verify: names, employers, titles, dates,
+    numbers, project titles and links, the location and the technologies
+    listed as used.
 
     Returns {"findings": [{"kind", "text", "where", "message"}], "not_checked": [...]}.
-    Kinds: name, contact, company, title, dates, order, number, term,
-    missing_job, missing_category. A finding is a thing to look at, not a
+    Kinds: name, contact, location, company, title, dates, order, number,
+    project, link, term, missing_job. A finding is a thing to look at, not a
     proof of invention: "MS SQL" written as "SQL Server" is a finding too."""
-    sources = normalize(common_text + "\n" + (parent_text or "") + "\n" + person)
-    common_norm = normalize(common_text + "\n" + person)
-    source_numbers = set(_numbers(common_text + "\n" + (parent_text or "") + "\n" + person))
+    known = "\n".join(languages or [])
+    raw = cv_text + "\n" + person + "\n" + known
+    sources = normalize(raw)
+    source_numbers = set(_numbers(raw))
     findings = []
     not_checked = []
 
     def add(kind, text, where, message):
         findings.append({"kind": kind, "text": text, "where": where, "message": message})
 
-    if normalize(content.get("name", "")) not in common_norm:
-        add("name", content.get("name", ""), "header", "the name is not written this way in the common CV")
+    def numbers_in(text, where):
+        for number in _numbers(text):
+            if number not in source_numbers:
+                add("number", number, where, f"the number is not in the CV: \"{text[:90]}\"")
+
+    if normalize(content.get("name", "")) not in sources:
+        add("name", content.get("name", ""), "header", "the name is not written this way in the CV")
     for contact in content.get("contacts") or []:
         value = contact.get("value", "")
-        if value and normalize(value) not in common_norm:
-            add("contact", value, "header", "this contact is not in the common CV")
+        if value and normalize(value) not in sources:
+            add("contact", value, "header", "this contact is not in the CV")
+    for part in LOCATION_SPLIT_RE.split(content.get("location") or ""):
+        part = part.strip()
+        if part and normalize(part) not in ALLOWED_LOCATION_PARTS and normalize(part) not in sources:
+            add("location", part, "header", "this part of the location line is not in the CV or the profile")
 
     starts = []
-    for index, job in enumerate(content.get("experience") or []):
+    for job in content.get("experience") or []:
         where = f"{job.get('company', '')} ({job.get('dates', '')})"
         for key, kind in (("company", "company"), ("title", "title"), ("dates", "dates")):
             value = job.get(key) or ""
             if value and normalize(value) not in sources:
-                add(kind, value, where, f"this {key} is not written this way in the CVs")
+                add(kind, value, where, f"this {key} is not written this way in the CV")
         start = _start_of(job.get("dates") or "")
         if start is None:
             not_checked.append(f"the order of '{job.get('dates')}': the start date is not readable")
         starts.append(start)
-        texts = [job.get("context") or ""] + [cv_docx.bullet_text(b) for b in job.get("bullets") or []]
-        for text in texts:
-            for number in _numbers(text):
-                if number not in source_numbers:
-                    add("number", number, where, f"the number is not in the CVs: \"{text[:90]}\"")
-    known = [s for s in starts if s is not None]
-    if any(a < b for a, b in zip(known, known[1:])):
+        for text in [job.get("context") or ""] + [cv_docx.bullet_text(b) for b in job.get("bullets") or []]:
+            numbers_in(text, where)
+    known_starts = [s for s in starts if s is not None]
+    if any(a < b for a, b in zip(known_starts, known_starts[1:])):
         add("order", "", "Work experience", "the jobs are not in reverse chronological order")
 
     for paragraph in content.get("summary") or []:
-        for number in _numbers(paragraph):
-            if number not in source_numbers:
-                add("number", number, "Summary", f"the number is not in the CVs: \"{paragraph[:90]}\"")
+        numbers_in(paragraph, "Summary")
+
+    projects = cv_docx.projects_of(content)
+    if projects["form"] == "full":
+        for project in projects["items"]:
+            title = project.get("title") or ""
+            if title and normalize(title) not in sources:
+                add("project", title, "Independent projects", "no project of this title in the CV")
+            link = project.get("link") or ""
+            if link and normalize(link) not in sources:
+                add("link", link, title, "this link is not in the CV")
+            texts = [project.get("intro") or ""] + [cv_docx.bullet_text(b) for b in project.get("bullets") or []]
+            for text in texts:
+                numbers_in(text, title or "Independent projects")
+    elif projects["form"] == "compact":
+        for bullet in projects["compact"].get("bullets") or []:
+            numbers_in(cv_docx.bullet_text(bullet), "Independent projects")
 
     seen = set()
     for term in cv_docx.iter_terms(content):
@@ -523,58 +576,54 @@ def check_facts(content: dict, common_text: str, parent_text: Optional[str],
             continue
         seen.add(key)
         if not _contains_term(sources, term):
-            add("term", term, "Skills / Tech stack", "this technology is not named in the CVs or the person's messages")
+            add("term", term, "Technologies", "this technology is not named in the CV or the person's messages")
 
     tailored_companies = {normalize(j.get("company", "")) for j in content.get("experience") or []}
-    for company in _common_companies(common_text):
+    for company in source_companies(cv_text):
         if normalize(company) not in tailored_companies:
-            add("missing_job", company, "Work experience", "a job of the common CV is left out")
-    tailored_categories = {normalize(g.get("category", "")) for g in content.get("skills") or []}
-    for category in _common_categories(common_text):
-        if normalize(category) not in tailored_categories:
-            add("missing_category", category, "Skills", "a skills category of the common CV is left out")
+            add("missing_job", company, "Work experience", "a job of the CV is left out")
     return {"findings": findings, "not_checked": not_checked}
 
 
-DATE_LINE_RE = re.compile(r"^\s*[A-Za-z]+\.?\s+\d{4}\s*[–—-]\s*(?:[A-Za-z]+\.?\s+\d{4}|present|now)\s*:?\s*$",
-                          re.IGNORECASE)
+# The location line's parts are joined by "·" or "|"; these may be added to
+# what the CV says (task 0113, G1: a contract vacancy).
+LOCATION_SPLIT_RE = re.compile(r"\s*[·|•]\s*")
+ALLOWED_LOCATION_PARTS = {"b2b contractor", "b2b", "contractor"}
+
+DATE_RANGE = r"[A-Za-z]+\.?\s+\d{4}\s*[–—-]\s*(?:[A-Za-z]+\.?\s+\d{4}|present|now)"
+DATE_LINE_RE = re.compile(rf"^\s*{DATE_RANGE}\s*:?\s*$", re.IGNORECASE)
+TITLE_COMPANY_RE = re.compile(r"^[^\t,]{2,60}, [^\t]{2,80}$")
 
 
-def _common_companies(common_text: str) -> List[str]:
-    """The companies of the common CV, read from the line after each date
-    line ("Title, Company"). Best effort: a CV laid out differently yields
-    none, and the check then has nothing to compare."""
-    lines = [line.strip() for line in common_text.splitlines()]
+def source_companies(cv_text: str) -> List[str]:
+    """The companies of the CV, read from each job's "Title, Company" line:
+    the line before or after a date line ("November 2025 – Present"), or the
+    part before a tab when the dates share the line (as cv_docx writes it).
+    Best effort: a CV laid out otherwise yields none, and the check then has
+    nothing to compare."""
+    lines = [line.strip() for line in cv_text.splitlines()]
     companies = []
     for index, line in enumerate(lines):
-        if DATE_LINE_RE.match(line):
-            following = next((l for l in lines[index + 1:] if l), "")
-            if ", " in following:
-                companies.append(following.split(", ", 1)[1])
-    return companies
-
-
-def _common_categories(common_text: str) -> List[str]:
-    lines = [line.strip() for line in common_text.splitlines()]
-    try:
-        start = next(i for i, l in enumerate(lines) if l.lower() == "skills")
-    except StopIteration:
-        return []
-    categories = []
-    for line in lines[start + 1:]:
-        if not line:
+        head, _, tail = line.rpartition("\t")
+        if head and DATE_LINE_RE.match(tail):
+            candidates = [head.strip()]
+        elif DATE_LINE_RE.match(line):
+            before = next((l for l in reversed(lines[:index]) if l), "")
+            after = next((l for l in lines[index + 1:] if l), "")
+            candidates = [before, after]
+        else:
             continue
-        match = re.match(r"^([A-Za-z][\w /&+.-]{1,30}):\s+\S", line)
-        if not match:
-            break
-        categories.append(match.group(1))
-    return categories
+        for candidate in candidates:
+            if TITLE_COMPANY_RE.match(candidate) and not candidate.endswith("."):
+                companies.append(candidate.split(", ", 1)[1])
+                break
+    return companies
 
 
 # --- length -----------------------------------------------------------------
 
 def _bullet_height(text: str) -> float:
-    return math.ceil(max(len(text), 1) / BULLET_LINE_CHARS) * BULLET_LINE_PT
+    return math.ceil(max(len(text), 1) / BULLET_LINE_CHARS) * BULLET_LINE_PT + BULLET_SPACE_PT
 
 
 def overflow_pt(pages: int, last_bottom_pt: Optional[float], limit: int) -> float:
@@ -586,33 +635,69 @@ def overflow_pt(pages: int, last_bottom_pt: Optional[float], limit: int) -> floa
     return (pages - limit - 1) * BODY_HEIGHT_PT + max(last_bottom_pt - MARGIN_PT, BULLET_LINE_PT)
 
 
+def _blocks(content: dict) -> List[dict]:
+    """Every list of bullets the length fitting may cut from, with its rank:
+    the higher, the sooner it is cut. The section printed second (projects
+    after the jobs, or the jobs after the projects) goes before the first;
+    inside it, the oldest job and the last project first. A job keeps one
+    bullet; a project with an intro may lose all of them."""
+    projects = cv_docx.projects_of(content)
+    projects_first = projects["placement"] == "before_experience"
+    job_rank, project_rank = (1, 0) if projects_first else (0, 1)
+    blocks = []
+    for index, job in enumerate(content.get("experience") or []):
+        blocks.append({"owner": job, "rank": (job_rank, index), "keep": 1, "label": job.get("company", "")})
+    if projects["form"] == "full":
+        for index, project in enumerate(projects["items"]):
+            keep = 0 if (project.get("intro") or "").strip() else 1
+            blocks.append({"owner": project, "rank": (project_rank, index), "keep": keep,
+                           "label": project.get("title", "")})
+    elif projects["form"] == "compact":
+        blocks.append({"owner": projects["compact"], "rank": (project_rank, 0), "keep": 1,
+                       "label": "Independent projects"})
+    return blocks
+
+
 def cut_bullets(content: dict, need_pt: float, max_priority: int) -> List[str]:
     """Removes bullets until about `need_pt` of height is freed: the highest
-    priority number first, then the oldest job, then the last bullet of a job.
-    Every job keeps at least one bullet. Returns the removed texts."""
-    jobs = content.get("experience") or []
+    priority number first, then the block ranked to go first (_blocks),
+    then the last bullet of a block. Returns the removed texts."""
+    blocks = _blocks(content)
     candidates = []
-    for job_index, job in enumerate(jobs):
-        for bullet_index, bullet in enumerate(job.get("bullets") or []):
+    for block_index, block in enumerate(blocks):
+        for bullet_index, bullet in enumerate(block["owner"].get("bullets") or []):
             priority = bullet.get("priority", 2) if isinstance(bullet, dict) else 2
             if priority >= max_priority:
-                candidates.append((priority, job_index, bullet_index))
+                candidates.append((priority, block["rank"], bullet_index, block_index))
     candidates.sort(reverse=True)
     freed, removed = 0.0, []
     doomed = {}
-    for priority, job_index, bullet_index in candidates:
+    for priority, _rank, bullet_index, block_index in candidates:
         if freed >= need_pt:
             break
-        bullets = jobs[job_index]["bullets"]
-        if len(bullets) - len(doomed.get(job_index, ())) <= 1:
+        block = blocks[block_index]
+        bullets = block["owner"]["bullets"]
+        if len(bullets) - len(doomed.get(block_index, ())) <= block["keep"]:
             continue
-        doomed.setdefault(job_index, set()).add(bullet_index)
+        doomed.setdefault(block_index, set()).add(bullet_index)
         text = cv_docx.bullet_text(bullets[bullet_index])
         freed += _bullet_height(text)
-        removed.append(f"{jobs[job_index].get('company', '')}: {text}")
-    for job_index, indexes in doomed.items():
-        jobs[job_index]["bullets"] = [b for i, b in enumerate(jobs[job_index]["bullets"]) if i not in indexes]
+        removed.append(f"{block['label']}: {text}")
+    for block_index, indexes in doomed.items():
+        owner = blocks[block_index]["owner"]
+        owner["bullets"] = [b for i, b in enumerate(owner["bullets"]) if i not in indexes]
     return removed
+
+
+def drop_project(content: dict) -> List[str]:
+    """The last resort: the last project goes whole."""
+    projects = content.get("projects") or {}
+    if cv_docx.projects_of(content)["form"] != "full" or not projects.get("items"):
+        return []
+    project = projects["items"].pop()
+    if not projects["items"]:
+        projects["form"] = "none"
+    return [f"the whole project {project.get('title', '')}"]
 
 
 def fit_length(content: dict, render, *, target_pages: int, max_pages: int) -> dict:
@@ -621,7 +706,7 @@ def fit_length(content: dict, render, *, target_pages: int, max_pages: int) -> d
 
     Stage 1 cuts priority 3 and 2 bullets down to target_pages. With only
     priority-1 bullets left the CV may stay up to max_pages; past that,
-    stage 2 cuts priority-1 bullets too."""
+    stage 2 cuts priority-1 bullets too, and then whole projects."""
     removed: List[str] = []
     measure = render(content)
     for _ in range(MAX_FIT_ROUNDS):
@@ -632,7 +717,7 @@ def fit_length(content: dict, render, *, target_pages: int, max_pages: int) -> d
         cut = cut_bullets(content, need, max_priority=2)
         if not cut and pages > max_pages:
             need = overflow_pt(pages, measure.get("last_page_bottom_pt"), max_pages)
-            cut = cut_bullets(content, need, max_priority=1)
+            cut = cut_bullets(content, need, max_priority=1) or drop_project(content)
         if not cut:
             break
         removed += cut
@@ -684,23 +769,16 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
     say(f"CV V{earlier['version']}: {vacancy.get('title', vacancy_id)} — {vacancy.get('company', '')}")
     if instructions and instructions.strip():
         say(f"message: {instructions.strip()}")
-    common_text = cv_docx.read_cv_text(settings["common"])
-    parent_text = None
+    cv_text = read_parent(settings)
+    languages = settings.get("languages") or []
     warnings = []
-    if settings.get("parent"):
-        if Path(settings["parent"]).exists():
-            parent_text = cv_docx.read_cv_text(settings["parent"])
-        else:
-            warnings.append(f"the parent CV {settings['parent']} does not exist; the common CV alone was used")
-    else:
-        warnings.append("no parent CV is set (cv.parent in the profile); the common CV alone was used. "
-                        "A parent CV with every achievement can be added at any time and gives the "
-                        "tailoring more to choose from")
 
     workdir = archive_root / vacancy_id / _stamp()
     workdir.mkdir(parents=True, exist_ok=True)
     if content is None:
-        message = build_message(common_text, parent_text, vacancy, instructions, **earlier)
+        message = build_message(cv_text, vacancy, instructions, languages=languages,
+                                target_pages=settings["target_pages"], max_pages=settings["max_pages"],
+                                **earlier)
         (workdir / "model_input.md").write_text(message, encoding="utf-8")
         say(f"asking the model ({settings['model']}), a minute or three")
         content = model_call(message, model=settings["model"], workdir=workdir)
@@ -713,8 +791,8 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
         raise TailorError("the CV content is not usable: " + "; ".join(problems))
     warnings += layout_warnings(content)
 
-    facts = check_facts(content, common_text, parent_text,
-                        person_text(instructions, earlier.get("log_text", "")))
+    facts = check_facts(content, cv_text, person_text(instructions, earlier.get("log_text", "")),
+                        languages)
     stem = settings["output_stem"]
     docx_path = workdir / f"{stem}.docx"
     pdf_path = workdir / f"{stem}.pdf"

@@ -2,30 +2,41 @@
 A CV as a Word document: the content of a tailored CV -> .docx, and the text
 of an existing .docx CV -> plain text for the model to read.
 
-The layout copies the owner's own CV (2026-10-06): A4, 1.27 cm margins,
-Arial 11 at 1.15 line spacing; the name, headline and stack line on the left
-and the contacts in small print on the right; section titles as white bold
-text on a teal bar; each job as a bold date line and a bold "Title, Company"
-line, one line of context, bullets, and a "Tech stack:" line. LAYOUT holds the
-numbers, so another person's look is a change in one place.
+The layout copies the owner's parent CV (2026-11-14; the common CV it copied
+before is gone): A4, 1.27 cm margins, Arial 10. The header has three columns:
+the name, headline, stack line and location line on the left, the contact
+labels in the middle, the contact values (links) on the right. Section titles
+are bold 14 pt. A project is a bold underlined title with its link on the
+right, an intro paragraph, bullets and a "Technologies:" line, then any
+labelled lines of its own ("AI Systems: ..."). A job is a bold "Title,
+Company" line with the dates on the right, one line of context, bullets and
+a "Technologies:" line; a job written as one paragraph has the context alone.
+LAYOUT holds the numbers, so another person's look is a change in one place.
 
 The content is a plain dict (see cv_tailor.CONTENT_SCHEMA):
 
-    {"name": ..., "headline": ..., "tagline": ...,
+    {"name": ..., "headline": ..., "tagline": ..., "location": ...,
      "contacts": [{"label": "Email", "value": "..."}],
      "summary": ["paragraph", ...],
      "skills": [{"category": "Back End", "items": ["C#", ...]}],
+     "projects": {"placement": "before_experience" | "after_experience",
+                  "form": "full" | "compact" | "none",
+                  "items": [{"title": ..., "link": ..., "intro": ...,
+                             "bullets": [{"text": ..., "priority": 1}], "tech_stack": [...],
+                             "extra_lines": [{"label": "AI Systems", "items": [...]}]}],
+                  "compact": {"bullets": [...], "tech_stack": [...]}},
      "experience": [{"dates": ..., "title": ..., "company": ..., "context": ...,
                      "bullets": [{"text": ..., "priority": 1}], "tech_stack": [...]}],
      "sections": [{"heading": "Education", "lines": ["..."]}]}
 
 A bullet may also be a plain string. `priority` is used by the length fitting
-in cv_tailor and is not printed.
+in cv_tailor and is not printed. Content without `location` or `projects`
+(made before 2026-11-14) renders without them.
 
 render_letter() writes a cover letter (cover_letter.LETTER_SCHEMA) under the
 same header as the CV, so the two read as one set:
 
-    {"name": ..., "headline": ..., "contacts": [...], "date": ...,
+    {"name": ..., "headline": ..., "location": ..., "contacts": [...], "date": ...,
      "recipient": ["Hiring Team", "Contoso"], "greeting": "Dear Hiring Team,",
      "paragraphs": ["...", ...], "closing": "Kind regards,"}
 """
@@ -37,38 +48,37 @@ from typing import Iterable, List
 
 from docx import Document
 from docx.enum.section import WD_SECTION
-from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_BREAK
+from docx.enum.text import WD_BREAK, WD_PARAGRAPH_ALIGNMENT, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.opc.constants import RELATIONSHIP_TYPE
-from docx.shared import Cm, Pt, RGBColor
+from docx.shared import Cm, Pt
 
 LAYOUT = {
     "page_width_cm": 21.0,
     "page_height_cm": 29.7,
     "margin_cm": 1.27,
     "font": "Arial",
-    "font_size_pt": 11,
-    "line_spacing": 1.15,
+    "font_size_pt": 10,
+    "line_spacing": 1.15,          # Summary and intro paragraphs; bullets are single
+    "letter_size_pt": 11,          # the body of a cover letter
     "header_size_pt": 12,          # name, headline, stack line
-    "contact_size_pt": 8,
-    "contact_tab_cm": 3.0,         # where a contact's value starts
-    "bar_fill": "31849B",          # section title bar
-    "bar_text_size_pt": 12,
-    "bar_text_indent_cm": 1.27,
-    "bar_space_before_pt": 6,
-    "bar_space_after_pt": 5,
-    "job_head_size_pt": 14,        # date line and "Title, Company"
-    "job_space_before_pt": 14,
-    "block_gap_pt": 11,            # after the context line, after the bullets
-    "summary_first_line_cm": 1.27,
+    "location_size_pt": 10,
+    "contact_size_pt": 9,
+    # the header's three columns: name, contact labels, contact values
+    "header_columns_cm": (9.70, 2.67, 6.10),
+    "heading_size_pt": 14,         # a section title
+    "heading_space_before_pt": 12,
+    "heading_space_after_pt": 6,
+    "paragraph_space_pt": 6,       # after a Summary paragraph, an intro, a head line
     "bullet_indent_cm": 0.635,
-    "tech_stack_label": "Tech stack:",
-    "tech_stack_tab_cm": 2.5,
-    "tech_stack_separator": " · ",
-    "link_color": "0000FF",
-    "section_titles": {"summary": "Summary", "skills": "Skills", "experience": "Work experience"},
+    "bullet_space_pt": 3,
+    "block_space_pt": 12,          # after a project or a job
+    "tech_label": "Technologies:",
+    "tech_separator": " · ",
+    "link_color": "0563C1",
+    "section_titles": {"summary": "Summary", "skills": "Technologies",
+                       "projects": "Independent Projects", "experience": "Work Experience"},
 }
 
 URL_RE = re.compile(r"^(https?://\S+)$", re.IGNORECASE)
@@ -126,6 +136,22 @@ def bullet_text(bullet) -> str:
     return bullet["text"] if isinstance(bullet, dict) else str(bullet)
 
 
+def _texts(bullets) -> List[str]:
+    return [bullet_text(b).strip() for b in bullets or [] if bullet_text(b).strip()]
+
+
+def _items(items) -> List[str]:
+    return [i.strip() for i in items or [] if i and i.strip()]
+
+
+def projects_of(content: dict) -> dict:
+    """The projects part with its defaults: a missing one is none."""
+    projects = content.get("projects") or {}
+    form = projects.get("form") or ("full" if projects.get("items") else "none")
+    return {"placement": projects.get("placement") or "after_experience", "form": form,
+            "items": projects.get("items") or [], "compact": projects.get("compact") or {}}
+
+
 def render(content: dict, path: Path, *, layout: dict = None, author: str = "") -> Path:
     """Writes the CV to `path` (.docx) and returns it."""
     lay = dict(LAYOUT, **(layout or {}))
@@ -137,36 +163,38 @@ def render(content: dict, path: Path, *, layout: dict = None, author: str = "") 
     titles = lay["section_titles"]
     summary = [p for p in content.get("summary") or [] if p and p.strip()]
     if summary:
-        _bar(document, titles["summary"], lay)
+        _heading(document, titles["summary"], lay)
         for text in summary:
             paragraph = document.add_paragraph()
-            paragraph.paragraph_format.first_line_indent = Cm(lay["summary_first_line_cm"])
-            paragraph.paragraph_format.space_after = Pt(4)
+            paragraph.paragraph_format.space_after = Pt(lay["paragraph_space_pt"])
             _run(paragraph, text.strip())
 
-    skills = [s for s in content.get("skills") or [] if s.get("items")]
+    skills = [s for s in content.get("skills") or [] if _items(s.get("items"))]
     if skills:
-        _bar(document, titles["skills"], lay)
+        _heading(document, titles["skills"], lay)
         for group in skills:
             paragraph = document.add_paragraph()
-            paragraph.paragraph_format.space_after = Pt(4)
-            _run(paragraph, f"{group.get('category', '').strip()}", bold=True)
-            _run(paragraph, ": " + ", ".join(i.strip() for i in group["items"] if i.strip()))
+            paragraph.paragraph_format.space_after = Pt(lay["bullet_space_pt"])
+            paragraph.paragraph_format.line_spacing = 1.0
+            _run(paragraph, f"{group.get('category', '').strip()}:", bold=True)
+            _run(paragraph, " " + ", ".join(_items(group["items"])))
 
-    jobs = content.get("experience") or []
-    if jobs:
-        _bar(document, titles["experience"], lay)
-        for job in jobs:
-            _job(document, job, lay)
+    projects = projects_of(content)
+    if projects["placement"] == "before_experience":
+        _projects(document, projects, lay)
+        _experience(document, content, lay)
+    else:
+        _experience(document, content, lay)
+        _projects(document, projects, lay)
 
     for section in content.get("sections") or []:
         lines = [line for line in section.get("lines") or [] if line and line.strip()]
         if not section.get("heading") or not lines:
             continue
-        _bar(document, section["heading"], lay)
+        _heading(document, section["heading"], lay)
         for line in lines:
             paragraph = document.add_paragraph()
-            paragraph.paragraph_format.space_after = Pt(2)
+            paragraph.paragraph_format.space_after = Pt(lay["bullet_space_pt"])
             _run(paragraph, line.strip())
 
     properties = document.core_properties
@@ -190,6 +218,7 @@ def render_letter(content: dict, path: Path, *, layout: dict = None, author: str
     _base_style(document, lay)
     _page(document.sections[0], lay)
     _header(document, content, lay)
+    size = lay["letter_size_pt"]
 
     def block(lines, space_before=0.0, space_after=0.0):
         lines = [line.strip() for line in lines if line and line.strip()]
@@ -199,9 +228,9 @@ def render_letter(content: dict, path: Path, *, layout: dict = None, author: str
                 paragraph.paragraph_format.space_before = Pt(space_before)
             if index == len(lines) - 1:
                 paragraph.paragraph_format.space_after = Pt(space_after)
-            _run(paragraph, line)
+            _run(paragraph, line, size=size)
 
-    gap = lay["block_gap_pt"]
+    gap = lay["block_space_pt"]
     block([content.get("date", "")], space_before=2 * gap, space_after=gap)
     block(content.get("recipient") or [], space_after=gap)
     block([content.get("greeting", "")], space_after=gap)
@@ -232,65 +261,146 @@ def signature(name: str) -> str:
 
 
 def _header(document, content: dict, lay: dict) -> None:
-    """The header: two columns, as in the original. Left: name, headline,
-    stack line. Right: contacts. The body after it is one column."""
-    _set_columns(document.sections[0], 2)
+    """The header: three columns, as in the parent CV. Left: name, headline,
+    stack line, location line. Middle: the contact labels. Right: the contact
+    values, aligned right. A column break starts each of the two contact
+    columns, so nothing flows from one column into the next. The body after
+    it is one column."""
+    _set_columns(document.sections[0], lay["header_columns_cm"])
     for line in (content.get("name", ""), content.get("headline", ""), content.get("tagline", "")):
-        if line:
+        if line and line.strip():
             paragraph = document.add_paragraph()
-            _run(paragraph, line, bold=True, size=lay["header_size_pt"])
-    contacts = content.get("contacts") or []
-    for index, contact in enumerate(contacts):
+            _run(paragraph, line.strip(), bold=True, size=lay["header_size_pt"])
+    location = (content.get("location") or "").strip()
+    if location:
         paragraph = document.add_paragraph()
-        paragraph.paragraph_format.tab_stops.add_tab_stop(Cm(lay["contact_tab_cm"]))
-        if index == 0:
-            paragraph.add_run().add_break(WD_BREAK.COLUMN)
-        label = (contact.get("label") or "").strip()
-        if label:
-            _run(paragraph, f"{label.rstrip(':')}:\t", size=lay["contact_size_pt"])
-        _contact_value(paragraph, (contact.get("value") or "").strip(), lay)
+        paragraph.paragraph_format.space_before = Pt(2)
+        _run(paragraph, location, size=lay["location_size_pt"])
+
+    contacts = [c for c in content.get("contacts") or [] if (c.get("value") or "").strip()]
+    for column in ("label", "value"):
+        for index, contact in enumerate(contacts or [{}]):
+            paragraph = document.add_paragraph()
+            if index == 0:
+                paragraph.add_run().add_break(WD_BREAK.COLUMN)
+                # one line down, level with the headline (as in the parent CV)
+                _run(paragraph, "", size=lay["contact_size_pt"]).add_break()
+            if column == "label":
+                label = (contact.get("label") or "").strip().rstrip(":")
+                if label:
+                    _run(paragraph, f"{label}:", size=lay["contact_size_pt"])
+            else:
+                paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+                value = (contact.get("value") or "").strip()
+                if value:
+                    _link(paragraph, value, _target(value), lay, size=lay["contact_size_pt"])
 
     body = document.add_section(WD_SECTION.CONTINUOUS)
     _page(body, lay)
-    _set_columns(body, 1)
+    _set_columns(body, None)
 
 
-def _job(document, job: dict, lay: dict) -> None:
-    dates = (job.get("dates") or "").strip()
-    head = ", ".join(x for x in ((job.get("title") or "").strip(), (job.get("company") or "").strip()) if x)
+def _experience(document, content: dict, lay: dict) -> None:
+    jobs = content.get("experience") or []
+    if not jobs:
+        return
+    _heading(document, lay["section_titles"]["experience"], lay)
+    for job in jobs:
+        head = ", ".join(x for x in ((job.get("title") or "").strip(), (job.get("company") or "").strip()) if x)
+        dates = (job.get("dates") or "").strip()
+        paragraph = _head_line(document, lay)
+        _run(paragraph, head, bold=True)
+        if dates:
+            _run(paragraph, "\t" + dates, bold=True)
+        _item_body(document, job.get("context"), job.get("bullets"), job.get("tech_stack"), [], lay)
+
+
+def _projects(document, projects: dict, lay: dict) -> None:
+    form = projects["form"]
+    if form == "compact":
+        compact = projects["compact"]
+        if not _texts(compact.get("bullets")):
+            return
+        _heading(document, lay["section_titles"]["projects"], lay)
+        _item_body(document, "", compact.get("bullets"), compact.get("tech_stack"), [], lay)
+        return
+    items = [p for p in projects["items"] if (p.get("title") or "").strip()] if form == "full" else []
+    if not items:
+        return
+    _heading(document, lay["section_titles"]["projects"], lay)
+    for project in items:
+        paragraph = _head_line(document, lay)
+        _run(paragraph, project["title"].strip(), bold=True, underline=True)
+        link = (project.get("link") or "").strip()
+        if link:
+            _run(paragraph, "\t")
+            _link(paragraph, link, _target(link), lay)
+        _item_body(document, project.get("intro"), project.get("bullets"), project.get("tech_stack"),
+                   project.get("extra_lines") or [], lay)
+
+
+def _head_line(document, lay: dict):
+    """The first line of a job or a project: bold on the left, the dates or
+    the link on a right-aligned tab stop at the right margin."""
     paragraph = document.add_paragraph()
-    paragraph.paragraph_format.space_before = Pt(lay["job_space_before_pt"])
-    paragraph.paragraph_format.keep_with_next = True
-    _run(paragraph, f"{dates}:" if dates else head, bold=True, size=lay["job_head_size_pt"])
-    if dates and head:
+    fmt = paragraph.paragraph_format
+    fmt.keep_with_next = True
+    fmt.space_after = Pt(lay["paragraph_space_pt"])
+    fmt.line_spacing = 1.0
+    width = lay["page_width_cm"] - 2 * lay["margin_cm"]
+    fmt.tab_stops.add_tab_stop(Cm(width), WD_TAB_ALIGNMENT.RIGHT)
+    return paragraph
+
+
+def _item_body(document, intro, bullets, tech_stack, extra_lines, lay: dict) -> None:
+    """What follows a head line: an intro paragraph, bullets, the
+    Technologies line and any labelled lines. The last of them carries the
+    space before the next job or project."""
+    intro = (intro or "").strip()
+    texts = _texts(bullets)
+    lines = []
+    stack = _items(tech_stack)
+    if stack:
+        lines.append((lay["tech_label"], stack))
+    for extra in extra_lines:
+        items = _items(extra.get("items"))
+        label = (extra.get("label") or "").strip().rstrip(":")
+        if label and items:
+            lines.append((f"{label}:", items))
+
+    last = "lines" if lines else "bullets" if texts else "intro"
+    if intro:
         paragraph = document.add_paragraph()
-        paragraph.paragraph_format.keep_with_next = True
-        _run(paragraph, head, bold=True, size=lay["job_head_size_pt"])
-    context = (job.get("context") or "").strip()
-    bullets = [bullet_text(b).strip() for b in job.get("bullets") or [] if bullet_text(b).strip()]
-    if context:
-        paragraph = document.add_paragraph()
-        paragraph.paragraph_format.space_after = Pt(lay["block_gap_pt"])
-        paragraph.paragraph_format.keep_with_next = bool(bullets)
-        _run(paragraph, context)
-    for index, text in enumerate(bullets):
+        fmt = paragraph.paragraph_format
+        fmt.space_after = Pt(lay["block_space_pt"] if last == "intro" else lay["paragraph_space_pt"])
+        fmt.keep_with_next = bool(texts or lines)
+        _run(paragraph, intro)
+    for index, text in enumerate(texts):
         paragraph = document.add_paragraph(style="List Bullet")
         fmt = paragraph.paragraph_format
         fmt.left_indent = Cm(lay["bullet_indent_cm"])
         fmt.first_line_indent = Cm(-lay["bullet_indent_cm"])
         fmt.line_spacing = 1.0
-        if index == len(bullets) - 1:
-            fmt.space_after = Pt(lay["block_gap_pt"])
+        final = index == len(texts) - 1
+        fmt.space_after = Pt(lay["block_space_pt"] if final and last == "bullets" else
+                             lay["paragraph_space_pt"] if final else lay["bullet_space_pt"])
         _run(paragraph, text)
-    stack = [t.strip() for t in job.get("tech_stack") or [] if t and t.strip()]
-    if stack:
+    for index, (label, items) in enumerate(lines):
         paragraph = document.add_paragraph()
         fmt = paragraph.paragraph_format
-        fmt.tab_stops.add_tab_stop(Cm(lay["tech_stack_tab_cm"]))
-        fmt.left_indent = Cm(lay["tech_stack_tab_cm"])
-        fmt.first_line_indent = Cm(-lay["tech_stack_tab_cm"])
         fmt.line_spacing = 1.0
-        _run(paragraph, f"{lay['tech_stack_label']}\t" + lay["tech_stack_separator"].join(stack))
+        fmt.space_after = Pt(lay["block_space_pt"] if index == len(lines) - 1 else lay["bullet_space_pt"])
+        _run(paragraph, label, bold=True)
+        _run(paragraph, " " + lay["tech_separator"].join(items))
+
+
+def _heading(document, title: str, lay: dict) -> None:
+    paragraph = document.add_paragraph()
+    fmt = paragraph.paragraph_format
+    fmt.space_before = Pt(lay["heading_space_before_pt"])
+    fmt.space_after = Pt(lay["heading_space_after_pt"])
+    fmt.keep_with_next = True
+    _run(paragraph, title, bold=True, size=lay["heading_size_pt"])
 
 
 def _base_style(document, lay: dict) -> None:
@@ -305,9 +415,10 @@ def _base_style(document, lay: dict) -> None:
     fmt.space_before = Pt(0)
     fmt.space_after = Pt(0)
     # The default template gives List Bullet "contextual spacing" and its own
-    # indents; the indents are set per paragraph in _job.
+    # indents; the indents are set per paragraph in _item_body.
     bullet = document.styles["List Bullet"]
     bullet.font.name = lay["font"]
+    bullet.font.size = Pt(lay["font_size_pt"])
 
 
 def _page(section, lay: dict) -> None:
@@ -318,36 +429,52 @@ def _page(section, lay: dict) -> None:
     section.header_distance = Cm(0)
 
 
-def _set_columns(section, number: int) -> None:
+def _set_columns(section, widths_cm) -> None:
+    """Columns of the given widths (cm), or one column for None."""
     sect = section._sectPr
     cols = sect.find(qn("w:cols"))
-    if cols is None:
-        cols = OxmlElement("w:cols")
-        sect.append(cols)
-    cols.set(qn("w:num"), str(number))
-    cols.set(qn("w:space"), "720")
+    if cols is not None:
+        sect.remove(cols)
+    cols = OxmlElement("w:cols")
+    if widths_cm:
+        cols.set(qn("w:num"), str(len(widths_cm)))
+        cols.set(qn("w:space"), "0")
+        cols.set(qn("w:equalWidth"), "0")
+        for width in widths_cm:
+            col = OxmlElement("w:col")
+            col.set(qn("w:w"), str(int(round(width / 2.54 * 1440))))
+            col.set(qn("w:space"), "0")
+            cols.append(col)
+    else:
+        cols.set(qn("w:num"), "1")
+        cols.set(qn("w:space"), "720")
+    sect.append(cols)
 
 
-def _run(paragraph, text: str, *, bold: bool = False, size: float = None, color: str = None):
+def _run(paragraph, text: str, *, bold: bool = False, underline: bool = False, size: float = None):
     run = paragraph.add_run(text)
     run.bold = bold or None
+    run.underline = underline or None
     if size:
         run.font.size = Pt(size)
-    if color:
-        run.font.color.rgb = RGBColor.from_string(color)
     return run
 
 
-def _contact_value(paragraph, value: str, lay: dict) -> None:
-    target = None
+def _target(value: str):
     if URL_RE.match(value):
-        target = value
-    elif EMAIL_RE.match(value):
-        target = f"mailto:{value}"
-    elif PHONE_RE.match(value):
-        target = "tel:" + re.sub(r"[^\d+]", "", value)
+        return value
+    if EMAIL_RE.match(value):
+        return f"mailto:{value}"
+    if PHONE_RE.match(value):
+        return "tel:" + re.sub(r"[^\d+]", "", value)
+    return None
+
+
+def _link(paragraph, value: str, target, lay: dict, size: float = None) -> None:
+    """`value` as a hyperlink to `target`, or as plain text when there is no
+    target."""
     if not target:
-        _run(paragraph, value, size=lay["contact_size_pt"])
+        _run(paragraph, value, size=size)
         return
     relation = paragraph.part.relate_to(target, RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
     link = OxmlElement("w:hyperlink")
@@ -358,9 +485,11 @@ def _contact_value(paragraph, value: str, lay: dict) -> None:
     color.set(qn("w:val"), lay["link_color"])
     underline = OxmlElement("w:u")
     underline.set(qn("w:val"), "single")
-    size = OxmlElement("w:sz")
-    size.set(qn("w:val"), str(int(lay["contact_size_pt"] * 2)))
-    properties.extend([color, underline, size])
+    properties.extend([color, underline])
+    if size:
+        node = OxmlElement("w:sz")
+        node.set(qn("w:val"), str(int(size * 2)))
+        properties.append(node)
     run.append(properties)
     text = OxmlElement("w:t")
     text.text = value
@@ -370,61 +499,36 @@ def _contact_value(paragraph, value: str, lay: dict) -> None:
     paragraph._p.append(link)
 
 
-def _bar(document, title: str, lay: dict) -> None:
-    """A section title: white bold text on a full-width filled bar (a one-cell
-    table, as in the original), with a little air above it."""
-    spacer = document.add_paragraph()
-    spacer.paragraph_format.line_spacing = Pt(lay["bar_space_before_pt"])
-    spacer.paragraph_format.keep_with_next = True
-
-    table = document.add_table(rows=1, cols=1)
-    table.alignment = WD_TABLE_ALIGNMENT.LEFT
-    width = Cm(lay["page_width_cm"] - 2 * lay["margin_cm"])
-    cell = table.rows[0].cells[0]
-    cell.width = width
-    tcPr = cell._tc.get_or_add_tcPr()
-    shading = OxmlElement("w:shd")
-    shading.set(qn("w:val"), "clear")
-    shading.set(qn("w:color"), "auto")
-    shading.set(qn("w:fill"), lay["bar_fill"])
-    tcPr.append(shading)
-    margins = OxmlElement("w:tcMar")
-    for side in ("top", "left", "bottom", "right"):
-        node = OxmlElement(f"w:{side}")
-        node.set(qn("w:w"), "80")
-        node.set(qn("w:type"), "dxa")
-        margins.append(node)
-    tcPr.append(margins)
-    tblPr = table._tbl.tblPr
-    borders = OxmlElement("w:tblBorders")
-    for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
-        node = OxmlElement(f"w:{side}")
-        node.set(qn("w:val"), "nil")
-        borders.append(node)
-    tblPr.append(borders)
-    # The heading row stays with the paragraph after it.
-    paragraph = cell.paragraphs[0]
-    paragraph.paragraph_format.left_indent = Cm(lay["bar_text_indent_cm"])
-    paragraph.paragraph_format.keep_with_next = True
-    paragraph.paragraph_format.line_spacing = 1.0
-    _run(paragraph, title, bold=True, size=lay["bar_text_size_pt"], color="FFFFFF")
-    spacer = document.add_paragraph()
-    spacer.paragraph_format.line_spacing = Pt(lay["bar_space_after_pt"])
-    spacer.paragraph_format.keep_with_next = True
-
-
 def plain_text(content: dict) -> str:
     """The CV as plain text, in the order it is printed: for the fact check
     and for the length estimate."""
-    lines: List[str] = [content.get("name", ""), content.get("headline", ""), content.get("tagline", "")]
+    lines: List[str] = [content.get("name", ""), content.get("headline", ""), content.get("tagline", ""),
+                        content.get("location", "")]
     lines += [f"{c.get('label', '')}: {c.get('value', '')}" for c in content.get("contacts") or []]
     lines += list(content.get("summary") or [])
     lines += [f"{g.get('category', '')}: {', '.join(g.get('items') or [])}" for g in content.get("skills") or []]
+    jobs: List[str] = []
     for job in content.get("experience") or []:
-        lines += [f"{job.get('dates', '')}:", f"{job.get('title', '')}, {job.get('company', '')}",
-                  job.get("context", "")]
-        lines += [bullet_text(b) for b in job.get("bullets") or []]
-        lines.append("Tech stack: " + " · ".join(job.get("tech_stack") or []))
+        jobs += [f"{job.get('title', '')}, {job.get('company', '')}\t{job.get('dates', '')}",
+                 job.get("context", "")]
+        jobs += [bullet_text(b) for b in job.get("bullets") or []]
+        if job.get("tech_stack"):
+            jobs.append("Technologies: " + " · ".join(job["tech_stack"]))
+    projects = projects_of(content)
+    part: List[str] = []
+    if projects["form"] == "full":
+        for project in projects["items"]:
+            part += [f"{project.get('title', '')}\t{project.get('link', '')}", project.get("intro", "")]
+            part += [bullet_text(b) for b in project.get("bullets") or []]
+            if project.get("tech_stack"):
+                part.append("Technologies: " + " · ".join(project["tech_stack"]))
+            part += [f"{e.get('label', '')}: {' · '.join(e.get('items') or [])}"
+                     for e in project.get("extra_lines") or []]
+    elif projects["form"] == "compact":
+        part += [bullet_text(b) for b in projects["compact"].get("bullets") or []]
+        if projects["compact"].get("tech_stack"):
+            part.append("Technologies: " + " · ".join(projects["compact"]["tech_stack"]))
+    lines += part + jobs if projects["placement"] == "before_experience" else jobs + part
     for section in content.get("sections") or []:
         lines.append(section.get("heading", ""))
         lines += list(section.get("lines") or [])
@@ -432,11 +536,22 @@ def plain_text(content: dict) -> str:
 
 
 def iter_terms(content: dict) -> Iterable[str]:
-    """Every skill and tech-stack entry: the claims the fact check matches
-    against the source CVs one by one."""
+    """Every skill and technology entry: the claims the fact check matches
+    against the source CV one by one."""
     for group in content.get("skills") or []:
         for item in group.get("items") or []:
             yield item
     for job in content.get("experience") or []:
         for item in job.get("tech_stack") or []:
+            yield item
+    projects = projects_of(content)
+    if projects["form"] == "full":
+        for project in projects["items"]:
+            for item in project.get("tech_stack") or []:
+                yield item
+            for extra in project.get("extra_lines") or []:
+                for item in extra.get("items") or []:
+                    yield item
+    elif projects["form"] == "compact":
+        for item in projects["compact"].get("tech_stack") or []:
             yield item

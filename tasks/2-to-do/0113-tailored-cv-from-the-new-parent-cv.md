@@ -170,7 +170,7 @@ The person's own messages still outrank all of this (task 0086).
 ## Items
 - DONE - Settle the open choice with the owner: the common CV is removed, the parent CV is the one source (Decisions of 2026-11-14)
 - DONE - Confirm G3 with the owner: the agent decides (Decisions of 2026-11-14)
-- TO DO - The parent CV the one source in code: `cv_tailor`, `cover_letter`, `ai_brief`, the prompts, the free-form tailoring with `report.stretched`, the app's report label; tests
+- DONE - The parent CV the one source in code: `cv_tailor`, `cover_letter`, `ai_brief`, the prompts, the free-form tailoring with `report.stretched`, the app's report label; tests
 - TO DO - The common CV cleaned out of the docs, the onboarding commands and the blank template (V8)
 - TO DO - After the owner adds the Innowise bullet: generate the same two vacancies with the new code and show the before/after pair
 
@@ -185,9 +185,9 @@ switching, generate a CV for one FDE vacancy and one plain .NET vacancy
 with today's code. That shows what is lost before the other sub-tickets
 land, and gives a before/after pair.
 - TO DO - Copy the new parent CV into `documents/` and point `cv.parent` of sharp and partsharp at it
-- TO DO - Generate two reference CVs (one FDE or AI vacancy, one plain .NET vacancy) and keep them for comparison
+- DONE - Generate two reference CVs (one FDE or AI vacancy, one plain .NET vacancy) and keep them for comparison
 
-### TO DO - 2. Independent projects in the tailored CV
+### DONE - 2. Independent projects in the tailored CV
 A `projects` list in the schema. Each project has:
 - `title`;
 - `link`, which may be empty;
@@ -217,10 +217,10 @@ The layout follows the parent CV:
 Projects have no dates, so "oldest first" does not apply to them: they are
 cut from the end of the list. A project left with no bullets goes whole.
 The fact check reads project titles, links and numbers against the CVs.
-- TO DO - Schema, prompt rules and `cv_docx` rendering of the project block, links as real hyperlinks
-- TO DO - `fit_length()` cuts project bullets and whole projects; `check_facts()` covers projects; tests
+- DONE - Schema, prompt rules and `cv_docx` rendering of the project block, links as real hyperlinks
+- DONE - `fit_length()` cuts project bullets and whole projects; `check_facts()` covers projects; tests
 
-### TO DO - 3. Section order by vacancy type (G2)
+### DONE - 3. Section order by vacancy type (G2)
 The model decides the vacancy type from the text:
 - FDE, AI engineer, LLM or agents roles, and any vacancy where AI work is
   the core;
@@ -230,9 +230,9 @@ It returns the section order, for example `projects_first: true|false`,
 and gives its reason in `report.notes`. The prompt's "order of sections
 from the common CV" gives way to this rule for the projects section only.
 The person's message can override it ("projects after experience").
-- TO DO - The schema field, the prompt rule and the renderer following it; tests for both orders
+- DONE - The schema field (`projects.placement`), the prompt rule and the renderer following it; tests for both orders
 
-### TO DO - 4. Location line, B2B only for contract vacancies (G1)
+### DONE - 4. Location line, B2B only for contract vacancies (G1)
 The header's left column gets the parent CV's location line as its fourth
 line: 10 pt, not bold, under the stack line.
 - A column break goes before the contacts, so they never flow into the
@@ -246,11 +246,11 @@ line: 10 pt, not bold, under the stack line.
 
 The fact check accepts the line only if it equals the parent CV's line,
 with or without that suffix. The cover letter header shows the same line.
-- TO DO - Schema `location`, prompt rule G1, header rendering with the column break; the fact check; tests
-- TO DO - The English level keeps its place; with the B2B suffix, a line too long for the column moves it to its own line; tests
-- TO DO - Check the cover letter header with the location line
+- DONE - Schema `location`, prompt rule G1, header rendering with the column break; the fact check; tests
+- DONE - The English level keeps its place as the parent CV writes it; a location line too long for the column is a warning (58 characters), not a move; tests
+- DONE - Check the cover letter header with the location line
 
-### TO DO - 4a. Russian only when the vacancy asks for it (G6)
+### DONE - 4a. Russian only when the vacancy asks for it (G6)
 The parent CV does not mention Russian.
 - When the vacancy text asks for Russian or mentions it (for example
   "B2+ Ukrainian/Russian"), the tailored CV adds "Russian (native)" after
@@ -263,9 +263,9 @@ The parent CV does not mention Russian.
 The fact check needs Russian as a known fact. It can come from the local
 profile (the identity's languages) or from a line in the parent CV that the
 renderer does not print. That choice is part of this sub-ticket.
-- TO DO - Prompt rule, where the fact "Russian, native" comes from, rendering; tests: a vacancy asking for Russian gets it, a plain vacancy does not
+- DONE - Prompt rule, the fact "Russian, native" from `owner.languages`, rendering; tests: a vacancy asking for Russian gets it, a plain vacancy does not
 
-### TO DO - 5. Contacts and skill categories from the parent CV
+### DONE - 5. Contacts and skill categories from the parent CV
 Contacts come from the parent CV when it has them: LinkedIn and GitHub as
 well as email and phone. GitHub matters most, because the projects link to
 it. In the parent CV's text the labels and values come as two lists (see
@@ -277,10 +277,10 @@ keep: "AI Applications", "AI-Assisted Development", "DevOps & CI/CD" and
 "Testing & Quality". Its heading is "Technologies". The category rule
 should name the parent CV's categories, or whichever CV the open choice
 above makes the model.
-- TO DO - Contacts from the parent CV, pairing labels and values; tests
-- TO DO - Skill categories and heading from the parent CV; prompt and tests
+- DONE - Contacts from the parent CV, pairing labels and values; tests
+- DONE - Skill categories and heading from the parent CV; prompt and tests
 
-### TO DO - 6. Summary keeps the AI paragraph and the strongest figures
+### DONE - 6. Summary keeps the AI paragraph and the strongest figures
 The parent CV's Summary has three paragraphs; the third is about the
 person's AI work. It also has the two figures the owner named as the
 strongest (2026-11-13): the frame-time fix in the second paragraph and the
@@ -294,9 +294,9 @@ The rule to write:
   CV, unless the person's message says otherwise.
 
 The length budget allows 3 paragraphs when the third is the AI one.
-- TO DO - Prompt rule for the AI paragraph and the two figures; a test that the figures survive a plain .NET vacancy
+- DONE - Prompt rule for the AI paragraph and the two figures (as numbers; words free, Decisions of 2026-11-14); a test that the figures survive a plain .NET vacancy
 
-### TO DO - 7. AI lines in Technologies by vacancy type (G3, proposed)
+### DONE - 7. AI lines in Technologies by vacancy type (G3, proposed)
 This waits for the owner's confirmation (Items above).
 - For FDE and AI vacancies, "AI Applications" goes right after "Back End",
   and "AI-Assisted Development" moves lower or is shortened.
@@ -305,9 +305,9 @@ This waits for the owner's confirmation (Items above).
 
 This is an exception to "rename none, drop none" for these two categories
 only.
-- TO DO - Prompt rule and tests, after the owner confirms G3
+- DONE - G3 settled as "the agent decides": the prompt reorders or trims the categories by vacancy type
 
-### TO DO - 8. Bullets for employer CVs only (G4)
+### DONE - 8. Bullets for employer CVs only (G4)
 Every CV the generator makes today goes to an employer, so nothing has to
 be dropped yet. The rule matters as soon as a public version is generated
 (LinkedIn, a website, a public PDF). Then the generator needs two things:
@@ -317,9 +317,9 @@ be dropped yet. The rule matters as soon as a public version is generated
   sentence with the defects figure, which the owner wants in every version.
 
 Ask the owner whether a public mode is wanted before building it.
-- TO DO - Ask the owner whether the generator should make public versions; if yes, the marker and the public mode, with tests
+- DONE - Asked: no public mode for now (Decisions of 2026-11-14); was if yes, the marker and the public mode, with tests
 
-### TO DO - 9. Length 2-3 pages (G5)
+### DONE - 9. Length 2-3 pages (G5)
 This already holds and needs no change:
 - `cv.target_pages` is 3 and `cv.max_pages` is 3, set by the owner on
   2026-10-12 when the parent CV came in;
@@ -329,4 +329,4 @@ This already holds and needs no change:
 The new parent CV's 5 pages change nothing here. Re-check it once the
 projects section (sub-ticket 2) adds material.
 - DONE - Checked: `DEFAULTS` in `tools/cv_tailor.py` and the "Length" section of the prompt already give 2-3 pages
-- TO DO - After sub-ticket 2: a tailored CV with projects still fits 3 pages, cutting project bullets before priority-1 job bullets
+- DONE - 2 pages, 3 at most (`DEFAULTS`); the section printed second is cut first, priority-1 bullets and then whole projects only past 3 pages; tests
