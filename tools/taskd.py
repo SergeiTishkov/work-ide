@@ -292,6 +292,13 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
             raise ValueError(f"the instructions are {len(instructions)} characters, more than {INSTRUCTIONS_LIMIT}")
         if instructions:
             argv += ["--instructions", instructions]
+        # task 0114: a CV regenerated for the batch, made anew
+        if args.get("auto") is True:
+            argv.append("--auto")
+        if args.get("anew") is True:
+            if kind != "cv":
+                raise ValueError("only a CV is made anew")
+            argv.append("--anew")
         return Command(argv, result_json=True)
     if kind == "cv_batch":
         import cv_batch

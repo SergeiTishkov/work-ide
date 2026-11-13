@@ -608,3 +608,13 @@ def test_the_ai_probe_without_claude():
     def run(argv, **kw):
         raise FileNotFoundError("claude")
     assert taskd.probe_ai("claude", run=run)[0] is False
+
+
+def test_a_cv_regenerated_for_the_batch_is_made_anew():
+    """Task 0114."""
+    py = "py"
+    cv = taskd.command(task("cv", vacancy_id="abc", args={"auto": True, "anew": True}), python=py)
+    assert cv.argv[-2:] == ["--auto", "--anew"]
+    assert "--anew" not in taskd.command(task("cv", vacancy_id="abc", args={"anew": "yes"}), python=py).argv
+    with pytest.raises(ValueError):
+        taskd.command(task("letter", vacancy_id="abc", args={"anew": True}), python=py)

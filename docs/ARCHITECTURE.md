@@ -707,6 +707,14 @@ message. The whole log and the current `.docx` (the person's own Word edits
 included) go to the model with the next request, so a version keeps every
 correction asked for before it.
 
+**A version made anew** (task 0114, `cv_tailor.py --anew`; the queue's CV task
+with `{"anew": true}`): the model gets neither the log nor the current
+`.docx`, only the parent CV and the vacancy. The log marks it "Made anew", and
+the log the model gets for a later version starts from it. Used once, on
+2026-11-14, to regenerate the batch's CVs made from the common CV after task
+0113: as the base of a new version they would have carried the common CV's
+selection over.
+
 **A vacancy that is gone.** Old vacancies have dead links or no description
 (fewer than 100 characters fetched). The tools then make no files and append
 `## Error · <time>` with "Vacancy not found, possibly outdated: …" to the

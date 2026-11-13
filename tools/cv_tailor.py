@@ -293,6 +293,9 @@ def history_parts(log_text: str, previous_text: Optional[str], version: int, wha
     the person's messages, and the current version's text — the base to edit,
     unless the new message rejects it as a whole."""
     if not previous_text and not log_text.strip():
+        if version > 1:
+            return [f"This version (V{version}) of the {what} is made anew, from the inputs below "
+                    "alone: no earlier version is given.", ""]
         return [f"This is the first version of the {what} (V1): there is no earlier one.", ""]
     parts = [f"This is version V{version} of the {what}. The log of the earlier versions, "
              "oldest first, with the person's message for each:", "",
@@ -746,26 +749,29 @@ def earlier_versions(document) -> dict:
 
 
 def publish_version(document, files: List[Path], content: dict, instructions: Optional[str],
-                    auto: bool = False) -> dict:
+                    auto: bool = False, anew: bool = False) -> dict:
     verdict = content.get("previous_version") or {}
     try:
         return document.publish(files, message=instructions,
-                                previous_failed=bool(verdict.get("failed")),
+                                previous_failed=bool(verdict.get("failed")) and not anew,
                                 failed_reason=(verdict.get("reason") or "").strip() or None,
-                                auto=auto)
+                                auto=auto, anew=anew)
     except documents.DocumentsError as exc:
         raise TailorError(str(exc))
 
 
 def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path, out_dir: Path,
            content: Optional[dict] = None, model_call=call_model, converter=None,
-           instructions: Optional[str] = None, auto: bool = False) -> dict:
+           instructions: Optional[str] = None, auto: bool = False, anew: bool = False) -> dict:
     """The whole run; returns the result the app shows. `out_dir` is the
     vacancy's folder of documents (documents.vacancy_dir): the new version
     goes there, the current one into "Old versions". `converter` is a
-    cv_convert.WordSession-like object, or None to pick one here."""
+    cv_convert.WordSession-like object, or None to pick one here. `anew`:
+    the model gets neither the log nor the previous version (task 0114)."""
     document = documents.Document(out_dir, "cv", settings["output_stem"])
     earlier = earlier_versions(document)
+    if anew:
+        earlier.update(log_text="", previous_text=None)
     say(f"CV V{earlier['version']}: {vacancy.get('title', vacancy_id)} — {vacancy.get('company', '')}")
     if instructions and instructions.strip():
         say(f"message: {instructions.strip()}")
@@ -834,7 +840,7 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
                         f"{settings['target_pages']}")
 
     files = [docx_path] + ([pdf_path] if pdf_path.exists() else [])
-    version = publish_version(document, files, content, instructions, auto)
+    version = publish_version(document, files, content, instructions, auto, anew)
     published = version["files"]
     verdict = content.get("previous_version") or {}
     if version.get("previous_failed"):
@@ -874,6 +880,9 @@ def main(argv=None) -> int:
                         help="The person's instructions for this CV (what to stress, the language...)")
     parser.add_argument("--auto", action="store_true",
                         help="Made by the document batch, not the person (the log says so)")
+    parser.add_argument("--anew", action="store_true",
+                        help="Make the version from the parent CV and the vacancy alone, without the "
+                             "log and the previous version (the log says so)")
     args = parser.parse_args(argv)
 
     import identity as identity_mod
@@ -896,6 +905,7 @@ def main(argv=None) -> int:
             content=content,
             instructions=args.instructions,
             auto=args.auto,
+            anew=args.anew,
         )
     except ai_limit.UsageLimit as exc:
         # its own exit code: the task queue holds AI work until the reset (task 0057)

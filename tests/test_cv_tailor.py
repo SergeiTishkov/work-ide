@@ -700,3 +700,27 @@ def test_a_vacancy_with_a_dead_link_or_no_description_is_refused_into_the_log(tm
         cv_tailor.refuse_gone({**described, "link_check": {"status": "dead"}}, doc)
     assert doc.log_path.exists() and not doc.current(".pdf").exists()
     cv_tailor.refuse_gone(described, doc)   # nothing to say
+
+
+def test_a_version_made_anew_gets_no_log_and_no_previous_version(tmp_path, parent_docx):
+    """Task 0114: the CVs made from the common CV are regenerated anew, not
+    moulded on their previous version."""
+    seen = []
+
+    def model(message, **_):
+        seen.append(message)
+        return tailored(previous_version={"failed": True, "reason": "a model's slip"})
+
+    folder = tmp_path / "docs" / "sharp" / "v1"
+    run = dict(settings=_settings(parent_docx), vacancy={"title": "Dev"}, vacancy_id="v1",
+               archive_root=tmp_path / "cvs", out_dir=folder, model_call=model, converter=FakeWord())
+    cv_tailor.tailor(**run, instructions="Old request.")
+    second = cv_tailor.tailor(**run, auto=True, anew=True)
+    assert second["version"] == 2
+    assert "<log>" not in seen[1] and "<previous_version>" not in seen[1] and "Old request." not in seen[1]
+    assert "This version (V2) of the CV is made anew" in seen[1]
+    # the previous version is kept as it was, never marked failed by a version that did not see it
+    assert (folder / "Old versions" / "CV Alex Example V1.pdf").exists()
+    entries = __import__("documents").read_log(folder / "CV log.md")
+    assert [(e["version"], e["failed"], e["auto"], e["anew"]) for e in entries] == [
+        (1, False, False, False), (2, False, True, True)]
