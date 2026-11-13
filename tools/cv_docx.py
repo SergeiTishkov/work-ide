@@ -72,7 +72,7 @@ LAYOUT = {
     "heading_space_after_pt": 6,
     "paragraph_space_pt": 6,       # after a Summary paragraph, an intro, a head line
     "bullet_indent_cm": 0.635,
-    "bullet_space_pt": 3,
+    "bullet_space_pt": 2,           # after a bullet but the last (the parent CV, 2026-11-14)
     "block_space_pt": 12,          # after a project or a job
     "tech_label": "Technologies:",
     "tech_separator": " · ",
