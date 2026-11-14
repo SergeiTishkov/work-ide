@@ -21,16 +21,19 @@ Inside: a folder per identity (its prefix), and in it a folder per vacancy
 (the vacancy's id — the app opens these, nobody has to read the names):
 
     <folder>/sharp/a2b7661172422d8db6c6/
-        CV Ivan Petrov.docx           the current CV
-        CV Ivan Petrov.pdf
+        CV Ivan Petrov Senior Full Stack Engineer.docx    the current CV
+        CV Ivan Petrov Senior Full Stack Engineer.pdf
         CV log.md                     every version and what the person asked
-        Cover Letter Ivan Petrov.docx
-        Cover Letter Ivan Petrov.pdf
+        Cover Letter Ivan Petrov Senior Full Stack Engineer.docx
+        Cover Letter Ivan Petrov Senior Full Stack Engineer.pdf
         Cover Letter log.md
         Old versions/
-            CV Ivan Petrov V1 failed.docx
-            CV Ivan Petrov V2.pdf
+            CV Ivan Petrov Software Engineer V1 failed.docx
+            CV Ivan Petrov Full Stack Engineer V2.pdf
             ...
+
+A tailored document is named after its headline (cv_tailor.headline_stem),
+so each version may have its own name; the log names it.
 
 VERSIONS. The current files carry no version; when a new version is made,
 the current pair moves into "Old versions" as "<name> V<n>", or "<name> V<n>
@@ -64,6 +67,13 @@ asked for before it. Its format, parsed by read_log():
     Without a message.
     Made automatically.
     Made anew: the earlier versions were not given to the model.
+    File: CV Ivan Petrov Senior Full Stack Engineer
+
+"File:" is the name of that version's files, without the extension (task
+0116): a tailored CV is named after its headline, so the name changes from
+one version to the next, and the current files are found by the last
+version's line. A version with no such line has the document's fixed name
+(the versions made before 2026-11-14).
 
 "Made anew" marks a version made from the parent CV and the vacancy alone,
 with no log and no previous version (task 0114: the CVs made from the
@@ -176,12 +186,14 @@ def vacancy_dir(prefix: str, vacancy_id: str, base: Optional[Path] = None) -> Pa
 HEAD_RE = re.compile(r"^## V(\d+) · ([^·]+?)( · failed)?\s*$")
 AUTO_LINE = "Made automatically."
 ANEW_LINE = "Made anew: the earlier versions were not given to the model."
+FILE_PREFIX = "File: "
 ERROR_RE = re.compile(r"^## Error · (.+?)\s*$")
 
 
 def read_log(path: Path) -> List[dict]:
     """[{"version", "at", "failed", "message", "failed_reason", "auto",
-    "anew"}], oldest first."""
+    "anew", "file"}], oldest first; "file" is None when the log does not
+    name it."""
     if not path.exists():
         return []
     entries: List[dict] = []
@@ -190,7 +202,7 @@ def read_log(path: Path) -> List[dict]:
         if head:
             entries.append({"version": int(head.group(1)), "at": head.group(2).strip(),
                             "failed": bool(head.group(3)), "message": None, "failed_reason": None,
-                            "auto": False, "anew": False})
+                            "auto": False, "anew": False, "file": None})
             continue
         if line.startswith("## "):
             entries.append(None)   # an error: not a version
@@ -208,6 +220,8 @@ def read_log(path: Path) -> List[dict]:
             entry["auto"] = True
         elif line == ANEW_LINE:
             entry["anew"] = True
+        elif line.startswith(FILE_PREFIX) and line[len(FILE_PREFIX):].strip():
+            entry["file"] = line[len(FILE_PREFIX):].strip()
     return [e for e in entries if e is not None]
 
 
@@ -243,6 +257,8 @@ def render_log(kind: str, entries: List[dict]) -> str:
             lines.append(ANEW_LINE)
         if entry.get("failed"):
             lines.append(f"Failed: {entry.get('failed_reason') or 'rejected as a whole'}")
+        if entry.get("file"):
+            lines.append(f"{FILE_PREFIX}{entry['file']}")
         lines.append("")
     return "\n".join(lines)
 
@@ -254,7 +270,10 @@ def error_section(text: str, now: Optional[datetime] = None) -> str:
 # --- one document of one vacancy --------------------------------------------
 
 class Document:
-    """The files of one kind ("cv" or "letter") in one vacancy's folder."""
+    """The files of one kind ("cv" or "letter") in one vacancy's folder.
+    `stem` is the document's fixed name: the name of a new version unless
+    publish() is given another, and of the current files when the log does
+    not name them."""
 
     def __init__(self, folder: Path, kind: str, stem: str):
         if kind not in KINDS:
@@ -264,8 +283,14 @@ class Document:
         self.stem = stem
         self.log_path = folder / KINDS[kind]["log"]
 
+    def current_stem(self) -> str:
+        """The name of the current files: the last version's "File:" line,
+        or the fixed name."""
+        entries = self.entries()
+        return (entries[-1].get("file") if entries else None) or self.stem
+
     def current(self, extension: str) -> Path:
-        return self.folder / f"{self.stem}{extension}"
+        return self.folder / f"{self.current_stem()}{extension}"
 
     def entries(self) -> List[dict]:
         return read_log(self.log_path)
@@ -304,19 +329,24 @@ class Document:
 
     def publish(self, files: List[Path], *, message: Optional[str], previous_failed: bool,
                 failed_reason: Optional[str], now: Optional[datetime] = None,
-                auto: bool = False, anew: bool = False) -> dict:
+                auto: bool = False, anew: bool = False, stem: Optional[str] = None) -> dict:
         """Moves the current pair into Old versions (as "V<n>" or "V<n>
-        failed"), copies the new files in as the current ones and appends the
-        new version to the log, "Made automatically." when `auto` (the
-        batch made it), "Made anew" when `anew`. Returns {"version", "files"}."""
+        failed", under its own name), copies the new files in as the current
+        ones, named `stem` (the fixed name when None), and appends the new
+        version to the log with its "File:" line, "Made automatically." when
+        `auto` (the batch made it), "Made anew" when `anew`. Returns
+        {"version", "files"}."""
         entries = self.entries()
-        current = [self.current(ext) for ext in EXTENSIONS if self.current(ext).exists()]
+        old_stem = self.current_stem()
+        new_stem = (stem or "").strip() or self.stem
+        current = [self.folder / f"{old_stem}{ext}" for ext in EXTENSIONS
+                   if (self.folder / f"{old_stem}{ext}").exists()]
         if current and not entries:
             # files with no log (put there by hand, or made before the log
             # existed): they are version 1
             made = datetime.fromtimestamp(current[0].stat().st_mtime).strftime("%Y-%m-%d %H:%M")
             entries = [{"version": 1, "at": made, "failed": False, "message": None, "failed_reason": None,
-                        "auto": False, "anew": False}]
+                        "auto": False, "anew": False, "file": None}]
         version = max((e["version"] for e in entries), default=0) + 1
         if current:
             old = self.folder / OLD_VERSIONS
@@ -324,7 +354,7 @@ class Document:
             previous = version - 1
             suffix = f" V{previous}" + (" failed" if previous_failed else "")
             for path in current:
-                target = old / f"{self.stem}{suffix}{path.suffix}"
+                target = old / f"{old_stem}{suffix}{path.suffix}"
                 try:
                     if target.exists():
                         target.unlink()
@@ -337,13 +367,13 @@ class Document:
         self.folder.mkdir(parents=True, exist_ok=True)
         published = []
         for file in files:
-            target = self.current(file.suffix)
+            target = self.folder / f"{new_stem}{file.suffix}"
             shutil.copyfile(file, target)
             published.append(target)
         stamp = (now or datetime.now()).strftime("%Y-%m-%d %H:%M")
         entries.append({"version": version, "at": stamp, "failed": False,
                         "message": (message or "").strip() or None, "failed_reason": None,
-                        "auto": bool(auto), "anew": bool(anew)})
+                        "auto": bool(auto), "anew": bool(anew), "file": new_stem})
         # the errors in between are dropped: they made nothing, and the log
         # now ends with a version
         self.log_path.write_text(render_log(self.kind, entries), encoding="utf-8")

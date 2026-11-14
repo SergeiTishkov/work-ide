@@ -26,9 +26,10 @@ without the model:
      LibreOffice) converts it to .pdf and counts the pages. More than one page
      is a warning, nothing is cut.
   3. The files go into the vacancy's folder of documents beside its CV
-     (tools/documents.py) as "<the CV's output name with CV turned into Cover
-     Letter>.docx/.pdf" ("CV Ivan Petrov.pdf" -> "Cover Letter Ivan
-     Petrov.pdf"), versioned as the CV is, with "Cover Letter log.md".
+     (tools/documents.py) named as the CV is, after the letter's headline,
+     with CV turned into Cover Letter ("Cover Letter Ivan Petrov Senior
+     Full Stack Engineer.pdf"), versioned as the CV is, with "Cover Letter
+     log.md".
 
 Every run is kept in data/identities/<prefix>/cover_letters/<vacancy id>/<time>/.
 """
@@ -204,7 +205,10 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
 
     facts = check_facts(content, cv_text, cv_tailor.person_text(instructions, earlier.get("log_text", "")),
                         languages)
-    stem = letter_stem(settings["output_stem"])
+    # named after its headline, as the CV (task 0116)
+    stem = letter_stem(cv_tailor.headline_stem(settings["output_stem"], content.get("name", ""),
+                                               content.get("headline", ""),
+                                               keep_fixed=bool(settings.get("output_fixed"))))
     docx_path = workdir / f"{stem}.docx"
     pdf_path = workdir / f"{stem}.pdf"
     cv_docx.render_letter(content, docx_path, author=content.get("name", ""))
@@ -225,7 +229,7 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
         warnings.append(f"{pages} pages: a cover letter is one page; shorten it before sending")
 
     files = [docx_path] + ([pdf_path] if pdf_path.exists() else [])
-    version = cv_tailor.publish_version(document, files, content, instructions, auto)
+    version = cv_tailor.publish_version(document, files, content, instructions, auto, stem=stem)
     published = version["files"]
     if version.get("previous_failed"):
         say(f"V{version['version'] - 1} marked failed: {(content.get('previous_version') or {}).get('reason') or ''}")

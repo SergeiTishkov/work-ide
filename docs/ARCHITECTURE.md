@@ -616,11 +616,18 @@ The steps:
    when nothing but priority 1 is left; past it, priority-1 bullets and then
    whole projects go.
 4. The pair is built in `data/identities/<prefix>/cvs/<vacancy>/<time>/` with
-   the model's input and output, then published to the vacancy's folder under
-   the parent CV's file name without a leading "Parent" or "Master"
-   (`Parent CV Ivan Petrov.docx` → `CV Ivan Petrov.pdf`; `cv.output_name`
-   overrides it; see "The documents folder" below); the previous pair moves to
-   `Old versions/`. A failed run leaves the current pair where it was.
+   the model's input and output, then published to the vacancy's folder
+   named after the CV's headline (the owner, 2026-11-14, task 0116): "CV",
+   the person's name as the parent CV's file name spells it, and the
+   headline of this version (`Parent CV Ivan Petrov Software Engineer.docx`
+   and the headline "Senior Full Stack Engineer" → `CV Ivan Petrov Senior
+   Full Stack Engineer.pdf`). An employer sees the file name first, and the
+   headline is already the vacancy's title in at most 40 characters, so the
+   name follows the vacancy without a list of keywords. `cv.output_name`
+   keeps one fixed name instead. The log records each version's file name
+   ("File: ..."), and the next version moves the current pair to `Old
+   versions/` by it (see "The documents folder" below). A failed run leaves
+   the current pair where it was.
 
 **Taken from career-ops** (github.com/santifer/career-ops, its CV mode and
 history): the model returns content only, never markup; a requirements →
@@ -675,9 +682,10 @@ letter does not reset the letter's button.
    LibreOffice makes the PDF and counts the pages. More than one page is a
    warning; nothing is cut.
 4. Archived in `data/identities/<prefix>/cover_letters/<vacancy>/<time>/`,
-   then published to the vacancy's folder as the CV's name with "CV" turned
-   into "Cover Letter" (`CV Ivan Petrov.pdf` → `Cover Letter Ivan
-   Petrov.pdf`), the previous letter moved to `Old versions/`.
+   then published to the vacancy's folder named as a CV with the letter's
+   own headline would be, "CV" turned into "Cover Letter" (`Cover Letter
+   Ivan Petrov Senior Full Stack Engineer.pdf`), the previous letter moved
+   to `Old versions/`.
 
 One generation at a time, of either kind (the documents slot of the task
 queue, "The task service" below): both tools drive Word through COM, and two at once could share one

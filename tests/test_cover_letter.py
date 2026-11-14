@@ -83,7 +83,9 @@ def test_a_whole_run_with_a_fake_model_and_a_fake_word(tmp_path, parent_docx):
         vacancy_id="v1", archive_root=tmp_path / "letters", out_dir=out, model_call=model,
         converter=FakeWord(pages=1), today=date(2026, 10, 12))
     assert result["ok"] and result["pages"] == 1
-    assert Path(result["docx"]) == out / "Cover Letter Alex Example.docx"
+    # task 0116: named after its headline, as the CV; the older one moved away under its own name
+    assert Path(result["docx"]) == out / "Cover Letter Alex Example Senior Software Engineer.docx"
+    assert (out / "Old versions" / "Cover Letter Alex Example V1.pdf").read_text() == "an older one"
     assert Path(result["pdf"]).read_bytes() == b"%PDF-1.4 fake"
     assert (out / "CV Alex Example.pdf").read_text() == "the CV stays"
     assert result["findings"] == [] and result["warnings"] == []

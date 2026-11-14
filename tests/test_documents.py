@@ -138,6 +138,32 @@ def test_a_version_the_batch_made_is_marked_and_the_rest_are_the_persons(tmp_pat
     assert documents.state("sharp", ["v1"], tmp_path)["v1"]["by_person"] is True
 
 
+def test_each_version_has_its_own_name_and_the_current_files_are_found_by_the_log(tmp_path):
+    """Task 0116: a tailored CV is named after its headline, so the name changes."""
+    folder = tmp_path / "sharp" / "v1"
+    folder.mkdir(parents=True)
+    (folder / "CV Alex.pdf").write_text("before the log")
+    doc = documents.Document(folder, "cv", "CV Alex")
+    assert doc.current_stem() == "CV Alex" and doc.next_version() == 2
+    doc.publish([_new(tmp_path, "x.pdf", "two")], message=None, previous_failed=False,
+                failed_reason=None, stem="CV Alex Senior Engineer")
+    assert doc.current_stem() == "CV Alex Senior Engineer"
+    assert doc.current(".pdf").read_text() == "two"
+    doc.publish([_new(tmp_path, "x.pdf", "three"), _new(tmp_path, "x.docx", "three")], message="Lead.",
+                previous_failed=True, failed_reason="start over", stem="CV Alex Lead Engineer")
+    assert sorted(p.name for p in folder.iterdir()) == [
+        "CV Alex Lead Engineer.docx", "CV Alex Lead Engineer.pdf", "CV log.md", "Old versions"]
+    assert sorted(p.name for p in (folder / "Old versions").iterdir()) == [
+        "CV Alex Senior Engineer V2 failed.pdf", "CV Alex V1.pdf"]
+    assert doc.previous_docx() == folder / "CV Alex Lead Engineer.docx"
+    entries = documents.read_log(folder / "CV log.md")
+    assert [e["file"] for e in entries] == [None, "CV Alex Senior Engineer", "CV Alex Lead Engineer"]
+    assert "Failed: start over\nFile: CV Alex Senior Engineer\n" in (folder / "CV log.md").read_text(encoding="utf-8")
+    # no name given: the fixed one
+    doc.publish([_new(tmp_path, "x.pdf", "four")], message=None, previous_failed=False, failed_reason=None)
+    assert doc.current_stem() == "CV Alex" and (folder / "Old versions" / "CV Alex Lead Engineer V3.pdf").exists()
+
+
 def test_a_version_made_anew_is_marked_and_the_models_log_starts_from_it(tmp_path):
     """Task 0114: the regeneration after the parent CV became the one source."""
     folder = tmp_path / "sharp" / "v1"

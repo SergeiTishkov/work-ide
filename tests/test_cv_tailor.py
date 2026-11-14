@@ -392,6 +392,34 @@ def test_the_parent_cv_is_the_one_source_and_names_the_output(tmp_path):
     assert cv_tailor.cv_settings(profile, tmp_path)["output_stem"] == "CV Alex"
 
 
+def test_the_file_is_named_after_the_headline_without_what_a_file_name_cannot_hold():
+    """Task 0116: "CV <the name> <the headline>", the name as the parent's file spells it."""
+    stem = cv_tailor.headline_stem
+    assert stem("CV Ivan Petrov Software Engineer", "IVAN PETROV", "Senior Full Stack Engineer") == \
+        "CV Ivan Petrov Senior Full Stack Engineer"
+    assert stem("CV Ivan Petrov", "Ivan  Petrov", "Forward Deployed Engineer") == \
+        "CV Ivan Petrov Forward Deployed Engineer"
+    assert stem("CV Ivan Petrov", "IVAN PETROV", "C#/.NET Engineer: Backend?") == "CV Ivan Petrov C# .NET Engineer Backend"
+    assert stem("CV Ivan Petrov", "IVAN PETROV", "Engineer.") == "CV Ivan Petrov Engineer"
+    long = "Principal Software Engineer Platform Infrastructure Reliability Team Lead"
+    named = stem("CV Ivan Petrov", "IVAN PETROV", long)
+    assert named.startswith("CV Ivan Petrov Principal") and len(named) <= len("CV Ivan Petrov ") + 60
+    assert not named.endswith(" ")
+    # the fixed name stays: set by the person, no headline, or the name not in it
+    assert stem("CV Ivan", "IVAN PETROV", "Senior Engineer", keep_fixed=True) == "CV Ivan"
+    assert stem("CV Ivan Petrov", "IVAN PETROV", "  ") == "CV Ivan Petrov"
+    assert stem("CV Ivan Petrov", "IVAN PETROV", '???') == "CV Ivan Petrov"
+    assert stem("everything", "IVAN PETROV", "Senior Engineer") == "everything"
+    assert stem("CV Ivan Petrov", "", "Senior Engineer") == "CV Ivan Petrov"
+
+
+def test_a_name_the_person_set_is_kept_fixed(tmp_path):
+    profile = {"cv": {"parent": "documents/Parent CV Alex Example.docx"}}
+    assert cv_tailor.cv_settings(profile, tmp_path)["output_fixed"] is False
+    profile["cv"]["output_name"] = "CV Alex"
+    assert cv_tailor.cv_settings(profile, tmp_path)["output_fixed"] is True
+
+
 def test_the_output_name_drops_parent_or_master():
     assert cv_tailor.output_stem("documents/Master CV Ivan Petrov.docx") == "CV Ivan Petrov"
     assert cv_tailor.output_stem("everything.md") == "everything"
@@ -436,7 +464,8 @@ def test_a_whole_run_with_a_fake_model_and_a_fake_word(tmp_path, parent_docx):
                                                   "description_text": "We use Go."},
         vacancy_id="v1", archive_root=tmp_path / "cvs", out_dir=out, model_call=model, converter=FakeWord())
     assert result["ok"] and result["pages"] == 2
-    assert Path(result["docx"]) == out / "CV Alex Example.docx"
+    # task 0116: named after the headline; the file made before the log keeps the fixed name
+    assert Path(result["docx"]) == out / "CV Alex Example Senior Software Engineer.docx"
     assert Path(result["pdf"]).read_bytes() == b"%PDF-1.4 fake"
     assert result["findings"] == [] and result["warnings"] == []
     assert result["report"]["gaps"] == ["Kubernetes"]
@@ -448,7 +477,7 @@ def test_a_whole_run_with_a_fake_model_and_a_fake_word(tmp_path, parent_docx):
     assert result["version"] == 2 and result["dir"] == str(out)
     assert (out / "Old versions" / "CV Alex Example V1.pdf").read_text() == "an older one"
     for name in ("model_input.md", "content_from_model.json", "content.json", "result.json",
-                 "CV Alex Example.docx", "CV Alex Example.pdf"):
+                 "CV Alex Example Senior Software Engineer.docx", "CV Alex Example Senior Software Engineer.pdf"):
         assert (archive / name).exists(), name
 
 
@@ -462,9 +491,11 @@ def test_a_missing_parent_cv_file_is_an_error(tmp_path):
 def test_the_second_version_gets_the_log_and_the_first_as_its_base(tmp_path, parent_docx):
     seen = []
 
+    headlines = iter(["Senior Software Engineer", "Lead .NET Engineer"])
+
     def model(message, **_):
         seen.append(message)
-        return tailored()
+        return tailored(headline=next(headlines))
 
     folder = tmp_path / "docs" / "sharp" / "v1"
     run = dict(settings=_settings(parent_docx), vacancy={"title": "Dev"}, vacancy_id="v1",
@@ -476,10 +507,14 @@ def test_the_second_version_gets_the_log_and_the_first_as_its_base(tmp_path, par
     assert "version V2 of the CV" in seen[1]
     assert "## V1 · " in seen[1] and "Without a message." in seen[1]
     assert "<previous_version>" in seen[1] and "Northwind" in seen[1]
-    assert (folder / "Old versions" / "CV Alex Example V1.pdf").exists()
-    assert (folder / "Old versions" / "CV Alex Example V1.docx").exists()
+    # task 0116: each version has its headline's name, and V1 moves away under its own
+    assert (folder / "Old versions" / "CV Alex Example Senior Software Engineer V1.pdf").exists()
+    assert (folder / "Old versions" / "CV Alex Example Senior Software Engineer V1.docx").exists()
+    assert sorted(p.name for p in folder.glob("CV Alex*")) == [
+        "CV Alex Example Lead .NET Engineer.docx", "CV Alex Example Lead .NET Engineer.pdf"]
     log = (folder / "CV log.md").read_text(encoding="utf-8")
     assert "## V2 · " in log and "> Shorter summary." in log
+    assert "File: CV Alex Example Lead .NET Engineer" in log
 
 
 def test_a_version_the_model_reads_as_rejected_is_kept_as_failed(tmp_path, parent_docx):
@@ -490,7 +525,7 @@ def test_a_version_the_model_reads_as_rejected_is_kept_as_failed(tmp_path, paren
                model_call=lambda message, **_: tailored(previous_version=next(verdicts)))
     cv_tailor.tailor(**run)
     cv_tailor.tailor(**run, instructions="This is bad, start over.")
-    assert (folder / "Old versions" / "CV Alex Example V1 failed.pdf").exists()
+    assert (folder / "Old versions" / "CV Alex Example Senior Software Engineer V1 failed.pdf").exists()
     entries = __import__("documents").read_log(folder / "CV log.md")
     assert [(e["version"], e["failed"]) for e in entries] == [(1, True), (2, False)]
     assert entries[0]["failed_reason"] == "asked to start over"
@@ -720,7 +755,7 @@ def test_a_version_made_anew_gets_no_log_and_no_previous_version(tmp_path, paren
     assert "<log>" not in seen[1] and "<previous_version>" not in seen[1] and "Old request." not in seen[1]
     assert "This version (V2) of the CV is made anew" in seen[1]
     # the previous version is kept as it was, never marked failed by a version that did not see it
-    assert (folder / "Old versions" / "CV Alex Example V1.pdf").exists()
+    assert (folder / "Old versions" / "CV Alex Example Senior Software Engineer V1.pdf").exists()
     entries = __import__("documents").read_log(folder / "CV log.md")
     assert [(e["version"], e["failed"], e["auto"], e["anew"]) for e in entries] == [
         (1, False, False, False), (2, False, True, True)]
