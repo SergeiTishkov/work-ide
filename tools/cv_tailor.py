@@ -331,10 +331,32 @@ def history_parts(log_text: str, previous_text: Optional[str], version: int, wha
     return parts
 
 
+def review_parts(review: Optional[dict]) -> List[str]:
+    """The automatic review of the current version (task 0115): its misses
+    and its strengths, for the `<review>` block."""
+    if not review:
+        return []
+    lines = ["<review>"]
+    for number, miss in enumerate(review.get("misses") or [], 1):
+        lines += [f"Miss {number}:",
+                  f"- the vacancy asks: {miss.get('requirement', '').strip()}",
+                  f"- the parent CV has: {miss.get('parent_evidence', '').strip()}",
+                  f"- in the current version: {miss.get('in_tailored_cv', '').strip()}",
+                  f"- the reviewer suggests: {miss.get('fix', '').strip()}"]
+    if review.get("type_misread") and (review.get("type_note") or "").strip():
+        lines.append(f"The vacancy's type was misread: {review['type_note'].strip()}")
+    strengths = [s.strip() for s in review.get("strengths") or [] if s and s.strip()]
+    if strengths:
+        lines.append("Strengths the new version keeps:")
+        lines += [f"- {s}" for s in strengths]
+    return lines + ["</review>", ""]
+
+
 def build_message(cv_text: str, vacancy: dict, instructions: Optional[str] = None, *,
                   languages: Optional[List[str]] = None, target_pages: int = DEFAULTS["target_pages"],
                   max_pages: int = DEFAULTS["max_pages"], log_text: str = "",
-                  previous_text: Optional[str] = None, version: int = 1) -> str:
+                  previous_text: Optional[str] = None, version: int = 1,
+                  review: Optional[dict] = None) -> str:
     description = (vacancy.get("description_text") or "").strip()
     if len(description) > DESCRIPTION_LIMIT:
         description = description[:DESCRIPTION_LIMIT] + "\n[cut]"
@@ -351,6 +373,7 @@ def build_message(cv_text: str, vacancy: dict, instructions: Optional[str] = Non
         parts += ["The person's languages, from their profile (a fact, not printed unless the rules "
                   "say so): " + ", ".join(languages) + ".", ""]
     parts += history_parts(log_text, previous_text, version, "CV")
+    parts += review_parts(review)
     instructions = (instructions or "").strip()
     if instructions:
         parts += ["<person_instructions>", instructions, "</person_instructions>", ""]
@@ -774,29 +797,38 @@ def earlier_versions(document) -> dict:
 
 
 def publish_version(document, files: List[Path], content: dict, instructions: Optional[str],
-                    auto: bool = False, anew: bool = False, stem: Optional[str] = None) -> dict:
+                    auto: bool = False, anew: bool = False, stem: Optional[str] = None,
+                    reviewed: bool = False) -> dict:
     verdict = content.get("previous_version") or {}
     try:
         return document.publish(files, message=instructions,
-                                previous_failed=bool(verdict.get("failed")) and not anew,
+                                previous_failed=bool(verdict.get("failed")) and not anew and not reviewed,
                                 failed_reason=(verdict.get("reason") or "").strip() or None,
-                                auto=auto, anew=anew, stem=stem)
+                                auto=auto, anew=anew, stem=stem, reviewed=reviewed)
     except documents.DocumentsError as exc:
         raise TailorError(str(exc))
 
 
 def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path, out_dir: Path,
            content: Optional[dict] = None, model_call=call_model, converter=None,
-           instructions: Optional[str] = None, auto: bool = False, anew: bool = False) -> dict:
+           instructions: Optional[str] = None, auto: bool = False, anew: bool = False,
+           review: Optional[dict] = None) -> dict:
     """The whole run; returns the result the app shows. `out_dir` is the
     vacancy's folder of documents (documents.vacancy_dir): the new version
     goes there, the current one into "Old versions". `converter` is a
     cv_convert.WordSession-like object, or None to pick one here. `anew`:
-    the model gets neither the log nor the previous version (task 0114)."""
+    the model gets neither the log nor the previous version (task 0114).
+    `review`: an automatic review of the current version ({"misses",
+    "strengths", ...}, task 0115), revised with the current version as the
+    mould; its remarks are no source of facts."""
+    if anew and review:
+        raise TailorError("a review revises the current version: it cannot be made anew")
     document = documents.Document(out_dir, "cv", settings["output_stem"])
     earlier = earlier_versions(document)
     if anew:
         earlier.update(log_text="", previous_text=None)
+    if review and not earlier.get("previous_text"):
+        raise TailorError("a review revises the current version, and there is none")
     say(f"CV V{earlier['version']}: {vacancy.get('title', vacancy_id)} — {vacancy.get('company', '')}")
     if instructions and instructions.strip():
         say(f"message: {instructions.strip()}")
@@ -809,8 +841,11 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
     if content is None:
         message = build_message(cv_text, vacancy, instructions, languages=languages,
                                 target_pages=settings["target_pages"], max_pages=settings["max_pages"],
-                                **earlier)
+                                review=review, **earlier)
         (workdir / "model_input.md").write_text(message, encoding="utf-8")
+        if review:
+            (workdir / "review.json").write_text(json.dumps(review, ensure_ascii=False, indent=2),
+                                                 encoding="utf-8")
         say(f"asking the model ({settings['model']}), a minute or three")
         content = model_call(message, model=settings["model"], workdir=workdir)
         say("the model answered: checking the facts, rendering")
@@ -866,7 +901,7 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
                         f"{settings['target_pages']}")
 
     files = [docx_path] + ([pdf_path] if pdf_path.exists() else [])
-    version = publish_version(document, files, content, instructions, auto, anew, stem)
+    version = publish_version(document, files, content, instructions, auto, anew, stem, reviewed=bool(review))
     published = version["files"]
     verdict = content.get("previous_version") or {}
     if version.get("previous_failed"):
@@ -906,6 +941,9 @@ def main(argv=None) -> int:
                         help="The person's instructions for this CV (what to stress, the language...)")
     parser.add_argument("--auto", action="store_true",
                         help="Made by the document batch, not the person (the log says so)")
+    parser.add_argument("--review", metavar="FILE",
+                        help="A JSON review of the current version (misses, strengths): revise it "
+                             "with these remarks (task 0115)")
     parser.add_argument("--anew", action="store_true",
                         help="Make the version from the parent CV and the vacancy alone, without the "
                              "log and the previous version (the log says so)")
@@ -918,6 +956,7 @@ def main(argv=None) -> int:
         if args.model:
             settings["model"] = args.model
         content = json.loads(Path(args.content).read_text(encoding="utf-8")) if args.content else None
+        review = json.loads(Path(args.review).read_text(encoding="utf-8")) if args.review else None
         vacancy = load_vacancy(common.DB_PATH, args.vacancy)
         out_dir = documents.vacancy_dir(prefix, args.vacancy,
                                         Path(args.documents_dir) if args.documents_dir else None)
@@ -932,6 +971,7 @@ def main(argv=None) -> int:
             instructions=args.instructions,
             auto=args.auto,
             anew=args.anew,
+            review=review,
         )
     except ai_limit.UsageLimit as exc:
         # its own exit code: the task queue holds AI work until the reset (task 0057)

@@ -759,3 +759,64 @@ def test_a_version_made_anew_gets_no_log_and_no_previous_version(tmp_path, paren
     entries = __import__("documents").read_log(folder / "CV log.md")
     assert [(e["version"], e["failed"], e["auto"], e["anew"]) for e in entries] == [
         (1, False, False, False), (2, False, True, True)]
+
+
+REVIEW = {
+    "misses": [{"requirement": "SQL Server performance tuning", "must_have": True,
+                "parent_evidence": "Tuned SQL queries for the invoice reports",
+                "in_tailored_cv": "buried: the last bullet of Contoso",
+                "fix": "Move it into the Summary and also mention Kubernetes"}],
+    "type_misread": False, "type_note": "",
+    "strengths": ["The Summary leads with Azure"], "verdict": "regenerate", "reason": "one must-have buried",
+}
+
+
+def test_a_review_revises_the_current_version_and_is_no_source_of_facts(tmp_path, parent_docx):
+    """Task 0115: the reviewer's remarks go to the model in their own block."""
+    seen = []
+    replies = iter([tailored(), tailored(previous_version={"failed": True, "reason": "the reviewer said so"},
+                                         skills=[{"category": "Back End", "items": ["C#", ".NET", "Azure",
+                                                                                    "SQL Server", "Kubernetes"]}])])
+
+    def model(message, **_):
+        seen.append(message)
+        return next(replies)
+
+    folder = tmp_path / "docs" / "sharp" / "v1"
+    run = dict(settings=_settings(parent_docx), vacancy={"title": "Dev"}, vacancy_id="v1",
+               archive_root=tmp_path / "cvs", out_dir=folder, model_call=model, converter=FakeWord())
+    cv_tailor.tailor(**run, auto=True)
+    second = cv_tailor.tailor(**run, auto=True, review=REVIEW)
+    message = seen[1]
+    assert "<previous_version>" in message and "<review>" in message
+    assert "- the vacancy asks: SQL Server performance tuning" in message
+    assert "- the parent CV has: Tuned SQL queries for the invoice reports" in message
+    assert "Strengths the new version keeps:\n- The Summary leads with Azure" in message
+    assert "<person_instructions>" not in message
+    # a term only the review names is a finding, not a fact
+    assert any(f["text"] == "Kubernetes" for f in second["findings"])
+    assert (Path(second["archive"]) / "review.json").exists()
+    entries = __import__("documents").read_log(folder / "CV log.md")
+    assert [(e["version"], e["failed"], e["auto"], e["reviewed"], e["message"]) for e in entries] == [
+        (1, False, True, False, None), (2, False, True, True, None)]
+    assert "Made automatically.\nRevised after an automatic review.\n" in (folder / "CV log.md").read_text(
+        encoding="utf-8")
+
+
+def test_a_review_needs_a_current_version_and_is_not_made_anew(tmp_path, parent_docx):
+    run = dict(settings=_settings(parent_docx), vacancy={"title": "Dev"}, vacancy_id="v1",
+               archive_root=tmp_path / "cvs", out_dir=tmp_path / "docs" / "v1",
+               model_call=lambda message, **_: tailored(), converter=FakeWord())
+    with pytest.raises(cv_tailor.TailorError, match="there is none"):
+        cv_tailor.tailor(**run, review=REVIEW)
+    cv_tailor.tailor(**run)
+    with pytest.raises(cv_tailor.TailorError, match="cannot be made anew"):
+        cv_tailor.tailor(**run, review=REVIEW, anew=True)
+
+
+def test_the_review_block_lists_misses_type_and_strengths():
+    lines = cv_tailor.review_parts({**REVIEW, "type_misread": True, "type_note": "an AI role read as plain .NET"})
+    text = "\n".join(lines)
+    assert text.startswith("<review>\nMiss 1:") and text.rstrip().endswith("</review>")
+    assert "The vacancy's type was misread: an AI role read as plain .NET" in text
+    assert cv_tailor.review_parts(None) == [] and cv_tailor.review_parts({}) == []

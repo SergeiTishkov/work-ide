@@ -618,3 +618,15 @@ def test_a_cv_regenerated_for_the_batch_is_made_anew():
     assert "--anew" not in taskd.command(task("cv", vacancy_id="abc", args={"anew": "yes"}), python=py).argv
     with pytest.raises(ValueError):
         taskd.command(task("letter", vacancy_id="abc", args={"anew": True}), python=py)
+
+
+
+def test_a_cv_revised_after_a_review_gets_the_reviews_file():
+    """Task 0115."""
+    py = "py"
+    cv = taskd.command(task("cv", vacancy_id="abc", args={"auto": True, "review": "C:/r/abc.json"}), python=py)
+    assert cv.argv[-3:] == ["--auto", "--review", "C:/r/abc.json"]
+    for bad in (task("letter", vacancy_id="abc", args={"review": "x.json"}),
+                task("cv", vacancy_id="abc", args={"review": {"misses": []}})):
+        with pytest.raises(ValueError):
+            taskd.command(bad, python=py)

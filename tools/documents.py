@@ -69,6 +69,17 @@ asked for before it. Its format, parsed by read_log():
     Made anew: the earlier versions were not given to the model.
     File: CV Ivan Petrov Senior Full Stack Engineer
 
+    ## V5 · 2026-11-14 09:40
+    Without a message.
+    Made automatically.
+    Revised after an automatic review.
+    File: CV Ivan Petrov Senior Full Stack Engineer
+
+"Revised after an automatic review." marks a version made from the previous
+one with a reviewing model's remarks: requirements of the vacancy the parent
+CV answers but the CV left out or buried (task 0115). The remarks are not the
+person's words and no fact comes from them.
+
 "File:" is the name of that version's files, without the extension (task
 0116): a tailored CV is named after its headline, so the name changes from
 one version to the next, and the current files are found by the last
@@ -186,13 +197,14 @@ def vacancy_dir(prefix: str, vacancy_id: str, base: Optional[Path] = None) -> Pa
 HEAD_RE = re.compile(r"^## V(\d+) · ([^·]+?)( · failed)?\s*$")
 AUTO_LINE = "Made automatically."
 ANEW_LINE = "Made anew: the earlier versions were not given to the model."
+REVIEW_LINE = "Revised after an automatic review."
 FILE_PREFIX = "File: "
 ERROR_RE = re.compile(r"^## Error · (.+?)\s*$")
 
 
 def read_log(path: Path) -> List[dict]:
     """[{"version", "at", "failed", "message", "failed_reason", "auto",
-    "anew", "file"}], oldest first; "file" is None when the log does not
+    "anew", "reviewed", "file"}], oldest first; "file" is None when the log does not
     name it."""
     if not path.exists():
         return []
@@ -202,7 +214,7 @@ def read_log(path: Path) -> List[dict]:
         if head:
             entries.append({"version": int(head.group(1)), "at": head.group(2).strip(),
                             "failed": bool(head.group(3)), "message": None, "failed_reason": None,
-                            "auto": False, "anew": False, "file": None})
+                            "auto": False, "anew": False, "reviewed": False, "file": None})
             continue
         if line.startswith("## "):
             entries.append(None)   # an error: not a version
@@ -220,6 +232,8 @@ def read_log(path: Path) -> List[dict]:
             entry["auto"] = True
         elif line == ANEW_LINE:
             entry["anew"] = True
+        elif line == REVIEW_LINE:
+            entry["reviewed"] = True
         elif line.startswith(FILE_PREFIX) and line[len(FILE_PREFIX):].strip():
             entry["file"] = line[len(FILE_PREFIX):].strip()
     return [e for e in entries if e is not None]
@@ -255,6 +269,8 @@ def render_log(kind: str, entries: List[dict]) -> str:
             lines.append(AUTO_LINE)
         if entry.get("anew"):
             lines.append(ANEW_LINE)
+        if entry.get("reviewed"):
+            lines.append(REVIEW_LINE)
         if entry.get("failed"):
             lines.append(f"Failed: {entry.get('failed_reason') or 'rejected as a whole'}")
         if entry.get("file"):
@@ -329,12 +345,14 @@ class Document:
 
     def publish(self, files: List[Path], *, message: Optional[str], previous_failed: bool,
                 failed_reason: Optional[str], now: Optional[datetime] = None,
-                auto: bool = False, anew: bool = False, stem: Optional[str] = None) -> dict:
+                auto: bool = False, anew: bool = False, stem: Optional[str] = None,
+                reviewed: bool = False) -> dict:
         """Moves the current pair into Old versions (as "V<n>" or "V<n>
         failed", under its own name), copies the new files in as the current
         ones, named `stem` (the fixed name when None), and appends the new
         version to the log with its "File:" line, "Made automatically." when
-        `auto` (the batch made it), "Made anew" when `anew`. Returns
+        `auto` (the batch made it), "Made anew" when `anew`, "Revised after
+        an automatic review." when `reviewed`. Returns
         {"version", "files"}."""
         entries = self.entries()
         old_stem = self.current_stem()
@@ -346,7 +364,7 @@ class Document:
             # existed): they are version 1
             made = datetime.fromtimestamp(current[0].stat().st_mtime).strftime("%Y-%m-%d %H:%M")
             entries = [{"version": 1, "at": made, "failed": False, "message": None, "failed_reason": None,
-                        "auto": False, "anew": False, "file": None}]
+                        "auto": False, "anew": False, "reviewed": False, "file": None}]
         version = max((e["version"] for e in entries), default=0) + 1
         if current:
             old = self.folder / OLD_VERSIONS
@@ -373,7 +391,8 @@ class Document:
         stamp = (now or datetime.now()).strftime("%Y-%m-%d %H:%M")
         entries.append({"version": version, "at": stamp, "failed": False,
                         "message": (message or "").strip() or None, "failed_reason": None,
-                        "auto": bool(auto), "anew": bool(anew), "file": new_stem})
+                        "auto": bool(auto), "anew": bool(anew), "reviewed": bool(reviewed),
+                        "file": new_stem})
         # the errors in between are dropped: they made nothing, and the log
         # now ends with a version
         self.log_path.write_text(render_log(self.kind, entries), encoding="utf-8")

@@ -299,6 +299,11 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
             if kind != "cv":
                 raise ValueError("only a CV is made anew")
             argv.append("--anew")
+        # task 0115: a CV revised after an automatic review
+        if args.get("review"):
+            if kind != "cv" or not isinstance(args["review"], str):
+                raise ValueError("a review is the path of a JSON file, for a CV")
+            argv += ["--review", args["review"]]
         return Command(argv, result_json=True)
     if kind == "cv_batch":
         import cv_batch
