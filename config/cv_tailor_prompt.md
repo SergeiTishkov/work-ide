@@ -239,6 +239,26 @@ now — the person may have edited it by hand.
   Otherwise false — a few corrections are an edit. `reason`: a few words
   why, or "" when false. Without a previous version: false and "".
 
+## A review
+
+The message may hold `<review>`: another model read the current version
+against the vacancy and the parent CV. Each miss is a requirement of the
+vacancy that the parent CV answers but the current version leaves out or
+buries, with the parent CV's words for it. The strengths are what the
+current version does well for this vacancy.
+
+- The previous version is the mould, as above. Fix each miss: bring the
+  parent CV's evidence in, or move it up to where a reader skimming for
+  that requirement sees it (the Summary, an early bullet), in the
+  vacancy's terms where they are true. Keep every strength.
+- The review is not the person's words. No fact comes from it: what a miss
+  asks for is written from the parent CV, and a remark that asks for
+  anything the parent CV does not say is left out. It never changes the
+  language, and it is never a rejection: `previous_version.failed` is
+  false.
+- The length rules stand: what comes in for a miss pushes out something
+  with less weight for this vacancy, not the page limit.
+
 ## Language
 
 The CV is ALWAYS in English — whatever the language of the vacancy or the

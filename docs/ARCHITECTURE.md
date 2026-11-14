@@ -723,6 +723,17 @@ the log the model gets for a later version starts from it. Used once, on
 0113: as the base of a new version they would have carried the common CV's
 selection over.
 
+**A version revised after a review** (task 0115, `cv_tailor.py --review
+FILE`; the queue's CV task with `{"review": "<path>"}`): another model's
+remarks on the current version — requirements of the vacancy that the parent
+CV answers but the CV left out or buried, each with the parent CV's words,
+and what the CV does well — go to the model in a `<review>` block, with the
+current version as the mould. The remarks are not the person's words: the
+fact check does not take facts from them, and a review never marks the
+previous version failed. The log marks the version "Revised after an
+automatic review.". On 2026-11-14 the review ran as a one-off experiment
+over the 86 regenerated CVs, by hand; it is not a step of the generation.
+
 **A vacancy that is gone.** Old vacancies have dead links or no description
 (fewer than 100 characters fetched). The tools then make no files and append
 `## Error · <time>` with "Vacancy not found, possibly outdated: …" to the

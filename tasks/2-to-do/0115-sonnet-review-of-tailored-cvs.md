@@ -47,8 +47,24 @@ is measured before it goes into the pipeline:
 5. The result goes to the owner, who decides whether the review becomes
    part of the generation.
 
+## Measured on 2026-11-14
+- The agent read 7 of the 86 regenerated CVs in full against their
+  vacancies (two Camunda roles, GitLab, Kraken, N-iX, Version 1, M-KOPA):
+  no must-have left out or buried; the vacancy type read right in each.
+- Sonnet, first prompt, all 86: 74 keep, 12 regenerate. Keep on all 7 the
+  agent read. Of the 12, about 5 were real misses: an ed-tech role with the
+  educational portal buried; SQL optimization required twice, its one piece
+  of evidence in the oldest job's last line; authorization required and
+  buried; AWS ownership required, its evidence in a project cut. Six were
+  soft skills (communication, proactivity) or "algorithms" answered by an
+  indirect quote.
+- The prompt was narrowed: soft skills and general computer-science
+  phrases are not misses; a miss is a concrete skill, technology, domain
+  or kind of work.
+
 ## Items
-- TO DO - Read the regenerated CVs (task 0114) and note the real misses
-- TO DO - The Sonnet review prompt and a one-off script; run it on the same CVs with no regeneration; compare with the agent's notes
-- TO DO - If it finds real misses: the regeneration with the review's remarks and strengths, run for the CVs that need it; compare before and after
+- DONE - Read the regenerated CVs (task 0114) and note the real misses
+- DONE - The Sonnet review prompt and a one-off script; run it on the same CVs with no regeneration; compare with the agent's notes
+- DONE - `cv_tailor.py --review FILE` and the queue's `review` arg: a version revised with the review's misses and strengths, the current version as the mould; tests
+- TO DO - Run the revision for the CVs whose review holds a real miss; compare before and after
 - TO DO - Report to the owner; the decision on a pipeline step

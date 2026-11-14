@@ -181,3 +181,19 @@ def test_a_version_made_anew_is_marked_and_the_models_log_starts_from_it(tmp_pat
     doc.publish([_new(tmp_path, "x.pdf", "three")], message="Shorter.", previous_failed=False, failed_reason=None)
     assert "## V2 · " in doc.log_text() and "## V3 · " in doc.log_text() and "## V1 · " not in doc.log_text()
     assert "## V1 · " in (folder / "CV log.md").read_text(encoding="utf-8")   # the file keeps everything
+
+
+
+def test_a_version_revised_after_a_review_is_marked(tmp_path):
+    """Task 0115."""
+    folder = tmp_path / "sharp" / "v1"
+    doc = documents.Document(folder, "cv", "CV Alex")
+    doc.publish([_new(tmp_path, "x.pdf", "one")], message=None, previous_failed=False, failed_reason=None,
+                auto=True)
+    doc.publish([_new(tmp_path, "x.pdf", "two")], message=None, previous_failed=False, failed_reason=None,
+                auto=True, reviewed=True)
+    assert [(e["version"], e["reviewed"]) for e in documents.read_log(folder / "CV log.md")] == [
+        (1, False), (2, True)]
+    assert "Made automatically.\nRevised after an automatic review.\nFile: CV Alex\n" in (
+        folder / "CV log.md").read_text(encoding="utf-8")
+    assert documents.state("sharp", ["v1"], tmp_path)["v1"]["by_person"] is False
