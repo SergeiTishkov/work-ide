@@ -338,8 +338,9 @@ read. Without `cv.parent` there is nothing to tailor and the tool says so.
 ```yaml
 cv:
   parent: "documents/Parent CV Ivan Petrov.docx"  # .docx, .md or .txt
-  output_name: "CV Ivan Petrov"      # optional; by default the parent's name
-                                     # without a leading "Parent" or "Master"
+  output_name: "CV Ivan Petrov"      # optional: one fixed file name; by default
+                                     # "CV <name> <the CV's headline>", the name
+                                     # as the parent's file name spells it
   model: opus                        # the claude CLI model
   target_pages: 2                    # cut lower-priority bullets above this
   max_pages: 3                       # never above this

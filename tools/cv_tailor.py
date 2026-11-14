@@ -40,8 +40,9 @@ person. Then, without the model:
      2026-11-14: a CV is 2 pages, a third only when what the vacancy needs
      does not fit in two.
   4. The files go into the vacancy's folder of documents (tools/documents.py:
-     <folder>/<identity>/<vacancy id>/) under the output name (cv.output_name,
-     or the parent CV's file name without a leading "Parent" or "Master").
+     <folder>/<identity>/<vacancy id>/) named after the CV's headline: "CV
+     Ivan Petrov Senior Full Stack Engineer" (headline_stem, task 0116), or
+     cv.output_name for every version when the person set it.
      The current pair moves into "Old versions" as V<n> (or "V<n> failed",
      when the model reads the person's message as a rejection of it), and "CV
      log.md" gets the new version and its message. The model gets that log
@@ -234,6 +235,29 @@ def output_stem(parent: str) -> str:
     return stem or "CV"
 
 
+FILE_NAME_BAD = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+HEADLINE_IN_NAME_LIMIT = 60
+
+
+def headline_stem(fixed_stem: str, name: str, headline: str, keep_fixed: bool = False) -> str:
+    """The file name of one tailored version (task 0116): the fixed name up
+    to the person's name, then the headline of the version. "CV Ivan Petrov
+    Software Engineer", "IVAN PETROV", "Senior Full Stack Engineer" -> "CV
+    Ivan Petrov Senior Full Stack Engineer". The fixed name as it is when
+    `keep_fixed` (the person set cv.output_name), when there is no headline,
+    or when the person's name is not in it."""
+    title = re.sub(r"\s+", " ", FILE_NAME_BAD.sub(" ", headline or "")).strip(" .")
+    if len(title) > HEADLINE_IN_NAME_LIMIT:
+        title = title[:HEADLINE_IN_NAME_LIMIT].rsplit(" ", 1)[0].strip(" .")
+    words = (name or "").split()
+    if keep_fixed or not title or not words:
+        return fixed_stem
+    found = re.search(r"\s+".join(re.escape(w) for w in words), fixed_stem, flags=re.IGNORECASE)
+    if not found:
+        return fixed_stem
+    return f"{fixed_stem[:found.end()].strip()} {title}"
+
+
 def person_languages(profile: dict) -> List[str]:
     """owner.languages as written for a CV: "Russian (native)" from
     {name: Russian, level: native}, a plain name as it is."""
@@ -262,6 +286,7 @@ def cv_settings(profile: dict, identity_dir: Path) -> dict:
         raise TailorError(f"cv.parent is {parent}: the CV is read from a .docx, .md or .txt")
     return {
         "output_stem": cv.get("output_name") or output_stem(parent),
+        "output_fixed": bool(cv.get("output_name")),
         "parent": (identity_dir / parent).resolve(),
         "languages": person_languages(profile),
         "model": cv.get("model") or DEFAULTS["model"],
@@ -749,13 +774,13 @@ def earlier_versions(document) -> dict:
 
 
 def publish_version(document, files: List[Path], content: dict, instructions: Optional[str],
-                    auto: bool = False, anew: bool = False) -> dict:
+                    auto: bool = False, anew: bool = False, stem: Optional[str] = None) -> dict:
     verdict = content.get("previous_version") or {}
     try:
         return document.publish(files, message=instructions,
                                 previous_failed=bool(verdict.get("failed")) and not anew,
                                 failed_reason=(verdict.get("reason") or "").strip() or None,
-                                auto=auto, anew=anew)
+                                auto=auto, anew=anew, stem=stem)
     except documents.DocumentsError as exc:
         raise TailorError(str(exc))
 
@@ -799,7 +824,8 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
 
     facts = check_facts(content, cv_text, person_text(instructions, earlier.get("log_text", "")),
                         languages)
-    stem = settings["output_stem"]
+    stem = headline_stem(settings["output_stem"], content.get("name", ""), content.get("headline", ""),
+                         keep_fixed=bool(settings.get("output_fixed")))
     docx_path = workdir / f"{stem}.docx"
     pdf_path = workdir / f"{stem}.pdf"
     author = content.get("name", "")
@@ -840,7 +866,7 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
                         f"{settings['target_pages']}")
 
     files = [docx_path] + ([pdf_path] if pdf_path.exists() else [])
-    version = publish_version(document, files, content, instructions, auto, anew)
+    version = publish_version(document, files, content, instructions, auto, anew, stem)
     published = version["files"]
     verdict = content.get("previous_version") or {}
     if version.get("previous_failed"):
