@@ -37,4 +37,16 @@ log nor the previous version.
 
 ## Items
 - DONE - `--anew` in `cv_tailor.py`, the queue passing `anew` and `auto`; tests
-- TO DO - Queue the regeneration of SHARP's active vacancies and check the results
+- DONE - Queue the regeneration of SHARP's active vacancies and check the results
+
+## Results (2026-11-14)
+- 86 of 86 regenerated, all made anew, none failed. The four made before
+  task 0116 got their headline names by hand, with a `File:` log line.
+- Pages, by the type the model read: engineering 28 at 2 pages and 5 at 3;
+  ai 15 at 3; mixed 3 at 2 and 35 at 3. The mixed share goes to task 0117.
+- The fact check flagged 13 CVs, all on Technologies terms: spelling
+  variants of terms the parent CV has (EF Core, REST APIs, Angular JS) and
+  generic terms it does not have (Algorithms, Data Structures, Design
+  Patterns, OOP, Semantic HTML, Data Modeling).
+- The agent read 7 CVs against their vacancies: no must-have missed; one
+  first-person phrase ("where I became"), one stretch on Scala/Java.
