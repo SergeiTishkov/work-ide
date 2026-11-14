@@ -61,10 +61,33 @@ is measured before it goes into the pipeline:
 - The prompt was narrowed: soft skills and general computer-science
   phrases are not misses; a miss is a concrete skill, technology, domain
   or kind of work.
+- Sonnet, narrowed prompt, on 19 CVs (the 12 above and the agent's 7):
+  3 regenerate. Two real (the two SQL ones), one a stretch (an allow/deny
+  layer read as role-based access). Keep on all 7 the agent read. It no
+  longer flagged three of the five real misses (ed-tech, authorization,
+  AWS), and on the same CV its verdict changed between runs.
+
+## The revision, measured on 2026-11-14
+The five real misses, revised with `--review` (queue tasks #185-#189);
+the version before is V2 in `Old versions/`.
+
+| Vacancy | The miss fixed | Pages | What else changed |
+|---|---|---|---|
+| GR8_TECH, .NET payments | yes: SQL performance in the Summary, the SQL bullet first | 2 -> 2 | "tuning the query around that schema" added to the SQL bullet; the parent CV says "a performant SQL script" |
+| TalentHop, Lead .NET full stack | yes: SQL Server performance in the Summary | 2 -> 2 | "replacing slow reporting over a structure that was never meant for analytics" added; the parent CV has no such claim |
+| Crimson, FDE | yes: the educational portal in the Summary and first in its job | 3 -> 3 | the length cut removed the bullet on the team's first Cursor Skills and multi-agent orchestration Skills |
+| Softthink, Senior .NET | yes: multi-tenant authorization in the Summary and in Architecture | 2 -> 2 | a code-quality bullet from the parent CV added |
+| Notabene, Staff Backend | yes: the news platform project with its own AWS deployment | 3 -> 3 | the length cut removed four job bullets (the ~94% frame-time fix, PO/BA decisions, the tree data model, mentoring) and the freight workspace project |
+
+All five misses were fixed. Two versions gained a claim in prose that the
+parent CV does not make; the fact check reads terms, not prose, and passed
+both. In the two 3-page CVs the added text pushed other bullets out under
+`cv.max_pages`.
 
 ## Items
 - DONE - Read the regenerated CVs (task 0114) and note the real misses
 - DONE - The Sonnet review prompt and a one-off script; run it on the same CVs with no regeneration; compare with the agent's notes
 - DONE - `cv_tailor.py --review FILE` and the queue's `review` arg: a version revised with the review's misses and strengths, the current version as the mould; tests
-- TO DO - Run the revision for the CVs whose review holds a real miss; compare before and after
-- TO DO - Report to the owner; the decision on a pipeline step
+- DONE - Run the revision for the CVs whose review holds a real miss; compare before and after
+- DONE - Report to the owner
+- TO DO - The owner decides whether the review becomes a step of the generation
