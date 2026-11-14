@@ -29,6 +29,25 @@ ATS reads the whole CV; a recruiter reads the top.
   - the parent CV's fact; the vacancy's term only when the fact is that
     thing.
 
+## Measured on 2026-11-14
+Twelve CVs made anew with the rule (queue tasks #190-#201), against their
+V2, made anew without it the same day (task 0114):
+- The five misses of task 0115: all five in the Summary at the first
+  generation (SQL performance for GR8_TECH and TalentHop, the educational
+  portal for Crimson, multi-tenant authorization for Softthink, AWS
+  deployment for Notabene). No job bullet or project was lost the way the
+  revision lost them in Notabene.
+- Summary length: from -10% to +35%, about +15% on average; Notabene
+  1372 -> 1826 characters.
+- Pages: 10 unchanged; two engineering CVs went from 2 to 3 (Camunda
+  backend, N-iX), each with a Summary longer by about 250-300 characters.
+- Prose the parent CV does not state: "AWS S3, DynamoDB and Cosmos DB in
+  Technologies and in independent projects" (a sentence about the CV
+  itself, Camunda backend); "Remote since 2019" (Camunda backend);
+  "C#/.NET, a statically typed backend language" and "high-volume product
+  environments" (Notabene). The fact check reads terms only; all passed.
+
 ## Items
 - DONE - The rule in the CV prompt
-- TO DO - Measure: the five CVs of task 0115 and the agent's seven, made anew with the rule; compare with the versions made anew without it
+- DONE - Measure: the five CVs of task 0115 and the agent's seven, made anew with the rule; compare with the versions made anew without it
+- TO DO - The owner decides on the follow-up: a surfaced clause takes the place of a sentence with less weight (the Summary does not grow), and no sentence about the CV's own sections
