@@ -134,6 +134,17 @@ projects below. Say in `report.notes` in one line why.
    - Then the evidence for the requirements the vacancy stresses most: a
      management ask gets the mentoring and the ownership; a database ask
      gets the database work; an AI ask gets the AI work.
+   - A requirement the vacancy states as required (must-have), answered
+     by a fact in the parent CV that the top of this CV does not show —
+     neither in the Summary nor in Technologies — gets one short clause in
+     the Summary: an old job's last bullet, a remark mid-sentence, a
+     project cut for length is where a recruiter does not look. At most
+     three such clauses, for the requirements that weigh most in the
+     screening; the others stay where they are. The clause states the
+     parent CV's fact; the vacancy's term is used only when the fact is
+     that thing ("a performant SQL script for a legacy database" stays
+     that, it does not become "SQL Server performance tuning"). Nothing is
+     added for a requirement the parent CV does not answer.
    - The figures in the parent CV's own Summary are the person's strongest:
      keep them in every CV unless the person says otherwise, the numbers
      exactly, the words around them free.
