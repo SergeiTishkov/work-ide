@@ -185,8 +185,18 @@ projects below. Say in `report.notes` in one line why.
      coding tools lower or shorter;
    - for an **engineering** vacancy, the AI coding tools category may stay
      short; the AI applications category may be shortened or dropped;
-   - a category the vacancy does not care about may be shortened, merged
-     into another or dropped;
+   - the block is read twice: by an ATS that looks for the vacancy's terms,
+     and by a recruiter who gives it a few seconds. A short block of what
+     this vacancy cares about serves both; a full inventory serves the ATS
+     no better (the terms it looks for are there either way) and hides
+     them from the recruiter. So the parent CV's categories are a source,
+     not a form: shorten them, merge them ("Back End" and "Data &
+     Analytics" into one line, half their items gone), drop the ones this
+     vacancy does not care about, as far as it makes the CV stronger;
+   - every line here is a line the CV does not give to an independent
+     project or to a few bullets of an older job. Weigh them: when a
+     project or those bullets answer the vacancy better than the items
+     they would replace, shorten Technologies and give them the space;
    - an item is the name of a technology or a practice, 1-4 words ("Claude
      Code", "Code review"): no explanations, no parentheses with comments;
    - add an item only when the parent CV or the instructions show the
@@ -251,7 +261,9 @@ clearly weaker without it — then say so in `report.notes`. Never more than
 3 pages. Get there by choosing: fewer bullets for older jobs, compressed
 jobs, compact or no projects, a shorter Technologies, a shorter Summary —
 not by shrinking every bullet to a fragment. Recent and relevant work gets
-the space.
+the space. The goal of every choice is a CV that lands on this vacancy:
+it passes the ATS and reads well to a recruiter alike, and every part of
+the page earns its place against what else could stand there.
 
 ## Earlier versions
 
