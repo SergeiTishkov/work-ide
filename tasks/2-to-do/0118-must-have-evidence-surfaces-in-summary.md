@@ -54,6 +54,7 @@ V2, made anew without it the same day (task 0114):
 - DONE - The Summary budget, `cv.summary_chars` (700): a longer Summary goes back to the model to be shortened, two rounds, then the run fails; the prompt's Summary rules; tests
 - DONE - The parent CV's bullet on the AI code review workflow in the short form, its time spans and the PBI figures kept (local, the owner's files: `documents/`, and the docx and PDF in the owner's cv-workspace)
 - DONE - Notabene's CV made anew with the new rules (queue task #202, V5): Summary 660 characters with no shortening round, 2 pages instead of 3, no findings; AWS stays in Technologies only, the self-deployed AWS project is not in the CV
+- DONE - Three shortening rounds; past them the last answer is used with a warning, the run does not fail (the owner, 2026-11-17); tests
 - TO DO - The owner reads Notabene's V5 and decides whether the other CVs are regenerated with these rules
 
 ## The owner's decisions of 2026-11-17
@@ -63,7 +64,9 @@ of strong CVs the owner keeps run 560-720 characters; career advice
 agrees on 2-4 lines, 40-80 words.
 - The Summary is at most 700 characters, every paragraph together. Code
   counts it after the model answers; a longer one goes back to the model
-  to be shortened (its own small prompt, no new facts). Code never cuts it.
+  to be shortened (its own small prompt, no new facts), up to three
+  times; still over after the third, the last answer is used and the run
+  goes on with a warning, it does not fail. Code never cuts it.
 - The vacancy's term names the person's fact; its descriptions, reasons
   and adjectives are not copied ("a statically typed backend language",
   "where correctness matters more than features", "high-volume").

@@ -100,8 +100,9 @@ DEFAULTS = {
 CLAUDE_TIMEOUT_SECONDS = 900
 DESCRIPTION_LIMIT = 20000
 MAX_FIT_ROUNDS = 10
-# A Summary over cv.summary_chars goes back to the model this many times.
-SHORTEN_ROUNDS = 2
+# A Summary over cv.summary_chars goes back to the model this many times;
+# past them the last answer is used (the owner, 2026-11-17).
+SHORTEN_ROUNDS = 3
 
 # The printed page: A4 at the margins of cv_docx.LAYOUT, in points.
 PAGE_HEIGHT_PT = cv_docx.LAYOUT["page_height_cm"] / 2.54 * 72
@@ -477,8 +478,9 @@ def fit_summary(content: dict, vacancy: dict, *, limit: int, model: str, workdir
     """A Summary over `limit` characters goes back to the model to be
     shortened, up to SHORTEN_ROUNDS times (the owner, 2026-11-17, task 0118:
     a short Summary is read, a long one is skipped). Returns a warning line
-    when it was shortened, None when it fit. Raises TailorError when it is
-    still over: nothing is published, the Summary is never cut in code."""
+    when it was sent back, None when it fit. Still over after the last
+    round, the last answer is used and the warning says so: a CV with a
+    long Summary is more use than no CV (the owner). Code never cuts it."""
     before = summary_length(content.get("summary"))
     if before <= limit:
         return None
@@ -497,8 +499,9 @@ def fit_summary(content: dict, vacancy: dict, *, limit: int, model: str, workdir
         if shorter and now <= limit:
             content["summary"] = shorter
             return f"the Summary was {before} characters, over cv.summary_chars ({limit}): shortened to {now}"
-    raise TailorError(f"the Summary is {before} characters, over cv.summary_chars ({limit}), and "
-                      f"{SHORTEN_ROUNDS} rounds of shortening left it at {now}")
+    content["summary"] = summary
+    return (f"the Summary was {before} characters, over cv.summary_chars ({limit}); after "
+            f"{SHORTEN_ROUNDS} rounds of shortening it is {now}, and that version is used")
 
 
 def clean_text(value):

@@ -864,12 +864,25 @@ def test_a_summary_over_the_budget_goes_back_to_be_shortened(tmp_path, parent_do
     assert any("shortened to 36" in w for w in result["warnings"])
 
 
-def test_a_summary_still_over_the_budget_fails_and_nothing_is_published(tmp_path, parent_docx):
-    calls, out, run = _budget_run(tmp_path, parent_docx, [list(LONG_SUMMARY), list(LONG_SUMMARY)])
-    with pytest.raises(cv_tailor.TailorError, match="2 rounds of shortening"):
-        cv_tailor.tailor(**run)
-    assert len(calls) == 1 + cv_tailor.SHORTEN_ROUNDS
-    assert not out.exists() or not list(out.glob("CV *"))
+def test_a_summary_still_over_the_budget_after_the_last_round_is_used(tmp_path, parent_docx):
+    """The owner, 2026-11-17: the operation does not fail on the length."""
+    rounds = [["Senior engineer with 8 years of experience in C#/.NET and React. " * n] for n in (12, 11, 11)]
+    calls, out, run = _budget_run(tmp_path, parent_docx, rounds)
+    result = cv_tailor.tailor(**run)
+    assert cv_tailor.SHORTEN_ROUNDS == 3 and len(calls) == 1 + 3
+    last = rounds[-1][0].strip()
+    content = json.loads((Path(result["archive"]) / "content.json").read_text(encoding="utf-8"))
+    assert content["summary"] == [last]
+    assert any(f"after 3 rounds of shortening it is {len(last)}" in w for w in result["warnings"])
+    assert list(out.glob("CV *.docx"))
+
+
+def test_an_empty_shortening_answer_keeps_the_summary_it_had():
+    content = {"summary": list(LONG_SUMMARY)}
+    folder = Path(__import__("tempfile").mkdtemp())
+    warning = cv_tailor.fit_summary(content, {}, limit=700, model="opus", workdir=folder,
+                                    model_call=lambda *a, **k: {"summary": []})
+    assert content["summary"] == LONG_SUMMARY and "that version is used" in warning
 
 
 def test_a_second_round_gets_the_first_rounds_answer(tmp_path, parent_docx):
