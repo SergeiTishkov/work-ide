@@ -52,8 +52,9 @@ V2, made anew without it the same day (task 0114):
 - DONE - Measure: the five CVs of task 0115 and the agent's seven, made anew with the rule; compare with the versions made anew without it
 - DONE - The owner decides on the follow-up (2026-11-17, below)
 - DONE - The Summary budget, `cv.summary_chars` (700): a longer Summary goes back to the model to be shortened, two rounds, then the run fails; the prompt's Summary rules; tests
-- TO DO - The parent CV's bullet on the AI code review workflow in the short form, its time spans and the PBI figures kept (local, the owner's files)
-- TO DO - Notabene's CV made anew with the new rules; the owner looks at it. The other vacancies are not regenerated
+- DONE - The parent CV's bullet on the AI code review workflow in the short form, its time spans and the PBI figures kept (local, the owner's files: `documents/`, and the docx and PDF in the owner's cv-workspace)
+- DONE - Notabene's CV made anew with the new rules (queue task #202, V5): Summary 660 characters with no shortening round, 2 pages instead of 3, no findings; AWS stays in Technologies only, the self-deployed AWS project is not in the CV
+- TO DO - The owner reads Notabene's V5 and decides whether the other CVs are regenerated with these rules
 
 ## The owner's decisions of 2026-11-17
 After the measurement, the owner read Notabene's CV: "C#/.NET, a
