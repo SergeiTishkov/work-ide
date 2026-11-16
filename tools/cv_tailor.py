@@ -84,6 +84,7 @@ import documents  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 PROMPT_PATH = ROOT / "config" / "cv_tailor_prompt.md"
+SUMMARY_PROMPT_PATH = ROOT / "config" / "cv_summary_prompt.md"
 
 DEFAULTS = {
     "model": "opus",
@@ -91,10 +92,16 @@ DEFAULTS = {
     # needs does not fit in two (3 and 3 from 2026-10-12, 4 before that).
     "target_pages": 2,
     "max_pages": 3,
+    # The owner, 2026-11-17 (task 0118): the Summary of every paragraph
+    # together. The CVs made before ran 1,200-1,830 characters; strong CVs
+    # the owner keeps as samples run 560-720.
+    "summary_chars": 700,
 }
 CLAUDE_TIMEOUT_SECONDS = 900
 DESCRIPTION_LIMIT = 20000
 MAX_FIT_ROUNDS = 10
+# A Summary over cv.summary_chars goes back to the model this many times.
+SHORTEN_ROUNDS = 2
 
 # The printed page: A4 at the margins of cv_docx.LAYOUT, in points.
 PAGE_HEIGHT_PT = cv_docx.LAYOUT["page_height_cm"] / 2.54 * 72
@@ -292,6 +299,7 @@ def cv_settings(profile: dict, identity_dir: Path) -> dict:
         "model": cv.get("model") or DEFAULTS["model"],
         "target_pages": int(cv.get("target_pages") or DEFAULTS["target_pages"]),
         "max_pages": int(cv.get("max_pages") or DEFAULTS["max_pages"]),
+        "summary_chars": int(cv.get("summary_chars") or DEFAULTS["summary_chars"]),
     }
 
 
@@ -356,7 +364,8 @@ def build_message(cv_text: str, vacancy: dict, instructions: Optional[str] = Non
                   languages: Optional[List[str]] = None, target_pages: int = DEFAULTS["target_pages"],
                   max_pages: int = DEFAULTS["max_pages"], log_text: str = "",
                   previous_text: Optional[str] = None, version: int = 1,
-                  review: Optional[dict] = None) -> str:
+                  review: Optional[dict] = None,
+                  summary_chars: int = DEFAULTS["summary_chars"]) -> str:
     description = (vacancy.get("description_text") or "").strip()
     if len(description) > DESCRIPTION_LIMIT:
         description = description[:DESCRIPTION_LIMIT] + "\n[cut]"
@@ -364,7 +373,8 @@ def build_message(cv_text: str, vacancy: dict, instructions: Optional[str] = Non
     parts = [
         f"The parent CV is {len(cv_text)} characters long as plain text. The tailored CV is "
         f"{target_pages} pages, {max_pages} at most; {target_pages} pages of the layout hold about "
-        f"{budget:,} characters of plain text.",
+        f"{budget:,} characters of plain text. The Summary is {summary_chars} characters at most, "
+        f"every paragraph together.",
         "",
         "<parent_cv>", cv_text.strip(), "</parent_cv>",
         "",
@@ -430,6 +440,65 @@ def call_model(message: str, *, model: str, workdir: Path, claude: str = "claude
     if not isinstance(content, dict):
         raise TailorError("claude returned no structured output")
     return content
+
+
+# --- the Summary's budget -------------------------------------------------------
+
+SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {"summary": {"type": "array", "items": {"type": "string"},
+                               "description": "1-2 paragraphs"}},
+    "required": ["summary"],
+    "additionalProperties": False,
+}
+
+
+def summary_length(summary) -> int:
+    """The characters of every paragraph together."""
+    return sum(len(p) for p in summary or [] if isinstance(p, str))
+
+
+def shorten_message(summary: List[str], vacancy: dict, limit: int) -> str:
+    description = (vacancy.get("description_text") or "")[:DESCRIPTION_LIMIT]
+    return "\n".join([
+        "<vacancy>",
+        f"{vacancy.get('title', '')} - {vacancy.get('company', '')}",
+        description,
+        "</vacancy>",
+        "",
+        f"<summary characters=\"{summary_length(summary)}\" budget=\"{limit}\">",
+        *summary,
+        "</summary>",
+    ])
+
+
+def fit_summary(content: dict, vacancy: dict, *, limit: int, model: str, workdir: Path,
+                model_call=None) -> Optional[str]:
+    """A Summary over `limit` characters goes back to the model to be
+    shortened, up to SHORTEN_ROUNDS times (the owner, 2026-11-17, task 0118:
+    a short Summary is read, a long one is skipped). Returns a warning line
+    when it was shortened, None when it fit. Raises TailorError when it is
+    still over: nothing is published, the Summary is never cut in code."""
+    before = summary_length(content.get("summary"))
+    if before <= limit:
+        return None
+    model_call = model_call or call_model
+    folder = workdir / "summary"
+    folder.mkdir(parents=True, exist_ok=True)
+    summary, now = content["summary"], before
+    for number in range(1, SHORTEN_ROUNDS + 1):
+        message = shorten_message(summary, vacancy, limit)
+        (folder / f"input_{number}.md").write_text(message, encoding="utf-8")
+        answer = model_call(message, model=model, workdir=folder, prompt_path=SUMMARY_PROMPT_PATH,
+                            schema=SUMMARY_SCHEMA)
+        shorter = [p for p in clean_text(answer.get("summary") or []) if isinstance(p, str) and p]
+        if shorter:
+            summary, now = shorter, summary_length(shorter)
+        if shorter and now <= limit:
+            content["summary"] = shorter
+            return f"the Summary was {before} characters, over cv.summary_chars ({limit}): shortened to {now}"
+    raise TailorError(f"the Summary is {before} characters, over cv.summary_chars ({limit}), and "
+                      f"{SHORTEN_ROUNDS} rounds of shortening left it at {now}")
 
 
 def clean_text(value):
@@ -841,6 +910,7 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
     if content is None:
         message = build_message(cv_text, vacancy, instructions, languages=languages,
                                 target_pages=settings["target_pages"], max_pages=settings["max_pages"],
+                                summary_chars=settings.get("summary_chars", DEFAULTS["summary_chars"]),
                                 review=review, **earlier)
         (workdir / "model_input.md").write_text(message, encoding="utf-8")
         if review:
@@ -856,6 +926,11 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
     if problems:
         raise TailorError("the CV content is not usable: " + "; ".join(problems))
     warnings += layout_warnings(content)
+    shortened = fit_summary(content, vacancy, limit=settings.get("summary_chars", DEFAULTS["summary_chars"]),
+                            model=settings["model"], workdir=workdir, model_call=model_call)
+    if shortened:
+        say(shortened)
+        warnings.append(shortened)
 
     facts = check_facts(content, cv_text, person_text(instructions, earlier.get("log_text", "")),
                         languages)

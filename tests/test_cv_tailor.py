@@ -820,3 +820,76 @@ def test_the_review_block_lists_misses_type_and_strengths():
     assert text.startswith("<review>\nMiss 1:") and text.rstrip().endswith("</review>")
     assert "The vacancy's type was misread: an AI role read as plain .NET" in text
     assert cv_tailor.review_parts(None) == [] and cv_tailor.review_parts({}) == []
+
+
+
+# --- the Summary's budget (task 0118) -------------------------------------------
+
+LONG_SUMMARY = ["Senior engineer with 8 years of experience in C#/.NET and React. " * 12]
+
+
+def _budget_run(tmp_path, parent_docx, shortened):
+    """A run whose model writes a Summary over the budget; `shortened` is
+    what the shortening call returns, round by round."""
+    calls = []
+    rounds = iter(shortened)
+
+    def model(message, *, model, workdir, prompt_path=None, schema=None):
+        calls.append({"message": message, "workdir": Path(workdir), "prompt_path": prompt_path,
+                      "schema": schema})
+        if schema is cv_tailor.SUMMARY_SCHEMA:
+            return {"summary": next(rounds)}
+        return tailored(summary=list(LONG_SUMMARY))
+
+    out = tmp_path / "docs" / "v1"
+    run = dict(settings=_settings(parent_docx), vacancy={"title": "Dev", "company": "Acme",
+                                                         "description_text": "C# and SQL Server."},
+               vacancy_id="v1", archive_root=tmp_path / "cvs", out_dir=out, model_call=model,
+               converter=FakeWord())
+    return calls, out, run
+
+
+def test_a_summary_over_the_budget_goes_back_to_be_shortened(tmp_path, parent_docx):
+    calls, out, run = _budget_run(tmp_path, parent_docx, [["Senior engineer, 8 years of C#/.NET."]])
+    result = cv_tailor.tailor(**run)
+    assert len(LONG_SUMMARY[0]) > 700
+    assert [c["schema"] is cv_tailor.SUMMARY_SCHEMA for c in calls] == [False, True]
+    shorten = calls[1]
+    assert shorten["prompt_path"] == cv_tailor.SUMMARY_PROMPT_PATH
+    assert 'budget="700"' in shorten["message"] and "C# and SQL Server." in shorten["message"]
+    # the shortening call has a folder of its own: the main model_output.json stays
+    assert shorten["workdir"].name == "summary" and (shorten["workdir"] / "input_1.md").exists()
+    content = json.loads((Path(result["archive"]) / "content.json").read_text(encoding="utf-8"))
+    assert content["summary"] == ["Senior engineer, 8 years of C#/.NET."]
+    assert any("shortened to 36" in w for w in result["warnings"])
+
+
+def test_a_summary_still_over_the_budget_fails_and_nothing_is_published(tmp_path, parent_docx):
+    calls, out, run = _budget_run(tmp_path, parent_docx, [list(LONG_SUMMARY), list(LONG_SUMMARY)])
+    with pytest.raises(cv_tailor.TailorError, match="2 rounds of shortening"):
+        cv_tailor.tailor(**run)
+    assert len(calls) == 1 + cv_tailor.SHORTEN_ROUNDS
+    assert not out.exists() or not list(out.glob("CV *"))
+
+
+def test_a_second_round_gets_the_first_rounds_answer(tmp_path, parent_docx):
+    middle = ["Senior engineer with 8 years of experience in C#/.NET and React. " * 11]
+    calls, out, run = _budget_run(tmp_path, parent_docx, [middle, ["Senior engineer."]])
+    cv_tailor.tailor(**run)
+    kept = middle[0].strip()  # clean_text strips the trailing space
+    assert kept in calls[2]["message"] and f'characters="{len(kept)}"' in calls[2]["message"]
+
+
+def test_a_summary_within_the_budget_is_not_sent_back():
+    content = {"summary": ["a" * 400, "b" * 300]}
+    assert cv_tailor.summary_length(content["summary"]) == 700
+    assert cv_tailor.fit_summary(content, {}, limit=700, model="opus", workdir=Path("unused"),
+                                 model_call=lambda *a, **k: pytest.fail("no call expected")) is None
+
+
+def test_the_summary_budget_comes_from_the_profile_and_goes_to_the_model(tmp_path):
+    base = {"cv": {"parent": "documents/Parent CV Alex.docx"}}
+    assert cv_tailor.cv_settings(base, tmp_path)["summary_chars"] == 700
+    assert cv_tailor.cv_settings({"cv": {**base["cv"], "summary_chars": 500}}, tmp_path)["summary_chars"] == 500
+    message = cv_tailor.build_message("CV", {"title": "Dev"}, summary_chars=500)
+    assert "The Summary is 500 characters at most" in message

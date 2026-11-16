@@ -50,4 +50,29 @@ V2, made anew without it the same day (task 0114):
 ## Items
 - DONE - The rule in the CV prompt
 - DONE - Measure: the five CVs of task 0115 and the agent's seven, made anew with the rule; compare with the versions made anew without it
-- TO DO - The owner decides on the follow-up: a surfaced clause takes the place of a sentence with less weight (the Summary does not grow), and no sentence about the CV's own sections
+- DONE - The owner decides on the follow-up (2026-11-17, below)
+- DONE - The Summary budget, `cv.summary_chars` (700): a longer Summary goes back to the model to be shortened, two rounds, then the run fails; the prompt's Summary rules; tests
+- TO DO - The parent CV's bullet on the AI code review workflow in the short form, its time spans and the PBI figures kept (local, the owner's files)
+- TO DO - Notabene's CV made anew with the new rules; the owner looks at it. The other vacancies are not regenerated
+
+## The owner's decisions of 2026-11-17
+After the measurement, the owner read Notabene's CV: "C#/.NET, a
+statically typed backend language" and a 1,826-character Summary. Samples
+of strong CVs the owner keeps run 560-720 characters; career advice
+agrees on 2-4 lines, 40-80 words.
+- The Summary is at most 700 characters, every paragraph together. Code
+  counts it after the model answers; a longer one goes back to the model
+  to be shortened (its own small prompt, no new facts). Code never cuts it.
+- The vacancy's term names the person's fact; its descriptions, reasons
+  and adjectives are not copied ("a statically typed backend language",
+  "where correctness matters more than features", "high-volume").
+- A surfaced must-have clause takes the place of a sentence that weighs
+  less; it never makes the Summary longer.
+- At most two achievements with figures, short, their numbers and time
+  spans exact; the model picks which for the vacancy, and the same two may
+  appear in every CV.
+- A word about the person's character stands only with a fact that shows
+  it, or when the parent CV's own Summary says it; at most one beyond the
+  parent CV's own. The owner: such words from the vacancy would do more
+  harm than good.
+- The Summary never speaks about the CV ("in Technologies").
