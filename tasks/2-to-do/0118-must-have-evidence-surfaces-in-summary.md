@@ -55,7 +55,7 @@ V2, made anew without it the same day (task 0114):
 - DONE - The parent CV's bullet on the AI code review workflow in the short form, its time spans and the PBI figures kept (local, the owner's files: `documents/`, and the docx and PDF in the owner's cv-workspace)
 - DONE - Notabene's CV made anew with the new rules (queue task #202, V5): Summary 660 characters with no shortening round, 2 pages instead of 3, no findings; AWS stays in Technologies only, the self-deployed AWS project is not in the CV
 - DONE - Three shortening rounds; past them the last answer is used with a warning, the run does not fail (the owner, 2026-11-17); tests
-- DONE - The owner reads Notabene's V5 and decides whether the other CVs are regenerated with these rules: yes, after the weekly AI limit resets on 2026-11-18 21:59 (the run of 2026-11-14 cost $68 at API prices for about 85 CVs, the week stood at 96%). A one-off Windows task, WorkIDE-0118-Regenerate, runs `data/scheduled/queue_0118_rest.py` at 22:10: an anew CV for every active vacancy whose newest CV predates 2026-11-17 (86 on 2026-11-17, Notabene skipped)
+- DONE - The owner reads Notabene's V5 and decides whether the other CVs are regenerated with these rules: yes, after the weekly AI limit resets on 2026-11-18 21:59 (the run of 2026-11-14 cost $68 at API prices for about 85 CVs, the week stood at 96%). A one-off Windows task, WorkIDE-0118-Regenerate, runs `data/scheduled/queue_0118_rest.py` at 22:10: an anew CV for every active vacancy whose newest CV predates the merge of task 0120 (2026-11-17 00:43): 87 on 2026-11-17, Notabene's V5 among them, so it gets the Technologies rule too
 - TO DO - Read the regenerated CVs: Summary lengths, shortening warnings, pages, findings
 
 ## The owner's decisions of 2026-11-17
