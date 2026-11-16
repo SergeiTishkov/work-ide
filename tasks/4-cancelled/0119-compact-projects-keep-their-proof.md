@@ -1,6 +1,7 @@
 # 0119 A compact project keeps its own result; a project that alone answers a must-have stays
 
 Source: the agent, 2026-11-17 (Notabene's CV of task 0118, read with the owner)
+Cancelled: the owner, 2026-11-17: more rules on what the CV must contain leave the model less room to reach the result the prompt asks for
 Scope: config, tools
 
 ## Business
