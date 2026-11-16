@@ -619,9 +619,10 @@ The steps:
    every paragraph together; the owner, 2026-11-17, task 0118). Before the
    fact check, a longer Summary goes back to the model with
    `config/cv_summary_prompt.md`: shorten it, no new facts, the vacancy's
-   most important evidence kept; up to two rounds, then the run fails and
-   nothing is published. Code never cuts the Summary itself: a sentence cut
-   mid-way reads worse than a run that failed. Measured before the budget:
+   most important evidence kept; up to three rounds. Still over after the
+   third, the last answer is used and the run's warning says so: a CV with
+   a long Summary is more use than no CV (the owner, 2026-11-17). Code
+   never cuts the Summary itself: a sentence cut mid-way reads worse. Measured before the budget:
    12 CVs made with the prompt alone ran 1,200-1,830 characters, the owner's
    samples of strong CVs 560-720.
 4. The pair is built in `data/identities/<prefix>/cvs/<vacancy>/<time>/` with
