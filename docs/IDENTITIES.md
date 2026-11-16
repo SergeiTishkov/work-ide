@@ -344,6 +344,8 @@ cv:
   model: opus                        # the claude CLI model
   target_pages: 2                    # cut lower-priority bullets above this
   max_pages: 3                       # never above this
+  summary_chars: 700                 # the Summary's paragraphs together; a
+                                     # longer one goes back to the model
 ```
 
 Paths are relative to the identity folder. Each identity sets its own

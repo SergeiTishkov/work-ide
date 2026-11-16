@@ -76,8 +76,15 @@ true.
    vacancy's term for it, exactly or nearly: "LLM workflows with
    retrieval" becomes "RAG pipelines" when the vacancy says RAG; "worked
    with BAs and POs on requirements" becomes "stakeholder management" when
-   the vacancy says that. Put the top terms in the Summary and in the first
-   bullets of the most relevant jobs.
+   the vacancy says that. The vacancy's term names the person's fact; the
+   vacancy's own descriptions, reasons and adjectives stay in the vacancy:
+   "C#" stays "C#", never "C#, a statically typed backend language";
+   "distributed systems" never grows into "distributed systems where
+   correctness matters more than features"; no "high-volume",
+   "fast-paced" or "mission-critical" the parent CV does not say. A reader
+   who sees the vacancy's sentences come back reads a CV fitted to the ad.
+   Put the top terms in the first bullets of the most relevant jobs and in
+   Technologies; the Summary takes the few that weigh most.
 4. A requirement the person meets only in part is answered with the nearest
    real experience, named as it is, in words that show the shared ground:
    - the vacancy asks for PostgreSQL, the person has years of SQL Server:
@@ -127,10 +134,14 @@ projects below. Say in `report.notes` in one line why.
    - `contacts`: every contact of the parent CV, label and value, in its
      order. In the text the labels may come first and the values after
      them in the same order: pair them by position.
-2. **Summary** — 1-3 short paragraphs, written for this vacancy, not
-   copied from the parent CV.
-   - The first sentence: the strongest true fit for this vacancy, in its
-     words — the role, the years, the stack or the domain it asks for.
+2. **Summary** — one or two short paragraphs, **at most the characters the
+   message gives** (700 by default), every paragraph together; written for
+   this vacancy, not copied from the parent CV. The count is checked in
+   code: a longer Summary is sent back to be shortened.
+   A recruiter reads a short Summary and skips a long one; the list of
+   keywords is the job of Technologies, not of the Summary.
+   - The first sentence: the strongest true fit for this vacancy — the
+     role, the years, the stack or the domain it asks for.
    - Then the evidence for the requirements the vacancy stresses most: a
      management ask gets the mentoring and the ownership; a database ask
      gets the database work; an AI ask gets the AI work.
@@ -140,19 +151,31 @@ projects below. Say in `report.notes` in one line why.
      the Summary: an old job's last bullet, a remark mid-sentence, a
      project cut for length is where a recruiter does not look. At most
      three such clauses, for the requirements that weigh most in the
-     screening; the others stay where they are. The clause states the
-     parent CV's fact; the vacancy's term is used only when the fact is
-     that thing ("a performant SQL script for a legacy database" stays
-     that, it does not become "SQL Server performance tuning"). Nothing is
-     added for a requirement the parent CV does not answer.
-   - The figures in the parent CV's own Summary are the person's strongest:
-     keep them in every CV unless the person says otherwise, the numbers
-     exactly, the words around them free.
-   - The parent CV's AI paragraph: whole for an **ai** vacancy; for
-     **mixed**, two or three sentences; for **engineering**, one sentence
-     (keeping its figure) or merged into another paragraph.
-   - When space is short, the last sentence may name the 2-3 technologies
-     the vacancy wants most.
+     screening; the others stay where they are. Such a clause takes the
+     place of a sentence that weighs less for this vacancy: it never makes
+     the Summary longer. The clause states the parent CV's fact; the
+     vacancy's term is used only when the fact is that thing ("a
+     performant SQL script for a legacy database" stays that, it does not
+     become "SQL Server performance tuning"). Nothing is added for a
+     requirement the parent CV does not answer.
+   - **At most two achievements with figures**, the ones that weigh most
+     for this vacancy, each in one short clause. The numbers and the time
+     spans around them stay exactly as the parent CV gives them ("cut
+     QA-reported defects from 22 in ten months to zero in three"); the long
+     form with every detail belongs in the job's bullet. The figures in the
+     parent CV's own Summary are the person's strongest: choose from them
+     first, and the same two may well appear in every CV.
+   - The person's character and way of working ("pragmatic", "works
+     independently", "detail-oriented"): a word for it stands only with a
+     fact next to it that shows it, or when the parent CV's own Summary
+     says it. At most one such word beyond the parent CV's own; never one
+     taken from the vacancy's wish list. A fact that shows the trait is
+     stronger than the word.
+   - The Summary speaks about the person, never about the CV: no "listed
+     in Technologies", "see the projects below".
+   - The parent CV's AI paragraph: the core of the Summary for an **ai**
+     vacancy; for **mixed**, one or two sentences; for **engineering**, one
+     clause or none.
 3. **Technologies** (`skills`) — the parent CV's categories, in its
    naming, chosen and ordered for this vacancy:
    - the items the vacancy names first inside each category; the

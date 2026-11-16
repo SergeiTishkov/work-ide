@@ -615,6 +615,15 @@ The steps:
    section's, and the CV rendered again; `cv.max_pages` (3) is allowed only
    when nothing but priority 1 is left; past it, priority-1 bullets and then
    whole projects go.
+   The Summary has a budget of its own, `cv.summary_chars` (700 characters,
+   every paragraph together; the owner, 2026-11-17, task 0118). Before the
+   fact check, a longer Summary goes back to the model with
+   `config/cv_summary_prompt.md`: shorten it, no new facts, the vacancy's
+   most important evidence kept; up to two rounds, then the run fails and
+   nothing is published. Code never cuts the Summary itself: a sentence cut
+   mid-way reads worse than a run that failed. Measured before the budget:
+   12 CVs made with the prompt alone ran 1,200-1,830 characters, the owner's
+   samples of strong CVs 560-720.
 4. The pair is built in `data/identities/<prefix>/cvs/<vacancy>/<time>/` with
    the model's input and output, then published to the vacancy's folder
    named after the CV's headline (the owner, 2026-11-14, task 0116): "CV",
