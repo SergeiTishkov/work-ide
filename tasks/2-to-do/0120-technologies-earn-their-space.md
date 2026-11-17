@@ -21,4 +21,5 @@ project or a few bullets of an older job. The model weighs it.
 
 ## Items
 - DONE - The prompt: Technologies is read by the ATS and by a recruiter; the parent CV's categories are a source, not a form; its lines are weighed against a project or an older job's bullets; the Length section names the goal every choice serves
-- TO DO - Read the regenerated CVs of task 0118 (the run of 2026-11-18 carries this rule too): categories and items per CV against the 87 measured here, and what took the freed space
+- DONE - Read the regenerated CVs of task 0118 (the run of 2026-11-17, 85 CVs, this rule in it): 8.2 categories on average (8.4 before; 8 in 52 CVs, 9 in 24, 7 in 8), 66.2 items (71.8 before, 52 to 81). Notabene's V6 went from 9 categories and 68 items to 8 and 59, its framework line gained its measured result and the Summary the Go interviews
+- TO DO - The owner reads a few of the new CVs and decides whether Technologies needs more than this
