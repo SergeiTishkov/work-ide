@@ -54,6 +54,8 @@
     other: 'filter.company_kind.other',
   };
   const CLASS_KEYS = {
+    // the person's own picks first (tools/add_vacancy.py, task 0122)
+    added_by_hand: 'class.added_by_hand',
     hot_lead: 'class.hot_lead',
     worth_a_look: 'class.worth_a_look',
     long_shot: 'class.long_shot',
