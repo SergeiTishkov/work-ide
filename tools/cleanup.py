@@ -38,7 +38,7 @@ import selections
 
 AGES = ("today", "week", "month", "older")
 CLASSES = ("hot_lead", "worth_a_look", "long_shot", "ai_unscreened", "remote_unconfirmed",
-           "engagement_unconfirmed", "low_priority", "rejected")
+           "engagement_unconfirmed", "never_say_never", "low_priority", "rejected")
 # Feedback the pipeline owner has not read yet (tools/feedback.py collect).
 UNREVIEWED = ("bugged", "rejected")
 

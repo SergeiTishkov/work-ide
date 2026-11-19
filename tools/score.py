@@ -424,6 +424,9 @@ STACK_UNREAD = "stack: no description yet, and the title names no technology"
 # (criteria `stretch_roles`, the owner, 2026-10-20: "remote outranks the
 # technology"). A refusal until the model reads the posting against the CV:
 # "fits" or "stretch" lifts the stack and level objections, "no" rejects it.
+# The class under long_shot that is still listed, for an identity whose
+# classification_thresholds name it (the owner, 2026-11-20, task 0124).
+NEVER_SAY_NEVER = "never_say_never"
 STRETCH_UNREAD = "stretch: off the stack or level; waits for the AI read against the CV"
 
 # Can a contractor sitting where this person sits actually take the work?
@@ -3171,6 +3174,12 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
         classification = "worth_a_look"
     elif total >= thresholds["long_shot"]:
         classification = "long_shot"
+    elif thresholds.get(NEVER_SAY_NEVER) is not None and total >= thresholds[NEVER_SAY_NEVER]:
+        # Opt-in per identity (task 0124): the band under long_shot that is
+        # still shown, in a section of its own. Not read by the screening
+        # model (ai_screen.TOP_CLASSES) and left out of the automatic CVs
+        # unless an identity's filter names it.
+        classification = NEVER_SAY_NEVER
     else:
         classification = "low_priority"
 

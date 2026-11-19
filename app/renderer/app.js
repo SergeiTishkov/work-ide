@@ -61,6 +61,8 @@
     long_shot: 'class.long_shot',
     ai_unscreened: 'class.ai_unscreened',
     engagement_unconfirmed: 'class.engagement_unconfirmed',
+    // under long_shot, still shown (task 0124)
+    never_say_never: 'class.never_say_never',
   };
   // Listed in "Identity fit" whether they hold any or not.
   const STABLE_CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'ai_unscreened'];
@@ -1847,6 +1849,7 @@
     long_shot: 'cleanup.class.long_shot', ai_unscreened: 'cleanup.class.ai_unscreened',
     remote_unconfirmed: 'cleanup.class.remote_unconfirmed',
     engagement_unconfirmed: 'cleanup.class.engagement_unconfirmed',
+    never_say_never: 'cleanup.class.never_say_never',
     low_priority: 'cleanup.class.low_priority', rejected: 'cleanup.class.rejected',
   };
   const CLEANUP_LEGENDS = { ages: 'cleanup.ages', statuses: 'cleanup.statuses', classes: 'cleanup.classes' };

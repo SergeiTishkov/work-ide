@@ -39,6 +39,7 @@
   'cleanup.class.ai_unscreened': 'Не обработано AI',
   'cleanup.class.remote_unconfirmed': 'Удалёнка не подтверждена',
   'cleanup.class.engagement_unconfirmed': 'Часы не подтверждены',
+  'cleanup.class.never_say_never': 'Никогда не говори никогда',
   'cleanup.class.low_priority': 'Низкий приоритет',
   'cleanup.class.rejected': 'Отсеяны фильтром',
   'cleanup.count': 'Посчитать',
@@ -300,6 +301,7 @@
   'class.long_shot': '🕰️ Дальний прицел',
   'class.ai_unscreened': '⏳ Не обработано AI',
   'class.engagement_unconfirmed': '⏱️ Часы не подтверждены',
+  'class.never_say_never': '🍀 Никогда не говори никогда',
 
   'list.empty': 'Здесь пусто.',
   'list.show_more': 'Показать ещё {n}',

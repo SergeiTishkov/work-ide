@@ -36,6 +36,7 @@
   'cleanup.class.ai_unscreened': 'Not processed with AI',
   'cleanup.class.remote_unconfirmed': 'Remote not confirmed',
   'cleanup.class.engagement_unconfirmed': 'Hours not confirmed',
+  'cleanup.class.never_say_never': 'Never say never',
   'cleanup.class.low_priority': 'Low priority',
   'cleanup.class.rejected': 'Rejected by the filter',
   'cleanup.count': 'Count',
@@ -297,6 +298,7 @@
   'class.long_shot': '🕰️ Long shots',
   'class.ai_unscreened': '⏳ Not processed with AI',
   'class.engagement_unconfirmed': '⏱️ Hours not confirmed',
+  'class.never_say_never': '🍀 Never say never',
 
   'list.empty': 'Nothing here.',
   'list.show_more': 'Show {n} more',

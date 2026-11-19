@@ -10,7 +10,7 @@ const AGES = ['today', 'week', 'month', 'older'];
 const STATUSES = ['new', 'applied', 'contacted', 'interview', 'awaiting_final', 'awaiting_offer',
   'offered', 'started', 'declined', 'rejected', 'bugged', 'expired'];
 const CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'ai_unscreened', 'remote_unconfirmed',
-  'engagement_unconfirmed', 'low_priority', 'rejected'];
+  'engagement_unconfirmed', 'never_say_never', 'low_priority', 'rejected'];
 const IDENTITY_PATTERN = /^[a-z][a-z0-9]{2,9}$/;
 
 // The command line for one cleanup; anything outside the known values is refused.
