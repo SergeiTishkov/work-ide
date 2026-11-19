@@ -291,6 +291,7 @@
   'filter.declined': 'Rejected',
   'filter.count': '({n})',
 
+  'class.added_by_hand': '✋ Added by hand',
   'class.hot_lead': '🔥 Hot leads — look at these first',
   'class.worth_a_look': '👀 Worth a look',
   'class.long_shot': '🕰️ Long shots',

@@ -279,6 +279,34 @@ def load_vacancies() -> dict:
         return records
 
 
+def load_vacancy(vacancy_id: str) -> Optional[dict]:
+    """One vacancy as load_vacancies() gives it (verdict, answer, screening
+    answer), without reading the whole base; None when it is not there."""
+    prefix = identity()
+    if not exists():
+        return None
+    with session() as conn:
+        row = conn.execute(
+            "SELECT v.data, vi.computed, vi.duplicate_of, vi.feedback_status FROM vacancies v "
+            "LEFT JOIN vacancy_identity vi ON vi.vacancy_id = v.id AND vi.identity_id = ? "
+            "WHERE v.id = ?", (prefix, vacancy_id)).fetchone()
+        if row is None:
+            return None
+        record = join_record(row[0], row[1], row[2])
+        if row[3] and row[3] != "new":
+            record["_feedback"] = row[3]
+        screen = conn.execute(
+            "SELECT text_hash, brief_hash, result FROM ai_screens "
+            "WHERE identity_id = ? AND vacancy_id = ?", (prefix, vacancy_id)).fetchone()
+        if screen:
+            try:
+                record["_ai_screen"] = {**json.loads(screen[2]), "text_hash": screen[0],
+                                        "brief_hash": screen[1]}
+            except json.JSONDecodeError:
+                pass
+        return record
+
+
 def save_vacancies(vacancies: dict) -> None:
     """Upserts the facts and the active identity's verdict, in one
     transaction. The feedback columns belong to the app and are never touched

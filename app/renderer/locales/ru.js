@@ -294,6 +294,7 @@
   'filter.declined': 'Отказали',
   'filter.count': '({n})',
 
+  'class.added_by_hand': '✋ Добавлено вручную',
   'class.hot_lead': '🔥 Горячие — смотреть в первую очередь',
   'class.worth_a_look': '👀 Стоит посмотреть',
   'class.long_shot': '🕰️ Дальний прицел',

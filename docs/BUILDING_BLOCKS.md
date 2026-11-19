@@ -68,6 +68,7 @@ A board token can be checked with one request:
 | `reputation.py` | Which shortlist companies are still unchecked; recording "we looked and found nothing" | By hand |
 | `reputation_lookup.py` | One vacancy's employer reputation, looked up by a model with web search and recorded | The app's "Collect reputation" button |
 | `ingest_manual.py` | Enter finds obtained by web search | After the manual stage of RUNBOOK |
+| `add_vacancy.py` | One vacancy the person found, by its link: page read, scored alone, listed under "Added by hand" now and on every later run | When the person asks for a vacancy in the app |
 | `company_intel.py` | Company age and size from Wikidata | Automatically inside the pipeline, for shortlist companies |
 | `company_kinds.py` | Which companies are freelance marketplaces, agencies or reposters (`config/company_kinds.yaml`), for the app's "Company" drop-down; `--scan` lists them, `--write` stores them in the base | Automatically with every selection; by hand after editing the YAML |
 | `link_check.py` | Checking that links are alive | Automatically inside the pipeline |

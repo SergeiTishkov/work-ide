@@ -179,6 +179,15 @@ tools (WebSearch/WebFetch):
    That puts the finds through the same normalize + score + selection path as
    the automatic sources, and records a new selection the app shows.
 
+   One vacancy the person found and wants in the app — whatever the scripts
+   would say of it — goes in by its link instead (task 0122):
+   ```bash
+   python tools/add_vacancy.py --identity <p> --url <link>
+   ```
+   It reads the page (LinkedIn by its job number, any copy in the base),
+   scores that one vacancy and lists it under "Added by hand" in the latest
+   selection and every later one, in seconds; no rebuild, no AI read.
+
 3. Employer reputation is **not** a step of the cycle any more (the owner,
    2026-10-17: not worth the time of every collection). The app's
    "Collect reputation" button on a vacancy looks it up for that company

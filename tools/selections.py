@@ -37,6 +37,15 @@ QUERIES_PATH = common.ROOT / "schemas" / "queries.sql"
 
 KINDS = ("run", "rebuild")
 
+# The person's own picks (tools/add_vacancy.py, task 0122): vacancies they
+# added by hand are listed in a section of their own, whatever the scripts'
+# class, in every market, until a near-duplicate or a dead link takes them
+# out like any other row. The scripts' verdict stays in the base for the
+# record: the row carries the real score.
+HAND_CLASS = "added_by_hand"
+HAND_CLASS_POSITION = -1
+PICKS_NAME = "added_by_hand.json"
+
 
 def listed_vacancies(vacancies: dict) -> list:
     """The vacancies a shortlist can show: no near-duplicates, no confirmed
@@ -83,6 +92,65 @@ def refresh_views(vacancies: dict) -> int:
     return len(rows)
 
 
+def picks_path() -> Path:
+    """data/identities/<prefix>/added_by_hand.json: {vacancy id: {added_at, url}}."""
+    return common.DATA_DIR / PICKS_NAME
+
+
+def load_picks() -> dict:
+    return common.load_json(picks_path(), default={}) or {}
+
+
+def save_pick(vacancy_id: str, url: str) -> None:
+    """Remembers a vacancy the person added by hand; a second add keeps the
+    first date."""
+    picks = load_picks()
+    picks.setdefault(vacancy_id, {"added_at": db.now_iso(), "url": url})
+    common.save_json_atomic(picks_path(), picks)
+
+
+def _hand_items(v: dict, segment_slugs) -> list:
+    """The selection rows of one pick: one per market."""
+    import report
+
+    score = int((v.get("computed") or {}).get("score") or 0)
+    return [(slug, v["id"], HAND_CLASS, HAND_CLASS_POSITION, report.TOP_N_PER_SECTION, score,
+             report._eligibility_rank(v)) for slug in segment_slugs]
+
+
+def _pick_listed(v: Optional[dict]) -> bool:
+    return bool(v) and not v.get("duplicate_of")         and (v.get("link_check") or {}).get("status") != "dead"
+
+
+INSERT_ITEMS = ("INSERT INTO selection_items (selection_id, segment, vacancy_id, class, "
+                "class_position, section_limit, score, eligibility_rank) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+
+
+def add_by_hand(vacancy: dict) -> Optional[int]:
+    """Lists one pick in the active identity's latest selection, so it shows
+    now rather than after the next run; returns that selection's id, None
+    when there is no selection yet (the first run lists it, record()).
+
+    The one change ever made to a recorded selection: a row added, nothing
+    else in it moved. A new selection would do the same through a rebuild
+    of the whole base, which is what the person asked not to wait for.
+    Must be called after kb.save_vacancies()."""
+    view_row = _view_row(vacancy)
+    with db.session() as conn:
+        selection_id = latest_selection_id(conn)
+        if selection_id is None:
+            return None
+        slugs = [row[0] for row in conn.execute(
+            "SELECT slug FROM selection_segments WHERE selection_id = ? ORDER BY position",
+            (selection_id,))]
+        conn.execute("DELETE FROM selection_items WHERE selection_id = ? AND vacancy_id = ?",
+                     (selection_id, vacancy["id"]))
+        conn.executemany(INSERT_ITEMS, ((selection_id, *item) for item in _hand_items(vacancy, slugs)))
+        conn.execute(UPDATE_VIEWS, view_row)
+    return selection_id
+
+
 def _configured_segments() -> list:
     """The identity's markets; an identity that configured none gets one
     segment holding everything."""
@@ -113,10 +181,13 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
     class_position = {cls: i for i, cls in enumerate(report.LISTED_CLASSES)}
     run = int((state or {}).get("run_count") or 0)
 
+    picks = load_picks()
     listed = listed_vacancies(vacancies)
     views, items = [], []
     for v in listed:
         vid = v["id"]
+        if vid in picks:
+            continue
         c = v.get("computed") or {}
         cls = c["classification"]
         views.append(_view_row(v))
@@ -126,6 +197,11 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
                 items.append((segment.slug, vid, cls, class_position[cls],
                               report.TOP_N_PER_SECTION, int(c.get("score") or 0),
                               report._eligibility_rank(v)))
+    for vid in picks:
+        v = vacancies.get(vid)
+        if _pick_listed(v):
+            views.append(_view_row(v))
+            items.extend(_hand_items(v, [s.slug for s in configured]))
 
     with db.session() as conn:
         prefix = db.ensure_identity(conn, display_name=_display_name())
@@ -142,12 +218,7 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
              for i, s in enumerate(configured)),
         )
         conn.executemany(UPDATE_VIEWS, views)
-        conn.executemany(
-            "INSERT INTO selection_items (selection_id, segment, vacancy_id, class, "
-            "class_position, section_limit, score, eligibility_rank) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            ((selection_id, *item) for item in items),
-        )
+        conn.executemany(INSERT_ITEMS, ((selection_id, *item) for item in items))
         write_source_sites(conn)
         write_company_kinds(conn)
     return selection_id
