@@ -64,8 +64,11 @@ import common  # noqa: E402
 #
 # `ai_unscreened` (task 0078) holds what the scripts put in the classes above
 # until the model reads it; the model reads the description.
+#
+# `never_say_never` (task 0124): listed, so read like the rest; it comes last
+# in the score order the budget is spent in.
 HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "ai_unscreened", "remote_unconfirmed",
-                "engagement_unconfirmed")
+                "engagement_unconfirmed", "never_say_never")
 
 # How many descriptions to fetch per run. A bound rather than a target: 251
 # were outstanding on the first run, and clearing them over a few runs is

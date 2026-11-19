@@ -34,7 +34,7 @@ TOP_N_PER_SECTION = 10
 # The classes a person actually reads. Everything else is in the database for
 # the record, not in the shortlist for a decision.
 LISTED_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "ai_unscreened",
-                  "remote_unconfirmed", "engagement_unconfirmed")
+                  "remote_unconfirmed", "engagement_unconfirmed", "never_say_never")
 
 
 def _fmt_amount(value: float) -> str:
