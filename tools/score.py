@@ -2150,7 +2150,7 @@ def _check_engagement(vacancy: dict, text: str, criteria: dict):
     }
 
 
-def _score_extra_signals(text: str, criteria: dict):
+def _score_extra_signals(text: str, criteria: dict, title: str = ""):
     """Named keyword signals an identity declares for itself.
 
     Every other component in this file is a fixed axis with a fixed name —
@@ -2168,10 +2168,17 @@ def _score_extra_signals(text: str, criteria: dict):
             negative_keywords: []          # optional
             negative_points_per_keyword: 0 # optional
             floor: -10                     # optional
+            title_patterns: []             # optional, regexes on the title only
 
     Substring matching, like every keyword list in this file, with the same
     caveat: a short word is a trap (docs/TECH_MATCHING.md).
+
+    `title_patterns` (task 0124) are regular expressions matched against the
+    title alone, each one that matches counting as a keyword: a role name
+    such as "AI engineer" is in most AI postings' text ("work with our AI
+    engineers") and says what the job is only in the title.
     """
+    title = " ".join((title or "").lower().split())
     total = 0
     detail = {}
     for spec in criteria.get("extra_signals") or []:
@@ -2179,6 +2186,8 @@ def _score_extra_signals(text: str, criteria: dict):
         if not name:
             continue
         positive = _matches(text, spec.get("keywords") or [])
+        positive += [f"title: {p}" for p in spec.get("title_patterns") or []
+                     if title and re.search(p, title)]
         negative = _matches(text, spec.get("negative_keywords") or [])
         raw = (len(positive) * (spec.get("points_per_keyword") or 0)
                + len(negative) * (spec.get("negative_points_per_keyword") or 0))
@@ -2884,7 +2893,7 @@ def score_vacancy(vacancy: dict, criteria: Optional[dict] = None, profile: Optio
     complexity_gate, complexity_bd = _score_role_complexity(text, vacancy.get("title") or "", criteria)
     legacy_points, legacy_bd = _score_legacy_enterprise(text, criteria)
     intensity_points, intensity_bd = _score_low_intensity(text, criteria)
-    extra_points, extra_bd = _score_extra_signals(text, criteria)
+    extra_points, extra_bd = _score_extra_signals(text, criteria, vacancy.get("title") or "")
     comp_points, comp_bd = _score_compensation(text, vacancy, criteria, profile)
     contractor_points, contractor_bd = _score_contractor_friendliness(text, criteria)
     reputation_points, reputation_bd, reputation_needs_review = _score_company_reputation(
