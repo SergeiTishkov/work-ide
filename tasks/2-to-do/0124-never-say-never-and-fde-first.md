@@ -37,4 +37,5 @@ in low_priority (70 first seen since 2026-11-01).
 
 ## Items
 - DONE - The class: scoring, listing, descriptions, clean-up, the app's labels; tests
-- TO DO - The SHARP identity's settings above, and the rescore of the base (no AI re-read)
+- DONE - The SHARP identity's settings above (2026-11-20). ENDGAME rescored with them, read-only: 48 (forward deployed +20, stack +14, AI-native +10, location +4), hot_lead by the scripts, waiting for the AI read
+- TO DO - The rescore of the base: the next rest run (no AI re-read; vacancies new to the top classes get their first read)

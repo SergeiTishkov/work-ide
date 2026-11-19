@@ -41,4 +41,4 @@ with its real score, in every market, and stays there on later runs.
 
 ## Items
 - DONE - The tool, the pick list, the selection rows, the app's section name; tests
-- TO DO - Add ENDGAME (4474971398) and queue its CV and cover letter
+- DONE - ENDGAME (4474971398) added 2026-11-20: description 3,231 characters, 8 points, listed under "Added by hand" in selection #101 in every market; its CV (task #301, 3 pages) and cover letter (#302, 1 page) generated
