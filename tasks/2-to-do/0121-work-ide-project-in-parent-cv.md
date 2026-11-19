@@ -1,7 +1,7 @@
 # 0121 Work IDE as an independent project in the parent CV
 
 Source: the owner, 2026-11-20
-Scope: documents (the owner's parent CV)
+Scope: other
 
 ## Business
 The parent CV lists independent projects (CHAD, the multi-agent framework)
