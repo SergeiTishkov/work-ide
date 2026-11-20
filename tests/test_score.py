@@ -530,6 +530,16 @@ def test_a_net_exporter_country_costs_points_but_is_not_excluded():
     assert r_exporter["score_breakdown"]["net_exporter_penalty"]["country"] == "India"
 
 
+def test_the_avoided_markets_are_not_taken_from_another_profile_with_the_same_id(monkeypatch):
+    """The cache is keyed by id(profile); an id freed by one profile can be
+    given to the next. An entry left by another object is not used."""
+    monkeypatch.setitem(score._AVOIDED_MARKETS_CACHE, id(PROFILE), ({"another": "profile"}, {}))
+    exporter = make_vacancy(location_raw="Bengaluru, India",
+                            description_text="C# ASP.NET SQL Server developer role.")
+    result = score.score_vacancy(exporter, CRITERIA, PROFILE)
+    assert result["score_breakdown"]["net_exporter_penalty"]["country"] == "India"
+
+
 def test_structured_location_worldwide_markers_pass():
     for loc in ["Anywhere in the World", "Anywhere", "100% Remote (Global)", "Worldwide"]:
         v = make_vacancy(

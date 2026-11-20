@@ -711,6 +711,9 @@ def _residency_eligibility(rl_bd: dict, dealbreakers: list, vacancy: dict,
     return ELIGIBILITY_UNKNOWN, "remote, but the employer never said from where"
 
 
+# id(profile) -> (profile, {normalized: name}). The profile is kept and
+# compared: an id may be reused for another profile once the first is freed
+# (task 0128).
 _AVOIDED_MARKETS_CACHE = {}
 
 
@@ -735,14 +738,15 @@ def _score_market_penalty(vacancy: dict, criteria: dict, profile: dict):
         return 0, {}
 
     key = id(profile)
-    if key not in _AVOIDED_MARKETS_CACHE:
+    cached = _AVOIDED_MARKETS_CACHE.get(key)
+    if cached is None or cached[0] is not profile:
         import markets as markets_mod
 
         names = markets_mod.avoided_countries(profile)
-        _AVOIDED_MARKETS_CACHE[key] = {
+        cached = _AVOIDED_MARKETS_CACHE[key] = (profile, {
             common.normalize_for_matching(n): n for n in names
-        }
-    avoided = _AVOIDED_MARKETS_CACHE[key]
+        })
+    avoided = cached[1]
     if not avoided:
         return 0, {}
 
