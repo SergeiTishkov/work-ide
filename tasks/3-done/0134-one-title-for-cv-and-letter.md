@@ -1,7 +1,7 @@
 # 0134 One title for the CV and the cover letter
 
 Source: the owner, 2026-11-20
-Scope: tools, prompts, docs
+Scope: tools, config, docs
 
 ## Business
 The owner, 2026-11-20: a CV's file name and the title inside it follow the
