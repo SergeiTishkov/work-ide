@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
   // page: { shown: { class: rows }, expanded: [class] }
   loadListing: (identity, view, page) => call('listing', identity, view, page || {}),
   classTotals: (identity, view) => call('class-totals', identity, view),
+  listedClasses: (identity) => call('listed-classes', identity),
   listingCounts: (identity, view) => call('counts', identity, view),
   listSources: (identity, view) => call('sources', identity, view),
   listCompanies: (identity, view) => call('companies', identity, view),

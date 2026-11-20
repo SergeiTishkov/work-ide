@@ -233,6 +233,7 @@ def record(vacancies: dict, state: Optional[dict] = None, kind: str = "run") -> 
         conn.executemany(INSERT_ITEMS, ((selection_id, *item) for item in items))
         write_source_sites(conn)
         write_company_kinds(conn)
+        write_listed_classes(conn, prefix)
     return selection_id
 
 
@@ -246,6 +247,37 @@ def write_source_sites(conn) -> None:
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (key, json.dumps(value, ensure_ascii=False, sort_keys=True)),
         )
+
+
+def listed_classes(criteria: dict) -> list:
+    """The classes the app lists for an identity (the owner, 2026-11-21, task
+    0137): the ones its criteria can put a row in. "Never say never" only
+    with its threshold (task 0124), "Hours not confirmed" only with an
+    engagement_fit that does not accept silence; the others always. The
+    app's own order decides how they are shown."""
+    import score
+
+    thresholds = criteria.get("classification_thresholds") or {}
+    classes = [HAND_CLASS, "hot_lead", "worth_a_look", "long_shot"]
+    if thresholds.get(score.NEVER_SAY_NEVER) is not None:
+        classes.append(score.NEVER_SAY_NEVER)
+    classes.append("ai_unscreened")
+    engagement = criteria.get("engagement_fit")
+    if engagement and engagement.get("unconfirmed_policy", "manual_check") != "accept":
+        classes.append("engagement_unconfirmed")
+    return classes
+
+
+def write_listed_classes(conn, prefix: str) -> None:
+    """listed_classes() of the identity, as meta "listed_classes:<prefix>",
+    for the app's "Identity fit" drop-down (it reads the database only)."""
+    import score
+
+    conn.execute(
+        "INSERT INTO meta (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (f"listed_classes:{prefix}", json.dumps(listed_classes(score.load_criteria()))),
+    )
 
 
 def write_company_kinds(conn) -> None:

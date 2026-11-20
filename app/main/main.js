@@ -145,6 +145,7 @@ function registerIpc(window) {
   handle('segments', (identity) => data.call('segments', identity));
   handle('listing', (identity, view, page) => data.call('listing', identity, view || {}, page || {}));
   handle('class-totals', (identity, view) => data.call('classTotals', identity, view || {}));
+  handle('listed-classes', (identity) => data.call('listedClasses', identity));
   handle('counts', (identity, view) => data.call('counts', identity, view || {}));
   handle('sources', (identity, view) => data.call('sources', identity, view || {}));
   handle('companies', (identity, view) => data.call('companies', identity, view || {}));

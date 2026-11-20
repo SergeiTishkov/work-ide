@@ -1045,6 +1045,27 @@ test('a class with nothing left stays listed and keeps its tick', async ({ page 
   await expect(page.getByTestId('fit-option-ai_unscreened')).toHaveAttribute('data-state', 'off');
 });
 
+// The owner, 2026-11-21 (task 0137): only the identity's own classes.
+test("the fit drop-down lists the identity's classes only, and any class that holds rows", async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.listedClasses = { sharp: ['added_by_hand', 'hot_lead', 'worth_a_look', 'long_shot', 'never_say_never', 'ai_unscreened'] };
+  await open(page, fixture);
+  await page.getByTestId('fit-filter').click();
+  const listed = await page.getByTestId('fit-filter-menu').locator('[role="option"][data-value]')
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.value));
+  expect(listed).toEqual(['added_by_hand', 'hot_lead', 'worth_a_look', 'long_shot', 'never_say_never', 'ai_unscreened']);
+  await expect(page.getByTestId('fit-option-engagement_unconfirmed')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // a class outside the list that holds a row is shown all the same
+  fixture.listedClasses = { sharp: ['hot_lead'] };
+  await open(page, fixture);
+  await page.getByTestId('fit-filter').click();
+  await expect(page.getByTestId('fit-option-hot_lead')).toBeVisible();
+  await expect(page.getByTestId('fit-option-worth_a_look')).toBeVisible();   // b1 is worth a look
+  await expect(page.getByTestId('fit-option-never_say_never')).toHaveCount(0);
+});
+
 test('one class chosen: the scroll brings ten more at a time', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 700 });
   await open(page, manyHotLeads(40));

@@ -526,6 +526,19 @@ test("each board's yield: every vacancy it brought, shortlisted now and applied 
   store.closeAll();
 });
 
+test("the identity's classes as the selection recorded them, null before (task 0137)", () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  db.prepare("INSERT INTO meta (key, value) VALUES ('listed_classes:test', ?)")
+    .run(JSON.stringify(['hot_lead', 'never_say_never']));
+  db.prepare("INSERT INTO meta (key, value) VALUES ('listed_classes:broken', 'not json')").run();
+  db.close();
+  assert.deepEqual(store.listedClasses('test'), ['hot_lead', 'never_say_never']);
+  assert.equal(store.listedClasses('broken'), null);
+  assert.equal(store.listedClasses('other'), null);
+  store.closeAll();
+});
+
 test('each board comes with its website when the selection recorded them', () => {
   const { store, file } = setup();
   const db = new DatabaseSync(file);

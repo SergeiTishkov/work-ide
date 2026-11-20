@@ -79,6 +79,14 @@ shown and the names hidden, not the names shown: with a shown-list, unticking
 one name would freeze the list, and every company a later run brings would be
 hidden.
 
+The "Identity fit" drop-down lists the classes the identity's criteria can
+put a row in (task 0137, the owner, 2026-11-21): "Never say never" only with
+its threshold, "Hours not confirmed" only with an `engagement_fit` that does
+not accept silence. Every selection writes them to meta
+`listed_classes:<prefix>` (`selections.listed_classes`); a class outside them
+that still holds rows is listed all the same, and with no meta row yet every
+class is.
+
 Every option of the drop-downs is listed whatever it holds (task 0133, the
 owner, 2026-11-20): a board, class, company kind or intermediary the other
 drop-downs leave empty stays, with 0, and keeps its tick. Until then an empty
