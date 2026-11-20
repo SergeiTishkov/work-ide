@@ -138,13 +138,15 @@ FILLED_FACTS = ("salary_raw", "employment_types", "workplace_type", "posted_at",
                 "apply_url", "company_url", "location_raw", "tags")
 
 
-def _filled(record: dict) -> tuple:
-    """How well a copy is filled, best first when sorted: the person's own
-    answer on it, a text long enough to have been read, the facts it has, the
-    length of its text, the earliest seen. Nothing the scoring or the model
-    made of it."""
+def _filled(record: dict, paid: frozenset = frozenset()) -> tuple:
+    """How well a copy is filled, best first when sorted: a free board before
+    a paid one (`paid`, the catalogue's paid boards), the person's own answer
+    on it, a text long enough to have been read, the facts it has, the length
+    of its text, the earliest seen. Nothing the scoring or the model made of
+    it."""
     text = len(record.get("description_text") or "")
     return (
+        record.get("source") in paid,
         not record.get("_feedback"),
         text < score.TEXT_READ_MIN_CHARS,
         -sum(1 for key in FILLED_FACTS if record.get(key)),
@@ -158,7 +160,8 @@ def mark_duplicates(vacancies: dict) -> int:
     practice: We Work Remotely sometimes returns one post under two different
     URLs, and LinkedIn posts one job once for each country. Records count as
     duplicates only on an EXACT match of the normalised (company, title) pair.
-    The canonical record is the best-filled copy (_filled); the rest get a
+    The canonical record is a free board's copy when there is one, then the
+    best-filled copy (_filled); the rest get a
     top-level "duplicate_of" field and drop out of the report, the description
     fetch, the link check and the AI read: only the canonical is worked on.
 
@@ -169,6 +172,17 @@ def mark_duplicates(vacancies: dict) -> int:
     refused; neither showed (Deel, Doit, 2026-10-21). Copies hardly differ in
     reach: of 918 groups with two read copies, 849 had the same location
     verdict, and the other 69 differed in the location field only.
+
+    The owner, 2026-11-20 (task 0130): a free board's copy is the canonical
+    one ahead of everything else, the person's answer included. A paid board
+    (`paid: true` in the catalogue) takes no application without payment;
+    the owner applies through the free board or finds the company's own page
+    from it. Measured that day, SHARP: 21 groups had a paid canonical copy
+    and a free twin (19 on We Work Remotely, 2 on RemoteOK; the free copies
+    on LinkedIn, 4dayweek, Working Nomads, Remotive, an ATS board, an RSS
+    board); none of the 21 was answered.
+    A paid copy the person answered loses to a free twin: the free copy shows
+    without the answer.
 
     Note: fuzzy title comparison is deliberately NOT used. On real data it
     produced serious false positives — "Software Engineer - Manchester" and
@@ -193,11 +207,12 @@ def mark_duplicates(vacancies: dict) -> int:
         )
         by_key.setdefault(key, []).append(vid)
 
+    paid = frozenset(common.paid_sources())
     marked = 0
     for ids in by_key.values():
         if len(ids) < 2:
             continue
-        ids.sort(key=lambda vid: (_filled(vacancies[vid]), vid))
+        ids.sort(key=lambda vid: (_filled(vacancies[vid], paid), vid))
         canonical = ids[0]
         for vid in ids[1:]:
             vacancies[vid]["duplicate_of"] = canonical
