@@ -14,6 +14,12 @@ asked for, ran as a plain `pipeline.py --ai` and read nothing ("considered
 restarted by hand (`schtasks /End`, `/Run`), and the re-read ran again as
 task 65.
 
+Again on 2026-11-20: the background worker (since 2026-11-12) and the
+desktop worker (since 2026-11-17) predate `{"read": true}` for `links`
+(task 0129) and `{"staged": true}` for `linkedin` (task 0135). The backlog
+read (#303) would have run as a plain link check and was stopped; the
+merge of the kept LinkedIn fetch waits for a restart (emergency.md).
+
 The pipeline itself starts as a new process for each task and runs the
 current code; only what the worker computes in its own process is stale.
 
