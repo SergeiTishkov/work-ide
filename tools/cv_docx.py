@@ -499,42 +499,6 @@ def _link(paragraph, value: str, target, lay: dict, size: float = None) -> None:
     paragraph._p.append(link)
 
 
-def plain_text(content: dict) -> str:
-    """The CV as plain text, in the order it is printed: for the fact check
-    and for the length estimate."""
-    lines: List[str] = [content.get("name", ""), content.get("headline", ""), content.get("tagline", ""),
-                        content.get("location", "")]
-    lines += [f"{c.get('label', '')}: {c.get('value', '')}" for c in content.get("contacts") or []]
-    lines += list(content.get("summary") or [])
-    lines += [f"{g.get('category', '')}: {', '.join(g.get('items') or [])}" for g in content.get("skills") or []]
-    jobs: List[str] = []
-    for job in content.get("experience") or []:
-        jobs += [f"{job.get('title', '')}, {job.get('company', '')}\t{job.get('dates', '')}",
-                 job.get("context", "")]
-        jobs += [bullet_text(b) for b in job.get("bullets") or []]
-        if job.get("tech_stack"):
-            jobs.append("Technologies: " + " · ".join(job["tech_stack"]))
-    projects = projects_of(content)
-    part: List[str] = []
-    if projects["form"] == "full":
-        for project in projects["items"]:
-            part += [f"{project.get('title', '')}\t{project.get('link', '')}", project.get("intro", "")]
-            part += [bullet_text(b) for b in project.get("bullets") or []]
-            if project.get("tech_stack"):
-                part.append("Technologies: " + " · ".join(project["tech_stack"]))
-            part += [f"{e.get('label', '')}: {' · '.join(e.get('items') or [])}"
-                     for e in project.get("extra_lines") or []]
-    elif projects["form"] == "compact":
-        part += [bullet_text(b) for b in projects["compact"].get("bullets") or []]
-        if projects["compact"].get("tech_stack"):
-            part.append("Technologies: " + " · ".join(projects["compact"]["tech_stack"]))
-    lines += part + jobs if projects["placement"] == "before_experience" else jobs + part
-    for section in content.get("sections") or []:
-        lines.append(section.get("heading", ""))
-        lines += list(section.get("lines") or [])
-    return "\n".join(line for line in lines if line)
-
-
 def iter_terms(content: dict) -> Iterable[str]:
     """Every skill and technology entry: the claims the fact check matches
     against the source CV one by one."""

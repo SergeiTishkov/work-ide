@@ -379,12 +379,6 @@ def page_facts(body: str) -> dict:
     return facts
 
 
-def _fetch_description(url: str, timeout: int) -> str:
-    """The full vacancy text. Kept as the narrow entry point for callers that
-    want nothing else; the work happens in fetch_page_facts."""
-    return fetch_page_facts(url, timeout)["description"]
-
-
 class _Pacer:
     """The pause between two search pages: PAUSE_SECONDS while LinkedIn
     answers, doubled by each 429 up to MAX_PAUSE_SECONDS, and back down by

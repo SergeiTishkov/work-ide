@@ -93,7 +93,6 @@ ALLOWED_TOOLS = [
 ]
 VACANCY_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 PROGRESS_LINE = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
-CLEAN_FILTERS = ("ages", "statuses", "classes")
 INSTRUCTIONS_LIMIT = 8000
 
 
@@ -274,15 +273,8 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
         return Command([python, tool("pipeline.py"), "--identity", _identity(task), *mode], map_line=pipeline_line)
     if kind == "clean":
         argv = [python, tool("cleanup.py"), "--identity", _identity(task), "--json"]
-        for name in CLEAN_FILTERS:
-            values = args.get(name) or []
-            if not isinstance(values, list) or not all(isinstance(v, str) and re.match(r"^[a-z_]+$", v)
-                                                       for v in values):
-                raise ValueError(f"invalid {name}: {values!r}")
-            if values:
-                argv += [f"--{name}", *values]
-        if argv[-1] == "--json":
-            raise ValueError("a clean-up names at least one filter")
+        for name, values in taskq.clean_filters(args).items():
+            argv += [f"--{name}", *values]
         return Command(argv, result_json=True)
     if kind in ("cv", "letter"):
         script = "cv_tailor.py" if kind == "cv" else "cover_letter.py"

@@ -762,43 +762,6 @@ def _score_market_penalty(vacancy: dict, criteria: dict, profile: dict):
     return 0, {}
 
 
-_TARGET_MARKETS_CACHE = {}
-
-
-def _target_market_of(vacancy: dict, profile: dict):
-    """The vacancy's target market, or None.
-
-    The board tag comes first (`market:United Kingdom` — the LinkedIn
-    fetcher records the country it queried, which is a fact rather than a
-    guess), then a country name in the location field.
-    """
-    if not profile:
-        return None
-    key = id(profile)
-    if key not in _TARGET_MARKETS_CACHE:
-        import markets as markets_mod
-
-        names = markets_mod.target_locations(profile)
-        _TARGET_MARKETS_CACHE[key] = (
-            set(names),
-            {common.normalize_for_matching(n): n for n in names},
-        )
-    names, normalized = _TARGET_MARKETS_CACHE[key]
-    if not names:
-        return None
-
-    for tag in vacancy.get("tags") or []:
-        tag = str(tag)
-        if tag.startswith("market:") and tag[7:] in names:
-            return tag[7:]
-
-    loc = common.normalize_for_matching(vacancy.get("location_raw") or "")
-    for needle, name in normalized.items():
-        if needle and needle in loc:
-            return name
-    return None
-
-
 def _check_header_hiring_scope(vacancy: dict, criteria: dict):
     """A structured header INSIDE the description (WeWorkRemotely prepends a
     "Headquarters: … / URL: …" block). Returns (is_restricted, detail).

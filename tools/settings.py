@@ -62,9 +62,6 @@ import common  # noqa: E402
 
 LAYER_ORDER = ("defaults", "template", "local")
 
-DELETED = object()
-
-
 class FrozenSettingError(Exception):
     """An upper layer tried to change a key that must not change."""
 

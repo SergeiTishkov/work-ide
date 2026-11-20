@@ -41,6 +41,14 @@ def test_the_age_is_the_posted_date_else_the_first_sighting(posted, seen, band):
     assert cleanup.age_band(posted, seen, TODAY) == band
 
 
+def test_today_is_the_date_the_app_counts_ages_from():
+    """The app's AGE counts from SQLite's date('now'), a UTC date; a local
+    date put a vacancy in another band for the hours around midnight."""
+    import sqlite3
+    sqlite_today = sqlite3.connect(":memory:").execute("SELECT date('now')").fetchone()[0]
+    assert cleanup.utc_today() == date.fromisoformat(sqlite_today)
+
+
 def test_old_ones_go_but_the_funnel_and_unread_feedback_stay(isolated_data_dir):
     both = lambda status="new", cls="hot_lead", reviewed=None: {
         "sharp": (status, cls, reviewed), "partsharp": ("new", "rejected", None)}

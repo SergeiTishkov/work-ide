@@ -32,8 +32,6 @@ FEED_URLS = [
     "https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss",
     "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss",
 ]
-FEED_URL = FEED_URLS[0]  # backwards compatibility for existing callers
-
 # The namespace WWR mixes into some elements (content:encoded and the like)
 _NS = {"content": "http://purl.org/rss/1.0/modules/content/"}
 

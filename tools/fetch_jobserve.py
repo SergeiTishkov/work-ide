@@ -62,7 +62,6 @@ _SHID_RE = re.compile(r"shid=([A-Z0-9]+)")
 _ITEM_RE = re.compile(
     r'<div class="jobListItem[^"]*" id="([A-Z0-9]+)">([\s\S]*?)(?=<div class="jobListItem|<div class="jobListingPaging|\Z)')
 _TITLE_RE = re.compile(r'<a href="([^"]+)"[^>]*class="jobListPosition"[^>]*>([\s\S]*?)</a>')
-_TITLE_ALT_RE = re.compile(r'class="jobListPosition"[^>]*>([\s\S]*?)</a>')
 _DETAIL_RE = re.compile(
     r'<span id="summ(location|rate|type)"[^>]*>([\s\S]*?)</span>')
 _AGENCY_RE = re.compile(
