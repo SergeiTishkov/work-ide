@@ -381,6 +381,7 @@
   'action.undo': 'undo',
   'action.hide': 'hide',
 
+  'reason.applied': 'Anything to remember about this application? (optional)',
   'reason.rejected': 'Why not for you? (optional)',
   'reason.bugged': 'What is wrong with the pick? (optional)',
   'reason.save': 'Save',

@@ -46,6 +46,7 @@ def _mark(vid, status, selection_id=None, reason="because"):
             "identity": db.identity(), "id": vid, "status": status,
             "rejected_reason": reason if status == "rejected" else None,
             "bugged_reason": reason if status == "bugged" else None,
+            "applied_comment": reason if status == "applied" else None,
             "at": db.now_iso(), "selection_id": selection_id,
         })
 
@@ -123,3 +124,33 @@ def test_the_agents_reject_is_a_reviewed_not_for_me(isolated_data_dir):
             "WHERE identity_id = 'ftf' AND vacancy_id = 'a'").fetchone()
     assert row == ("rejected", "on-site in Lyon, says the page", sel, 1)
     assert feedback.count() == {"bugged": 0, "rejected": 0}
+
+
+def test_applications_come_with_what_was_written_and_stay_out_of_the_review(isolated_data_dir, capsys):
+    """The applied comment (task 0131) is read back for the cover letter; it
+    is not a reason about the vacancy, so no review package carries it."""
+    sel = _setup({"a": "new", "b": "new", "c": "new", "r": "new"})
+    _mark("a", "applied", sel, reason="Q: notice period? A: one month")
+    _mark("b", "applied", sel, reason=None)
+    _mark("r", "rejected", sel, reason="too far")
+    with db.session() as conn:
+        conn.execute("UPDATE vacancy_identity SET applied_at = '2026-01-01T00:00:00+00:00' "
+                     "WHERE identity_id = 'ftf' AND vacancy_id = 'b'")
+
+    items = feedback.applied_items()
+    assert [(it["id"], it["applied_comment"]) for it in items] == [
+        ("a", "Q: notice period? A: one month"), ("b", None)]
+    assert items[0]["status"] == "applied" and items[0]["title"] == "Developer a"
+    assert [it["id"] for it in feedback.applied_items(["b", "c"])] == ["b"]
+
+    assert [it["id"] for it in feedback.pending_items()] == ["r"]
+    assert "one month" not in yaml.safe_dump(feedback.build_package(feedback.pending_items()))
+
+    args = feedback.build_parser().parse_args(["applied", "--id", "a"])
+    args.func(args)
+    printed = yaml.safe_load(capsys.readouterr().out)
+    assert [it["applied_comment"] for it in printed["applied"]] == ["Q: notice period? A: one month"]
+
+
+def test_no_applications_without_a_base(isolated_data_dir):
+    assert feedback.applied_items() == []

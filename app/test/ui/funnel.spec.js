@@ -108,7 +108,8 @@ test('the timeline: dated steps, empty ones plain, commented ones accordions', a
   const applied = card.getByTestId('entry-applied');
   await expect(applied.getByTestId('entry-date')).toHaveText('30 Sep 2026');
   await expect(applied.getByTestId('entry-label')).toHaveText(en['timeline.applied']);
-  await expect(applied.getByTestId('entry-edit')).toHaveCount(0);
+  await expect(applied.getByTestId('entry-toggle')).toHaveCount(0);   // no applied comment: a plain line
+  await expect(applied.getByTestId('entry-edit')).toBeVisible();
 
   const contact = card.getByTestId('entry-contact');
   await expect(contact.getByTestId('entry-date')).toHaveText('01 Oct 2026');
@@ -127,6 +128,26 @@ test('the timeline: dated steps, empty ones plain, commented ones accordions', a
   const second = card.getByTestId('entry-interview-1');
   await expect(second.getByTestId('entry-label')).toHaveText(en['timeline.interview'].replace('{n}', '2'));
   await expect(second.getByTestId('entry-toggle')).toHaveCount(0);
+});
+
+test('the applied comment is the applied step\'s accordion, editable like the others', async ({ page }) => {
+  const fixture = standardFixture();
+  inFunnel(fixture, 'p1', {
+    status: 'contacted', at: CONTACT_AT, appliedAt: APPLIED_AT, appliedComment: 'Notice period: one month',
+    contactAt: CONTACT_AT, contactComment: '',
+  });
+  await open(page, fixture);
+  await choose(page, 'filter', 'contacted');
+  const applied = byId(page, 'p1').getByTestId('entry-applied');
+  await expect(applied.getByTestId('entry-comment')).toHaveCount(0);   // closed at first
+  await applied.getByTestId('entry-toggle').click();
+  await expect(applied.getByTestId('entry-comment')).toHaveText('Notice period: one month');
+  await applied.getByTestId('entry-edit').click();
+  await applied.getByTestId('entry-input').fill('');
+  await applied.getByTestId('entry-save').click();
+  expect(await calls(page, 'editComment')).toEqual([['sharp', 'p1', 'applied', null, '']]);
+  await expect(applied.getByTestId('entry-toggle')).toHaveCount(0);   // emptied: a plain line again
+  await expect(byId(page, 'p1').getByTestId('status-badge')).toHaveText(en['status.contacted']);
 });
 
 test('Ctrl+Enter saves a step comment and an edited one, as "Save" does', async ({ page }) => {

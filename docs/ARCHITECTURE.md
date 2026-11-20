@@ -1452,6 +1452,28 @@ the menu. Later that day Refresh left the menu again (task 0058): a button of
 its own in the top bar, left of the theme and language pickers and the same
 size, with the same ring-arrow icon.
 
+### A comment on "Applied" (2026-11-20, task 0131)
+
+"Applied" takes an optional text, the way "Not for me" and "Wrong pick"
+take a reason: one click opens the form under the card, a second click on
+the same button within 500 ms (`DOUBLE_CLICK_MS`) or "Save" or Ctrl+Enter
+records the application with whatever is typed. The owner writes there what
+application forms ask of them (the screening questions and their answers);
+it is meant for the cover letter later. It is stored in
+`vacancy_identity.applied_comment` (schema version 12; NULL when nothing was
+written, unlike the funnel steps' `''`), shown as the comment of the timeline's
+"Applied" step and edited there with the pencil (editing it changes no
+date). Undo of the application clears it, as going back to "new" does; undo
+of a later step keeps it. `python tools/feedback.py --identity <p> applied
+[--id X]` prints the applications with it (`feedback.applied_items()`).
+
+It is not a reason about the vacancy, so it stays out of what judges
+vacancies: no review package of `tools/feedback.py` and no AI screening
+brief (`tools/ai_brief.py` reads the rejected and bugged reasons only).
+`tools/merge_shared_base.py` does not carry it: it reads the version-7 files,
+which never had the column.
+
+
 ### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)
 
 When eligibility became its own axis, sections were sorted by it first and by

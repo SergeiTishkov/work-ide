@@ -362,6 +362,8 @@ function installMockApi(fixture) {
         status,
         at: NOW,
         appliedAt: status === 'applied' ? NOW : null,
+        // as the store keeps it: trimmed, null when nothing was written
+        appliedComment: status === 'applied' && reason && reason.trim() ? reason.trim() : null,
         rejectedReason: status === 'rejected' ? reason : null,
         buggedReason: status === 'bugged' ? reason : null,
         interviewComments: [],

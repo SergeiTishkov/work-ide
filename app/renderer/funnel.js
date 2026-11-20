@@ -4,14 +4,17 @@
 // A plain script, like the locale: it loads in Electron, a browser and node.
 //
 // A record is the feedback of one vacancy:
-//   { status, at, rejectedReason, buggedReason, appliedAt,
+//   { status, at, rejectedReason, buggedReason, appliedAt, appliedComment,
 //     contactComment, contactAt, interviewComments[], interviewAt[],
 //     finalComment, finalAt, offerComment, offerAt,
 //     offeredComment, offeredAt, startedComment, startedAt,
 //     declinedComment, declinedAt }
 // ("offer" is the wait for the offer; "offered" is the offer itself.)
 // A step that happened keeps a comment that is never null: '' means it
-// happened and nothing was written about it.
+// happened and nothing was written about it. The one exception is
+// appliedComment, written with "Applied" itself: null when nothing was
+// written (the person's answers to the application form, for the cover
+// letter; not a reason about the vacancy).
 (function (root, factory) {
   const value = factory();
   if (typeof module === 'object' && module.exports) module.exports = value;
@@ -135,6 +138,7 @@
       default:   // applied, rejected, bugged, expired: back to no feedback
         back.status = 'new';
         back.appliedAt = null;
+        back.appliedComment = null;
         back.rejectedReason = null;
         back.buggedReason = null;
     }
@@ -144,6 +148,7 @@
 
   // Rewrites one comment. A negative reason left empty is no reason (null) and
   // editing it dates the feedback anew, so /feedback reviews the new words.
+  // The applied comment left empty is null too; editing it moves no date.
   function editComment(record, kind, index, text, now) {
     const next = copy(record);
     const value = text == null ? '' : String(text);
@@ -153,7 +158,10 @@
     else if (kind === 'offered') next.offeredComment = value;
     else if (kind === 'started') next.startedComment = value;
     else if (kind === 'declined') next.declinedComment = value;
-    else if (kind === 'interview') {
+    else if (kind === 'applied') {
+      if (!appliedAtOf(record)) throw new Error('the vacancy was not applied to');
+      next.appliedComment = value.trim() ? value : null;
+    } else if (kind === 'interview') {
       if (!(index >= 0 && index < next.interviewComments.length)) {
         throw new Error(`no interview ${index}`);
       }
@@ -168,13 +176,19 @@
     return next;
   }
 
+  // When the application was made; null when there was none.
+  function appliedAtOf(record) {
+    if (record.status === 'new') return null;
+    return record.appliedAt || (record.status === 'applied' ? record.at : null);
+  }
+
   // The steps to show under a vacancy, in order, each with its date:
   // { kind, index?, at, comment (null when the step has none), editable }.
   function timeline(record) {
     const steps = [];
-    const appliedAt = record.appliedAt || (record.status === 'applied' ? record.at : null);
-    if (appliedAt && record.status !== 'new') {
-      steps.push({ kind: 'applied', at: appliedAt, comment: null, editable: false });
+    const appliedAt = appliedAtOf(record);
+    if (appliedAt) {
+      steps.push({ kind: 'applied', at: appliedAt, comment: record.appliedComment ?? '', editable: true });
     }
     if (record.contactAt) {
       steps.push({ kind: 'contact', at: record.contactAt, comment: record.contactComment ?? '', editable: true });

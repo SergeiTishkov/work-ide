@@ -53,6 +53,7 @@ OLD_SCHEMA_VERSION = "7"
 NOT_FACTS = (*db.PER_IDENTITY_KEYS, *db.TRANSIENT_KEYS, "manual")
 
 # vacancy_identity columns copied as they are from the old `vacancies` row.
+# applied_comment (version 12) is not among them: version 7 had no such column.
 CARRIED_COLUMNS = (
     "view", "views", "feedback_status", "rejected_reason", "bugged_reason", "feedback_at",
     "applied_at", "contact_comment", "contact_at", "interview_comments", "interview_at",

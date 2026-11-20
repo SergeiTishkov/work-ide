@@ -27,6 +27,7 @@
 --
 -- VERSIONS. 1-7: one file per identity (see git history). 8: one base for
 -- every identity — tools/merge_shared_base.py built it from the old files.
+-- 9-12: tools/db.py MIGRATIONS (12: vacancy_identity.applied_comment).
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -86,6 +87,11 @@ CREATE TABLE IF NOT EXISTS vacancy_identity (
   -- person wrote nothing. The interviews are JSON arrays, one entry each —
   -- their number is the number of interviews; the dates run parallel.
   applied_at            TEXT,
+  -- What the person wrote when they applied (version 12, task 0131): their
+  -- answers to the application form's own questions, kept for the cover
+  -- letter. NULL when nothing was written. Not a reason about the vacancy:
+  -- tools/ai_brief.py does not read it.
+  applied_comment       TEXT,
   contact_comment       TEXT,
   contact_at            TEXT,
   interview_comments    TEXT,

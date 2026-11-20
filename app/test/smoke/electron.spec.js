@@ -86,6 +86,20 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     db.close();
     expect({ ...row }).toEqual({ feedback_status: 'bugged', bugged_reason: 'onsite in fact' });
 
+    // "Applied" with a comment: written to applied_comment, not to a reason (task 0131)
+    await window.getByTestId('vacancy-new1').getByTestId('btn-applied').click();
+    await window.getByTestId('vacancy-new1').getByTestId('reason-input').fill('Q: notice period? A: one month');
+    await window.getByTestId('vacancy-new1').getByTestId('reason-save').click();
+    await expect(window.getByTestId('stub-new1')).toBeVisible();
+    const appliedDb = new DatabaseSync(repo.database);
+    const applied = appliedDb.prepare('SELECT feedback_status, applied_comment, rejected_reason, bugged_reason '
+      + "FROM vacancy_identity WHERE identity_id = 'sharp' AND vacancy_id = ?").get('new1');
+    appliedDb.close();
+    expect({ ...applied }).toEqual({
+      feedback_status: 'applied', applied_comment: 'Q: notice period? A: one month',
+      rejected_reason: null, bugged_reason: null,
+    });
+
     await window.getByTestId('menu-button').click();
     // "Collect" adds a collection to the task queue (tools/taskq.py): the
     // top, LinkedIn, the rest of the base after both, a CV/CL batch after

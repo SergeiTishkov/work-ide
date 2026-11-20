@@ -106,7 +106,7 @@ test('the timeline lists every step in order, with its date and comment', () => 
   r = F.advance(r, 'interview', 'went well', T3);
   r = F.advance(r, 'awaiting_final', '', T4);
   assert.deepEqual(F.timeline(r), [
-    { kind: 'applied', at: T1, comment: null, editable: false },
+    { kind: 'applied', at: T1, comment: '', editable: true },
     { kind: 'contact', at: T2, comment: '', editable: true },
     { kind: 'interview', index: 0, at: T3, comment: 'went well', editable: true },
     { kind: 'final', at: T4, comment: '', editable: true },
@@ -121,7 +121,31 @@ test('the timeline shows a negative answer with its reason, and nothing for a ne
     [{ kind: 'expired', at: T2, comment: null, editable: false }]);
   // Applied before the funnel had dates: the answer's own date stands in.
   assert.deepEqual(F.timeline({ status: 'applied', at: T2 }),
-    [{ kind: 'applied', at: T2, comment: null, editable: false }]);
+    [{ kind: 'applied', at: T2, comment: '', editable: true }]);
+});
+
+test('the applied comment: shown and edited on the applied step, null when empty, never re-dated', () => {
+  const r = { ...applied(), appliedComment: 'Notice period: one month' };
+  assert.deepEqual(F.timeline(r)[0], { kind: 'applied', at: T1, comment: 'Notice period: one month', editable: true });
+  const later = F.advance(r, 'contacted', '', T2);
+  assert.equal(F.timeline(later)[0].comment, 'Notice period: one month', 'the next steps keep it');
+
+  const edited = F.editComment(later, 'applied', null, 'Salary asked: 5000', T4);
+  assert.equal(edited.appliedComment, 'Salary asked: 5000');
+  assert.equal(edited.at, T2, 'editing it does not re-date the feedback');
+  assert.equal(edited.status, 'contacted');
+  assert.equal(F.editComment(later, 'applied', null, '  \n ', T4).appliedComment, null);
+  assert.throws(() => F.editComment({ status: 'new', at: null }, 'applied', null, 'x', T4));
+  assert.throws(() => F.editComment({ status: 'rejected', at: T1, rejectedReason: null }, 'applied', null, 'x', T4));
+});
+
+test('undo of the application forgets its comment; undo of a later step keeps it', () => {
+  const r = { ...applied(), appliedComment: 'Visa: not needed' };
+  const contacted = F.advance(r, 'contacted', '', T2);
+  assert.equal(F.stepBack(contacted, T3).appliedComment, 'Visa: not needed');
+  const back = F.stepBack(r, T3);
+  assert.equal(back.status, 'new');
+  assert.equal(back.appliedComment, null);
 });
 
 test('after the final resolution, the offer; and a no can come at any step', () => {

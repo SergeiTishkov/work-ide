@@ -173,7 +173,7 @@ candidates AS (
 ),
 joined AS (
   SELECT c.*, v.view, v.views, v.feedback_status, v.rejected_reason, v.bugged_reason,
-         v.feedback_at, v.applied_at, v.contact_comment, v.contact_at,
+         v.feedback_at, v.applied_at, v.applied_comment, v.contact_comment, v.contact_at,
          v.interview_comments, v.interview_at, v.final_comment, v.final_at,
          v.awaiting_offer_comment, v.awaiting_offer_at, v.declined_comment, v.declined_at,
          v.offered_comment, v.offered_at, v.started_comment, v.started_at,
@@ -245,7 +245,7 @@ ranked AS (
   FROM matched
 )
 SELECT vacancy_id, class, score, eligibility_rank, fresh, view, views, feedback_status,
-       rejected_reason, bugged_reason, feedback_at, applied_at, contact_comment,
+       rejected_reason, bugged_reason, feedback_at, applied_at, applied_comment, contact_comment,
        contact_at, interview_comments, interview_at, final_comment, final_at,
        awaiting_offer_comment, awaiting_offer_at, declined_comment, declined_at,
        offered_comment, offered_at, started_comment, started_at
@@ -394,8 +394,10 @@ ORDER BY id DESC
 LIMIT 1;
 
 -- name: set_feedback
--- The first answer on a vacancy. "applied" dates the start of the funnel;
--- going back to "new" forgets everything the funnel recorded.
+-- The first answer on a vacancy. "applied" dates the start of the funnel and
+-- keeps what the person wrote about the application (:applied_comment, NULL
+-- for any other status); going back to "new" forgets everything the funnel
+-- recorded.
 UPDATE vacancy_identity
 SET feedback_status = :status,
     rejected_reason = :rejected_reason,
@@ -404,6 +406,8 @@ SET feedback_status = :status,
     feedback_selection_id = :selection_id,
     applied_at = CASE WHEN :status = 'applied' THEN :at
                       WHEN :status = 'new' THEN NULL ELSE applied_at END,
+    applied_comment = CASE WHEN :status = 'applied' THEN :applied_comment
+                           WHEN :status = 'new' THEN NULL ELSE applied_comment END,
     contact_comment    = CASE WHEN :status = 'new' THEN NULL ELSE contact_comment END,
     contact_at         = CASE WHEN :status = 'new' THEN NULL ELSE contact_at END,
     interview_comments = CASE WHEN :status = 'new' THEN NULL ELSE interview_comments END,
@@ -421,7 +425,7 @@ SET feedback_status = :status,
 WHERE identity_id = :identity AND vacancy_id = :id;
 
 -- name: vacancy_progress
-SELECT vacancy_id AS id, feedback_status, feedback_at, rejected_reason, bugged_reason, applied_at, contact_comment, contact_at, interview_comments, interview_at, final_comment, final_at,
+SELECT vacancy_id AS id, feedback_status, feedback_at, rejected_reason, bugged_reason, applied_at, applied_comment, contact_comment, contact_at, interview_comments, interview_at, final_comment, final_at,
        awaiting_offer_comment, awaiting_offer_at, declined_comment, declined_at,
        offered_comment, offered_at, started_comment, started_at
 FROM vacancy_identity WHERE identity_id = :identity AND vacancy_id = :id;
@@ -431,7 +435,8 @@ FROM vacancy_identity WHERE identity_id = :identity AND vacancy_id = :id;
 UPDATE vacancy_identity
 SET feedback_status = :status, feedback_at = :at,
     rejected_reason = :rejected_reason, bugged_reason = :bugged_reason,
-    applied_at = :applied_at, contact_comment = :contact_comment, contact_at = :contact_at,
+    applied_at = :applied_at, applied_comment = :applied_comment,
+    contact_comment = :contact_comment, contact_at = :contact_at,
     interview_comments = :interview_comments, interview_at = :interview_at,
     final_comment = :final_comment, final_at = :final_at,
     awaiting_offer_comment = :awaiting_offer_comment, awaiting_offer_at = :awaiting_offer_at,

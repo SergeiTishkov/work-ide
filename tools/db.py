@@ -39,7 +39,7 @@ import common  # noqa: E402
 
 # 8: one base for every identity. The per-identity files of versions 1-7 are
 # not upgraded in place: tools/merge_shared_base.py merged them once.
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 SCHEMA_PATH = common.ROOT / "schemas" / "db.sql"
 
 # How long a writer waits for another writer's transaction before giving up.
@@ -122,9 +122,18 @@ def _to_11(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE identities ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
 
 
+def _to_12(conn: sqlite3.Connection) -> None:
+    """What the person wrote when they applied (2026-11-20, task 0131):
+    vacancy_identity.applied_comment. Earlier applications have NULL."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(vacancy_identity)")}
+    if "applied_comment" not in columns:
+        with conn:
+            conn.execute("ALTER TABLE vacancy_identity ADD COLUMN applied_comment TEXT")
+
+
 # version reached -> the step that reaches it. Version 8 started the shared
 # base afresh.
-MIGRATIONS: dict = {9: _to_9, 10: _to_10, 11: _to_11}
+MIGRATIONS: dict = {9: _to_9, 10: _to_10, 11: _to_11, 12: _to_12}
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:

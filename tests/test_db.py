@@ -287,3 +287,26 @@ def test_version_11_gives_every_identity_the_active_flag_on(isolated_data_dir):
     with db.session() as conn:
         rows = conn.execute("SELECT id, active FROM identities").fetchall()
     assert rows == [(db.identity(), 1)]
+
+
+def test_version_12_gives_the_applications_an_empty_comment(isolated_data_dir):
+    kb.save_vacancies({"a1": _vacancy("a1")})
+    _set_feedback("a1", "applied")
+    with db.session() as conn:
+        # The table as version 11 made it (SQLite 3.34 has no DROP COLUMN).
+        kept = ", ".join(row[1] for row in conn.execute("PRAGMA table_info(vacancy_identity)")
+                         if row[1] != "applied_comment")
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute(f"CREATE TABLE vacancy_identity_11 AS SELECT {kept} FROM vacancy_identity")
+        conn.execute("DROP TABLE vacancy_identity")
+        conn.execute("ALTER TABLE vacancy_identity_11 RENAME TO vacancy_identity")
+        conn.execute("UPDATE meta SET value = '11' WHERE key = 'schema_version'")
+    kb.load_vacancies()
+    with db.session() as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(vacancy_identity)")}
+        version = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()[0]
+        row = conn.execute("SELECT feedback_status, applied_comment FROM vacancy_identity "
+                           "WHERE identity_id = 'ftf' AND vacancy_id = 'a1'").fetchone()
+    assert "applied_comment" in columns
+    assert version == "12" == str(db.SCHEMA_VERSION)
+    assert row == ("applied", None)

@@ -15,6 +15,7 @@ database by hand:
     python tools/feedback.py --identity sharp mark-reviewed --id X --id Y \\
         --outcome "role gate now rejects 'Java' titles; test added"
     python tools/feedback.py --identity sharp reject --id X --reason "on-site in Lyon"
+    python tools/feedback.py --identity sharp applied [--id X]   # the applications
 
 A package (data/identities/<prefix>/feedback/pending_<time>.yaml) holds everything a
 diagnosis needs: the person's words, what the vacancy looked like, why the
@@ -22,6 +23,12 @@ scorer let it through (the full score breakdown), the class and score when
 the feedback was given next to the class and score now, and a summary of what
 the pending items have in common. One shared cause is worth more than a patch
 per vacancy, so the summary comes first.
+
+`applied` prints the vacancies applied to with what the person wrote when
+applying (vacancy_identity.applied_comment: the application form's own
+questions and their answers), for the cover letter. That comment is not a
+reason about the vacancy: it is in no review package, and tools/ai_brief.py
+does not read it.
 
 This script writes vacancy_identity.feedback_reviewed_at, and — through
 `reject` only — the agent's own "not for me" (see reject()).
@@ -237,6 +244,39 @@ def reject(vid: str, reason: str) -> bool:
             (reason.strip() or None, at, latest, at, db.identity(), vid)).rowcount == 1
 
 
+def applied_items(ids: Optional[list] = None) -> list:
+    """The vacancies applied to, newest application first, each with what the
+    person wrote when applying (None when nothing was). `ids` narrows it to
+    those vacancies. A vacancy further along the funnel keeps its
+    application, so it is here too, with the status it has now."""
+    if not db.exists():
+        return []
+    where = ""
+    params: list = [db.identity()]
+    if ids:
+        where = f" AND vi.vacancy_id IN ({','.join('?' for _ in ids)})"
+        params.extend(ids)
+    with db.session() as conn:
+        rows = conn.execute(
+            "SELECT vi.vacancy_id, v.data, vi.feedback_status, vi.applied_at, vi.applied_comment "
+            "FROM vacancy_identity vi JOIN vacancies v ON v.id = vi.vacancy_id "
+            f"WHERE vi.identity_id = ? AND vi.applied_at IS NOT NULL{where} "
+            "ORDER BY vi.applied_at DESC, vi.vacancy_id", params).fetchall()
+    items = []
+    for vid, data, status, applied_at, comment in rows:
+        v = json.loads(data)
+        items.append({
+            "id": vid,
+            "status": status,
+            "applied_at": applied_at,
+            "applied_comment": comment or None,
+            "title": v.get("title"),
+            "company": v.get("company"),
+            "url": v.get("url"),
+        })
+    return items
+
+
 def _latest_package() -> Optional[Path]:
     packages = sorted(feedback_dir().glob("pending_*.yaml"))
     return packages[-1] if packages else None
@@ -280,6 +320,15 @@ def cmd_reject(args) -> None:
     print(f"OK: {args.id} -> not for me ({args.reason})")
 
 
+def cmd_applied(args) -> None:
+    items = applied_items(args.id)
+    if not items:
+        print("No applications.")
+        return
+    sys.stdout.reconfigure(encoding="utf-8")
+    print(_dump({"applied": items}))
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Gather a person's feedback for review")
     sub = p.add_subparsers(dest="command", required=True)
@@ -302,6 +351,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_reject.add_argument("--id", required=True)
     p_reject.add_argument("--reason", required=True, help="Why it does not fit")
     p_reject.set_defaults(func=cmd_reject)
+    p_applied = sub.add_parser(
+        "applied", help="The vacancies applied to, with what was written when applying, as YAML")
+    p_applied.add_argument("--id", action="append", default=None, help="Only this vacancy (repeatable)")
+    p_applied.set_defaults(func=cmd_applied)
     return p
 
 
