@@ -67,9 +67,14 @@ vacancy text does not say: no invented mission, product, news or values.
    when the vacancy explicitly says contract, B2B, contractor or freelance;
    the contacts' labels and values may come as two lists in the text: pair
    them by position). `headline` is the
-   title line under the name and `tagline` the stack line under it, as a CV
-   tailored to this vacancy would have them: the person's real title (never
-   a higher level) and their technologies this vacancy cares about first.
+   title line under the name: the title of the person's CV for this vacancy
+   when the message gives it, as it is (the CV and the letter carry one
+   title, and their files are named after it); otherwise the person's job
+   title for this vacancy, "Senior Software Engineer" unless the vacancy
+   hires for a role of its own kind that the person's history supports
+   ("AI Engineer", "Forward Deployed Engineer"...), never a higher level,
+   one title without a second after "/" or "|". `tagline` is the stack
+   line under it: their technologies this vacancy cares about first.
    Each sits in a half-page-wide column in 12 pt bold and must fit one line:
    at most 40 characters each.
 8. `date`: today's date, given in the message, written as is usual in the

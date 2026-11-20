@@ -687,7 +687,18 @@ The steps:
    Full Stack Engineer.pdf`). An employer sees the file name first, and the
    headline is already the vacancy's title in at most 40 characters, so the
    name follows the vacancy without a list of keywords. `cv.output_name`
-   keeps one fixed name instead. The log records each version's file name
+   keeps one fixed name instead. One title for the CV and the cover letter,
+   inside and in the file name (the owner, 2026-11-20, task 0134): the
+   headline is "Senior Software Engineer" unless the vacancy hires for a role
+   of its own kind ("AI Engineer", "Forward Deployed Engineer"), one title
+   with no second after "/"; what a file name cannot hold becomes a space
+   inside too (`cv_tailor.file_title`), and the letter takes the title of
+   the vacancy's latest CV (`cv_tailor.current_title`; the batch makes the
+   CV first). Before: the letter's model picked its own headline, "Senior
+   Full-Stack Software Engineer" in 368 of 372 letters, and the latest CV
+   of 76 vacancies out of 365 had "/", "|" or ":" in its headline, once
+   between two titles ("AI Engineer / Senior Software Engineer" became "AI
+   Engineer Senior Software Engineer" in the file name). The log records each version's file name
    ("File: ..."), and the next version moves the current pair to `Old
    versions/` by it (see "The documents folder" below). A failed run leaves
    the current pair where it was.
