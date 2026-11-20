@@ -274,7 +274,7 @@ def main(argv=None) -> int:
         vacancy.setdefault("id", args.vacancy)
         stats = check([vacancy], minutes=1, recheck_hours=0)
     else:
-        stats = check(selections.listed_vacancies(kb.load_vacancies()), minutes=args.minutes)
+        stats = check(selections.shown_vacancies(kb.load_vacancies()), minutes=args.minutes)
     for vacancy_id, value in stats["changed"].items():
         print(vacancy_id, value["status"], value.get("reason") or value.get("http_code") or "")
     if not args.dry_run and stats["changed"]:

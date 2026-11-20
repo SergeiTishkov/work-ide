@@ -509,13 +509,15 @@ def test_the_rest_run_fetches_nothing(isolated_data_dir, monkeypatch):
 
 
 
-def test_the_links_run_checks_the_listed_only_writes_their_verdicts_and_records_a_rebuild(
+def test_the_links_run_checks_the_shown_only_writes_their_verdicts_and_records_a_rebuild(
         isolated_data_dir, monkeypatch):
     import availability
     import selections
-    vacancies = {"a": {"id": "a"}, "b": {"id": "b"}}
+    # c is listed but never shown (remote_unconfirmed): not checked
+    vacancies = {"a": {"id": "a", "computed": {"classification": "hot_lead"}}, "b": {"id": "b"},
+                 "c": {"id": "c", "computed": {"classification": "remote_unconfirmed"}}}
     monkeypatch.setattr(pipeline, "_load", lambda: (vacancies, {}, {"sources": {}}))
-    monkeypatch.setattr(selections, "listed_vacancies", lambda vs: [vs["a"]])
+    monkeypatch.setattr(selections, "listed_vacancies", lambda vs: [vs["a"], vs["c"]])
     common.save_json_atomic(common.STATE_PATH, {"sources": {"x": {}}, "run_count": 3})
     seen = {}
 
@@ -533,7 +535,7 @@ def test_the_links_run_checks_the_listed_only_writes_their_verdicts_and_records_
     result = pipeline.run_links()
     assert seen["ids"] == ["a"] and seen["minutes"] == availability.DEFAULT_MINUTES
     assert seen["saved"] == {"a": {"status": "dead"}}
-    assert seen["kind"] == "rebuild" and seen["selected"] == ["a", "b"]
+    assert seen["kind"] == "rebuild" and seen["selected"] == ["a", "b", "c"]
     state = common.load_json(common.STATE_PATH)
     assert state["last_link_check"]["dead"] == 1 and state["run_count"] == 3 and "x" in state["sources"]
     assert "changed" not in state["last_link_check"]
