@@ -263,6 +263,8 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
             mode = ["--top"] if args.get("mode") == "top" else []
             if args.get("skip_contracts"):   # the agent checked them just before (`/run`, step 3)
                 mode.append("--skip-contracts")
+        elif kind == "linkedin" and args.get("staged"):   # merge the kept fetch (task 0135)
+            mode = [*mode, "--staged"]
         elif kind == "ai" and args.get("reread"):   # the owner asked for the re-read (task 0103)
             mode = [*mode, "--reread"]
             since = args.get("since")

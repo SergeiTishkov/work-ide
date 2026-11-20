@@ -33,6 +33,10 @@ CV *.docx
 *_cv.pdf
 *_cv.docx
 
+# --- The emergency file (tools/emergency.py, task 0135): this machine's serious
+# --- breakdowns, kept until settled; never committed (the hook refuses it too).
+/emergency.md
+
 # --- The virtual environment: each machine has its own, requirements.txt is enough.
 .venv/
 

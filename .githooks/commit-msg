@@ -18,6 +18,19 @@
 # Turned on once per clone: git config core.hooksPath .githooks
 
 msg_file="$1"
+
+# emergency.md (tools/emergency.py, task 0135) is never committed; its open
+# entries are shown at every commit, so the owner is reminded of them.
+if git diff --cached --name-only | grep -qx 'emergency.md'; then
+  echo "commit-msg: emergency.md is never committed (CLAUDE.md §12 \"Emergencies\"): git restore --staged emergency.md" >&2
+  exit 1
+fi
+root=$(git rev-parse --show-toplevel)
+if [ -s "$root/emergency.md" ] && grep -q '[^_[:space:]]' "$root/emergency.md"; then
+  echo "commit-msg: emergency.md has open entries; tell the owner of each (CLAUDE.md §12 \"Emergencies\"):" >&2
+  grep '^## ' "$root/emergency.md" | sed 's/^## /  - /' >&2
+fi
+
 subject=$(sed -n '1p' "$msg_file")
 case "$subject" in
   "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"amend! "*) exit 0 ;;

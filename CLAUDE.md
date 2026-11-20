@@ -521,6 +521,23 @@ use it before the first edit of any change and before every commit.
   (`git config core.hooksPath .githooks`, once per clone;
   `tests/test_commit_hook.py` fails while it is off). Never `--no-verify`.
 
+**Emergencies** (the owner, 2026-11-21, task 0135). `emergency.md` in the
+repository's root holds the serious breakdowns of the scripts: a failure that
+lost or puts at risk work already done. Scripts append to it
+(`tools/emergency.py`), each entry after a line of underscores; an agent may
+add one too. It is never committed: `.gitignore` holds it, and
+`.githooks/commit-msg` refuses a commit that stages it and lists its open
+entries at every commit.
+
+- Read it at the start of work (`python tools/emergency.py`). An entry with
+  an obvious, clear fix: fix it (a task and a commit as usual), then tell the
+  owner what broke and what was done. An entry whose fix is not obvious: tell
+  the owner and wait for the decision.
+- While an entry is open, remind the owner of each one at the end of every
+  piece of work and at every commit, however often it was said before.
+- An entry leaves the file when it is settled: fixed and told, or the owner
+  said to drop it.
+
 Numbers are four digits, unique, never reused; tasks are written in English,
 business first. Every task from 0052 on names its scope on a `Scope:` line:
 `identity:<prefix>`, `tools`, `app`, `config`, `rules`, `docs`, `tasks` or

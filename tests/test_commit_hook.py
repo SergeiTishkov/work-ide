@@ -129,6 +129,19 @@ def test_a_change_to_the_task_system_is_not_a_task_file(repo):
     assert not ok and "Task: NNNN" in err
 
 
+def test_the_emergency_file_is_never_committed_and_its_entries_are_shown(repo):
+    """Task 0135: emergency.md is refused even with a task, and listed at every commit."""
+    (repo / "emergency.md").write_text("____\n\n## 2026-11-20 22:59 LinkedIn fetch kept\n\ntext\n", encoding="utf-8")
+    _git(repo, "add", "-f", "emergency.md")
+    _write(repo, "tasks/2-to-do/0002-agreed-work.md", "# 0002 Agreed work\n- DONE - it\n")
+    ok, err = _commit(repo, "Fix a thing\n\nTask: 0002")
+    assert not ok and "emergency.md is never committed" in err
+    _git(repo, "restore", "--staged", "emergency.md")
+    ok, err = _commit(repo, "Fix a thing\n\nTask: 0002")
+    assert ok, err
+    assert "open entries" in err and "2026-11-20 22:59 LinkedIn fetch kept" in err
+
+
 def test_merges_and_reverts_are_exempt(repo):
     _write(repo, "tools/a.py", "y\n")
     ok, err = _commit(repo, 'Revert "Fix a thing"')

@@ -61,6 +61,14 @@ def isolated_data_dir(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_real_emergency_file(monkeypatch, tmp_path_factory):
+    """No test appends to the repository's emergency.md (task 0135)."""
+    import emergency
+
+    monkeypatch.setattr(emergency, "PATH", tmp_path_factory.mktemp("emergency") / "emergency.md")
+
+
+@pytest.fixture(autouse=True)
 def _no_model_calls(monkeypatch):
     """No test reaches the claude CLI: a model call costs money and its answer
     is not repeatable. A test that wants one passes `call=` itself."""
