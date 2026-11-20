@@ -12,7 +12,9 @@ What is picked is cv_auto's choice: every vacancy of the shortlist its
 filters match. A document already in the vacancy's folder, or a vacancy
 found gone, is skipped — so a stopped batch goes on where it was when
 started again. The documents it makes are marked "Made automatically." in
-their logs (--auto to the tools).
+their logs (--auto to the tools). Right before a vacancy's document the
+board is asked whether the posting is still open (availability.refresh,
+task 0127): a closed one counts as gone, with no document.
 
 THE PERSON'S VACANCIES ARE LEFT ALONE (task 0087, cv_auto.left_alone): before
 each document, after a pause too, the batch asks again whether the person
@@ -231,7 +233,11 @@ class Batch:
                     prefix, item, kind = work[self.index]
                     self.index += 1
                     why = check(prefix, item) if check else None
-                    if why:
+                    if why and why.startswith(GONE):
+                        self.status["gone"] += 1
+                        self.log(f"gone    [{self.index}/{len(work)}] {prefix} {kind} {item['vacancy_id']}: {why}")
+                        self.save()
+                    elif why:
                         self.status["left_alone"] += 1
                         self.log(f"left alone [{self.index}/{len(work)}] {prefix} {kind} {item['vacancy_id']}: {why}")
                         self.save()
@@ -301,7 +307,10 @@ def plan_for(prefix: str) -> list:
 
 
 def check_now(prefix: str, item: dict) -> Optional[str]:
-    """cv_auto.left_alone for one vacancy, asked right before its document."""
+    """Asked right before a vacancy's document: cv_auto.left_alone, then
+    whether the posting is still open (availability.refresh, task 0127) —
+    a GONE text when the board says it is closed."""
+    import availability
     import cv_auto
     import db
     import identity as identity_mod
@@ -309,7 +318,13 @@ def check_now(prefix: str, item: dict) -> Optional[str]:
     if not db.exists():
         return None
     with db.session() as conn:
-        return cv_auto.left_alone(conn, prefix, [item["vacancy_id"]]).get(item["vacancy_id"])
+        why = cv_auto.left_alone(conn, prefix, [item["vacancy_id"]]).get(item["vacancy_id"])
+    if why:
+        return why
+    verdict = availability.refresh(item["vacancy_id"]) or {}
+    if verdict.get("status") == "dead":
+        return f"{GONE}: {verdict.get('reason') or 'the link is dead'}"
+    return None
 
 
 def generate_with_tools(prefix: str, item: dict, kind: str) -> dict:

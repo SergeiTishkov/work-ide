@@ -287,6 +287,29 @@ link (the same principle as in `kb.mark_duplicates`). The check is cached for 12
 hours per vacancy (`recheck_after_hours`) so as not to hammer the job boards on
 every pipeline run.
 
+### Whether a listed vacancy is still open (task 0127, 2026-11-20)
+The HEAD check above was blind on LinkedIn, which makes up most of the list:
+1,041 of the 1,071 listed LinkedIn vacancies of SHARP carried "unknown 429",
+and a sample read one by one found 26 of 38 answered postings closed.
+
+`tools/availability.py` checks the listed vacancies:
+- LinkedIn one by one through the guest posting fragment, paced as the
+  collection is: "No longer accepting applications" or 404 is closed, a
+  description is open, a 429 is no verdict.
+- The other boards as `link_check.py` does.
+
+It runs within a time budget, the oldest check first, and writes only the
+`link_check` field of the rows it checked, so a LinkedIn merge running beside
+it keeps its writes. `link_check.py` no longer sends LinkedIn records a HEAD.
+A closed verdict is not undone by an unknown one (`link_check.merge`): before
+this, a posting the description reader found closed was listed again 12 hours
+later, when the HEAD got a 429. The document batch asks the board once more
+right before a vacancy's CV or letter.
+
+Rejected: hiding a vacancy by its age. The owner's own "expired" answers
+came a median of 13 days after first sight, with a range of 0 to 77 days, so
+no age separates open from closed.
+
 ### The search-identity system (2026-07-31)
 
 The project became multi-user. The full description is in `docs/IDENTITIES.md`;

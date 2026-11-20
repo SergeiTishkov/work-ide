@@ -19,6 +19,17 @@ devitjobs.com is a single-page app: a vacancy taken down answers 200 and shows
 "could not find this job" once JavaScript runs, so by status code every one of
 its links was alive. Its own list and detail API say it instead
 (_devitjobs_results).
+
+LINKEDIN IS NOT ASKED HERE (task 0127). Measured 2026-11-20: 118,533
+LinkedIn records of the base carried "unknown 429" from this check, and a
+rest run sent one HEAD per record not checked in 12 hours, 12 at a time.
+LinkedIn postings are checked by tools/availability.py, one by one through
+the guest fragment, and closed ones are found by the description reader.
+
+A CLOSED VERDICT STAYS CLOSED (merge): an "unknown" answer after it is not
+"open again". Until 2026-11-20 a posting the description reader found
+closed ("no longer accepting applications") was listed again 12 hours
+later, when this check got a 429 for it.
 """
 from __future__ import annotations
 
@@ -28,6 +39,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
@@ -45,10 +57,24 @@ DEVITJOBS_LIST_TIMEOUT = 60
 _DEVITJOBS_ID = re.compile(r"^https://devitjobs\.com/jobs/([0-9a-f]{24})$")
 
 
+def is_linkedin_url(url: str) -> bool:
+    host = (urlparse(url or "").hostname or "").lower()
+    return host == "linkedin.com" or host.endswith(".linkedin.com")
+
+
+def merge(before: Optional[dict], result: dict, now: datetime, by: Optional[str] = None) -> dict:
+    """The record's new `link_check`: the result with its time, except that
+    an unknown result keeps a dead verdict (noting when it was asked)."""
+    stamp = now.isoformat()
+    if result.get("status") == "unknown" and (before or {}).get("status") == "dead":
+        return {**before, "unknown_at": stamp}
+    return {**result, "checked_at": stamp, **({"by": by} if by else {})}
+
+
 def _should_check(vacancy: dict, recheck_after_hours: int, now: datetime) -> bool:
     if vacancy.get("duplicate_of"):
         return False
-    if not vacancy.get("url"):
+    if not vacancy.get("url") or is_linkedin_url(vacancy["url"]):
         return False
     link_check = vacancy.get("link_check")
     if not link_check or not link_check.get("checked_at"):
@@ -193,7 +219,8 @@ def check_links(
         for future in as_completed(futures):
             tick()
             vid, result = future.result()
-            vacancies[vid]["link_check"] = {**result, "checked_at": datetime.now(timezone.utc).isoformat()}
+            vacancies[vid]["link_check"] = merge(vacancies[vid].get("link_check"), result,
+                                                 datetime.now(timezone.utc))
             stats["checked"] += 1
             stats[result["status"]] += 1
 

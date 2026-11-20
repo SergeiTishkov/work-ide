@@ -104,9 +104,11 @@ file live). It:
 - rescores **the whole database** rather than only the new records, so that if
   you improved `<p>_criteria.yaml`, the old vacancies get the current verdict
   too;
-- checks the links (`tools/link_check.py`) and removes from the shortlist any
-  vacancy with a confirmed broken link (404/410) — the counts are in the run
-  log and in `last_link_check` of the state file;
+- checks the links of every board but LinkedIn (`tools/link_check.py`) and
+  removes from the shortlist any vacancy with a confirmed broken link
+  (404/410) — the counts are in the run log and in `last_link_check` of the
+  state file; whether the listed vacancies, LinkedIn's included, are still
+  open is the queue's `links` run (`tools/availability.py`, task 0127);
 - fetches the vacancy page for anything in the shortlist that arrived without a
   description (`tools/enrich_descriptions.py`), which also picks up the stated
   salary, whether the posting still accepts applications, and whether the

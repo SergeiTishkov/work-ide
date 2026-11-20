@@ -256,6 +256,16 @@ _EMPLOYMENT_TYPE_RE = re.compile(
 # asked for only when the page said nothing: one extra request, where needed.
 GUEST_POSTING_URL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
 _JOB_ID_RE = re.compile(r"(\d{8,})(?:[/?#]|$)")
+# The job number in a posting's address, with or without the title slug:
+# linkedin.com/jobs/view/4474971398/ and
+# de.linkedin.com/jobs/view/senior-architect-net-at-computer-futures-4472723959
+JOB_URL_RE = re.compile(r"linkedin\.com/jobs/view/(?:[^/?#]*?-)?(\d{8,})(?:[/?#]|$)")
+
+
+def job_id(url: str) -> Optional[str]:
+    """The job number of a LinkedIn posting's address, or None."""
+    match = JOB_URL_RE.search(url or "")
+    return match.group(1) if match else None
 
 
 def _employment_types_from_guest_fragment(url: str, timeout: int) -> list:

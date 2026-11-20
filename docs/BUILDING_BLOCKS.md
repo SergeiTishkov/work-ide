@@ -71,7 +71,8 @@ A board token can be checked with one request:
 | `add_vacancy.py` | One vacancy the person found, by its link: page read, scored alone, listed under "Added by hand" now and on every later run | When the person asks for a vacancy in the app |
 | `company_intel.py` | Company age and size from Wikidata | Automatically inside the pipeline, for shortlist companies |
 | `company_kinds.py` | Which companies are freelance marketplaces, agencies or reposters (`config/company_kinds.yaml`), for the app's "Company" drop-down; `--scan` lists them, `--write` stores them in the base | Automatically with every selection; by hand after editing the YAML |
-| `link_check.py` | Checking that links are alive | Automatically inside the pipeline |
+| `link_check.py` | Checking that links are alive (every board but LinkedIn) | Automatically inside the pipeline |
+| `availability.py` | Whether a listed vacancy is still open: LinkedIn through the guest posting fragment, one by one; the other boards as `link_check.py` does; a closed verdict is kept | The queue's `links` run; the document batch before each document; by hand for one vacancy |
 | `report.py` | Record a new selection without collecting again; the app shows it | After editing the criteria |
 | `textclean.py` | Strip email addresses and links out of text | Inside scoring; also useful by hand when debugging a match |
 

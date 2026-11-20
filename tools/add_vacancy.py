@@ -38,12 +38,12 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 import db  # noqa: E402
+import fetch_linkedin  # noqa: E402
 import kb  # noqa: E402
 import normalize  # noqa: E402
 import score  # noqa: E402
 import selections  # noqa: E402
 
-LINKEDIN_JOB_RE = re.compile(r"linkedin\.com/jobs/view/(?:[^/?#]*?-)?(\d{8,})(?:[/?#]|$)")
 # The top card of an anonymous LinkedIn posting page (checked 2026-11-20).
 _LI_TITLE_RE = re.compile(r"<h1[^>]*topcard__title[^>]*>\s*([^<]+?)\s*</h1>")
 _LI_COMPANY_RE = re.compile(r"topcard__org-name-link[^>]*>\s*([^<]+?)\s*<")
@@ -59,9 +59,7 @@ class NotAdded(Exception):
     """Why the vacancy was not added, for the person."""
 
 
-def linkedin_job_id(url: str) -> Optional[str]:
-    match = LINKEDIN_JOB_RE.search(url or "")
-    return match.group(1) if match else None
+linkedin_job_id = fetch_linkedin.job_id
 
 
 def find_existing(url: str) -> Optional[str]:
@@ -91,8 +89,6 @@ def _first(pattern: re.Pattern, body: str) -> Optional[str]:
 def read_linkedin(job_id: str) -> dict:
     """The posting's facts and top card, read anonymously."""
     import requests
-
-    import fetch_linkedin
 
     url = f"https://www.linkedin.com/jobs/view/{job_id}/"
     body = ""
