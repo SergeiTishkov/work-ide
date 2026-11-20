@@ -480,6 +480,33 @@ def test_the_linkedin_run_fetches_apart_then_merges_like_the_top_run(isolated_da
     assert asked["posted_within_days"] == 1
 
 
+def test_a_kept_fetch_is_merged_without_fetching_again_and_a_failure_is_an_emergency(isolated_data_dir, monkeypatch):
+    """Task 0135: on 2026-11-20 a LinkedIn fetch of 22 hours was kept but not
+    merged (the base's schema changed under it); `--staged` merges it."""
+    import emergency
+    import runstate
+
+    monkeypatch.setattr(pipeline, "FETCHERS", {"linkedin": lambda **_: ([_linkedin_card(1)], "queries 1")})
+    monkeypatch.setattr(pipeline, "load_sources_config", lambda: [{"name": "linkedin"}])
+    _quiet_top(monkeypatch)
+    with pytest.raises(SystemExit):
+        pipeline.kept_linkedin_fetch()
+    staged = pipeline.fetch_linkedin_apart()
+
+    pipeline.report_unmerged(staged, RuntimeError("the database has schema version 12, newer than this code (11)"))
+    [entry] = emergency.entries()
+    assert "LinkedIn fetch kept, not merged" in entry and "1 records" in entry
+    assert "schema version 12" in entry and str(pipeline.linkedin_staged_path()) in entry
+    assert "--linkedin --staged" in entry
+
+    monkeypatch.setattr(pipeline, "FETCHERS", {"linkedin": lambda **_: pytest.fail("fetched again")})
+    kept = pipeline.kept_linkedin_fetch()
+    assert kept["started_at"] == staged["started_at"] and len(kept["records"]) == 1
+    with runstate.PipelineRun(wait=True):
+        result = pipeline.merge_linkedin(kept)
+    assert result["new_vacancies"] == 1 and not pipeline.linkedin_staged_path().exists()
+
+
 def test_a_failed_linkedin_fetch_records_the_failure_without_loading_the_base(isolated_data_dir, monkeypatch):
     monkeypatch.setattr(pipeline, "FETCHERS", {"linkedin": lambda **_: ([], "errors: C#/UK: HTTPError")})
     monkeypatch.setattr(pipeline, "load_sources_config", lambda: [{"name": "linkedin"}])

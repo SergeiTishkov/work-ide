@@ -1116,6 +1116,11 @@ others:
   fresh: its vacancies stay fresh, and LinkedIn's new ones are fresh too. A
   fetch that brought nothing records its failure in the state without
   loading the base; the coverage stays, so the next run asks for those days.
+  A run that fails after the fetch was kept (on 2026-11-20 the base's schema
+  was upgraded during a fetch of 22 hours) leaves the file and an entry in
+  `emergency.md` (`tools/emergency.py`, task 0135); `pipeline.py --linkedin
+  --staged` (queue: `linkedin` with `{"staged": true}`) merges the kept
+  fetch without fetching again.
 - `pipeline.py --top` fetches every source but LinkedIn; its `collected`
   line says LinkedIn is fetched apart.
 - `pipeline.py --rest` fetches nothing. It read LinkedIn's window again after

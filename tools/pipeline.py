@@ -890,6 +890,37 @@ def fetch_linkedin_apart() -> Optional[dict]:
     return staged
 
 
+def kept_linkedin_fetch() -> dict:
+    """The fetch an earlier LinkedIn run kept and did not merge
+    (linkedin_staged_path), for `--linkedin --staged`: merged without
+    fetching again (task 0135)."""
+    path = linkedin_staged_path()
+    if not path.exists():
+        raise SystemExit(f"no kept LinkedIn fetch: {path} does not exist")
+    staged = common.load_json(path, default={})
+    progress.log(f"   the kept LinkedIn fetch of {staged.get('started_at')}: "
+                 f"{progress.number(len(staged.get('records') or []))} records, not fetched again")
+    return staged
+
+
+def report_unmerged(staged: dict, exc: BaseException) -> None:
+    """A LinkedIn fetch kept but not merged: an entry in the emergency file
+    (task 0135), since the next LinkedIn run fetches its days again instead.
+    On 2026-11-20 a fetch of 22 hours ended so: the base's schema had been
+    upgraded during the fetch."""
+    import emergency
+
+    count = len(staged.get("records") or [])
+    emergency.report(
+        f"LinkedIn fetch kept, not merged ({common.ACTIVE_IDENTITY})",
+        f"The LinkedIn run fetched {count} records (started {staged.get('started_at')}, "
+        f"{staged.get('days')} days) and failed before merging them: {type(exc).__name__}: {exc}\n\n"
+        f"Kept in {linkedin_staged_path()}. Merge without fetching again, after the cause is fixed:\n"
+        f"`python tools/taskq.py add linkedin --identity {common.ACTIVE_IDENTITY} --args '{{\"staged\": true}}'` "
+        f"(or `python tools/pipeline.py --identity {common.ACTIVE_IDENTITY} --linkedin --staged`). "
+        f"A new LinkedIn run before that fetches the days again and replaces the file.")
+
+
 def merge_linkedin(staged: dict) -> dict:
     """The LinkedIn run's second half, holding the base: what was fetched is
     merged, the window noted, and the top run's steps done on the top classes
@@ -1100,6 +1131,9 @@ def main() -> None:
                       help="only the links of the shortlist checked again (see run_links)")
     mode.add_argument("--ai", action="store_true",
                       help="only the AI check of what waits for it (see run_ai)")
+    parser.add_argument("--staged", action="store_true",
+                        help="with --linkedin: merge the fetch an earlier LinkedIn run kept and did "
+                             "not merge, without fetching again (task 0135)")
     parser.add_argument("--read", action="store_true",
                         help="with --links: the vacancies left unread instead, checked open "
                              "and the open ones read (see run_unread, task 0129)")
@@ -1113,6 +1147,8 @@ def main() -> None:
         parser.error("--reread goes with --ai")
     if args.read and not args.links:
         parser.error("--read goes with --links")
+    if args.staged and not args.linkedin:
+        parser.error("--staged goes with --linkedin")
     if args.since and not args.reread:
         parser.error("--since goes with --reread")
     if args.since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):
@@ -1140,7 +1176,9 @@ def main() -> None:
     with taskq.Registered(kind, common.ACTIVE_IDENTITY, log_path=log_path,
                           args={"mode": mode_name} if kind == "pipeline" else None):
         try:
-            staged = fetch_linkedin_apart() if args.linkedin else None
+            staged = None
+            if args.linkedin:
+                staged = kept_linkedin_fetch() if args.staged else fetch_linkedin_apart()
             # Marks the run as going in the database (the app's indicator), and
             # refuses to start while another run is alive — of any identity: the
             # base is shared. The LinkedIn run waits for it instead: its fetch
@@ -1148,14 +1186,20 @@ def main() -> None:
             if args.linkedin and staged is None:
                 result = {"collected": "nothing: this identity does not fetch LinkedIn"}
             else:
-                with contextlib.ExitStack() as held:
-                    run = runstate.PipelineRun(log_path=log_path, wait=args.linkedin)
-                    if args.linkedin:
-                        with progress.stage("wait for the base"):
+                try:
+                    with contextlib.ExitStack() as held:
+                        run = runstate.PipelineRun(log_path=log_path, wait=args.linkedin)
+                        if args.linkedin:
+                            with progress.stage("wait for the base"):
+                                held.enter_context(run)
+                        else:
                             held.enter_context(run)
-                    else:
-                        held.enter_context(run)
-                    result = _run_mode(args, staged)
+                        result = _run_mode(args, staged)
+                except Exception as exc:
+                    # hours of fetching are kept on disk; say so where it is seen (task 0135)
+                    if staged and staged.get("records") and linkedin_staged_path().exists():
+                        report_unmerged(staged, exc)
+                    raise
         except runstate.AlreadyRunningError as exc:
             progress.log(f"!! not started: {exc}")
             progress.close_log()
