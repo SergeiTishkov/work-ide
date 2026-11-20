@@ -624,7 +624,7 @@ test('the keyboard: Enter or Space checks the row under the cursor and keeps the
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveAttribute('data-state', 'off');
   expect(await lastListing(page)).toEqual(['sharp', view({
-    fits: ['added_by_hand', 'worth_a_look', 'long_shot', 'ai_unscreened', 'engagement_unconfirmed', 'never_say_never'],
+    fits: ['added_by_hand', 'worth_a_look', 'long_shot', 'never_say_never', 'ai_unscreened', 'engagement_unconfirmed'],
   })]);
   await expect(page.getByTestId('fit-filter-menu')).toBeVisible();
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveClass(/cursor/);
@@ -1030,9 +1030,9 @@ test('a class with nothing left stays listed and keeps its tick', async ({ page 
     ['hot_lead', `${en['class.hot_lead']} (0)`, 'on'],
     ['worth_a_look', `${en['class.worth_a_look']} (1)`, 'on'],
     ['long_shot', `${en['class.long_shot']} (0)`, 'on'],
+    ['never_say_never', `${en['class.never_say_never']} (0)`, 'on'],   // right under long_shot (task 0136)
     ['ai_unscreened', `${en['class.ai_unscreened']} (0)`, 'on'],
     ['engagement_unconfirmed', `${en['class.engagement_unconfirmed']} (0)`, 'on'],
-    ['never_say_never', `${en['class.never_say_never']} (0)`, 'on'],
   ]);
   await expect(page.getByTestId('fit-option-remote_unconfirmed')).toHaveCount(0);   // never listed (task 0098)
   await page.keyboard.press('Escape');

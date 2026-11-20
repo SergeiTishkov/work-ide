@@ -59,10 +59,10 @@
     hot_lead: 'class.hot_lead',
     worth_a_look: 'class.worth_a_look',
     long_shot: 'class.long_shot',
+    // under long_shot, still shown (task 0124), right after it (the owner, 2026-11-21, task 0136)
+    never_say_never: 'class.never_say_never',
     ai_unscreened: 'class.ai_unscreened',
     engagement_unconfirmed: 'class.engagement_unconfirmed',
-    // under long_shot, still shown (task 0124)
-    never_say_never: 'class.never_say_never',
   };
   // Never listed (schemas/queries.sql, NOT LISTED; task 0098), also when a
   // view saved before still names it.
