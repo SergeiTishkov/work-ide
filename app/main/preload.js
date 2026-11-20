@@ -15,7 +15,8 @@ contextBridge.exposeInMainWorld('api', {
   // false turns the identity off: nothing collects for it
   setIdentityActive: (identity, active) => call('set-identity-active', identity, Boolean(active)),
   loadSegments: (identity) => call('segments', identity),
-  // view: { segments, statuses, fresh, sources, fits, companies, ages, roles, text } (store.viewParams);
+  // view: { segments, statuses, fresh, sources, hiddenSources, fits, companies, ages, roles, text }
+  // (store.viewParams);
   // page: { shown: { class: rows }, expanded: [class] }
   loadListing: (identity, view, page) => call('listing', identity, view, page || {}),
   classTotals: (identity, view) => call('class-totals', identity, view),

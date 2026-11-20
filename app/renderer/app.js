@@ -26,8 +26,8 @@
   // text: the words typed in the text field (WORDS there), '' for none.
   // roles: null for every kind of role (ROLE there).
   const DEFAULT_VIEW = {
-    segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, fits: null, companies: null, ages: null,
-    roles: null, text: '',
+    segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, hiddenSources: null, fits: null,
+    companies: null, ages: null, roles: null, text: '',
   };
   // The "Age" drop-down (the owner, 2026-10-17): how long ago it was posted,
   // in bands of their own (schemas/queries.sql, AGE).
@@ -64,8 +64,6 @@
     // under long_shot, still shown (task 0124)
     never_say_never: 'class.never_say_never',
   };
-  // Listed in "Identity fit" whether they hold any or not.
-  const STABLE_CLASSES = ['hot_lead', 'worth_a_look', 'long_shot', 'ai_unscreened'];
   // Never listed (schemas/queries.sql, NOT LISTED; task 0098), also when a
   // view saved before still names it.
   const UNLISTED_CLASSES = ['remote_unconfirmed'];
@@ -187,9 +185,6 @@
     dropdownScroll: 0,
     // [{ source, site, total }]: the boards the view holds, the boards aside
     sources: [],
-    // { identity: Set of boards }: every board listed since the app started,
-    // so a board hidden and then emptied by the other drop-downs is known
-    seenSources: {},
     // [{ kind, name, total }]: the companies the view holds, the companies
     // aside; every other company is one row, name null
     companies: [],
@@ -448,8 +443,15 @@
     state.counts = counts;
     state.classTotals = totals;
     state.sources = sources;
-    const seen = state.seenSources[state.active] || (state.seenSources[state.active] = new Set());
-    for (const s of sources) if (s.source) seen.add(s.source);
+    // A view saved before task 0133 named the boards shown; it now names the
+    // boards hidden, so a board a later run brings is shown. Every board is
+    // listed now, so the two say the same.
+    const saved = state.views[state.active];
+    if (saved && Array.isArray(saved.sources)) {
+      const off = sources.map((s) => s.source).filter((s) => s && !saved.sources.includes(s));
+      state.views[state.active] = { ...saved, sources: null, hiddenSources: off.length ? off : null };
+      saveView();
+    }
     state.companies = companies;
     for (const c of companies) if (c.name) state.companyKinds[c.name] = c.kind;
     // a chosen board the view has emptied keeps its website on the list
@@ -2300,19 +2302,17 @@
   }
 
   // The classes ("Hot leads", "Worth a look", ...) under the other three
-  // drop-downs, each with how many. The classes of every selection are
-  // always listed, with 0 too (the owner, 2026-10-20: "a stable filter is
-  // neither hidden nor switched off when it empties"): until then an empty
-  // class left the list, a click on another row left it out of the view,
-  // and its vacancies stayed hidden once they came back. Another class
-  // (engagement_unconfirmed, the part-time search's) while it holds any or
-  // is chosen.
+  // drop-downs, each with how many. Every class is always listed, with 0 too
+  // (the owner, 2026-10-20: "a stable filter is neither hidden nor switched
+  // off when it empties"; 2026-11-20, task 0133: every option, always):
+  // until 2026-10-20 an empty class left the list, a click on another row
+  // left it out of the view, and its vacancies stayed hidden once they came
+  // back.
   function renderFitFilter(view) {
     const chosen = view.fits;
     const totals = state.classTotals;
     const order = Object.keys(CLASS_KEYS);
     const classes = [...order, ...Object.keys(totals).filter((cls) => !order.includes(cls))]
-      .filter((cls) => STABLE_CLASSES.includes(cls) || totals[cls] || (chosen && chosen.includes(cls)))
       .filter((cls) => !UNLISTED_CLASSES.includes(cls));
     const all = Object.values(totals).reduce((sum, n) => sum + n, 0);
     const options = classes.map((cls) => {
@@ -2354,20 +2354,22 @@
     });
   }
 
-  // The boards under the other three drop-downs, each with how many; a
-  // chosen one stays on the list even when nothing is left from it. The view
-  // keeps the boards shown; every board ticked becomes "all" (null, the ones
-  // a later run brings too) only when no board known to be hidden is off the
-  // list (task 0048: a hidden board the other drop-downs emptied came back
-  // ticked after a click on another one).
+  // The boards under the other drop-downs, each with how many: every board
+  // there is, 0 where the view leaves it none (task 0133). The view keeps the
+  // boards hidden (`hiddenSources`), so a board a later run brings is shown
+  // and ticked until the person unticks it (the owner, 2026-11-20). Until
+  // then it kept the boards shown, and a new board came in unticked.
   // All of them on top; under it the free boards and the paid ones — those
   // that ask the job seeker to pay before they assess an application (the
   // owner, 2026-10-26, task 0101) — each with its boards; a kind with no
   // board has no row.
   function renderSourceFilter(view) {
-    const chosen = view.sources;
+    const legacy = Array.isArray(view.sources) ? view.sources : null;   // until loadList converts it
+    const hidden = view.hiddenSources || [];
+    const isOn = (source) => (legacy ? legacy.includes(source) : !hidden.includes(source));
+    const whole = !legacy && !hidden.length;
     const sources = state.sources.filter((s) => s.source);
-    for (const source of chosen || []) {
+    for (const source of [...hidden, ...(legacy || [])]) {
       if (!sources.some((s) => s.source === source)) {
         sources.push({
           source, site: (state.sourceSites || {})[source] || null,
@@ -2378,12 +2380,12 @@
     const all = state.sources.reduce((sum, s) => sum + s.total, 0);
     const option = (s) => ({
       value: s.source, label: s.site || s.source, text: counted(s.site || s.source, s.total),
-      testid: `source-option-${s.source}`, checked: !chosen || chosen.includes(s.source),
+      testid: `source-option-${s.source}`, checked: isOn(s.source),
     });
     const groups = [['free', false, 'filter.source_free'], ['paid', true, 'filter.source_paid']].map(([key, paid, name]) => {
       const members = sources.filter((s) => Boolean(s.paid) === paid);
       return {
-        key, options: members.map(option), whole: !chosen,
+        key, options: members.map(option), whole,
         master: {
           text: counted(t(name), members.reduce((sum, s) => sum + s.total, 0)),
           testid: `source-kind-${key}`,
@@ -2393,25 +2395,23 @@
     const options = groups.flatMap((group) => group.options);
     const on = options.filter((o) => o.checked);
     let topMark = 'partial';
-    if (!chosen || on.length === options.length) topMark = 'on';
+    if (whole || on.length === options.length) topMark = 'on';
     else if (!on.length) topMark = 'off';
+    const hide = (off) => changeView({ sources: null, hiddenSources: off.length ? off : null });
     return checklist({
       testid: 'source-filter', label: t('filter.source_legend'), labelTestid: 'source-label',
-      summary: !chosen ? t('filter.source_all') : summaryOf(t('filter.source_all'), options),
+      summary: whole ? t('filter.source_all') : summaryOf(t('filter.source_all'), options),
       nested: true,
       top: {
         text: counted(t('filter.source_all'), all), testid: 'source-option-all', mark: topMark,
-        toggle: () => changeView({ sources: chosen ? null : [] }),
+        toggle: () => hide(topMark === 'on' ? options.map((o) => o.value) : []),
       },
       groups,
       // the boards of the other kind keep their ticks
       onToggle: (group, values) => {
         const mine = group.options.map((o) => o.value);
-        const shown = options.map((o) => o.value)
-          .filter((value) => (mine.includes(value) ? values.includes(value) : on.some((o) => o.value === value)));
-        const known = state.seenSources[state.active] || new Set();
-        const hiddenAside = [...known].some((source) => !options.some((o) => o.value === source));
-        changeView({ sources: shown.length === options.length && !hiddenAside ? null : shown });
+        hide(options.map((o) => o.value)
+          .filter((value) => (mine.includes(value) ? !values.includes(value) : !isOn(value))));
       },
     });
   }
@@ -2444,8 +2444,8 @@
     const groups = [];
     const marks = [];
     for (const kind of INTERMEDIARIES) {
+      // every kind is listed, an empty one too (task 0133)
       const members = rows.filter((c) => c.kind === kind);
-      if (!members.length && kindOn(kind)) continue;   // none in the view: no row
       const names = members.map((c) => c.name);
       const on = names.filter((name) => nameOn(name, kind));
       let mark = 'partial';
