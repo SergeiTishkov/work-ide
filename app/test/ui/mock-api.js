@@ -291,6 +291,10 @@ function installMockApi(fixture) {
         return seen[row.class] <= (shown[row.class] || data.limit || 1000);
       });
     },
+    async listedClasses(identity) {
+      record('listedClasses', [identity]);
+      return (data.listedClasses && data.listedClasses[identity]) || null;
+    },
     async classTotals(identity, view) {
       record('classTotals', [identity, view]);
       if (data.failClassTotals) throw new Error("No handler registered for 'class-totals'");

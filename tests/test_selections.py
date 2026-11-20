@@ -9,6 +9,7 @@ import pytest
 import db
 import kb
 import report
+import score
 import segments
 import selections
 
@@ -565,6 +566,30 @@ def test_a_selection_carries_the_paid_boards(isolated_data_dir):
     with db.session() as conn:
         (value,) = conn.execute(selections.load_queries()["paid_sources"]).fetchone()
     assert json.loads(value) == ["freelancermap", "remoteok", "weworkremotely"]
+
+
+def test_a_selection_carries_the_identitys_classes(isolated_data_dir):
+    """The owner, 2026-11-21 (task 0137): the "Identity fit" drop-down lists
+    the classes this identity's criteria can put a row in, no other."""
+    import common
+
+    _store(_by_source())
+    with db.session() as conn:
+        (value,) = conn.execute(selections.load_queries()["listed_classes"],
+                                {"identity": common.ACTIVE_IDENTITY}).fetchone()
+    assert json.loads(value) == selections.listed_classes(score.load_criteria())
+
+    base = {"classification_thresholds": {"hot_lead": 40, "worth_a_look": 28, "long_shot": 12}}
+    assert selections.listed_classes(base) == ["added_by_hand", "hot_lead", "worth_a_look", "long_shot",
+                                               "ai_unscreened"]
+    sharp_like = {"classification_thresholds": {**base["classification_thresholds"], "never_say_never": 5}}
+    assert "never_say_never" in selections.listed_classes(sharp_like)
+    assert "engagement_unconfirmed" not in selections.listed_classes(sharp_like)
+    part_time = {**base, "engagement_fit": {"confirming_types": ["part-time"]}}
+    assert selections.listed_classes(part_time)[-1] == "engagement_unconfirmed"
+    assert "never_say_never" not in selections.listed_classes(part_time)
+    accepting = {**base, "engagement_fit": {"unconfirmed_policy": "accept"}}
+    assert "engagement_unconfirmed" not in selections.listed_classes(accepting)
 
 
 def test_every_automatic_source_in_the_catalogue_names_its_website():

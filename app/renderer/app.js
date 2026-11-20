@@ -222,6 +222,7 @@
     stalled: new Set(),    // classes where "more" brought nothing: the scroll stops asking
     loadingMore: false,
     classTotals: {},       // class -> how many the view holds, the classes aside
+    listedClasses: null,   // the identity's classes (task 0137); null: every class
     // the number of the list load a drop-down started, 0 when none is going:
     // a spinner stands in for the vacancies meanwhile
     listLoading: 0,
@@ -426,7 +427,7 @@
     const view = viewToLoad(info);
     // the rows asked for travel only when set
     const page = Object.keys(state.shown).length ? [{ shown: { ...state.shown } }] : [];
-    const [listing, counts, totals, pending, sources, companies, ages, roles] = await Promise.all([
+    const [listing, counts, totals, pending, sources, companies, ages, roles, listed] = await Promise.all([
       api.loadListing(state.active, view, ...page),
       api.listingCounts(state.active, view),
       api.classTotals(state.active, view),
@@ -435,8 +436,10 @@
       api.listCompanies(state.active, view),
       api.listAges ? api.listAges(state.active, view) : {},
       api.listRoles ? api.listRoles(state.active, view) : {},
+      api.listedClasses ? api.listedClasses(state.active) : null,
     ]);
     if (asked !== listRequest) return;
+    state.listedClasses = Array.isArray(listed) ? listed : null;
     state.ages = ages || {};
     state.roles = roles || {};
     state.listing = listing;
@@ -2312,8 +2315,11 @@
     const chosen = view.fits;
     const totals = state.classTotals;
     const order = Object.keys(CLASS_KEYS);
+    // the identity's classes only (task 0137); a class that holds rows all the same is shown
+    const listed = state.listedClasses;
     const classes = [...order, ...Object.keys(totals).filter((cls) => !order.includes(cls))]
-      .filter((cls) => !UNLISTED_CLASSES.includes(cls));
+      .filter((cls) => !UNLISTED_CLASSES.includes(cls))
+      .filter((cls) => !listed || listed.includes(cls) || totals[cls] > 0);
     const all = Object.values(totals).reduce((sum, n) => sum + n, 0);
     const options = classes.map((cls) => {
       const name = className(cls);

@@ -113,6 +113,11 @@ ORDER BY position;
 -- name: display_name
 SELECT display_name AS value FROM identities WHERE id = :identity;
 
+-- name: listed_classes
+-- [class] as JSON: the classes the identity's criteria can put a row in,
+-- written with every selection (selections.write_listed_classes, task 0137).
+SELECT value FROM meta WHERE key = 'listed_classes:' || :identity;
+
 -- name: source_sites
 -- {source name: website} as JSON, from config/sources.catalog.yaml, written
 -- with every selection (selections.write_source_sites).

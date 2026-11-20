@@ -372,6 +372,20 @@ class Store {
     }));
   }
 
+  // [class] the identity's criteria can put a row in (task 0137), or null
+  // when no selection wrote it yet: the "Identity fit" drop-down lists these.
+  listedClasses(identity) {
+    const db = this.connection(identity);
+    const row = db && db.prepare(this.queries.listed_classes).get({ identity });
+    if (!row || !row.value) return null;
+    try {
+      const classes = JSON.parse(row.value);
+      return Array.isArray(classes) ? classes : null;
+    } catch {
+      return null;
+    }
+  }
+
   sourceSites(db) {
     const row = db.prepare(this.queries.source_sites).get();
     if (!row || !row.value) return {};
