@@ -69,6 +69,8 @@ test('the real window lists, records feedback, and runs the (fake) agent', async
     const window = await app.firstWindow();
     await expect(window.getByTestId('identity-tab-sharp')).toBeVisible();
     await expect(window.getByTestId('identity-name')).toHaveText('Test search');
+    // a fresh profile starts with the filters' card folded (2026-10-23)
+    await window.getByTestId('filters-toggle').click();
     await expect(window.getByTestId('segment-filter-value')).toHaveText('Everything');   // the market holding everything
     await expect(window.getByTestId('list').locator('article')).toHaveCount(3);   // new0..new2
 

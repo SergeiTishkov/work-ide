@@ -3,7 +3,7 @@
 // 2026-10-13: "a collection split into tasks"). A collection is the agent's
 // /run, and its log holds both the agent's commands ("> Bash: ...") and the
 // pipeline's own lines ("  | [04:14:11] >> fetch 19 sources ...", followed
-// by runner.js). The steps:
+// by the queue's worker, tools/taskd.py). The steps:
 //
 //   prepare      the agent: the identity, the template, the source contracts
 //   <stage>      each stage of tools/pipeline.py, as tools/progress.py logs
@@ -15,12 +15,15 @@
 //                agent's summary, in place of the checklist
 //
 // The agent's step "reputation" went on 2026-10-17: a lookup is the
-// vacancy's "Collect reputation" button (reputation.js).
+// vacancy's "Collect reputation" button, a task of the queue
+// (tools/reputation_lookup.py).
 //
-// The rest of the base and LinkedIn's run (rest.js) are the pipeline alone:
+// The rest of the base and LinkedIn's run (the queue's rest and linkedin
+// tasks) are the pipeline alone:
 // no agent steps.
 //
-// The CVs and cover letters after it are a task of their own (batch.js).
+// The CVs and cover letters after it are a task of their own
+// (tools/cv_batch.py).
 //
 // The steps still to come are listed too, from the outline of the task's
 // kind (the owner, 2026-10-21: an empty circle for a stage to do). A stage
@@ -83,7 +86,7 @@ function clock(ms) {
 }
 
 class StepTracker {
-  // agent: false for the pipeline alone (rest.js): no agent steps
+  // agent: false for the pipeline alone (rest, linkedin): no agent steps
   // outline: the keys of the steps to come (OUTLINES), or none
   constructor({ now = () => Date.now(), agent = true, outline = [] } = {}) {
     this.now = now;

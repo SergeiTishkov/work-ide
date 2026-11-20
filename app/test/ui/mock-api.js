@@ -26,7 +26,7 @@ function installMockApi(fixture) {
     calls.push({ name, args });
   }
 
-  // The task queue as main/tasks.js keeps it: two lanes, one task at a time
+  // The task queue as main/queue.js shows it: two lanes, one task at a time
   // in each. A CV or a cover letter finishes by itself at once — unless
   // holdCv, when window.__releaseCv() finishes the running one; failCv makes
   // it fail. A collection runs until window.__finishCollect(result), or ends
@@ -40,7 +40,7 @@ function installMockApi(fixture) {
   const schedules = copy(data.schedules || []);
   let nextSchedule = schedules.reduce((most, s) => Math.max(most, s.id), 0) + 1;
   const laneOf = (kind) => (kind === 'collect' ? 'collect' : kind === 'reputation' ? 'reputation' : 'documents');
-  // The CV/CL batch (main/batch.js): window.__setBatch(task, lines) sets it
+  // The CV/CL batch (tools/cv_batch.py's status file): window.__setBatch(task, lines) sets it
   // as the status file would, null removes it; it is listed after the tasks.
   let batch = null;
   let batchDismissed = null;

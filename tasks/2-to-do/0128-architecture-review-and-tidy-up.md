@@ -16,7 +16,8 @@ are done here with tests, the larger ones become items or triage tasks.
 
 ## Items
 - DONE - The two reviews (2026-11-20)
-- TO DO - App: the i18n parameter tests match `{w}` only (a missing backslash) and check nothing
-- TO DO - App: classes without a label (remote_unconfirmed, low_priority, rejected rows in the applications view) sort first and show the raw key
-- TO DO - App: dead exports and comments naming files that no longer exist
+- DONE - App: the i18n parameter tests matched `{w}` only (a missing backslash) and checked nothing; fixed, with a check that they find parameters
+- DONE - App: a class without a section label (low_priority, rejected, remote_unconfirmed rows kept by the applications view) sorted first and showed its raw key; now last, named as in the clean-up
+- DONE - App: comments naming files that no longer exist (main/tasks.js, reputation.js, cv.js, batch.js, rest.js, runner.js) point at what replaced them; `QueueClient.active()`, a duplicate of `AGES` and two orphaned comments removed
+- DONE - App: the Electron smoke test failed since 2026-10-23 (the filters' card starts folded in a fresh profile); it opens the card
 - TO DO - Tools: the findings of the Python review

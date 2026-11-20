@@ -69,6 +69,19 @@
   // Never listed (schemas/queries.sql, NOT LISTED; task 0098), also when a
   // view saved before still names it.
   const UNLISTED_CLASSES = ['remote_unconfirmed'];
+  // A class's name; the applications view also holds rows of classes never
+  // listed (low_priority, rejected, remote_unconfirmed), named as in the
+  // clean-up (task 0128).
+  function className(cls) {
+    const key = CLASS_KEYS[cls] || CLEANUP_CLASS_KEYS[cls];
+    return key ? t(key) : cls;
+  }
+  // Listed classes in their order, any other class after them, as
+  // schemas/queries.sql orders the rows.
+  function classRank(cls) {
+    const rank = Object.keys(CLASS_KEYS).indexOf(cls);
+    return rank < 0 ? Infinity : rank;
+  }
   const FILTER_KEYS = {
     fresh: 'filter.fresh',
     earlier: 'filter.earlier',
@@ -215,7 +228,7 @@
     // the number of the list load a drop-down started, 0 when none is going:
     // a spinner stands in for the vacancies meanwhile
     listLoading: 0,
-    // the task queue (main/tasks.js), as its last event gave it
+    // the task queue (main/queue.js), as its last event gave it
     tasks: [],
     // the task whose log the panel shows: chosen by a click, else the running one
     chosenTask: null,
@@ -536,7 +549,6 @@
     });
   }
 
-  // A click in a drop-down: the view changes, the list reloads from the top.
   // A click in a drop-down: the check box changes at once, the list follows
   // once the clicks stop for VIEW_DEBOUNCE_MS, and a spinner stands in for
   // the vacancies until it has come (the owner, 2026-10-12: the window
@@ -757,7 +769,7 @@
 
   // --- the task queue ----------------------------------------------------------
   // "Collect vacancies", "Generate CV" and "Generate Cover Letter" queue a
-  // task (main/tasks.js); the bottom panel lists the tasks and the log of one.
+  // task (main/queue.js); the bottom panel lists the tasks and the log of one.
 
   const ACTIVE_TASK = new Set(['queued', 'running']);
 
@@ -1160,7 +1172,7 @@
       return menuItem({ testid: 'run-collect', disabled: true, text: t('run.collect'), title: t('run.inactive') });
     }
     // Another identity's run holds the shared base: this one queues behind
-    // it (main/tasks.js).
+    // it (main/queue.js).
     return menuItem({
       testid: 'run-collect', text: t('run.collect'), onclick: startCollect,
       title: pipeline.busyWith ? t('run.busy_other', { identity: pipeline.busyWith }) : null,
@@ -1696,7 +1708,7 @@
       }, SCHEDULE_WHAT.map((what) => el('option', { value: what, selected: what === form.what },
         t(SCHEDULE_WHAT_KEYS[what]))))),
       form.what === 'clean' && field(t('scheduler.clean_filters'),
-        group('ages', CLEANUP_AGES, (a) => t(AGE_KEYS[a])),
+        group('ages', AGES, (a) => t(AGE_KEYS[a])),
         group('statuses', Object.keys(CLEANUP_STATUS_KEYS), (v) => t(CLEANUP_STATUS_KEYS[v])),
         group('classes', Object.keys(CLEANUP_CLASS_KEYS), (v) => t(CLEANUP_CLASS_KEYS[v]))),
       field(t('scheduler.identities'),
@@ -1839,7 +1851,6 @@
   // popup over the page: the filters, a count of what would go, then the
   // deletion. Applications and feedback not yet reviewed stay whatever is
   // ticked; that is the Python side's rule, the popup only says so.
-  const CLEANUP_AGES = ['today', 'week', 'month', 'older'];
   const CLEANUP_STATUS_KEYS = {
     new: 'cleanup.status.new', expired: 'cleanup.status.expired',
     rejected: 'cleanup.status.rejected', bugged: 'cleanup.status.bugged',
@@ -1922,7 +1933,7 @@
       el('h2', {}, t('cleanup.title')),
       el('p', { class: 'muted' }, t('cleanup.explain')),
       el('div', { class: 'cleanup-groups' },
-        group('ages', CLEANUP_AGES, (a) => t(AGE_KEYS[a])),
+        group('ages', AGES, (a) => t(AGE_KEYS[a])),
         group('statuses', Object.keys(CLEANUP_STATUS_KEYS), (v) => t(CLEANUP_STATUS_KEYS[v])),
         group('classes', Object.keys(CLEANUP_CLASS_KEYS), (v) => t(CLEANUP_CLASS_KEYS[v]))),
       outcome,
@@ -1938,10 +1949,6 @@
         el('button', { testid: 'cleanup-close', disabled: c.busy, onclick: closeCleanup }, t('cleanup.close')))));
   }
 
-  // "Review feedback (N)" starts nothing: the review runs in an agent session
-  // the person opens, where they follow and steer it (the owner, 2026-10-07).
-  // The count stays, and hovering or clicking says where to go. Not
-  // `disabled`: a disabled button gets no clicks, and the click must show it.
   // --- the filters' drop-downs ---------------------------------------------------
   // An outlined box with its name on the top edge (Material's outlined field),
   // all four the same width. Not a <select>: a native list cannot wrap a long
@@ -2307,7 +2314,7 @@
       .filter((cls) => !UNLISTED_CLASSES.includes(cls));
     const all = Object.values(totals).reduce((sum, n) => sum + n, 0);
     const options = classes.map((cls) => {
-      const name = CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls;
+      const name = className(cls);
       return {
         value: cls, label: name, text: counted(name, totals[cls]), testid: `fit-option-${cls}`,
         checked: !chosen || chosen.includes(cls),
@@ -2525,8 +2532,7 @@
       const items = byClass.get(stub.class);
       items.splice(Math.min(Math.max(stub.index, 0), items.length), 0, { kind: 'stub', id, stub });
     }
-    const order = Object.keys(CLASS_KEYS);
-    sections.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    sections.sort((a, b) => (classRank(a) - classRank(b)) || (a < b ? -1 : a > b ? 1 : 0));
     return { sections, byClass };
   }
 
@@ -2542,7 +2548,7 @@
     return el('div', { class: 'list', testid: 'list' }, sections.map((cls) => el('section', {
       class: 'class-section', testid: `section-${cls}`,
     },
-    el('h2', {}, el('span', { class: 'section-title' }, CLASS_KEYS[cls] ? t(CLASS_KEYS[cls]) : cls),
+    el('h2', {}, el('span', { class: 'section-title' }, className(cls)),
       el('span', { class: 'count', testid: `section-count-${cls}` }, sectionCount(cls))),
     byClass.get(cls).map((item) => (item.kind === 'row' ? renderRow(item.row) : renderStub(item.id, item.stub))),
     renderMore(cls))));
@@ -2779,7 +2785,7 @@
 
   // "Collect reputation" (the owner, 2026-10-17): the employer's reputation
   // is no longer looked up by every collection; this button looks it up for
-  // the vacancy's company (main/reputation.js) and is gone once the company
+  // the vacancy's company (tools/reputation_lookup.py) and is gone once the company
   // has a result — found, or too few sources.
   function reputationButton(item) {
     const view = viewOf(item);
@@ -2820,8 +2826,8 @@
   // (tools/cv_tailor.py). "Generate Cover Letter" beside it (2026-10-12): a
   // cover letter from the same CVs (tools/cover_letter.py). Both go into the
   // vacancy's own folder of documents, versioned (tools/documents.py). Each
-  // takes a minute or three; a click queues a task (main/tasks.js), and the
-  // tasks run one at a time, of either kind (app/main/cv.js says why).
+  // takes a minute or three; a click queues a task (main/queue.js), and the
+  // tasks run one at a time in their slot (tools/taskq.py, KINDS).
   //
   // Both buttons behave alike. Like the reason of a rejection (the owner,
   // 2026-10-12): the first click opens a field for instructions to this one
