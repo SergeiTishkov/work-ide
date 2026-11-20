@@ -995,9 +995,77 @@ def run_links(minutes: float = availability.DEFAULT_MINUTES) -> dict:
             "links": availability.note(stats), "collected": "nothing: the links run fetches nothing"}
 
 
+# The time the unread vacancies' check may take (run_unread): about 2,300 on
+# 2026-11-20, a request each at LinkedIn's pace (2-3 s), about two hours.
+UNREAD_MINUTES = 300
+
+
+def unread_vacancies(vacancies: dict) -> list:
+    """The vacancies left unread: no description, not refused by the
+    scripts (rejected: a title or a country on the card said no), not a
+    near-duplicate, not known to be closed."""
+    return [
+        v for v in vacancies.values()
+        if not v.get("duplicate_of") and v.get("url")
+        and not (v.get("description_text") or "").strip()
+        and (v.get("link_check") or {}).get("status") != "dead"
+        and (v.get("computed") or {}).get("classification") != "rejected"
+    ]
+
+
+def run_unread(minutes: float = UNREAD_MINUTES) -> dict:
+    """The vacancies left unread, read (task 0129): each asked first whether
+    it is still open (tools/availability.py, newest first). LinkedIn: one
+    request to the guest fragment, which says closed (the marker, 404) or
+    gives the text and the employment types, kept as the page's would be;
+    the full page is not read, since the score does not take LinkedIn's
+    schema.org workplace (sources.catalog.yaml, workplace_hidden) and reads
+    remote work from the text. Other boards: the open ones' pages read as the
+    descriptions step reads them. Those read are rescored, the AI check
+    reads what rose to the top, and a "rebuild" selection lists the result.
+    Holds the base like the other runs."""
+    vacancies, companies, state = _load()
+    criteria, profile = score.load_criteria(), score.load_profile()
+    unread = unread_vacancies(vacancies)
+    with progress.stage(f"check that the unread vacancies are open "
+                        f"({progress.number(len(unread))} unread)") as st:
+        checked = availability.check(unread, minutes=minutes, recheck_hours=0,
+                                     newest_first=True, keep_facts=True)
+        fragments = checked.pop("facts")
+        changed = checked.pop("changed")
+        st.note = availability.note(checked)
+    state["last_link_check"] = checked
+    opened = [vacancies[vid] for vid, verdict in changed.items() if verdict.get("status") == "ok"]
+    with progress.stage(f"fetch missing descriptions of the open ones "
+                        f"({progress.number(len(opened))})") as st:
+        read = enrich_descriptions.read([v for v in opened if v["id"] not in fragments])
+        read["linkedin"] = 0
+        for record in opened:
+            if record["id"] in fragments:
+                enrich_descriptions.apply_facts(record, fragments[record["id"]], read)
+                read["linkedin"] += 1
+        st.note = _stats_note(read)
+    state["last_description_enrich"] = read
+    touched = {vid: vacancies[vid] for vid in changed}
+    with progress.stage(f"rescore the base, with the new descriptions "
+                        f"({progress.number(len(touched))} vacancies)"):
+        rescore_all(touched, criteria, profile, companies)
+    if ai_check_stage(vacancies, state):
+        top = screened_subset(vacancies)
+        with progress.stage(f"rescore the top, with the AI check ({progress.number(len(top))} vacancies)"):
+            rescore_all(top, criteria, profile, companies)
+    selection_id = _save_and_select(vacancies, companies, state, "rebuild")
+    return {"new_vacancies": 0, "total_in_kb": len(vacancies), "selection_id": selection_id,
+            "links": availability.note(checked), "descriptions": _stats_note(read),
+            "waiting_for_ai": unscreened_count(vacancies),
+            "collected": "nothing: the unread vacancies' pages only"}
+
+
 def _run_mode(args, staged: Optional[dict]) -> dict:
     if args.ai:
         return run_ai(reread=args.reread, since=args.since)
+    if args.links and args.read:
+        return run_unread()
     if args.links:
         return run_links()
     if args.linkedin:
@@ -1032,6 +1100,9 @@ def main() -> None:
                       help="only the links of the shortlist checked again (see run_links)")
     mode.add_argument("--ai", action="store_true",
                       help="only the AI check of what waits for it (see run_ai)")
+    parser.add_argument("--read", action="store_true",
+                        help="with --links: the vacancies left unread instead, checked open "
+                             "and the open ones read (see run_unread, task 0129)")
     parser.add_argument("--reread", action="store_true",
                         help="with --ai: read again the answers given under another prompt or brief "
                              "(only when the owner asked for it, task 0103)")
@@ -1040,6 +1111,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.reread and not args.ai:
         parser.error("--reread goes with --ai")
+    if args.read and not args.links:
+        parser.error("--read goes with --links")
     if args.since and not args.reread:
         parser.error("--since goes with --reread")
     if args.since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):

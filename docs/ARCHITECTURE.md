@@ -314,6 +314,24 @@ Rejected: hiding a vacancy by its age. The owner's own "expired" answers
 came a median of 13 days after first sight, with a range of 0 to 77 days, so
 no age separates open from closed.
 
+### The vacancies left unread, read once (task 0129, 2026-11-20)
+A page is read for a listed vacancy within a run's budget (300 pages), the
+highest score first; "remote not confirmed" only in the run that brought
+it. A LinkedIn run brings thousands of cards, so on 2026-11-20 1,010
+vacancies not refused by the scripts had no text, 955 of them LinkedIn in
+"remote not confirmed", 851 first seen in October.
+
+`pipeline.py --links --read` (the queue's `links` task with
+`{"read": true}`) takes each of them, newest first: the availability check
+asks whether it is open, and for LinkedIn the same guest-fragment request
+gives the text and the employment types, kept as a page's would be. The
+full page is not asked as well: its one more fact, schema.org's
+TELECOMMUTE, is not taken by the score for LinkedIn (workplace_hidden),
+which reads remote work from the text ("remote worldwide" +6, a bare
+"remote" +4 in SHARP's criteria). A closed one is marked so and never asked
+again. Then the usual tail: rescore, the AI check of what rose to the top,
+a "rebuild" selection.
+
 ### The search-identity system (2026-07-31)
 
 The project became multi-user. The full description is in `docs/IDENTITIES.md`;

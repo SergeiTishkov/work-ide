@@ -50,6 +50,8 @@ const STAGE_KEYS = [
   [/^AI check/, 'ai_check'],
   [/^mark near-duplicates/, 'duplicates'],
   [/^check links/, 'links'],
+  // the links run (tools/availability.py, tasks 0127 and 0129)
+  [/^check that the \w+ vacancies are open/, 'links'],
   [/^rebuild companies/, 'companies'],
   [/^find direct application channels/, 'channels'],
   [/^company facts from Wikidata/, 'wikidata'],

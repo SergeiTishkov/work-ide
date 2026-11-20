@@ -542,6 +542,75 @@ def test_the_links_run_checks_the_shown_only_writes_their_verdicts_and_records_a
     assert result["selection_id"] == 7 and result["new_vacancies"] == 0
 
 
+def test_the_unread_vacancies_are_the_ones_without_text_not_refused_not_closed():
+    vacancies = {
+        "unread": {"id": "unread", "url": "u", "computed": {"classification": "remote_unconfirmed"}},
+        "low": {"id": "low", "url": "u", "computed": {"classification": "low_priority"}},
+        "read": {"id": "read", "url": "u", "description_text": "text",
+                 "computed": {"classification": "remote_unconfirmed"}},
+        "refused": {"id": "refused", "url": "u", "computed": {"classification": "rejected"}},
+        "closed": {"id": "closed", "url": "u", "link_check": {"status": "dead"},
+                   "computed": {"classification": "hot_lead"}},
+        "twin": {"id": "twin", "url": "u", "duplicate_of": "unread",
+                 "computed": {"classification": "hot_lead"}},
+        "no_link": {"id": "no_link", "computed": {"classification": "hot_lead"}},
+    }
+    assert sorted(v["id"] for v in pipeline.unread_vacancies(vacancies)) == ["low", "unread"]
+
+
+def test_the_unread_run_checks_reads_the_open_ones_rescores_and_records_a_rebuild(
+        isolated_data_dir, monkeypatch):
+    """Task 0129: LinkedIn's open ones keep the fragment's text (no second
+    request); another board's open one is read by its reader; a closed one
+    is only marked."""
+    import availability
+    import enrich_descriptions
+    vacancies = {
+        "li": {"id": "li", "url": "https://www.linkedin.com/jobs/view/4000000001", "source": "linkedin",
+               "computed": {"classification": "remote_unconfirmed"}},
+        "gone": {"id": "gone", "url": "https://www.linkedin.com/jobs/view/4000000002", "source": "linkedin",
+                 "computed": {"classification": "remote_unconfirmed"}},
+        "reed": {"id": "reed", "url": "https://reed.example/1", "source": "reed",
+                 "computed": {"classification": "low_priority"}},
+    }
+    monkeypatch.setattr(pipeline, "_load", lambda: (vacancies, {}, {"sources": {}}))
+    seen = {}
+
+    def check(unread, **kw):
+        seen.update(checked=sorted(v["id"] for v in unread), **kw)
+        for vid, status in (("li", "ok"), ("gone", "dead"), ("reed", "ok")):
+            vacancies[vid]["link_check"] = {"status": status}
+        return {"due": 3, "checked": 3, "ok": 2, "dead": 1, "unknown": 0, "rate_limited": 0,
+                "left_for_next_run": 0, "linkedin_stopped": None,
+                "changed": {"li": {"status": "ok"}, "gone": {"status": "dead"}, "reed": {"status": "ok"}},
+                "facts": {"li": {"description": "Remote worldwide. C# and .NET.",
+                                 "employment_types": ["contract"], "closed": False}}}
+
+    monkeypatch.setattr(availability, "check", check)
+
+    def read(records):
+        seen["read"] = [r["id"] for r in records]
+        for r in records:
+            r["description_text"] = "Read by its reader"
+        return enrich_descriptions.new_stats()
+
+    monkeypatch.setattr(enrich_descriptions, "read", read)
+    monkeypatch.setattr(pipeline, "rescore_all", lambda subset, *a, **k: seen.update(rescored=sorted(subset)))
+    monkeypatch.setattr(pipeline, "ai_check_stage", lambda *a, **k: False)
+    monkeypatch.setattr(pipeline, "_save_and_select",
+                        lambda v, c, s, kind: seen.update(kind=kind, state=s) or 9)
+    result = pipeline.run_unread()
+    assert seen["checked"] == ["gone", "li", "reed"]
+    assert seen["newest_first"] and seen["keep_facts"] and seen["recheck_hours"] == 0
+    assert seen["read"] == ["reed"]
+    assert vacancies["li"]["description_text"] == "Remote worldwide. C# and .NET."
+    assert "contract" in vacancies["li"]["employment_types"]
+    assert not vacancies["gone"].get("description_text")
+    assert seen["rescored"] == ["gone", "li", "reed"]
+    assert seen["kind"] == "rebuild" and seen["state"]["last_description_enrich"]["linkedin"] == 1
+    assert result["selection_id"] == 9
+
+
 def _one_good_record():
     return [{
         "source": "arbeitnow", "external_id": "job-1",

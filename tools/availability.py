@@ -88,7 +88,10 @@ def linkedin_job(vacancy: dict) -> Optional[str]:
 
 
 def linkedin_verdict(job_id: str, session, timeout: int = TIMEOUT) -> dict:
-    """One posting through the guest fragment. Never raises."""
+    """One posting through the guest fragment. Never raises. An open one
+    carries what the fragment states under "facts" (fetch_linkedin
+    .page_facts: the description, the employment types; no schema.org
+    workplace type, which only the full page has); check() takes it off."""
     try:
         resp = session.get(fetch_linkedin.GUEST_POSTING_URL.format(job_id=job_id),
                            timeout=timeout, allow_redirects=False)
@@ -103,7 +106,7 @@ def linkedin_verdict(job_id: str, session, timeout: int = TIMEOUT) -> dict:
     if facts["closed"]:
         return {"status": "dead", "http_code": code, "reason": CLOSED_MARKER}
     if facts["description"]:
-        return {"status": "ok", "http_code": code}
+        return {"status": "ok", "http_code": code, "facts": facts}
     return {"status": "unknown", "http_code": code, "error": "no posting in the answer"}
 
 
@@ -132,18 +135,29 @@ def _order_key(vacancy: dict) -> str:
     return (vacancy.get("link_check") or {}).get("checked_at") or ""
 
 
+def _newest_first(vacancy: dict) -> str:
+    return str(vacancy.get("first_seen") or "")
+
+
 def check(vacancies: Iterable[dict], *, minutes: float = DEFAULT_MINUTES,
           recheck_hours: float = RECHECK_HOURS, session=None,
           sleep: Callable[[float], None] = time.sleep,
           clock: Callable[[], float] = time.monotonic,
-          now: Optional[datetime] = None) -> dict:
-    """Checks the due vacancies, oldest check first, until the budget ends.
-    Mutates each checked record's `link_check`; returns the statistics and
-    {"changed": {vacancy id: link_check}} for save()."""
+          now: Optional[datetime] = None, newest_first: bool = False,
+          keep_facts: bool = False) -> dict:
+    """Checks the due vacancies, oldest check first (`newest_first`: the
+    vacancies first seen last go first), until the budget ends. Mutates each
+    checked record's `link_check`; returns the statistics and
+    {"changed": {vacancy id: link_check}} for save(). `keep_facts`: also
+    {"facts": {vacancy id: what an open LinkedIn posting's fragment states}}."""
     now = now or _now()
-    todo = sorted((v for v in vacancies if due(v, now, recheck_hours)), key=_order_key)
+    due_ones = [v for v in vacancies if due(v, now, recheck_hours)]
+    todo = (sorted(due_ones, key=_newest_first, reverse=True) if newest_first
+            else sorted(due_ones, key=_order_key))
     stats = {"due": len(todo), "checked": 0, "ok": 0, "dead": 0, "unknown": 0, "rate_limited": 0,
              "left_for_next_run": 0, "linkedin_stopped": None, "changed": {}}
+    if keep_facts:
+        stats["facts"] = {}
     if not todo:
         return stats
     if session is None:
@@ -198,6 +212,9 @@ def check(vacancies: Iterable[dict], *, minutes: float = DEFAULT_MINUTES,
         else:
             result = other_verdict(vacancy, session, devitjobs_listed=listed)
         tick()
+        facts = result.pop("facts", None)
+        if keep_facts and facts:
+            stats["facts"][vacancy["id"]] = facts
         merged = link_check.merge(vacancy.get("link_check"), result, _now(), by=BY)
         vacancy["link_check"] = merged
         stats["changed"][vacancy["id"]] = merged
