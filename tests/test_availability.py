@@ -123,6 +123,24 @@ def test_the_oldest_check_goes_first_and_the_budget_leaves_the_rest_for_the_next
     assert stats["left_for_next_run"] == 1
 
 
+def test_newest_first_and_the_open_postings_text_kept_apart_from_the_verdict():
+    """Task 0129: the unread vacancies, newest first; an open posting's
+    fragment gives its text, kept under "facts", not in link_check."""
+    vacancies = [_li("october", "4000000001", first_seen="2026-10-02T00:00:00+00:00"),
+                 _li("november", "4000000002", first_seen="2026-11-19T00:00:00+00:00"),
+                 _li("closed", "4000000003", first_seen="2026-11-01T00:00:00+00:00")]
+    session = FakeSession({"4000000001": Answer(200, OPEN_PAGE), "4000000002": Answer(200, OPEN_PAGE),
+                           "4000000003": Answer(200, CLOSED_PAGE)})
+    clock = Clock()
+    stats = availability.check(vacancies, minutes=30, session=session, sleep=clock.sleep, clock=clock,
+                               now=NOW, newest_first=True, keep_facts=True)
+    assert list(stats["changed"]) == ["november", "closed", "october"]
+    assert set(stats["facts"]) == {"november", "october"}
+    assert stats["facts"]["november"]["description"] == "Build things"
+    assert all("facts" not in verdict for verdict in stats["changed"].values())
+    assert "facts" not in _run([_li("x", "4000000001")], FakeSession({"4000000001": Answer(200, OPEN_PAGE)}))
+
+
 # --- 429 ---------------------------------------------------------------------
 
 def test_a_429_is_waited_out_and_the_same_posting_asked_again():

@@ -89,3 +89,10 @@ test('a task that failed fails the step it was in', () => {
   steps.finish('failed');
   assert.deepEqual(steps.steps().map((s) => [s.key, s.state]), [['merge_linkedin', 'failed']]);
 });
+
+test('the links run\'s stages are the step "links" (tasks 0127, 0129)', () => {
+  const { stageKey } = require('../../main/steps');
+  assert.equal(stageKey('check that the shown vacancies are open (220 shown)'), 'links');
+  assert.equal(stageKey('check that the unread vacancies are open (2 300 unread)'), 'links');
+  assert.equal(stageKey('fetch missing descriptions of the open ones (700)'), 'descriptions');
+});

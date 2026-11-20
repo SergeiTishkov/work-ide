@@ -109,6 +109,8 @@ file live). It:
   (404/410) — the counts are in the run log and in `last_link_check` of the
   state file; whether the listed vacancies, LinkedIn's included, are still
   open is the queue's `links` run (`tools/availability.py`, task 0127);
+  with `--args '{"read": true}'` it takes the vacancies left without a
+  description instead, and reads the open ones (task 0129);
 - fetches the vacancy page for anything in the shortlist that arrived without a
   description (`tools/enrich_descriptions.py`), which also picks up the stated
   salary, whether the posting still accepts applications, and whether the

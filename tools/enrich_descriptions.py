@@ -331,8 +331,7 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT,
     """
     import progress
 
-    stats = {"considered": 0, "fetched": 0, "empty": 0, "errors": 0,
-             "closed": 0, "declared_remote": 0, "salary_found": 0}
+    stats = new_stats()
     keys = list(worklist(vacancies, classes, limit, need_employment_types))
     head = set(keys)
     wanted = [key for key in wanted_worklist(vacancies, wanted_limit) if key not in head]
@@ -341,62 +340,94 @@ def enrich(vacancies: dict, classes=HEAD_CLASSES, limit: int = DEFAULT_LIMIT,
     tick = progress.Progress(len(keys), "descriptions")
     for key in keys:
         tick()
-        record = vacancies[key]
-        stats["considered"] += 1
-        facts = {"description": "", "workplace_type": None,
-                 "salary_raw": None, "closed": False}
-        reader = _reader_for(record.get("source"))
-        try:
-            if reader is not None:
-                facts = reader(record.get("read_url") or record["url"],
-                               common.DEFAULT_TIMEOUT)
-        except Exception:  # noqa: BLE001 — one page must not stop the rest
-            stats["errors"] += 1
-        if reader is not None and READ_PAUSE_SECONDS.get(record.get("source")):
-            time.sleep(READ_PAUSE_SECONDS[record["source"]])
-        text = facts.get("description") or ""
-        record["description_fetch"] = {
-            "attempted_at": _now(),
-            "chars": len(text),
+        read_one(vacancies[key], stats)
+    return stats
+
+
+def read_one(record: dict, stats: dict) -> None:
+    """Reads one vacancy's page with its source's reader and keeps what it
+    states (apply_facts). Never raises."""
+    stats["considered"] += 1
+    facts = {"description": "", "workplace_type": None,
+             "salary_raw": None, "closed": False}
+    reader = _reader_for(record.get("source"))
+    try:
+        if reader is not None:
+            facts = reader(record.get("read_url") or record["url"],
+                           common.DEFAULT_TIMEOUT)
+    except Exception:  # noqa: BLE001 — one page must not stop the rest
+        stats["errors"] += 1
+    if reader is not None and READ_PAUSE_SECONDS.get(record.get("source")):
+        time.sleep(READ_PAUSE_SECONDS[record["source"]])
+    apply_facts(record, facts, stats)
+
+
+def apply_facts(record: dict, facts: dict, stats: dict) -> None:
+    """Keeps what a vacancy's page states: the description, the declared
+    workplace, the employment types, a salary, the closed marker. `stats`
+    counts them as enrich() does."""
+    text = facts.get("description") or ""
+    record["description_fetch"] = {
+        "attempted_at": _now(),
+        "chars": len(text),
+    }
+    if text.strip():
+        record["description_text"] = text
+        stats["fetched"] += 1
+    else:
+        stats["empty"] += 1
+
+    # The employer's own declaration, where there is one. Only ever set to
+    # "remote": silence is not evidence of onsite, and the scoring has a
+    # class of its own for "nobody said".
+    if facts.get("workplace_type"):
+        record["workplace_type"] = facts["workplace_type"]
+        stats["declared_remote"] += 1
+    # The engagement as the page states it. Merged rather than replaced: a
+    # board's card may already have said "contract", and the page adding
+    # "part-time" does not make the first statement untrue.
+    if facts.get("employment_types"):
+        import normalize
+
+        record["employment_types"] = normalize.employment_types(
+            list(record.get("employment_types") or []) + list(facts["employment_types"]))
+        stats["employment_type_found"] = stats.get("employment_type_found", 0) + 1
+    # A salary stated in the vacancy is the highest level of trust there
+    # is (CLAUDE.md §5) and it was being discarded on every LinkedIn card.
+    if facts.get("salary_raw") and not record.get("salary_raw"):
+        record["salary_raw"] = facts["salary_raw"]
+        stats["salary_found"] += 1
+    # A posting that no longer accepts applications is not a candidate.
+    # Recorded through link_check, which the report already filters on —
+    # the same treatment as a 404, and for the same reason: there is
+    # nothing on the other end of the link. Found by the owner 2026-08-11,
+    # leading the shortlist at 65.
+    if facts.get("closed"):
+        record["link_check"] = {
+            "status": "dead",
+            "reason": "no longer accepting applications",
+            "checked_at": _now(),
         }
-        if text.strip():
-            record["description_text"] = text
-            stats["fetched"] += 1
-        else:
-            stats["empty"] += 1
+        stats["closed"] += 1
 
-        # The employer's own declaration, where there is one. Only ever set to
-        # "remote": silence is not evidence of onsite, and the scoring has a
-        # class of its own for "nobody said".
-        if facts.get("workplace_type"):
-            record["workplace_type"] = facts["workplace_type"]
-            stats["declared_remote"] += 1
-        # The engagement as the page states it. Merged rather than replaced: a
-        # board's card may already have said "contract", and the page adding
-        # "part-time" does not make the first statement untrue.
-        if facts.get("employment_types"):
-            import normalize
 
-            record["employment_types"] = normalize.employment_types(
-                list(record.get("employment_types") or []) + list(facts["employment_types"]))
-            stats["employment_type_found"] = stats.get("employment_type_found", 0) + 1
-        # A salary stated in the vacancy is the highest level of trust there
-        # is (CLAUDE.md §5) and it was being discarded on every LinkedIn card.
-        if facts.get("salary_raw") and not record.get("salary_raw"):
-            record["salary_raw"] = facts["salary_raw"]
-            stats["salary_found"] += 1
-        # A posting that no longer accepts applications is not a candidate.
-        # Recorded through link_check, which the report already filters on —
-        # the same treatment as a 404, and for the same reason: there is
-        # nothing on the other end of the link. Found by the owner 2026-08-11,
-        # leading the shortlist at 65.
-        if facts.get("closed"):
-            record["link_check"] = {
-                "status": "dead",
-                "reason": "no longer accepting applications",
-                "checked_at": _now(),
-            }
-            stats["closed"] += 1
+def new_stats() -> dict:
+    return {"considered": 0, "fetched": 0, "empty": 0, "errors": 0,
+            "closed": 0, "declared_remote": 0, "salary_found": 0}
+
+
+def read(records: list) -> dict:
+    """Reads the pages of the given vacancies, those whose source has a
+    reader (READABLE_SOURCES), with no worklist and no limit: the caller
+    chose them (pipeline.py --links --read, task 0129)."""
+    import progress
+
+    stats = new_stats()
+    todo = [r for r in records if r.get("url") and _reader_for(r.get("source")) is not None]
+    tick = progress.Progress(len(todo), "descriptions")
+    for record in todo:
+        tick()
+        read_one(record, stats)
     return stats
 
 

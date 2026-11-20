@@ -305,8 +305,12 @@ def command(task: dict, *, python: Optional[str] = None, claude: Optional[str] =
         return Command([python, tool("reputation_lookup.py"), "--identity", _identity(task),
                         "--vacancy", _vacancy(task)])
     if kind == "links":
-        return Command([python, tool("pipeline.py"), "--identity", _identity(task), "--links"],
-                       map_line=pipeline_line)
+        # {"read": true}: the vacancies left unread, checked and read (task 0129)
+        read = args.get("read", False)
+        if not isinstance(read, bool):
+            raise ValueError(f"read is true or false: {read!r}")
+        return Command([python, tool("pipeline.py"), "--identity", _identity(task), "--links",
+                        *(["--read"] if read else [])], map_line=pipeline_line)
     raise ValueError(f"no runner for the kind {kind!r}")
 
 
