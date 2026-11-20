@@ -55,7 +55,7 @@ WHAT: Dict[str, str] = {
     "rest": "the rest of the base",
     "clean": "a clean-up, with the filters of the Clean up dialog",
     "cv_batch": "a CV/CL batch",
-    "links": "a re-check of the shortlist's links",
+    "links": "whether the listed vacancies are still open",
 }
 MISSED = ("catch_up", "skip")
 ALL = "all"

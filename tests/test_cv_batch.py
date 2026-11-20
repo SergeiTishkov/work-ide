@@ -205,3 +205,24 @@ def test_a_vacancy_the_person_took_up_meanwhile_is_left_alone(tmp_path):
     log = where["log"].read_text(encoding="utf-8")
     assert "left alone [2/4] sharp letter a1: the person generates a document for it" in log
     assert "finished: 3 made, 0 gone, 0 failed, 1 left alone" in log
+
+
+def test_a_posting_found_closed_right_before_its_document_counts_as_gone(tmp_path):
+    # task 0127: check_now asks the board before each document
+    where = cv_batch.paths(tmp_path)
+    made = []
+
+    def generate(prefix, item, kind):
+        made.append((item["vacancy_id"], kind))
+        return {"ok": True}
+
+    def check(prefix, item):
+        if item["vacancy_id"] == "a2":
+            return f"{cv_batch.GONE}: no longer accepting applications"
+        return None
+
+    status = cv_batch.Batch(where).run(_ask("sharp"), _plan, generate, check=check)
+    assert made == [("a1", "cv"), ("a1", "letter")]
+    assert (status["made"], status["gone"], status["left_alone"]) == (2, 1, 0)
+    log = where["log"].read_text(encoding="utf-8")
+    assert "gone    [3/3] sharp cv a2: Vacancy not found: no longer accepting applications" in log

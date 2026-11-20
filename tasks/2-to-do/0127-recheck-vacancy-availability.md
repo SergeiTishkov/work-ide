@@ -59,4 +59,8 @@ In outline:
 
 ## Items
 - DONE - The measurement above
-- TO DO - The checker, the sticky verdicts, the budget, tests; the queue's links run; docs
+- DONE - `tools/availability.py`: LinkedIn through the guest posting fragment (measured 2026-11-20: open = 200 with a description, closed = 200 with "No longer accepting applications", no posting = 404), one by one, paced as the collection, a 429 waited out and asked again, five in a row end LinkedIn for the run; the other boards as link_check; the oldest check first in a 45-minute budget; only `link_check` written, into the rows as they are now
+- DONE - `link_check.merge`: a closed verdict is not undone by an unknown one; link_check sends LinkedIn no HEAD
+- DONE - The queue's links run (`pipeline.py --links`) uses it and writes no more than the verdicts; the document batch asks the board before each document (a closed posting counts as gone)
+- DONE - Tests (tests/test_availability.py, the batch, the links run); docs (ARCHITECTURE, BUILDING_BLOCKS, RUNBOOK). A live dry run from the worktree, 2026-11-20, beside LinkedIn task #296: 12 listed vacancies in 4 minutes (5 answers 429), 11 closed (7 "no longer accepting", 4 404), 1 open
+- TO DO - A real links run after the rest run, measured; a daily schedule of it for SHARP

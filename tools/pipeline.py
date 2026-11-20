@@ -82,6 +82,7 @@ import enrich_descriptions  # noqa: E402
 import ai_brief  # noqa: E402
 import ai_limit  # noqa: E402
 import ai_screen  # noqa: E402
+import availability  # noqa: E402
 import link_check  # noqa: E402
 import normalize  # noqa: E402
 import score  # noqa: E402
@@ -967,24 +968,29 @@ def run_ai(reread: bool = False, since: Optional[str] = None) -> dict:
             "collected": "nothing: the AI run fetches nothing"}
 
 
-# The links mode checks again what was not checked in this many hours.
-LINKS_RECHECK_HOURS = 6
-
-
-def run_links() -> dict:
-    """The links of the shortlist checked again (a schedule's "re-check of
-    the shortlist's links", task 0061): what the shortlist lists, every link
-    not checked in LINKS_RECHECK_HOURS; a dead one leaves the shortlist with
-    the "rebuild" selection. Nothing fetched, nothing rescored."""
-    vacancies, companies, state = _load()
-    listed = {v["id"]: v for v in selections.listed_vacancies(vacancies)}
-    with progress.stage(f"check links of the shortlist ({progress.number(len(listed))} vacancies)") as st:
-        stats = link_check.check_links(listed, recheck_after_hours=LINKS_RECHECK_HOURS)
-        st.note = _stats_note(stats)
+def run_links(minutes: float = availability.DEFAULT_MINUTES) -> dict:
+    """The listed vacancies checked again, open or closed (task 0127; a
+    schedule's "re-check of the shortlist's links", task 0061): see
+    tools/availability.py — the oldest check first, within `minutes`. Only
+    the checked vacancies' `link_check` is written, into their rows as they
+    are in the base now: a LinkedIn merge running beside this one keeps what
+    it wrote. A closed one leaves the list with the "rebuild" selection.
+    Nothing fetched, nothing rescored."""
+    vacancies, _companies, _state = _load()
+    listed = selections.listed_vacancies(vacancies)
+    with progress.stage(f"check that the listed vacancies are open "
+                        f"({progress.number(len(listed))} listed)") as st:
+        stats = availability.check(listed, minutes=minutes)
+        availability.save(stats.pop("changed"))
+        st.note = availability.note(stats)
+    state = common.load_json(common.STATE_PATH, default={"run_count": 0, "sources": {}})
     state["last_link_check"] = stats
-    selection_id = _save_and_select(vacancies, companies, state, "rebuild")
+    common.save_json_atomic(common.STATE_PATH, state)
+    with progress.stage("record the selection (rebuild)") as st:
+        selection_id = selections.record(vacancies, state, kind="rebuild")
+        st.note = f"#{selection_id}, {progress.number(len(selections.listed_vacancies(vacancies)))} listed"
     return {"new_vacancies": 0, "total_in_kb": len(vacancies), "selection_id": selection_id,
-            "links": _stats_note(stats), "collected": "nothing: the links run fetches nothing"}
+            "links": availability.note(stats), "collected": "nothing: the links run fetches nothing"}
 
 
 def _run_mode(args, staged: Optional[dict]) -> dict:
