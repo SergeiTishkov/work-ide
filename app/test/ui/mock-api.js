@@ -358,14 +358,16 @@ function installMockApi(fixture) {
     },
     async setFeedback(identity, id, status, reason) {
       record('setFeedback', [identity, id, status, reason]);
-      return update(identity, id, () => ({
+      // as the store keeps it: trimmed, null when nothing was written; the
+      // other statuses' texts stay (task 0132)
+      const text = reason && reason.trim() ? reason.trim() : null;
+      return update(identity, id, (fb) => ({
         status,
         at: NOW,
         appliedAt: status === 'applied' ? NOW : null,
-        // as the store keeps it: trimmed, null when nothing was written
-        appliedComment: status === 'applied' && reason && reason.trim() ? reason.trim() : null,
-        rejectedReason: status === 'rejected' ? reason : null,
-        buggedReason: status === 'bugged' ? reason : null,
+        appliedComment: status === 'applied' ? text : (fb.appliedComment ?? null),
+        rejectedReason: status === 'rejected' ? reason : (fb.rejectedReason ?? null),
+        buggedReason: status === 'bugged' ? reason : (fb.buggedReason ?? null),
         interviewComments: [],
         interviewAt: [],
       }));

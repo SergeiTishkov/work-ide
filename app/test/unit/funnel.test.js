@@ -79,10 +79,11 @@ test('from the final word without interviews, undo returns to the contact', () =
   assert.equal(F.stepBack(r, T4).status, 'contacted');
 });
 
-test('undo on a negative answer clears it', () => {
+test('undo on a negative answer keeps its text for the next time (task 0132)', () => {
   const r = F.stepBack({ ...applied(), status: 'rejected', rejectedReason: 'far too senior' }, T2);
   assert.equal(r.status, 'new');
-  assert.equal(r.rejectedReason, null);
+  assert.equal(r.rejectedReason, 'far too senior');
+  assert.deepEqual(F.timeline(r), [], 'a text off its status is not shown');
 });
 
 test('editing: positive comments may become empty, negative ones become null and are re-dated', () => {
@@ -139,13 +140,15 @@ test('the applied comment: shown and edited on the applied step, null when empty
   assert.throws(() => F.editComment({ status: 'rejected', at: T1, rejectedReason: null }, 'applied', null, 'x', T4));
 });
 
-test('undo of the application forgets its comment; undo of a later step keeps it', () => {
+test('undo of the application, or of a later step, keeps its comment (task 0132)', () => {
   const r = { ...applied(), appliedComment: 'Visa: not needed' };
   const contacted = F.advance(r, 'contacted', '', T2);
   assert.equal(F.stepBack(contacted, T3).appliedComment, 'Visa: not needed');
   const back = F.stepBack(r, T3);
   assert.equal(back.status, 'new');
-  assert.equal(back.appliedComment, null);
+  assert.equal(back.appliedAt, null);
+  assert.equal(back.appliedComment, 'Visa: not needed');
+  assert.deepEqual(F.timeline(back), []);
 });
 
 test('after the final resolution, the offer; and a no can come at any step', () => {

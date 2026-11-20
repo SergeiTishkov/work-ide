@@ -3008,6 +3008,10 @@
   // row, and the second lands on a new button.
   const DOUBLE_CLICK_MS = 500;
 
+  // The text written the last time the vacancy had this status: an undone
+  // answer keeps it, and the form opens with it (task 0132).
+  const TEXT_OF = { applied: 'appliedComment', rejected: 'rejectedReason', bugged: 'buggedReason' };
+
   function askReason(item, status) {
     const open = state.reasonFor;
     if (open && open.id === item.id && open.status === status
@@ -3015,7 +3019,8 @@
       return mark(item, status, open.draft || '');
     }
     const same = open && open.id === item.id && open.status === status;
-    state.reasonFor = { id: item.id, status, at: Date.now(), draft: same ? open.draft : undefined };
+    const kept = (item.feedback && item.feedback[TEXT_OF[status]]) || undefined;
+    state.reasonFor = { id: item.id, status, at: Date.now(), draft: same ? open.draft : kept };
     render();
   }
 

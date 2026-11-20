@@ -415,7 +415,7 @@ test('Ctrl+Enter saves the applied comment; the draft survives a re-render', asy
   expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'applied', 'Visa: not needed']]);
 });
 
-test('the applied comment shows in the timeline, is edited there, and undo forgets it', async ({ page }) => {
+test('the applied comment shows in the timeline, is edited there, and undo keeps it for the next time', async ({ page }) => {
   await open(page);
   await choose(page, 'filter', 'all');
   const row = byId(page, 'a1');
@@ -437,9 +437,30 @@ test('the applied comment shows in the timeline, is edited there, and undo forge
   await row.getByTestId('btn-undo').click();
   await expect(row.getByTestId('btn-applied')).toBeVisible();
   await expect(row.getByTestId('entry-applied')).toHaveCount(0);
+  // task 0132: marked again, the form opens with the old comment
+  await row.getByTestId('btn-applied').click();
+  await expect(row.getByTestId('reason-input')).toHaveValue('Q: why us? A: the product and the team');
+  await row.getByTestId('reason-cancel').click();
+  // a double click keeps it as it was
   await row.getByTestId('btn-applied').dblclick();
-  await entry.getByTestId('entry-edit').click();
-  await expect(entry.getByTestId('entry-input')).toHaveValue('');   // the old comment is gone
+  expect((await calls(page, 'setFeedback')).at(-1))
+    .toEqual(['sharp', 'a1', 'applied', 'Q: why us? A: the product and the team']);
+  // the step's accordion stays open as it was before the undo
+  await expect(entry.getByTestId('entry-comment')).toHaveText('Q: why us? A: the product and the team');
+});
+
+test('"Not for me" undone and pressed again opens with the old reason (task 0132)', async ({ page }) => {
+  await open(page);
+  const row = byId(page, 'a1');
+  await row.getByTestId('btn-rejected').click();
+  await row.getByTestId('reason-input').fill('too much travel');
+  await row.getByTestId('reason-save').click();
+  await page.getByTestId('stub-a1').getByTestId('btn-undo').click();
+  await byId(page, 'a1').getByTestId('btn-rejected').click();
+  await expect(byId(page, 'a1').getByTestId('reason-input')).toHaveValue('too much travel');
+  // another status's form opens with its own text, not this one
+  await byId(page, 'a1').getByTestId('btn-bugged').click();
+  await expect(byId(page, 'a1').getByTestId('reason-input')).toHaveValue('');
 });
 
 test('an answer and its undo change the card at once, before the list loads again', async ({ page }) => {

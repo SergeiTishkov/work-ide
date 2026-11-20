@@ -30,6 +30,13 @@ questions and their answers), for the cover letter. That comment is not a
 reason about the vacancy: it is in no review package, and tools/ai_brief.py
 does not read it.
 
+A text counts for the status it was written for (TEXT_STATUSES; the owner,
+2026-11-20, task 0132). The texts outlive their status: an undone or changed
+answer keeps them, so a vacancy marked "not for me" may still hold an applied
+comment. Such an off-status text is left out of every reading by default;
+`--off-status include` adds it, marked, and `--off-status only` reads it
+alone, when the owner asks for that.
+
 This script writes vacancy_identity.feedback_reviewed_at, and — through
 `reject` only — the agent's own "not for me" (see reject()).
 """
@@ -49,6 +56,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 import db  # noqa: E402
 import selections  # noqa: E402
+
+# A text column -> the statuses it counts for (task 0132). The applied comment
+# stays true along the funnel: a vacancy now at an interview was applied to.
+TEXT_STATUSES = {
+    "rejected_reason": ("rejected",),
+    "bugged_reason": ("bugged",),
+    "applied_comment": selections.FUNNEL,
+}
+OFF_STATUS = ("skip", "include", "only")
+
+
+def counts(column: str, status: str) -> bool:
+    """Whether the text in `column` counts for a vacancy with `status`."""
+    return status in TEXT_STATUSES[column]
+
+
+def _status_in(column: str) -> str:
+    return "vi.feedback_status IN (" + ", ".join(f"'{s}'" for s in TEXT_STATUSES[column]) + ")"
 
 DESCRIPTION_LIMIT = 4000
 SUMMARY_TOP = 15
@@ -109,7 +134,9 @@ def _item(conn, row: tuple, latest_selection: Optional[int]) -> dict:
     return {
         "id": vid,
         "status": status,
-        "reason": (bugged_reason if status == "bugged" else rejected_reason) or None,
+        # The status's own text only (task 0132).
+        "reason": (bugged_reason if status == "bugged"
+                   else rejected_reason if status == "rejected" else None) or None,
         "feedback_at": at,
         "title": v.get("title"),
         "company": v.get("company"),
@@ -239,33 +266,44 @@ def reject(vid: str, reason: str) -> bool:
         latest = selections.latest_selection_id(conn)
         return conn.execute(
             "UPDATE vacancy_identity SET feedback_status = 'rejected', rejected_reason = ?, "
-            "bugged_reason = NULL, feedback_at = ?, feedback_selection_id = ?, "
+            "feedback_at = ?, feedback_selection_id = ?, "
             "feedback_reviewed_at = ? WHERE identity_id = ? AND vacancy_id = ?",
             (reason.strip() or None, at, latest, at, db.identity(), vid)).rowcount == 1
 
 
-def applied_items(ids: Optional[list] = None) -> list:
+def applied_items(ids: Optional[list] = None, off_status: str = "skip") -> list:
     """The vacancies applied to, newest application first, each with what the
     person wrote when applying (None when nothing was). `ids` narrows it to
     those vacancies. A vacancy further along the funnel keeps its
-    application, so it is here too, with the status it has now."""
+    application, so it is here too, with the status it has now.
+
+    `off_status` (task 0132): "skip" lists the vacancies whose status is in
+    the funnel; "include" adds those another status took over that still hold
+    an applied comment, each marked `off_status: true`; "only" lists those
+    alone. "All the applied comments" means the first, unless the owner says
+    otherwise."""
+    if off_status not in OFF_STATUS:
+        raise ValueError(f"off_status is one of {OFF_STATUS}, not {off_status!r}")
     if not db.exists():
         return []
-    where = ""
+    on, off = _status_in("applied_comment"), "vi.applied_comment IS NOT NULL"
+    where = {"skip": f" AND {on}",
+             "include": f" AND ({on} OR {off})",
+             "only": f" AND NOT {on} AND {off}"}[off_status]
     params: list = [db.identity()]
     if ids:
-        where = f" AND vi.vacancy_id IN ({','.join('?' for _ in ids)})"
+        where += f" AND vi.vacancy_id IN ({','.join('?' for _ in ids)})"
         params.extend(ids)
     with db.session() as conn:
         rows = conn.execute(
             "SELECT vi.vacancy_id, v.data, vi.feedback_status, vi.applied_at, vi.applied_comment "
             "FROM vacancy_identity vi JOIN vacancies v ON v.id = vi.vacancy_id "
-            f"WHERE vi.identity_id = ? AND vi.applied_at IS NOT NULL{where} "
-            "ORDER BY vi.applied_at DESC, vi.vacancy_id", params).fetchall()
+            f"WHERE vi.identity_id = ?{where} "
+            "ORDER BY vi.applied_at DESC, vi.feedback_at DESC, vi.vacancy_id", params).fetchall()
     items = []
     for vid, data, status, applied_at, comment in rows:
         v = json.loads(data)
-        items.append({
+        item = {
             "id": vid,
             "status": status,
             "applied_at": applied_at,
@@ -273,7 +311,10 @@ def applied_items(ids: Optional[list] = None) -> list:
             "title": v.get("title"),
             "company": v.get("company"),
             "url": v.get("url"),
-        })
+        }
+        if off_status != "skip":
+            item["off_status"] = not counts("applied_comment", status)
+        items.append(item)
     return items
 
 
@@ -321,7 +362,7 @@ def cmd_reject(args) -> None:
 
 
 def cmd_applied(args) -> None:
-    items = applied_items(args.id)
+    items = applied_items(args.id, off_status=args.off_status)
     if not items:
         print("No applications.")
         return
@@ -354,6 +395,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_applied = sub.add_parser(
         "applied", help="The vacancies applied to, with what was written when applying, as YAML")
     p_applied.add_argument("--id", action="append", default=None, help="Only this vacancy (repeatable)")
+    p_applied.add_argument("--off-status", choices=OFF_STATUS, default="skip",
+                           help="comments of vacancies whose status is no longer in the funnel: "
+                                "skip (default), include (marked), only")
     p_applied.set_defaults(func=cmd_applied)
     return p
 

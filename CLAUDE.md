@@ -308,6 +308,18 @@ The project is succeeding if:
   change, 30 of 121 kept vacancies came back rejected on other grounds
   (task 0100). The scorer's rescoring of the base is not covered: it costs
   nothing and every rest run does it.
+- **A person's text counts for the status it was written for.** The texts
+  a person writes on a vacancy (the applied comment, the "not for me" and
+  "wrong pick" reasons) outlive their status: an undone or changed answer
+  keeps them, so the form opens with them when the vacancy is marked so
+  again. Any reading of these texts (an analysis, a brief, a cover letter,
+  a count) takes only the text of the status the vacancy has now (the
+  applied comment for every status of the application funnel); the others
+  are off-status texts and are left out. "All the applied comments" means
+  all of those that count. Off-status texts are read only when the owner
+  asks for them in so many words, with them or alone (the owner,
+  2026-11-20, task 0132; `tools/feedback.py`, TEXT_STATUSES and
+  `--off-status`).
 - **Dead links are not shown to a person.** Confirmed explicitly (2026-07-30):
   every vacancy link in the report must be checked, and a vacancy with an
   unambiguously broken link (404/410) is removed from the shortlist rather than

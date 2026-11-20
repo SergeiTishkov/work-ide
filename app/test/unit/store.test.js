@@ -141,30 +141,51 @@ test('"Applied" keeps what was written as the applied comment, never as a reason
   const edited = store.editComment('test', 'new0', 'applied', null, 'Salary asked: 5000');
   assert.equal(edited.appliedComment, 'Salary asked: 5000');
   assert.equal(store.stepBack('test', 'new0').appliedComment, 'Salary asked: 5000', 'undo of the contact keeps it');
-  assert.equal(store.stepBack('test', 'new0').appliedComment, null, 'undo of the application forgets it');
+  const undone = store.stepBack('test', 'new0');
+  assert.equal(undone.status, 'new');
+  assert.equal(undone.appliedComment, 'Salary asked: 5000', 'undo of the application keeps it (task 0132)');
   store.setFeedback('test', 'new1', 'applied', 'written');
-  assert.equal(store.setFeedback('test', 'new1', 'new').appliedComment, null);
+  assert.equal(store.setFeedback('test', 'new1', 'new').appliedComment, 'written');
   store.closeAll();
 
   const db = new DatabaseSync(file);
-  const rows = db.prepare("SELECT vacancy_id, applied_comment, rejected_reason FROM vacancy_identity "
-    + "WHERE identity_id = 'test' AND vacancy_id IN ('new0', 'new1', 'new2') ORDER BY vacancy_id").all();
+  const rows = db.prepare("SELECT vacancy_id, feedback_status, applied_at, applied_comment, rejected_reason "
+    + "FROM vacancy_identity WHERE identity_id = 'test' AND vacancy_id IN ('new0', 'new1', 'new2') "
+    + 'ORDER BY vacancy_id').all();
   db.close();
   assert.deepEqual(rows.map((r) => ({ ...r })), [
-    { vacancy_id: 'new0', applied_comment: null, rejected_reason: null },
-    { vacancy_id: 'new1', applied_comment: null, rejected_reason: null },
-    { vacancy_id: 'new2', applied_comment: null, rejected_reason: 'too far' },
+    { vacancy_id: 'new0', feedback_status: 'new', applied_at: null, applied_comment: 'Salary asked: 5000', rejected_reason: null },
+    { vacancy_id: 'new1', feedback_status: 'new', applied_at: null, applied_comment: 'written', rejected_reason: null },
+    { vacancy_id: 'new2', feedback_status: 'rejected', applied_at: null, applied_comment: null, rejected_reason: 'too far' },
   ]);
 });
 
-test('undo returns a vacancy to new and erases its reason', () => {
+test('a text outlives its status: another answer keeps it, the same answer rewrites it (task 0132)', () => {
+  const { store } = setup();
+  store.setFeedback('test', 'new0', 'applied', 'Q: notice? A: a month');
+  store.stepBack('test', 'new0');
+  let r = store.setFeedback('test', 'new0', 'rejected', 'too far');
+  assert.equal(r.appliedComment, 'Q: notice? A: a month');
+  assert.equal(r.rejectedReason, 'too far');
+  store.setFeedback('test', 'new0', 'new');
+  r = store.setFeedback('test', 'new0', 'bugged', 'Java');
+  assert.deepEqual([r.appliedComment, r.rejectedReason, r.buggedReason], ['Q: notice? A: a month', 'too far', 'Java']);
+  store.setFeedback('test', 'new0', 'new');
+  r = store.setFeedback('test', 'new0', 'rejected', '  ');
+  assert.equal(r.rejectedReason, null, 'emptied on purpose: the same status rewrites its own text');
+  assert.equal(r.buggedReason, 'Java');
+  store.closeAll();
+});
+
+test('undo returns a vacancy to new and keeps its reason for the next time', () => {
   const { store } = setup();
   store.setFeedback('test', 'new0', 'rejected', 'too much travel');
   assert.deepEqual(store.pendingFeedback('test'), { bugged: 0, rejected: 1 });
   store.setFeedback('test', 'new0', 'new');
   const [row] = store.listing('test', v('full', 'fresh_new'));
   assert.equal(row.id, 'new0');
-  assert.equal(row.feedback.rejectedReason, null);
+  assert.equal(row.feedback.status, 'new');
+  assert.equal(row.feedback.rejectedReason, 'too much travel');
   assert.deepEqual(store.pendingFeedback('test'), { bugged: 0, rejected: 0 });
   store.closeAll();
 });
