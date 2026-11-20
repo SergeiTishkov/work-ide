@@ -359,19 +359,94 @@ test('cancelling the reason form saves nothing', async ({ page }) => {
   expect(await calls(page, 'setFeedback')).toEqual([]);
 });
 
-test('"Applied" is recorded at once, with no reason form', async ({ page }) => {
+test('"Applied" opens an optional comment form; "Save" records the application with it', async ({ page }) => {
   await open(page);
-  await byId(page, 'a1').getByTestId('btn-applied').click();
-  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'applied', null]]);
+  const row = byId(page, 'a1');
+  await row.getByTestId('btn-applied').click();
+  expect(await calls(page, 'setFeedback')).toEqual([]);   // nothing saved before "Save"
+  await expect(row.getByTestId('btn-applied')).toHaveClass(/pressed/);
+  await expect(row.getByTestId('reason-input')).toHaveAttribute('placeholder', en['reason.applied']);
+  await row.getByTestId('reason-input').fill('Q: notice period? A: one month');
+  await row.getByTestId('reason-save').click();
+  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'applied', 'Q: notice period? A: one month']]);
   await expect(page.getByTestId('reason-form')).toHaveCount(0);
   await expect(page.getByTestId('stub-a1')).toBeVisible();
+});
+
+test('"Applied" saved with nothing typed has no comment', async ({ page }) => {
+  await open(page);
+  await choose(page, 'filter', 'all');
+  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('reason-input').fill('   ');
+  await byId(page, 'a1').getByTestId('reason-save').click();
+  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'applied', '   ']]);
+  const entry = byId(page, 'a1').getByTestId('entry-applied');
+  await expect(entry.getByTestId('entry-toggle')).toHaveCount(0);   // stored as null: a plain line
+  await expect(entry.getByTestId('entry-edit')).toBeVisible();
+});
+
+test('a double click on "Applied" records it at once, with whatever is typed', async ({ page }) => {
+  await open(page);
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
+  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'applied', '']]);
+  await expect(page.getByTestId('reason-form')).toHaveCount(0);
+  await expect(page.getByTestId('stub-a1')).toBeVisible();
+
+  const row = byId(page, 'a2r');
+  await row.getByTestId('btn-applied').click();
+  await row.getByTestId('reason-input').fill('Salary asked: 5000');
+  await page.waitForTimeout(600);
+  await row.getByTestId('btn-applied').click();   // slow: the form stays, the text too
+  expect((await calls(page, 'setFeedback')).length).toBe(1);
+  await expect(row.getByTestId('reason-input')).toHaveValue('Salary asked: 5000');
+  await row.getByTestId('btn-applied').click();   // fast: saved with the text
+  expect((await calls(page, 'setFeedback')).at(-1)).toEqual(['sharp', 'a2r', 'applied', 'Salary asked: 5000']);
+});
+
+test('Ctrl+Enter saves the applied comment; the draft survives a re-render', async ({ page }) => {
+  await open(page);
+  const row = byId(page, 'a1');
+  await row.getByTestId('btn-applied').click();
+  await row.getByTestId('reason-input').fill('Visa: not needed');
+  await page.evaluate(() => window.__setPipeline('sharp', { running: true, stage: 'rescore' }));
+  await expect(page.getByTestId('menu-busy')).toBeVisible();
+  await expect(row.getByTestId('reason-input')).toHaveValue('Visa: not needed');
+  await row.getByTestId('reason-input').press('Control+Enter');
+  expect(await calls(page, 'setFeedback')).toEqual([['sharp', 'a1', 'applied', 'Visa: not needed']]);
+});
+
+test('the applied comment shows in the timeline, is edited there, and undo forgets it', async ({ page }) => {
+  await open(page);
+  await choose(page, 'filter', 'all');
+  const row = byId(page, 'a1');
+  await row.getByTestId('btn-applied').click();
+  await row.getByTestId('reason-input').fill('Q: why us? A: the product');
+  await row.getByTestId('reason-save').click();
+  const entry = row.getByTestId('entry-applied');
+  await entry.getByTestId('entry-toggle').click();
+  await expect(entry.getByTestId('entry-comment')).toHaveText('Q: why us? A: the product');
+
+  await entry.getByTestId('entry-edit').click();
+  await expect(entry.getByTestId('entry-input')).toHaveValue('Q: why us? A: the product');
+  await entry.getByTestId('entry-input').fill('Q: why us? A: the product and the team');
+  await entry.getByTestId('entry-save').click();
+  expect(await calls(page, 'editComment')).toEqual(
+    [['sharp', 'a1', 'applied', null, 'Q: why us? A: the product and the team']]);
+  await expect(entry.getByTestId('entry-comment')).toHaveText('Q: why us? A: the product and the team');
+
+  await row.getByTestId('btn-undo').click();
+  await expect(row.getByTestId('btn-applied')).toBeVisible();
+  await expect(row.getByTestId('entry-applied')).toHaveCount(0);
+  await row.getByTestId('btn-applied').dblclick();
+  await entry.getByTestId('entry-edit').click();
+  await expect(entry.getByTestId('entry-input')).toHaveValue('');   // the old comment is gone
 });
 
 test('an answer and its undo change the card at once, before the list loads again', async ({ page }) => {
   await open(page);
   // the reload after the click is held: what changes, changes without it
   await page.evaluate(() => window.__holdListing());
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   await expect(page.getByTestId('stub-a1')).toBeVisible();
   await expect(byId(page, 'a2r')).toBeVisible();
   await page.evaluate(() => window.__releaseListing());
@@ -541,7 +616,7 @@ test('marked vacancies keep their places, whatever order they are marked in', as
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
   await open(page);
   expect(await order()).toEqual(['vacancy-a1', 'vacancy-a2r']);
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   await expect(page.getByTestId('stub-a1')).toBeVisible();
   await byId(page, 'a2r').getByTestId('btn-expired').click();
   await expect(page.getByTestId('stub-a2r')).toBeVisible();
@@ -551,7 +626,7 @@ test('marked vacancies keep their places, whatever order they are marked in', as
   await page.getByTestId('stub-a2r').getByTestId('btn-undo').click();
   await byId(page, 'a2r').getByTestId('btn-expired').click();
   await expect(page.getByTestId('stub-a2r')).toBeVisible();
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   await expect(page.getByTestId('stub-a1')).toBeVisible();
   expect(await order()).toEqual(['stub-a1', 'stub-a2r']);
 });
@@ -559,7 +634,7 @@ test('marked vacancies keep their places, whatever order they are marked in', as
 test('a stub drains for 30 seconds, counts down on hover, then goes', async ({ page }) => {
   await page.clock.install();
   await open(page);
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   const stub = page.getByTestId('stub-a1');
   await expect(stub).toBeVisible();
   const tip = stub.getByTestId('stub-timer-tip');
@@ -576,7 +651,7 @@ test('a stub drains for 30 seconds, counts down on hover, then goes', async ({ p
 test('"Hide" removes a stub at once and keeps the answer', async ({ page }) => {
   await page.clock.install();
   await open(page);
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   const stub = page.getByTestId('stub-a1');
   await expect(stub).toBeVisible();
   await stub.getByTestId('btn-hide').click();
@@ -589,7 +664,7 @@ test('a stub that goes lets the ones below keep their order', async ({ page }) =
   const order = () => page.getByTestId('section-hot_lead').locator('article, .stub')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
   await open(page);
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   await expect(page.getByTestId('stub-a1')).toBeVisible();
   await page.clock.runFor(15000);
   await byId(page, 'a2r').getByTestId('btn-expired').click();
@@ -604,10 +679,10 @@ test('a stub that goes lets the ones below keep their order', async ({ page }) =
 test('an undone stub is not removed again by its timer', async ({ page }) => {
   await page.clock.install();
   await open(page);
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   await page.getByTestId('stub-a1').getByTestId('btn-undo').click();
   await expect(byId(page, 'a1')).toBeVisible();
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   await page.clock.runFor(29000);
   await expect(page.getByTestId('stub-a1')).toBeVisible();
 });
@@ -621,7 +696,7 @@ test('in "All", a vacancy turned down folds into a stub and goes; an applied one
   await expect(byId(page, 'a1')).toHaveCount(0);
   await byId(page, 'a2r').getByTestId('btn-rejected').dblclick();
   await expect(page.getByTestId('stub-a2r')).toBeVisible();
-  await byId(page, 'a3').getByTestId('btn-applied').click();
+  await byId(page, 'a3').getByTestId('btn-applied').dblclick();
   await expect(byId(page, 'a3').getByTestId('status-badge')).toBeVisible();
   await expect(page.getByTestId('stub-a3')).toHaveCount(0);
   await page.clock.runFor(30000);
@@ -634,7 +709,7 @@ test('in "All", a vacancy turned down folds into a stub and goes; an applied one
 
 test('changing the filter clears stubs', async ({ page }) => {
   await open(page);
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   await expect(page.getByTestId('stub-a1')).toBeVisible();
   await choose(page, 'filter', 'all');
   await expect(page.getByTestId('stub-a1')).toHaveCount(0);
@@ -818,7 +893,7 @@ test('an answer and its undo change the class count at once, and the list that c
   await expect(count).toHaveText(shownOf(30));
 
   await page.evaluate(() => window.__holdListing());
-  await byId(page, 'h00').getByTestId('btn-applied').click();
+  await byId(page, 'h00').getByTestId('btn-applied').dblclick();
   await expect(page.getByTestId('stub-h00')).toBeVisible();
   await expect(count).toHaveText(shownOf(29));
   await page.evaluate(() => window.__releaseListing());
@@ -840,7 +915,7 @@ test('in a class shown whole, an answer takes one off its count at once', async 
   const count = page.getByTestId('section-count-hot_lead');
   await expect(count).toHaveText(en['list.shown_all'].replace('{n}', '2'));   // a1, a2r
   await page.evaluate(() => window.__holdListing());
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   await expect(count).toHaveText(en['list.shown_all'].replace('{n}', '1'));
   await page.evaluate(() => window.__releaseListing());
   await expect(count).toHaveText(en['list.shown_all'].replace('{n}', '1'));
@@ -1973,7 +2048,7 @@ test('"CV fit" shows the stretches alone or hides them, each kind of role with i
 
 test('the stub\'s text has one width, so the buttons after it stand in one column', async ({ page }) => {
   await open(page);
-  await byId(page, 'a1').getByTestId('btn-applied').click();
+  await byId(page, 'a1').getByTestId('btn-applied').dblclick();
   await byId(page, 'a2r').getByTestId('btn-rejected').click();
   await byId(page, 'a2r').getByTestId('reason-save').click();
   const lefts = await Promise.all(['stub-a1', 'stub-a2r'].map((id) =>

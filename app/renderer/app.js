@@ -145,7 +145,9 @@
     bugged: 'timeline.bugged',
     expired: 'timeline.expired',
   };
-  const REASON_KEYS = { rejected: 'reason.rejected', bugged: 'reason.bugged' };
+  // "Applied" asks too, though not for a reason: what the person wants to
+  // keep about the application (the form's questions and their answers).
+  const REASON_KEYS = { applied: 'reason.applied', rejected: 'reason.rejected', bugged: 'reason.bugged' };
   const LOG_LIMIT = 3000;
   const PANEL_KEY = 'work-ide-task-panel';
   // The app's own settings (Menu -> Settings...), kept per Windows user with
@@ -3000,9 +3002,10 @@
 
   // One click opens the reason; a second one on the same button within a
   // double-click's time saves at once, with whatever reason is typed (the
-  // owner, 2026-10-04: a double click skips "Save"). Timed by hand rather than
-  // with dblclick: the first click re-renders the row, and the second lands on
-  // a new button.
+  // owner, 2026-10-04: a double click skips "Save"). "Applied" works the same
+  // way since 2026-11-20 (task 0131), its text being the applied comment.
+  // Timed by hand rather than with dblclick: the first click re-renders the
+  // row, and the second lands on a new button.
   const DOUBLE_CLICK_MS = 500;
 
   function askReason(item, status) {
@@ -3020,7 +3023,10 @@
     const open = state.reasonFor && state.reasonFor.id === item.id ? state.reasonFor.status : null;
     const answers = el('div', { class: 'answers' },
       openButton(item),
-      el('button', { testid: 'btn-applied', onclick: () => mark(item, 'applied', null) }, t('action.applied')),
+      el('button', {
+        testid: 'btn-applied', class: open === 'applied' ? 'pressed' : null,
+        onclick: () => askReason(item, 'applied'),
+      }, t('action.applied')),
       el('button', {
         testid: 'btn-rejected', class: open === 'rejected' ? 'pressed' : null,
         onclick: () => askReason(item, 'rejected'),
@@ -3036,7 +3042,7 @@
     // The draft lives in the state: the pipeline indicator re-renders the
     // list now and then, and must not wipe a reason half typed.
     const input = el('textarea', {
-      testid: 'reason-input', rows: '2', placeholder: t(REASON_KEYS[open]),
+      testid: 'reason-input', rows: open === 'applied' ? '4' : '2', placeholder: t(REASON_KEYS[open]),
       oninput: (event) => { state.reasonFor.draft = event.target.value; },
       onkeydown: saveOnCtrlEnter(() => mark(item, open, input.value)),
     });

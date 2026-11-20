@@ -13,7 +13,7 @@ const { loadQueries } = require('./queries');
 const { addFold } = require('./fold');
 const funnel = require('../renderer/funnel.js');
 
-const SCHEMA_VERSION = '11';
+const SCHEMA_VERSION = '12';
 // The same threshold as tools/runstate.STALE_AFTER_SECONDS: a run that has not
 // beaten for this long is gone, whatever its row still says.
 const STALE_AFTER_MS = 45000;
@@ -84,6 +84,7 @@ function recordOf(row) {
     rejectedReason: row.rejected_reason,
     buggedReason: row.bugged_reason,
     appliedAt: row.applied_at,
+    appliedComment: row.applied_comment ?? null,
     contactComment: row.contact_comment,
     contactAt: row.contact_at,
     interviewComments: jsonArray(row.interview_comments),
@@ -363,7 +364,8 @@ class Store {
   // instead of reloading the list (the owner, 2026-10-18).
 
   // The first answer on a vacancy. 'new' takes it back; a reason is kept only
-  // for the status it explains.
+  // for the status it explains. For 'applied' the text is the person's note on
+  // the application (applied_comment), not a reason about the vacancy.
   setFeedback(identity, vacancyId, status, reason = null) {
     if (!STATUSES.includes(status)) throw new Error(`unknown feedback status: ${status}`);
     const db = this.connection(identity);
@@ -376,6 +378,7 @@ class Store {
       status,
       rejected_reason: status === 'rejected' ? text : null,
       bugged_reason: status === 'bugged' ? text : null,
+      applied_comment: status === 'applied' ? text : null,
       at: this.clock(),
       selection_id: status === 'new' || !selection ? null : selection.id,
     });
@@ -402,6 +405,7 @@ class Store {
       rejected_reason: record.rejectedReason ?? null,
       bugged_reason: record.buggedReason ?? null,
       applied_at: record.appliedAt ?? null,
+      applied_comment: record.appliedComment ?? null,
       contact_comment: record.contactComment ?? null,
       contact_at: record.contactAt ?? null,
       interview_comments: record.interviewComments.length ? JSON.stringify(record.interviewComments) : null,

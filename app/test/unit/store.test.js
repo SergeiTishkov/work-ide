@@ -126,6 +126,37 @@ test('every write answers with the record as the base now holds it', () => {
   store.closeAll();
 });
 
+test('"Applied" keeps what was written as the applied comment, never as a reason', () => {
+  const { store, file } = setup();
+  const applied = store.setFeedback('test', 'new0', 'applied', '  Q: notice period?\nA: one month  ');
+  assert.equal(applied.appliedComment, 'Q: notice period?\nA: one month');
+  assert.equal(applied.rejectedReason, null);
+  assert.equal(applied.buggedReason, null);
+  assert.equal(store.setFeedback('test', 'new1', 'applied', '   ').appliedComment, null, 'empty is NULL');
+  assert.equal(store.setFeedback('test', 'new2', 'rejected', 'too far').appliedComment, null);
+  const [row] = store.listing('test', v('full', 'applied')).filter((r) => r.id === 'new0');
+  assert.equal(row.feedback.appliedComment, 'Q: notice period?\nA: one month', 'the list carries it');
+
+  store.advance('test', 'new0', 'contacted', '');
+  const edited = store.editComment('test', 'new0', 'applied', null, 'Salary asked: 5000');
+  assert.equal(edited.appliedComment, 'Salary asked: 5000');
+  assert.equal(store.stepBack('test', 'new0').appliedComment, 'Salary asked: 5000', 'undo of the contact keeps it');
+  assert.equal(store.stepBack('test', 'new0').appliedComment, null, 'undo of the application forgets it');
+  store.setFeedback('test', 'new1', 'applied', 'written');
+  assert.equal(store.setFeedback('test', 'new1', 'new').appliedComment, null);
+  store.closeAll();
+
+  const db = new DatabaseSync(file);
+  const rows = db.prepare("SELECT vacancy_id, applied_comment, rejected_reason FROM vacancy_identity "
+    + "WHERE identity_id = 'test' AND vacancy_id IN ('new0', 'new1', 'new2') ORDER BY vacancy_id").all();
+  db.close();
+  assert.deepEqual(rows.map((r) => ({ ...r })), [
+    { vacancy_id: 'new0', applied_comment: null, rejected_reason: null },
+    { vacancy_id: 'new1', applied_comment: null, rejected_reason: null },
+    { vacancy_id: 'new2', applied_comment: null, rejected_reason: 'too far' },
+  ]);
+});
+
 test('undo returns a vacancy to new and erases its reason', () => {
   const { store } = setup();
   store.setFeedback('test', 'new0', 'rejected', 'too much travel');

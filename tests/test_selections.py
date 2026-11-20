@@ -54,6 +54,7 @@ def _set_feedback(vid, status, reason=None, selection_id=None):
             "identity": db.identity(), "id": vid, "status": status,
             "rejected_reason": reason if status == "rejected" else None,
             "bugged_reason": reason if status == "bugged" else None,
+            "applied_comment": reason if status == "applied" else None,
             "at": db.now_iso(), "selection_id": selection_id,
         })
 
@@ -421,7 +422,7 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
         conn.execute(selections.load_queries()["write_progress"], {
             "identity": db.identity(), "id": "a", "status": "interview", "at": "2026-10-02T10:00:00+00:00",
             "rejected_reason": None, "bugged_reason": None,
-            "applied_at": "2026-10-01T10:00:00+00:00",
+            "applied_at": "2026-10-01T10:00:00+00:00", "applied_comment": "Notice: one month",
             "contact_comment": "", "contact_at": "2026-10-01T12:00:00+00:00",
             "interview_comments": '["went well"]', "interview_at": '["2026-10-02T10:00:00+00:00"]',
             "final_comment": None, "final_at": None,
@@ -435,6 +436,7 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
                            {"identity": db.identity(), "id": "a"}).fetchone()
     assert row["feedback_status"] == "interview"
     assert row["contact_comment"] == "" and row["interview_comments"] == '["went well"]'
+    assert row["applied_comment"] == "Notice: one month"
     assert _ids(_listing(sel, filter_name="interview")) == ["a"]
 
     _set_feedback("a", "new", selection_id=None)
@@ -443,6 +445,7 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
         row = conn.execute(selections.load_queries()["vacancy_progress"],
                            {"identity": db.identity(), "id": "a"}).fetchone()
     assert row["applied_at"] is None and row["contact_at"] is None
+    assert row["applied_comment"] is None
     assert row["interview_comments"] is None and row["final_comment"] is None
     assert row["declined_comment"] is None and row["declined_at"] is None
 
