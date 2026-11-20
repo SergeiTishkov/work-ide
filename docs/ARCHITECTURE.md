@@ -1527,7 +1527,13 @@ text, more facts, a longer text, the earliest seen; nothing the scoring or the
 model made of it. Measured before the change: of 918 groups with two read
 copies, 849 had the same location verdict, and the other 69 differed in the
 location field ("Remote" on an aggregator against "Remote, United Kingdom" at
-the employer), not in the employer's offer.
+the employer), not in the employer's offer. Since task 0130 (the owner,
+2026-11-20) a free board's copy comes before all of that, the answer included:
+a paid board (`paid: true` in the catalogue) takes no application without
+payment, and the owner applies through the free copy or finds the company's
+own page from it. A paid copy the person answered loses to a free twin, which
+then shows without the answer; on 2026-11-20 none of the 21 such groups for
+SHARP was answered.
 
 ### A common CV beside the parent CV (2026-10-06 to 2026-11-14)
 

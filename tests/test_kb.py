@@ -1,3 +1,4 @@
+import common
 import kb
 
 
@@ -186,6 +187,29 @@ def test_the_copy_the_person_answered_stays_the_shown_one(isolated_data_dir):
     kb.merge_vacancy(vacancies, make_normalized(vid_suffix="1"), DUMMY_COMPUTED)
     kb.mark_duplicates(vacancies)
     assert vacancies[answered].get("duplicate_of") is None
+
+
+def test_a_free_board_copy_is_canonical_over_a_paid_one(isolated_data_dir):
+    # task 0130: the owner cannot apply on a paid board, so the free copy is
+    # the one worked on, however much better the paid copy is filled or answered
+    paid = common.paid_sources()
+    assert "weworkremotely" in paid and "remoteok" in paid and "linkedin" not in paid
+    vacancies = {}
+    on_paid = _copy(vacancies, "1", text="x" * 5000, salary_raw="$100k", source="weworkremotely")
+    on_free = _copy(vacancies, "2", text="short card", source="linkedin")
+    vacancies[on_paid]["_feedback"] = "applied"
+    kb.mark_duplicates(vacancies)
+    assert vacancies[on_free].get("duplicate_of") is None
+    assert vacancies[on_paid]["duplicate_of"] == on_free
+
+
+def test_among_paid_copies_the_best_filled_still_wins(isolated_data_dir):
+    vacancies = {}
+    card = _copy(vacancies, "1", text="short card", source="remoteok")
+    read = _copy(vacancies, "2", text="x" * 700, source="weworkremotely")
+    kb.mark_duplicates(vacancies)
+    assert vacancies[read].get("duplicate_of") is None
+    assert vacancies[card]["duplicate_of"] == read
 
 
 def test_mark_duplicates_ignores_different_companies_or_titles(isolated_data_dir):

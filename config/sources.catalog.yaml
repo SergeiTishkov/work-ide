@@ -26,6 +26,9 @@
 #  `paid: true` marks a board that asks the job seeker to pay before it
 #  assesses an application (the owner, 2026-10-26, task 0101). The app's
 #  "Source" drop-down lists such boards under "Paid", the rest under "Free".
+#  A vacancy found on a paid board and on a free one is kept under the free
+#  one (kb.mark_duplicates, task 0130): the owner applies through it, or
+#  through the company's own page found from it.
 #
 #  How to read params_schema: it lists the parameters the fetcher accepts from
 #  an identity, with their type and meaning. The full description for building
@@ -61,6 +64,7 @@ sources:
 
   - name: remoteok
     site: "remoteok.com"
+    paid: true            # the owner, 2026-11-20 (task 0130)
     kind: json_api
     remote_only: true
     url: "https://remoteok.com/api"
