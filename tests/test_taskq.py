@@ -148,7 +148,9 @@ def test_a_collection_is_a_group_in_order(conn):
     ids = made["ids"]
     kinds = [(t["kind"], t["group_id"]) for t in made["group"]]
     assert kinds == [("collect", ids["top"]), ("linkedin", ids["top"]), ("rest", ids["top"]),
+                     ("links", ids["top"]),
                      ("cv_batch", ids["top"]), ("cv_batch", ids["top"]), ("cv_batch", ids["top"])]
+    assert taskq.get(conn, ids["read"])["args"] == {"read": True}
     assert claim(conn)["id"] == ids["top"]
     assert claim(conn)["id"] == ids["linkedin"]
     assert claim(conn) is None
@@ -166,6 +168,11 @@ def test_a_collection_is_a_group_in_order(conn):
     assert taskq.get(conn, ids["cv_batch_rest"])["waiting_for"] == f"#{ids['rest']} to end"
     taskq.finish(conn, ids["cv_batch"], "done")
     taskq.finish(conn, ids["rest"], "done")
+    # then the unread vacancies read (task 0129), and the batch after it:
+    # what the read raised into a class
+    assert claim(conn)["id"] == ids["read"]
+    assert taskq.get(conn, ids["cv_batch_rest"])["waiting_for"] == f"#{ids['read']} to end"
+    taskq.finish(conn, ids["read"], "failed", "five 429s")
     assert claim(conn, "desktop", BOTH)["id"] == ids["cv_batch_rest"]
 
 
@@ -179,6 +186,17 @@ def test_a_failed_top_skips_the_rest_and_its_batch(conn):
     assert taskq.get(conn, ids["rest"])["error"] == f"#{ids['top']} ended failed"
     assert taskq.get(conn, ids["cv_batch"])["state"] == "skipped"
     assert taskq.get(conn, ids["cv_batch_rest"])["state"] == "skipped"
+    assert taskq.get(conn, ids["read"])["state"] == "skipped"
+
+
+def test_a_links_task_already_queued_takes_the_place_of_the_read(conn):
+    first = taskq.add(conn, "links", "ftf", origin="agent", args={"read": True})["task"]["id"]
+    made = taskq.collection(conn, "ftf", origin="schedule")
+    assert "read" not in made["ids"]
+    assert [t["kind"] for t in made["group"]].count("links") == 0
+    rest = made["ids"]["rest"]
+    assert taskq.get(conn, made["ids"]["cv_batch_rest"])["after"] == [{"after_id": rest, "needs_done": 1}]
+    assert taskq.get(conn, first)["state"] == "queued"
 
 
 def test_a_collection_already_going_is_not_queued_twice(conn):
