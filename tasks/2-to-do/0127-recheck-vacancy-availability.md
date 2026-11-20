@@ -63,4 +63,5 @@ In outline:
 - DONE - `link_check.merge`: a closed verdict is not undone by an unknown one; link_check sends LinkedIn no HEAD
 - DONE - The queue's links run (`pipeline.py --links`) uses it and writes no more than the verdicts; the document batch asks the board before each document (a closed posting counts as gone)
 - DONE - Tests (tests/test_availability.py, the batch, the links run); docs (ARCHITECTURE, BUILDING_BLOCKS, RUNBOOK). A live dry run from the worktree, 2026-11-20, beside LinkedIn task #296: 12 listed vacancies in 4 minutes (5 answers 429), 11 closed (7 "no longer accepting", 4 404), 1 open
+- DONE - The links run checks what the app shows (`selections.shown_vacancies`). The 1,189 "listed" above counted remote_unconfirmed, which the selection keeps and the app never shows (task 0098): 967 of the 1,190 listed on 2026-11-20, nearly all LinkedIn cards never read; they would have taken LinkedIn's budget first
 - TO DO - A real links run after the rest run, measured; a daily schedule of it for SHARP

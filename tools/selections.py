@@ -60,6 +60,18 @@ def listed_vacancies(vacancies: dict) -> list:
     ]
 
 
+# Listed classes the app never shows (schemas/queries.sql, NOT LISTED; the
+# owner, 2026-10-24, task 0098), as app/renderer/app.js UNLISTED_CLASSES.
+NOT_SHOWN = ("remote_unconfirmed",)
+
+
+def shown_vacancies(vacancies: dict) -> list:
+    """The listed vacancies the app shows: listed_vacancies less the
+    classes in NOT_SHOWN. What a person can open, answer or apply to."""
+    return [v for v in listed_vacancies(vacancies)
+            if (v.get("computed") or {}).get("classification") not in NOT_SHOWN]
+
+
 def _view_row(v: dict) -> tuple:
     """(view, views, identity, id) for the UPDATE of one vacancy's display
     row: `view` in the identity's language, `views` in every language of the

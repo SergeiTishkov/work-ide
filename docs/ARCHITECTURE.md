@@ -292,7 +292,11 @@ The HEAD check above was blind on LinkedIn, which makes up most of the list:
 1,041 of the 1,071 listed LinkedIn vacancies of SHARP carried "unknown 429",
 and a sample read one by one found 26 of 38 answered postings closed.
 
-`tools/availability.py` checks the listed vacancies:
+`tools/availability.py` checks the vacancies the app shows
+(`selections.shown_vacancies`): the listed ones less remote_unconfirmed,
+which the selection keeps and the app never shows (task 0098). On
+2026-11-20 that class held 967 of the 1,190 listed, nearly all LinkedIn
+cards never read, and would have taken LinkedIn's budget first.
 - LinkedIn one by one through the guest posting fragment, paced as the
   collection is: "No longer accepting applications" or 404 is closed, a
   description is open, a 429 is no verdict.

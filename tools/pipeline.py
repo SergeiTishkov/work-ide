@@ -969,7 +969,7 @@ def run_ai(reread: bool = False, since: Optional[str] = None) -> dict:
 
 
 def run_links(minutes: float = availability.DEFAULT_MINUTES) -> dict:
-    """The listed vacancies checked again, open or closed (task 0127; a
+    """The vacancies the app shows checked again, open or closed (task 0127; a
     schedule's "re-check of the shortlist's links", task 0061): see
     tools/availability.py — the oldest check first, within `minutes`. Only
     the checked vacancies' `link_check` is written, into their rows as they
@@ -977,10 +977,12 @@ def run_links(minutes: float = availability.DEFAULT_MINUTES) -> dict:
     it wrote. A closed one leaves the list with the "rebuild" selection.
     Nothing fetched, nothing rescored."""
     vacancies, _companies, _state = _load()
-    listed = selections.listed_vacancies(vacancies)
-    with progress.stage(f"check that the listed vacancies are open "
-                        f"({progress.number(len(listed))} listed)") as st:
-        stats = availability.check(listed, minutes=minutes)
+    # What the app shows: remote_unconfirmed, 967 of the 1 190 listed on
+    # 2026-11-20 and never shown, would spend LinkedIn's budget first.
+    shown = selections.shown_vacancies(vacancies)
+    with progress.stage(f"check that the shown vacancies are open "
+                        f"({progress.number(len(shown))} shown)") as st:
+        stats = availability.check(shown, minutes=minutes)
         availability.save(stats.pop("changed"))
         st.note = availability.note(stats)
     state = common.load_json(common.STATE_PATH, default={"run_count": 0, "sources": {}})

@@ -94,6 +94,7 @@ def test_the_classes_agree_between_the_scripts_the_clean_up_and_the_app():
     assert js_keys("app/renderer/app.js", "CLEANUP_CLASS_KEYS") == list(cleanup.CLASSES)
     unlisted = js_list("app/renderer/app.js", "UNLISTED_CLASSES")
     assert set(unlisted) <= set(listed)
+    assert unlisted == list(selections.NOT_SHOWN)
     # the app's sections: the person's own picks first, then the listed
     # classes in their order, less the ones never listed (queries.sql)
     sections = js_keys("app/renderer/app.js", "CLASS_KEYS")
