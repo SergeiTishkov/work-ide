@@ -117,8 +117,14 @@ projects below. Say in `report.notes` in one line why.
 
 1. **Header.**
    - `name`: exactly as in the parent CV.
-   - `headline` (the line under the name): the vacancy's title wording when
-     the person's real level and history support it. Never raise the level.
+   - `headline` (the line under the name): the person's job title for this
+     vacancy. The CV's and the cover letter's files are named after it
+     ("CV <name> <headline>"), and the letter carries the same title.
+     "Senior Software Engineer" unless the vacancy hires for a role of its
+     own kind that the person's history supports ("AI Engineer", "Forward
+     Deployed Engineer", "Data Engineer"...): then that role's name. Never
+     raise the level. One title: the stack goes to the tagline, and there is
+     no second title after "/" or "|".
    - `tagline` (the stack line under it): the person's own technologies,
      the ones this vacancy cares about first.
    - Both sit in a half-page-wide column in 12 pt bold: each must fit one

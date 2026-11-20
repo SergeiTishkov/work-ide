@@ -102,6 +102,37 @@ def test_a_whole_run_with_a_fake_model_and_a_fake_word(tmp_path, parent_docx):
     assert Path(result["archive"]).parent == tmp_path / "letters" / "v1"
 
 
+def test_the_letter_carries_the_title_of_the_vacancys_cv(tmp_path, parent_docx):
+    """Task 0134: one title for the CV and the letter, inside and in the name."""
+    run = tmp_path / "cvs" / "v1" / "2026-11-20_014037"
+    run.mkdir(parents=True)
+    (run / "content.json").write_text(json.dumps({"headline": "Senior Software Engineer, AI Tooling"}),
+                                      encoding="utf-8")
+    seen = {}
+
+    def model(message, *, model, workdir):
+        seen["message"] = message
+        return letter(headline="Senior Full-Stack Software Engineer")
+
+    result = cover_letter.write_letter(
+        settings=_settings(parent_docx), vacancy={"title": "Software Engineer, AI Tooling"}, vacancy_id="v1",
+        archive_root=tmp_path / "letters", out_dir=tmp_path / "out", model_call=model,
+        converter=FakeWord(pages=1))
+    assert 'titled "Senior Software Engineer, AI Tooling"' in seen["message"]
+    assert Path(result["docx"]).name == "Cover Letter Alex Example Senior Software Engineer, AI Tooling.docx"
+    assert "Senior Software Engineer, AI Tooling" in cv_docx.docx_text(Path(result["docx"]))
+    assert "Full-Stack" not in cv_docx.docx_text(Path(result["docx"]))
+
+    # no CV: the model's own title, cleaned as the CV's is
+    result = cover_letter.write_letter(
+        settings=_settings(parent_docx), vacancy={"title": "Dev"}, vacancy_id="v2",
+        archive_root=tmp_path / "letters", out_dir=tmp_path / "out2",
+        model_call=lambda message, **_: letter(headline="AI Engineer / Senior Software Engineer"),
+        converter=FakeWord(pages=1))
+    assert Path(result["docx"]).name == "Cover Letter Alex Example AI Engineer Senior Software Engineer.docx"
+    assert "AI Engineer Senior Software Engineer" in cv_docx.docx_text(Path(result["docx"]))
+
+
 def test_a_headline_too_long_for_its_column_is_a_warning(tmp_path, parent_docx):
     long = "Senior Full-Stack Software Engineer — C# / .NET | Azure | Angular / React"
     result = cover_letter.write_letter(

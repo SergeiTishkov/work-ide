@@ -413,6 +413,25 @@ def test_the_file_is_named_after_the_headline_without_what_a_file_name_cannot_ho
     assert stem("CV Ivan Petrov", "", "Senior Engineer") == "CV Ivan Petrov"
 
 
+def test_the_title_is_the_same_inside_and_in_the_file_name():
+    """Task 0134: what a file name cannot hold leaves the headline inside too."""
+    assert cv_tailor.file_title("Senior C# / .NET Developer") == "Senior C# .NET Developer"
+    assert cv_tailor.file_title("  Senior Software Engineer, AI Tooling ") == "Senior Software Engineer, AI Tooling"
+    assert cv_tailor.file_title(None) == ""
+
+
+def test_the_current_title_is_the_latest_finished_cvs(tmp_path):
+    archive = tmp_path / "cvs"
+    assert cv_tailor.current_title(archive, "v1") is None
+    for stamp, headline in (("2026-11-14_065440", "Senior Software Engineer"),
+                            ("2026-11-17_055423", "AI Engineer / Platform")):
+        (archive / "v1" / stamp).mkdir(parents=True)
+        (archive / "v1" / stamp / "content.json").write_text(json.dumps({"headline": headline}), encoding="utf-8")
+    (archive / "v1" / "2026-11-18_000000").mkdir()          # a run that failed: no content.json
+    assert cv_tailor.current_title(archive, "v1") == "AI Engineer Platform"
+    assert cv_tailor.current_title(archive, "v2") is None
+
+
 def test_a_name_the_person_set_is_kept_fixed(tmp_path):
     profile = {"cv": {"parent": "documents/Parent CV Alex Example.docx"}}
     assert cv_tailor.cv_settings(profile, tmp_path)["output_fixed"] is False

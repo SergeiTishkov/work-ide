@@ -31,6 +31,11 @@ without the model:
      Full Stack Engineer.pdf"), versioned as the CV is, with "Cover Letter
      log.md".
 
+The letter's headline is the title of the vacancy's latest CV
+(cv_tailor.current_title, task 0134): the model is told it, and the code
+puts it in, so the CV and the letter carry one title inside and in their
+file names. With no CV yet the model picks the title by the CV's rule.
+
 Every run is kept in data/identities/<prefix>/cover_letters/<vacancy id>/<time>/.
 """
 from __future__ import annotations
@@ -97,7 +102,8 @@ def letter_stem(cv_stem: str) -> str:
 
 def build_message(cv_text: str, vacancy: dict, instructions: Optional[str] = None,
                   today: Optional[date] = None, *, languages: Optional[list] = None, log_text: str = "",
-                  previous_text: Optional[str] = None, version: int = 1) -> str:
+                  previous_text: Optional[str] = None, version: int = 1,
+                  title: Optional[str] = None) -> str:
     description = (vacancy.get("description_text") or "").strip()
     if len(description) > cv_tailor.DESCRIPTION_LIMIT:
         description = description[:cv_tailor.DESCRIPTION_LIMIT] + "\n[cut]"
@@ -106,6 +112,9 @@ def build_message(cv_text: str, vacancy: dict, instructions: Optional[str] = Non
              "<parent_cv>", cv_text.strip(), "</parent_cv>", ""]
     if languages:
         parts += ["The person's languages, from their profile: " + ", ".join(languages) + ".", ""]
+    if title:
+        parts += [f"The person's CV for this vacancy is titled \"{title}\": the letter's headline is this "
+                  "title, as it is.", ""]
     parts += cv_tailor.history_parts(log_text, previous_text, version, "cover letter")
     instructions = (instructions or "").strip()
     if instructions:
@@ -169,10 +178,12 @@ def check_facts(content: dict, cv_text: str, person: str = "", languages: Option
 def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path, out_dir: Path,
                  content: Optional[dict] = None, model_call=None, converter=None,
                  instructions: Optional[str] = None, today: Optional[date] = None,
-                 auto: bool = False) -> dict:
+                 auto: bool = False, cv_archive: Optional[Path] = None) -> dict:
     """The whole run; returns the result the app shows. `out_dir` is the
     vacancy's folder of documents, as for cv_tailor.tailor. `converter` is a
-    cv_convert.WordSession-like object, or None to pick one here."""
+    cv_convert.WordSession-like object, or None to pick one here.
+    `cv_archive`: the CVs' archive the title comes from (task 0134);
+    `archive_root`'s sibling "cvs" when None."""
     say = cv_tailor.say
     document = documents.Document(out_dir, "letter", letter_stem(settings["output_stem"]))
     earlier = cv_tailor.earlier_versions(document)
@@ -182,11 +193,15 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
     cv_text = cv_tailor.read_parent(settings)
     languages = settings.get("languages") or []
     warnings = []
+    title = cv_tailor.current_title(cv_archive or archive_root.parent / "cvs", vacancy_id)
+    if title:
+        say(f"title: {title}, as the CV")
 
     workdir = archive_root / vacancy_id / cv_tailor._stamp()
     workdir.mkdir(parents=True, exist_ok=True)
     if content is None:
-        message = build_message(cv_text, vacancy, instructions, today, languages=languages, **earlier)
+        message = build_message(cv_text, vacancy, instructions, today, languages=languages, title=title,
+                                **earlier)
         (workdir / "model_input.md").write_text(message, encoding="utf-8")
         say(f"asking the model ({settings['model']}), a minute or two")
         if model_call is None:
@@ -197,6 +212,8 @@ def write_letter(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root
     (workdir / "content_from_model.json").write_text(json.dumps(content, ensure_ascii=False, indent=2),
                                                      encoding="utf-8")
     content = cv_tailor.clean_text(content)
+    # one title with the CV, inside and in the file name (task 0134)
+    content["headline"] = title or cv_tailor.file_title(content.get("headline", ""))
     problems = validate_content(content)
     if problems:
         raise TailorError("the letter's content is not usable: " + "; ".join(problems))

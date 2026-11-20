@@ -42,7 +42,9 @@ person. Then, without the model:
   4. The files go into the vacancy's folder of documents (tools/documents.py:
      <folder>/<identity>/<vacancy id>/) named after the CV's headline: "CV
      Ivan Petrov Senior Full Stack Engineer" (headline_stem, task 0116), or
-     cv.output_name for every version when the person set it.
+     cv.output_name for every version when the person set it. The headline
+     inside is the same text as in the name: what a file name cannot hold
+     ("/", "|", ":") becomes a space in both (file_title, task 0134).
      The current pair moves into "Old versions" as V<n> (or "V<n> failed",
      when the model reads the person's message as a rejection of it), and "CV
      log.md" gets the new version and its message. The model gets that log
@@ -247,6 +249,30 @@ FILE_NAME_BAD = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 HEADLINE_IN_NAME_LIMIT = 60
 
 
+def file_title(headline: str) -> str:
+    """The headline as a file name can hold it: what Windows refuses in a
+    file name becomes a space. Since task 0134 the headline inside the CV
+    and the letter is this same text, so the title in the file name and the
+    one under the person's name are the same."""
+    return re.sub(r"\s+", " ", FILE_NAME_BAD.sub(" ", headline or "")).strip(" .")
+
+
+def current_title(cv_archive: Path, vacancy_id: str) -> Optional[str]:
+    """The headline of the vacancy's latest CV (task 0134): its last run in
+    the archive that finished (content.json is written at the end), or
+    None. The cover letter carries it, so the CV and the letter have one
+    title."""
+    runs = sorted((cv_archive / vacancy_id).glob("*/content.json")) if (cv_archive / vacancy_id).is_dir() else []
+    for path in reversed(runs):
+        try:
+            headline = json.loads(path.read_text(encoding="utf-8")).get("headline")
+        except (OSError, ValueError):
+            continue
+        if isinstance(headline, str) and file_title(headline):
+            return file_title(headline)
+    return None
+
+
 def headline_stem(fixed_stem: str, name: str, headline: str, keep_fixed: bool = False) -> str:
     """The file name of one tailored version (task 0116): the fixed name up
     to the person's name, then the headline of the version. "CV Ivan Petrov
@@ -254,7 +280,7 @@ def headline_stem(fixed_stem: str, name: str, headline: str, keep_fixed: bool = 
     Ivan Petrov Senior Full Stack Engineer". The fixed name as it is when
     `keep_fixed` (the person set cv.output_name), when there is no headline,
     or when the person's name is not in it."""
-    title = re.sub(r"\s+", " ", FILE_NAME_BAD.sub(" ", headline or "")).strip(" .")
+    title = file_title(headline)
     if len(title) > HEADLINE_IN_NAME_LIMIT:
         title = title[:HEADLINE_IN_NAME_LIMIT].rsplit(" ", 1)[0].strip(" .")
     words = (name or "").split()
@@ -925,6 +951,7 @@ def tailor(*, settings: dict, vacancy: dict, vacancy_id: str, archive_root: Path
     (workdir / "content_from_model.json").write_text(json.dumps(content, ensure_ascii=False, indent=2),
                                                      encoding="utf-8")
     content = clean_text(content)
+    content["headline"] = file_title(content.get("headline", ""))   # the same inside and in the name (task 0134)
     problems = validate_content(content)
     if problems:
         raise TailorError("the CV content is not usable: " + "; ".join(problems))
