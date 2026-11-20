@@ -15,6 +15,11 @@
 // appliedComment, written with "Applied" itself: null when nothing was
 // written (the person's answers to the application form, for the cover
 // letter; not a reason about the vacancy).
+// The person's texts (appliedComment, rejectedReason, buggedReason) outlive
+// the status they were written for: "Undo" keeps them, and marking the
+// vacancy so again opens the form with them (the owner, 2026-11-20, task
+// 0132). A text counts only while the status is its own (timeline() shows
+// it so; tools/feedback.py reads it so).
 (function (root, factory) {
   const value = factory();
   if (typeof module === 'object' && module.exports) module.exports = value;
@@ -137,10 +142,7 @@
         break;
       default:   // applied, rejected, bugged, expired: back to no feedback
         back.status = 'new';
-        back.appliedAt = null;
-        back.appliedComment = null;
-        back.rejectedReason = null;
-        back.buggedReason = null;
+        back.appliedAt = null;   // the texts stay (task 0132)
     }
     back.at = now;
     return back;

@@ -363,9 +363,10 @@ class Store {
   // it, read back after the write: the renderer redraws that one card from it
   // instead of reloading the list (the owner, 2026-10-18).
 
-  // The first answer on a vacancy. 'new' takes it back; a reason is kept only
-  // for the status it explains. For 'applied' the text is the person's note on
-  // the application (applied_comment), not a reason about the vacancy.
+  // The first answer on a vacancy. 'new' takes it back. The text is written
+  // to the column of the status it explains (for 'applied' the person's note
+  // on the application, applied_comment, not a reason about the vacancy); the
+  // other columns keep what they hold (task 0132, queries.sql set_feedback).
   setFeedback(identity, vacancyId, status, reason = null) {
     if (!STATUSES.includes(status)) throw new Error(`unknown feedback status: ${status}`);
     const db = this.connection(identity);

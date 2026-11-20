@@ -394,20 +394,22 @@ ORDER BY id DESC
 LIMIT 1;
 
 -- name: set_feedback
--- The first answer on a vacancy. "applied" dates the start of the funnel and
--- keeps what the person wrote about the application (:applied_comment, NULL
--- for any other status); going back to "new" forgets everything the funnel
--- recorded.
+-- The first answer on a vacancy. "applied" dates the start of the funnel;
+-- going back to "new" forgets the funnel's steps. The person's texts
+-- (applied_comment, rejected_reason, bugged_reason) are written only by the
+-- status they belong to and are never erased by another one (the owner,
+-- 2026-11-20, task 0132): marked again, the form opens with the old text.
+-- Whether a text counts is decided by the status when it is read
+-- (tools/feedback.py, TEXT_STATUSES).
 UPDATE vacancy_identity
 SET feedback_status = :status,
-    rejected_reason = :rejected_reason,
-    bugged_reason = :bugged_reason,
+    rejected_reason = CASE WHEN :status = 'rejected' THEN :rejected_reason ELSE rejected_reason END,
+    bugged_reason = CASE WHEN :status = 'bugged' THEN :bugged_reason ELSE bugged_reason END,
     feedback_at = :at,
     feedback_selection_id = :selection_id,
     applied_at = CASE WHEN :status = 'applied' THEN :at
                       WHEN :status = 'new' THEN NULL ELSE applied_at END,
-    applied_comment = CASE WHEN :status = 'applied' THEN :applied_comment
-                           WHEN :status = 'new' THEN NULL ELSE applied_comment END,
+    applied_comment = CASE WHEN :status = 'applied' THEN :applied_comment ELSE applied_comment END,
     contact_comment    = CASE WHEN :status = 'new' THEN NULL ELSE contact_comment END,
     contact_at         = CASE WHEN :status = 'new' THEN NULL ELSE contact_at END,
     interview_comments = CASE WHEN :status = 'new' THEN NULL ELSE interview_comments END,

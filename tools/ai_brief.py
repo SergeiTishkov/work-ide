@@ -91,18 +91,23 @@ def stored_hash(path: Path) -> Optional[str]:
     return match.group(1) if match else None
 
 
+_OWN_TEXT = "CASE v.feedback_status WHEN 'rejected' THEN v.rejected_reason ELSE v.bugged_reason END"
+
+
 def feedback_reasons(prefix: str, limit: int = FEEDBACK_LIMIT) -> list:
     """The owner's own words on postings they turned down or marked wrong,
-    newest first: "title | company | status: reason"."""
+    newest first: "title | company | status: reason". The text of the status
+    the vacancy has now only (task 0132): a "wrong pick" reason left on a
+    vacancy now "not for me" is not read."""
     if not db.exists():
         return []
     with db.session() as conn:
         rows = conn.execute(
             "SELECT json_extract(d.data, '$.title'), json_extract(d.data, '$.company'), "
-            "v.feedback_status, COALESCE(v.rejected_reason, v.bugged_reason) "
+            "v.feedback_status, " + _OWN_TEXT + " "
             "FROM vacancy_identity v JOIN vacancies d ON d.id = v.vacancy_id "
             "WHERE v.identity_id = ? AND v.feedback_status IN ('rejected', 'bugged') "
-            "AND COALESCE(v.rejected_reason, v.bugged_reason, '') <> '' "
+            "AND COALESCE(" + _OWN_TEXT + ", '') <> '' "
             "ORDER BY v.feedback_at DESC LIMIT ?", (prefix, limit)).fetchall()
     return [f"{t} | {c} | {s}: {r}" for t, c, s, r in rows]
 

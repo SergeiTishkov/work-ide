@@ -1474,6 +1474,18 @@ brief (`tools/ai_brief.py` reads the rejected and bugged reasons only).
 which never had the column.
 
 
+
+### The person's texts outlive their status (2026-11-20, task 0132)
+The owner: applied, undone, applied again, the comment must still be there;
+the same for the reasons. `set_feedback` writes a text only to the column of
+the status given and never erases the others; "Undo" keeps them; the form
+opens with the text the vacancy holds for that status. So a vacancy can
+hold texts of statuses it no longer has. A reading takes the text of the
+current status only (the applied comment for every status of the funnel):
+`feedback.TEXT_STATUSES`, `ai_brief.feedback_reasons`, the review package's
+`reason`; `feedback.py applied --off-status include|only` reads the others
+when the owner asks for them (CLAUDE.md, "A person's text counts for the
+status it was written for").
 ### Reachability ahead of score inside a section (2026-08-12 → 2026-09-13)
 
 When eligibility became its own axis, sections were sorted by it first and by

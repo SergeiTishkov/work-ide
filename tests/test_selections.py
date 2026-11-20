@@ -445,7 +445,7 @@ def test_applying_dates_the_funnel_and_going_back_forgets_it(isolated_data_dir):
         row = conn.execute(selections.load_queries()["vacancy_progress"],
                            {"identity": db.identity(), "id": "a"}).fetchone()
     assert row["applied_at"] is None and row["contact_at"] is None
-    assert row["applied_comment"] is None
+    assert row["applied_comment"] == "Notice: one month"   # the person's text stays (task 0132)
     assert row["interview_comments"] is None and row["final_comment"] is None
     assert row["declined_comment"] is None and row["declined_at"] is None
 

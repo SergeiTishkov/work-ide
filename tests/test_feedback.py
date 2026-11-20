@@ -152,5 +152,54 @@ def test_applications_come_with_what_was_written_and_stay_out_of_the_review(isol
     assert [it["applied_comment"] for it in printed["applied"]] == ["Q: notice period? A: one month"]
 
 
+def test_a_text_counts_for_its_own_status_only(isolated_data_dir, capsys):
+    """Task 0132: the texts outlive their status; a reading takes the text of
+    the status the vacancy has now, and off-status texts only on request."""
+    import ai_brief
+
+    sel = _setup({"a": "new", "b": "new", "c": "new", "d": "new"})
+    _mark("a", "applied", sel, reason="Q: notice? A: a month")            # counts
+    _mark("b", "applied", sel, reason="Q: visa? A: none")
+    _mark("b", "new", sel)                                                # undone: off-status
+    _mark("c", "applied", sel, reason="Q: salary? A: 5000")
+    _mark("c", "new", sel)
+    _mark("c", "rejected", sel, reason="relocation")                      # now "not for me"
+    _mark("d", "bugged", sel, reason="a Java role")
+    _mark("d", "new", sel)
+    _mark("d", "rejected", sel, reason=None)                              # the bugged text is off-status
+    with db.session() as conn:
+        kept = dict(conn.execute("SELECT vacancy_id, COALESCE(applied_comment, bugged_reason) "
+                                 "FROM vacancy_identity WHERE identity_id = 'ftf'").fetchall())
+    assert kept == {"a": "Q: notice? A: a month", "b": "Q: visa? A: none",
+                    "c": "Q: salary? A: 5000", "d": "a Java role"}, "nothing was erased"
+
+    assert [it["id"] for it in feedback.applied_items()] == ["a"]
+    both = {it["id"]: it["off_status"] for it in feedback.applied_items(off_status="include")}
+    assert both == {"a": False, "b": True, "c": True}
+    assert sorted(it["id"] for it in feedback.applied_items(off_status="only")) == ["b", "c"]
+    with pytest.raises(ValueError):
+        feedback.applied_items(off_status="all")
+
+    reasons = {it["id"]: it["reason"] for it in feedback.pending_items()}
+    assert reasons == {"c": "relocation", "d": None}
+    assert ai_brief.feedback_reasons("ftf") == ["Developer c | Company c | rejected: relocation"]
+
+    args = feedback.build_parser().parse_args(["applied", "--off-status", "only"])
+    args.func(args)
+    printed = yaml.safe_load(capsys.readouterr().out)
+    assert sorted(it["id"] for it in printed["applied"]) == ["b", "c"]
+
+
+def test_the_agents_reject_keeps_the_other_texts(isolated_data_dir):
+    sel = _setup({"a": "new"})
+    _mark("a", "bugged", sel, reason="a Java role")
+    _mark("a", "new", sel)
+    assert feedback.reject("a", "onsite only")
+    with db.session() as conn:
+        row = conn.execute("SELECT feedback_status, rejected_reason, bugged_reason FROM vacancy_identity "
+                           "WHERE identity_id = 'ftf' AND vacancy_id = 'a'").fetchone()
+    assert tuple(row) == ("rejected", "onsite only", "a Java role")
+
+
 def test_no_applications_without_a_base(isolated_data_dir):
     assert feedback.applied_items() == []
