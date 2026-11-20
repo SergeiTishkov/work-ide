@@ -10,7 +10,7 @@ const { execFile } = require('node:child_process');
 const LOGS = { cv: 'CV log.md', letter: 'Cover Letter log.md' };
 const VERSION_RE = /^## V\d+ · /;
 const ERROR_RE = /^## Error · /;
-// The same rules as cv.js
+// The same rules as main/queue.js
 const IDENTITY_PATTERN = /^[a-z][a-z0-9]{2,9}$/;
 const VACANCY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 

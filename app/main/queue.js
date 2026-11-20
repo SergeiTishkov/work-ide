@@ -244,10 +244,6 @@ class QueueClient {
     return entry ? [...entry.lines] : [];
   }
 
-  active() {
-    return this.current.some((task) => ACTIVE.has(task.state));
-  }
-
   // The workers alive now: { role, capabilities, note }.
   liveWorkers(staleMs = 45000) {
     const now = this.clock();

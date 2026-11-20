@@ -54,6 +54,14 @@ test('sections follow the class order, with their titles from the locale', async
   expect(titles).toEqual([en['class.hot_lead'], en['class.worth_a_look']]);
 });
 
+test('a class never listed (an application kept from low_priority) comes last, named as in the clean-up', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.rows.sharp.full.unshift(row('lp1', { cls: 'low_priority', score: 3 }));
+  await open(page, fixture);
+  const titles = await page.locator('.class-section h2 .section-title').allTextContents();
+  expect(titles).toEqual([en['class.hot_lead'], en['class.worth_a_look'], en['cleanup.class.low_priority']]);
+});
+
 test('"Collect vacancies" queues a collection; the bottom panel lists it with its log', async ({ page }) => {
   await open(page);
   // with no tasks the panel is there and says so (task 0064)

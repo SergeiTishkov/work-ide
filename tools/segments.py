@@ -100,12 +100,6 @@ def vacancy_group(vacancy: dict, country_of) -> str:
     return group_of(country)
 
 
-def group_name(key: str) -> str:
-    if key == OTHER_GROUP:
-        return "Other markets"
-    return (load_groups().get(key) or {}).get("name") or key
-
-
 class Segment:
     """One market list: which groups it holds, and what it is called.
 
@@ -218,10 +212,3 @@ def split(vacancies: list, segments: List[Segment], country_of) -> dict:
     return buckets
 
 
-def counts_by_group(vacancies: list, country_of) -> dict:
-    """{group key: how many}. For showing a person what the split cost them."""
-    tally = {}
-    for vacancy in vacancies:
-        key = vacancy_group(vacancy, country_of)
-        tally[key] = tally.get(key, 0) + 1
-    return tally

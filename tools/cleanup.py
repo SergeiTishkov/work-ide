@@ -29,7 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 
 import db
 import report
@@ -43,13 +43,20 @@ CLASSES = ("hot_lead", "worth_a_look", "long_shot", "ai_unscreened", "remote_unc
 UNREVIEWED = ("bugged", "rejected")
 
 
+def utc_today() -> date:
+    """Today as the app's AGE counts it: SQLite's date('now'), a UTC date.
+    The local date differs for the hours around midnight, and a clean-up
+    chosen from the app's bands deletes by them (task 0128)."""
+    return datetime.now(timezone.utc).date()
+
+
 def age_band(posted_at, first_seen, today: date | None = None) -> str:
     """The app's AGE: days since it was posted, else since we first saw it;
     no date at all reads as today."""
     day = report.calendar_date(posted_at) or report.calendar_date(first_seen)
     if not day:
         return "today"
-    days = ((today or date.today()) - date.fromisoformat(day)).days
+    days = ((today or utc_today()) - date.fromisoformat(day)).days
     if days < 1:
         return "today"
     if days <= 7:

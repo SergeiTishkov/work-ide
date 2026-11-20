@@ -47,8 +47,11 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
+import fetch_linkedin  # noqa: E402
+import report  # noqa: E402
 
-# The classes worth spending a request on.
+# The classes worth spending a request on: the listed ones
+# (report.LISTED_CLASSES).
 #
 # `remote_unconfirmed` was added 2026-09-08, and its absence was the single
 # largest hole in this step. That class holds more vacancies than every
@@ -67,8 +70,7 @@ import common  # noqa: E402
 #
 # `never_say_never` (task 0124): listed, so read like the rest; it comes last
 # in the score order the budget is spent in.
-HEAD_CLASSES = ("hot_lead", "worth_a_look", "long_shot", "ai_unscreened", "remote_unconfirmed",
-                "engagement_unconfirmed", "never_say_never")
+HEAD_CLASSES = report.LISTED_CLASSES
 
 # How many descriptions to fetch per run. A bound rather than a target: 251
 # were outstanding on the first run, and clearing them over a few runs is
@@ -143,7 +145,7 @@ DEVITJOBS_PAUSE_SECONDS = 0.5
 # Between two vacancy pages of a source whose reader does not pause itself.
 # LinkedIn's had none: harmless at a hundred pages a run, not at the thousand
 # a full walk of its search brings (2026-10-03). The same pause as its fetcher.
-READ_PAUSE_SECONDS = {"linkedin": 1.5}
+READ_PAUSE_SECONDS = {"linkedin": fetch_linkedin.PAUSE_SECONDS}
 
 
 def _json_ld_facts(url: str, timeout: int) -> dict:
@@ -253,8 +255,6 @@ def _reader_for(source: str):
     if source == "devitjobs":
         return _devitjobs_facts
     if source == "linkedin":
-        import fetch_linkedin
-
         return fetch_linkedin.fetch_page_facts
     if source in READABLE_SOURCES:
         return _json_ld_facts

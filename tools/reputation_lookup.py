@@ -161,13 +161,7 @@ def refresh_company(vacancies: dict, companies: dict, slug: str) -> int:
     subset = {vid: vacancies[vid] for vid in ids}
     rescore_all(subset, score.load_criteria(), score.load_profile(), companies)
     kb.save_vacancies(subset)
-    with db.session() as conn:
-        shown = {row[0] for row in conn.execute(
-            "SELECT vacancy_id FROM vacancy_identity WHERE identity_id = ? AND view IS NOT NULL",
-            (db.identity(),))}
-    rows = [selections._view_row(v) for vid, v in subset.items() if vid in shown]
-    with db.session() as conn:
-        conn.executemany(selections.UPDATE_VIEWS, rows)
+    selections.refresh_views(subset)
     return len(subset)
 
 

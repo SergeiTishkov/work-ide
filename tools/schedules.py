@@ -59,7 +59,6 @@ WHAT: Dict[str, str] = {
 }
 MISSED = ("catch_up", "skip")
 ALL = "all"
-CLEAN_FILTERS = ("ages", "statuses", "classes")
 # found later than this after its time, a run was missed (off or asleep);
 # a worker looks far more often than this while the computer is on
 LATE_AFTER = timedelta(minutes=10)
@@ -192,17 +191,7 @@ def _identities(value) -> str:
 def _args(what: str, args: Optional[dict]) -> dict:
     args = dict(args or {})
     if what == "clean":
-        clean = {}
-        for name in CLEAN_FILTERS:
-            values = args.get(name) or []
-            if not isinstance(values, list) or not all(isinstance(v, str) and re.match(r"^[a-z_]+$", v)
-                                                       for v in values):
-                raise ValueError(f"invalid {name}: {values!r}")
-            if values:
-                clean[name] = values
-        if not clean:
-            raise ValueError("a clean-up names at least one filter (ages, statuses, classes)")
-        return clean
+        return taskq.clean_filters(args)
     if what == "collect":
         return {k: False for k in ("linkedin", "documents") if args.get(k) is False}
     return {}

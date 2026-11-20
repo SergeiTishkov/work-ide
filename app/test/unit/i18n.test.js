@@ -55,7 +55,9 @@ test('every language has exactly the same texts', () => {
 });
 
 test('a text takes the same parameters in every language', () => {
-  const names = (text) => [...String(text).matchAll(/{(w+)}/g)].map((m) => m[1]).sort();
+  const names = (text) => [...String(text).matchAll(/{(\w+)}/g)].map((m) => m[1]).sort();
+  // The pattern once lacked its backslash and matched nothing (task 0128).
+  assert.ok(Object.values(LOCALES.en).some((text) => names(text).length), 'no parameters found at all');
   for (const key of Object.keys(locale)) {
     if (key === 'date.format') continue;   // each language picks its own parts of a date
     assert.deepEqual(names(LOCALES.en[key]), names(locale[key]), key);
@@ -64,7 +66,8 @@ test('a text takes the same parameters in every language', () => {
 
 test('a date format uses only the parts a date has, and twelve months', () => {
   for (const [language, texts] of Object.entries(LOCALES)) {
-    const parts = [...texts['date.format'].matchAll(/{(w+)}/g)].map((m) => m[1]);
+    const parts = [...texts['date.format'].matchAll(/{(\w+)}/g)].map((m) => m[1]);
+    assert.ok(parts.length, language);
     assert.ok(parts.every((p) => ['day', 'mm', 'month', 'year'].includes(p)), language);
     assert.equal(texts['date.months'].split(' ').length, 12, language);
   }

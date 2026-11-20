@@ -81,7 +81,7 @@ KINDS: Dict[str, tuple] = {
     "letter": ("documents", ("desktop", "ai")),  # tools/cover_letter.py
     "cv_batch": ("documents", ("desktop", "ai")),  # tools/cv_batch.py
     "reputation": ("reputation", ("ai",)),  # tools/reputation_lookup.py
-    "links": ("collect", ()),               # pipeline.py --links: the shortlist's links again
+    "links": ("collect", ()),               # pipeline.py --links: are the listed vacancies still open (tools/availability.py)
     "ai": ("collect", ("ai",)),             # pipeline.py --ai: what waits for the AI read (task 0078)
 }
 ACTIVE = ("queued", "running")
@@ -96,6 +96,28 @@ MAX_ATTEMPTS = 3
 # The worker runs a task with this set; a pipeline.py or cv_batch.py started
 # under it does not register a second row (register()).
 TASK_ENV = "WORK_IDE_TASK_ID"
+
+
+# What a clean-up task filters by (tools/cleanup.py's options).
+CLEAN_FILTERS = ("ages", "statuses", "classes")
+
+
+def clean_filters(args: Optional[dict]) -> Dict[str, List[str]]:
+    """{filter: values} of a clean-up's args, the filters left empty out;
+    ValueError for a value that is not a plain name, or no filter at all.
+    Checked when a clean-up is scheduled (tools/schedules.py) and again when
+    it starts (tools/taskd.py)."""
+    chosen: Dict[str, List[str]] = {}
+    for name in CLEAN_FILTERS:
+        values = (args or {}).get(name) or []
+        if not isinstance(values, list) or not all(isinstance(v, str) and re.match(r"^[a-z_]+$", v)
+                                                   for v in values):
+            raise ValueError(f"invalid {name}: {values!r}")
+        if values:
+            chosen[name] = values
+    if not chosen:
+        raise ValueError("a clean-up names at least one filter")
+    return chosen
 
 
 def now() -> datetime:
