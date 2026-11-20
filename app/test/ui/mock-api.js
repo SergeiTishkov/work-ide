@@ -209,7 +209,8 @@ function installMockApi(fixture) {
   function narrowed(identity, view, aside) {
     return poolOf(identity, view).filter((row) => (aside === 'statuses' || view.statuses.includes(row.feedback.status))
       && (aside === 'fresh' || view.fresh.includes(row.fresh ? 'fresh' : 'earlier'))
-      && (aside === 'sources' || view.sources == null || view.sources.includes(row.view.source))
+      && (aside === 'sources' || ((view.sources == null || view.sources.includes(row.view.source))
+        && !(view.hiddenSources || []).includes(row.view.source)))
       && (aside === 'fits' || view.fits == null || view.fits.includes(row.class))
       && (aside === 'companies' || companyShown(row, view.companies))
       && (aside === 'ages' || view.ages == null || view.ages.includes(ageOf(row)))
@@ -311,6 +312,10 @@ function installMockApi(fixture) {
       for (const row of narrowed(identity, view, 'sources')) {
         totals.set(row.view.source, (totals.get(row.view.source) || 0) + 1);
       }
+      // every board the pool holds, 0 where the view leaves none (task 0133);
+      // fixture.catalogSources: the catalogue's boards beyond them
+      for (const row of poolOf(identity, view)) if (!totals.has(row.view.source)) totals.set(row.view.source, 0);
+      for (const source of data.catalogSources || []) if (!totals.has(source)) totals.set(source, 0);
       const sites = { linkedin: 'linkedin.com', devitjobs: 'devitjobs.uk, devitjobs.com' };
       // fixture.paidSources: the boards the selection recorded as paid (task 0101)
       const paid = new Set(data.paidSources || []);
@@ -350,6 +355,14 @@ function installMockApi(fixture) {
         const key = JSON.stringify([kind, name]);
         totals.set(key, (totals.get(key) || 0) + 1);
       }
+      // every intermediary the pool holds and the 'other' row, 0 where the
+      // view leaves none (task 0133)
+      for (const row of poolOf(identity, view)) {
+        const { kind, name } = kindOf(row);
+        const key = JSON.stringify([kind, name]);
+        if (!totals.has(key)) totals.set(key, 0);
+      }
+      if (![...totals.keys()].some((key) => JSON.parse(key)[0] === 'other')) totals.set(JSON.stringify(['other', null]), 0);
       return [...totals].map(([key, total]) => {
         const [kind, name] = JSON.parse(key);
         return { kind, name, total };

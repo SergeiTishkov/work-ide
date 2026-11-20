@@ -79,6 +79,23 @@ shown and the names hidden, not the names shown: with a shown-list, unticking
 one name would freeze the list, and every company a later run brings would be
 hidden.
 
+Every option of the drop-downs is listed whatever it holds (task 0133, the
+owner, 2026-11-20): a board, class, company kind or intermediary the other
+drop-downs leave empty stays, with 0, and keeps its tick. Until then an empty
+board or kind left the list, and the renderer kept a set of boards seen since
+start (task 0048) so that a hidden board emptied by another drop-down did not
+come back ticked. `store.sources` now lists every board of the catalogue
+(meta `source_sites`) and every board the selection holds under the view's
+markets; `store.companies` every intermediary the selection holds and always
+the "other" row. "Source" keeps the boards hidden (`view.hiddenSources`, with
+`sources` null), as "Company" keeps the names hidden, so a board a later run
+brings is shown and ticked until the person unticks it; with the shown-list
+it kept before, a new board came in unticked. `viewParams` turns the hidden
+boards into the `:sources` list the queries read: every board there is minus
+the hidden ones. A view saved before task 0133 (`sources: [shown]`) is
+turned into `hiddenSources` once, on its first load, with the same boards
+ticked.
+
 "Category" (task 0049, 2026-10-21) also takes the kind of role under the
 classes: on the CV's stack, another stack the CV fits, or a stretch for the
 CV, worked out in `view_pool` from the view's `stretch` mark (ROLE in

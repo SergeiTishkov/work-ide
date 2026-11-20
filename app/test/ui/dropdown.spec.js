@@ -129,8 +129,8 @@ test('the keyboard: arrows move, Enter checks and leaves the list open, Escape c
   await expect(page.getByTestId('fresh-option-earlier')).toHaveClass(/cursor/);
   await settled(page);
   expect((await calls(page, 'loadListing')).at(-1)).toEqual(['sharp', {
-    segments: null, statuses: ['new'], fresh: ['fresh', 'earlier'], sources: null, fits: null, companies: null, ages: null,
-    roles: null, text: '',
+    segments: null, statuses: ['new'], fresh: ['fresh', 'earlier'], sources: null, hiddenSources: null, fits: null, companies: null,
+    ages: null, roles: null, text: '',
   }]);
   await expect(page.getByTestId('fresh-filter-value')).toHaveText(en['filter.fresh_all']);
   await page.keyboard.press('Escape');
@@ -159,8 +159,8 @@ test('quick clicks ask for one list, and a spinner stands in for it until it com
   await expect(page.getByTestId('filter-menu')).toBeVisible();   // the open list stays
   const asked = (await calls(page, 'loadListing')).slice(before);
   expect(asked).toEqual([['sharp', {
-    segments: null, statuses: ['new', 'applied', 'contacted'], fresh: ['fresh'], sources: null, fits: null, companies: null, ages: null,
-    roles: null, text: '',
+    segments: null, statuses: ['new', 'applied', 'contacted'], fresh: ['fresh'], sources: null, hiddenSources: null, fits: null,
+    companies: null, ages: null, roles: null, text: '',
   }]]);
   await page.evaluate(() => window.__releaseListing());
   await settled(page);

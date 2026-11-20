@@ -65,8 +65,8 @@ async function choose(page, testid, value) {
 // The view the app starts with, and one changed from it (renderer/app.js,
 // DEFAULT_VIEW): what the listing calls carry.
 const VIEW = {
-  segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, fits: null, companies: null, ages: null,
-  roles: null, text: '',
+  segments: null, statuses: ['new'], fresh: ['fresh'], sources: null, hiddenSources: null, fits: null,
+  companies: null, ages: null, roles: null, text: '',
 };
 const BOTH = ['fresh', 'earlier'];
 const view = (change = {}) => ({ ...VIEW, ...change });

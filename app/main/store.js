@@ -186,6 +186,8 @@ class Store {
   // `sources`, `fits`, `ages` and `roles` null mean every board, class, age
   // and kind of role; `companies`
   // null every company, or { kinds: [shown], hidden: [names hidden among them] }.
+  // `hiddenSources` (task 0133, with `sources` null): the boards switched
+  // off, every other board shown, a board the base did not hold yet too.
   // `text` the words a row must hold, empty for any.
   viewParams(db, identity, selection, view = {}) {
     const statuses = view.statuses || [];
@@ -206,13 +208,19 @@ class Store {
       segments = (everything.length ? everything : markets).map((m) => m.slug);
     }
     const listed = (values) => (values == null ? null : JSON.stringify(values));
+    let sources = listed(view.sources);
+    const off = view.sources == null && Array.isArray(view.hiddenSources) ? view.hiddenSources : [];
+    if (off.length) {
+      sources = JSON.stringify(this.allSources(db, identity, selection, segments)
+        .filter((source) => !off.includes(source)));
+    }
     return {
       identity,
       selection_id: selection.id,
       segments: JSON.stringify(segments),
       statuses: JSON.stringify(statuses),
       fresh: JSON.stringify(fresh.map((f) => (f === 'fresh' ? 1 : 0))),
-      sources: listed(view.sources),
+      sources,
       fits: listed(view.fits),
       companies: companies && JSON.stringify(companies),
       ages: listed(view.ages),
@@ -257,18 +265,37 @@ class Store {
     return Object.fromEntries(rows.map((r) => [r.class, r.total]));
   }
 
+  // The view's markets with no other drop-down applied: what the drop-downs
+  // list as options, 0 where the view leaves an option none (task 0133).
+  wideParams(db, identity, selection, segments) {
+    return this.viewParams(db, identity, selection, { segments, statuses: VIEW_STATUSES, fresh: FRESHNESS });
+  }
+
+  // Every board there is: the catalogue's and every one the selection holds.
+  allSources(db, identity, selection, segments) {
+    const { sources, ...params } = this.wideParams(db, identity, selection, segments);
+    const held = db.prepare(this.queries.view_sources).all(params).map((r) => r.source);
+    return [...new Set([...Object.keys(this.sourceSites(db)), ...held])].filter(Boolean);
+  }
+
   // [{ source, site, paid, total }], largest first, the chosen boards aside:
-  // the "Source" drop-down. `paid`: the board asks the job seeker to pay
-  // before it assesses an application (task 0101).
+  // the "Source" drop-down. Every board is listed, 0 where the view leaves
+  // it none (the owner, 2026-11-20, task 0133). `paid`: the board asks the
+  // job seeker to pay before it assesses an application (task 0101).
   sources(identity, view) {
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db, identity);
     if (!selection) return [];
     const { sources, ...params } = this.viewParams(db, identity, selection, view);   // the boards aside
-    const rows = db.prepare(this.queries.view_sources).all(params);
+    const totals = new Map(db.prepare(this.queries.view_sources).all(params).map((r) => [r.source, r.total]));
+    for (const source of this.allSources(db, identity, selection, view.segments)) {
+      if (!totals.has(source)) totals.set(source, 0);
+    }
     const sites = this.sourceSites(db);
     const paid = this.paidSources(db);
-    return rows.map((r) => ({ source: r.source, site: sites[r.source] || null, paid: paid.has(r.source), total: r.total }));
+    return [...totals].filter(([source]) => source)
+      .map(([source, total]) => ({ source, site: sites[source] || null, paid: paid.has(source), total }))
+      .sort((a, b) => b.total - a.total || a.source.localeCompare(b.source));
   }
 
   // The "Show" drop-down's numbers: { statuses: { status: n } } under the
@@ -290,14 +317,22 @@ class Store {
 
   // [{ kind, name, total }], largest first, the chosen companies aside: the
   // "Company" drop-down. Every company not an intermediary is one row of kind
-  // 'other', name null.
+  // 'other', name null. Every intermediary the selection holds is listed,
+  // and the 'other' row always, 0 where the view leaves none (task 0133).
   companies(identity, view) {
     const db = this.connection(identity);
     const selection = db && this.latestSelection(db, identity);
     if (!selection) return [];
     const { companies, ...params } = this.viewParams(db, identity, selection, view);   // the companies aside
-    return db.prepare(this.queries.view_companies).all(params)
+    const rows = db.prepare(this.queries.view_companies).all(params)
       .map((r) => ({ kind: r.kind, name: r.name, total: r.total }));
+    const { companies: all, ...wide } = this.wideParams(db, identity, selection, view.segments);
+    const known = new Set(rows.map((r) => `${r.kind}\u0000${r.name}`));
+    for (const r of db.prepare(this.queries.view_companies).all(wide)) {
+      if (!known.has(`${r.kind}\u0000${r.name}`)) rows.push({ kind: r.kind, name: r.name, total: 0 });
+    }
+    if (!rows.some((r) => r.kind === 'other')) rows.push({ kind: 'other', name: null, total: 0 });
+    return rows;
   }
 
   // { age band: how many }, the chosen ages aside: the "Age" drop-down.

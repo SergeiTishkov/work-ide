@@ -619,10 +619,13 @@ test('the keyboard: Enter or Space checks the row under the cursor and keeps the
   await page.keyboard.press('ArrowDown');
   await expect(page.getByTestId('fit-filter-menu')).toBeVisible();
   await expect(page.getByTestId('fit-option-all')).toHaveClass(/cursor/);
-  await page.keyboard.press('ArrowDown');   // the master row, then "Hot leads"
+  await page.keyboard.press('ArrowDown');   // the master row, "Added by hand", then "Hot leads"
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveAttribute('data-state', 'off');
-  expect(await lastListing(page)).toEqual(['sharp', view({ fits: ['worth_a_look', 'long_shot', 'ai_unscreened'] })]);
+  expect(await lastListing(page)).toEqual(['sharp', view({
+    fits: ['added_by_hand', 'worth_a_look', 'long_shot', 'ai_unscreened', 'engagement_unconfirmed', 'never_say_never'],
+  })]);
   await expect(page.getByTestId('fit-filter-menu')).toBeVisible();
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveClass(/cursor/);
   await page.keyboard.press(' ');
@@ -997,7 +1000,9 @@ test('"Fit" narrows the list to one class, and the other filters count within it
   expect((await calls(page, 'listingCounts')).at(-1)).toEqual(hot);
   expect((await calls(page, 'listSources')).at(-1)).toEqual(hot);
   await expect(page.getByTestId('filter-option-new')).toContainText('(2)');
-  await expect(page.getByTestId('source-option-devitjobs')).toHaveCount(0);   // b1 is worth a look
+  // b1 is worth a look: its board stays listed with 0, ticked (task 0133)
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs.uk, devitjobs.com (0)');
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'on');
   await expect(page.getByTestId('fit-option-worth_a_look')).toHaveText(`${en['class.worth_a_look']} (1)`);
 
   // with the status filter: "All" adds a3 (not fresh) and x1 (a wrong pick)
@@ -1013,13 +1018,24 @@ test('"Fit" narrows the list to one class, and the other filters count within it
   await expect(page.getByTestId('fit-filter-value')).toHaveText(en['class.hot_lead']);
 });
 
+// The owner, 2026-11-20 (task 0133): every class is listed, whatever it holds.
 test('a class with nothing left stays listed and keeps its tick', async ({ page }) => {
   await open(page);
   await choose(page, 'source-filter', 'devitjobs');   // b1, worth a look, alone
-  await expect(page.getByTestId('fit-option-hot_lead')).toHaveText(`${en['class.hot_lead']} (0)`);
-  await expect(page.getByTestId('fit-option-long_shot')).toHaveText(`${en['class.long_shot']} (0)`);
+  await page.getByTestId('fit-filter').click();
+  const rows = await page.getByTestId('fit-filter-menu').locator('[role="option"][data-value]')
+    .evaluateAll((nodes) => nodes.map((n) => [n.dataset.value, n.textContent, n.dataset.state]));
+  expect(rows).toEqual([
+    ['added_by_hand', `${en['class.added_by_hand']} (0)`, 'on'],
+    ['hot_lead', `${en['class.hot_lead']} (0)`, 'on'],
+    ['worth_a_look', `${en['class.worth_a_look']} (1)`, 'on'],
+    ['long_shot', `${en['class.long_shot']} (0)`, 'on'],
+    ['ai_unscreened', `${en['class.ai_unscreened']} (0)`, 'on'],
+    ['engagement_unconfirmed', `${en['class.engagement_unconfirmed']} (0)`, 'on'],
+    ['never_say_never', `${en['class.never_say_never']} (0)`, 'on'],
+  ]);
   await expect(page.getByTestId('fit-option-remote_unconfirmed')).toHaveCount(0);   // never listed (task 0098)
-  await expect(page.getByTestId('fit-option-engagement_unconfirmed')).toHaveCount(0);
+  await page.keyboard.press('Escape');
 
   await check(page, 'fit-filter', ['hot_lead', 'worth_a_look', 'long_shot']);
   // the empty hot leads stay chosen
@@ -1153,7 +1169,7 @@ test('"Vacancy expired" is recorded at once, with no reason, and has its own fil
 
 // --- the source filter (the owner, 2026-10-04) --------------------------------
 
-test('"Source" lists the boards of the current filter, each with its count', async ({ page }) => {
+test('"Source" lists every board, each with its count under the current filter', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('source-label')).toHaveText(en['filter.source_legend']);
   await expect(page.getByTestId('source-filter-value')).toHaveText(en['filter.source_all']);
@@ -1184,7 +1200,8 @@ test('choosing a source lists only its vacancies, and the filter counts follow i
   await choose(page, 'source-filter', 'devitjobs');
   await expect(page.getByTestId('list').locator('article')).toHaveCount(1);
   await expect(byId(page, 'b1')).toBeVisible();
-  const devitjobs = ['sharp', view({ sources: ['devitjobs'] })];
+  // the view names the boards hidden (task 0133)
+  const devitjobs = ['sharp', view({ hiddenSources: ['linkedin'] })];
   expect(await lastListing(page)).toEqual(devitjobs);
   expect((await calls(page, 'listingCounts')).at(-1)).toEqual(devitjobs);
   await expect(page.getByTestId('filter-option-bugged')).toContainText('(1)');   // x1
@@ -1314,27 +1331,30 @@ test('the text field above the drop-downs narrows the list by words, together wi
   await settled(page);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(1);
   await expect(byId(page, 'a2r')).toBeVisible();
-  expect(await lastListing(page)).toEqual(['sharp', view({ sources: ['linkedin'], text: 'a2r' })]);
+  expect(await lastListing(page)).toEqual(['sharp', view({ hiddenSources: ['devitjobs'], text: 'a2r' })]);
   await field.fill('devitjobs');
   await settled(page);
   await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
   await expect(field).toHaveValue('devitjobs');
 });
 
-test('a source hidden, then emptied by another drop-down, stays hidden after a click on another source', async ({ page }) => {
-  // task 0048: devitjobs hidden; "Hot leads" alone leaves nothing from it, so
-  // its row goes; linkedin off and on again used to make the filter "all"
+test('a source hidden, then emptied by another drop-down, stays listed and hidden after a click on another source', async ({ page }) => {
+  // task 0048: devitjobs hidden; "Hot leads" alone leaves nothing from it;
+  // linkedin off and on again used to make the filter "all". Since task 0133
+  // its row stays, with 0, unticked.
   await open(page);
   await choose(page, 'source-filter', 'linkedin');
   await choose(page, 'fit-filter', 'hot_lead');
   await page.getByTestId('source-filter').click();
-  await expect(page.getByTestId('source-option-devitjobs')).toHaveCount(0);
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs.uk, devitjobs.com (0)');
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'off');
   await page.getByTestId('source-option-linkedin').click();
   await expect(page.getByTestId('source-option-linkedin')).toHaveAttribute('data-state', 'off');
+  await expect.poll(async () => (await lastListing(page))[1].hiddenSources).toEqual(['linkedin', 'devitjobs']);
   await page.getByTestId('source-option-linkedin').click();
   await expect(page.getByTestId('source-option-linkedin')).toHaveAttribute('data-state', 'on');
   await page.keyboard.press('Escape');
-  await expect.poll(async () => (await lastListing(page))[1].sources).toEqual(['linkedin']);
+  await expect.poll(async () => (await lastListing(page))[1]).toMatchObject({ sources: null, hiddenSources: ['devitjobs'] });
 
   await choose(page, 'fit-filter', '');
   await page.getByTestId('source-filter').click();
@@ -1344,7 +1364,7 @@ test('a source hidden, then emptied by another drop-down, stays hidden after a c
   await page.getByTestId('source-option-all').click();
   await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'on');
   await page.keyboard.press('Escape');
-  await expect.poll(async () => (await lastListing(page))[1].sources).toBeNull();
+  await expect.poll(async () => (await lastListing(page))[1]).toMatchObject({ sources: null, hiddenSources: null });
 });
 
 // The owner, 2026-10-26 (task 0101): the boards that ask for payment apart.
@@ -1364,15 +1384,15 @@ test('"Source" lists the free boards and the paid ones under "All sources"', asy
   await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'off');
   await expect(page.getByTestId('source-kind-free')).toHaveAttribute('data-state', 'on');
   await expect(page.getByTestId('source-option-all')).toHaveAttribute('data-state', 'partial');
-  await expect.poll(async () => (await lastListing(page))[1].sources).toEqual(['linkedin']);
+  await expect.poll(async () => (await lastListing(page))[1].hiddenSources).toEqual(['devitjobs']);
   // a free board off keeps the paid one off
   await page.getByTestId('source-option-linkedin').click();
   await expect(page.getByTestId('source-option-all')).toHaveAttribute('data-state', 'off');
-  await expect.poll(async () => (await lastListing(page))[1].sources).toEqual([]);
+  await expect.poll(async () => (await lastListing(page))[1].hiddenSources).toEqual(['linkedin', 'devitjobs']);
   await page.getByTestId('source-option-devitjobs').click();
-  await expect.poll(async () => (await lastListing(page))[1].sources).toEqual(['devitjobs']);
+  await expect.poll(async () => (await lastListing(page))[1].hiddenSources).toEqual(['linkedin']);
   await page.getByTestId('source-option-all').click();
-  await expect.poll(async () => (await lastListing(page))[1].sources).toBeNull();
+  await expect.poll(async () => (await lastListing(page))[1]).toMatchObject({ sources: null, hiddenSources: null });
 });
 
 test('with no paid board, "Source" has no "Paid" row', async ({ page }) => {
@@ -1388,7 +1408,7 @@ test('the status filter and the source apply together', async ({ page }) => {
   await choose(page, 'filter', 'bugged');
   await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
   expect(await lastListing(page))
-    .toEqual(['sharp', view({ statuses: ['bugged'], fresh: BOTH, sources: ['linkedin'] })]);
+    .toEqual(['sharp', view({ statuses: ['bugged'], fresh: BOTH, hiddenSources: ['devitjobs'] })]);
   // the chosen board stays on the list with nothing in it; the others follow the filter
   await expect(page.getByTestId('source-filter-value')).toHaveText('linkedin.com');
   await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (0)');
@@ -1400,11 +1420,108 @@ test('the status filter and the source apply together', async ({ page }) => {
 });
 
 test('the chosen boards stay across markets, and a refresh brings them back', async ({ page }) => {
-  await open(page);
+  // both boards are in the catalogue, as every board the pipeline collects is
+  const fixture = standardFixture();
+  fixture.catalogSources = ['linkedin', 'devitjobs'];
+  await open(page, fixture);
   await choose(page, 'source-filter', 'devitjobs');
-  await choose(page, 'segment-filter', 'uk');
+  await choose(page, 'segment-filter', 'uk');   // u1 and u2, both linkedin
   await expect(page.getByTestId('source-filter-value')).toHaveText('devitjobs.uk, devitjobs.com');
+  await page.getByTestId('source-filter').click();
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveText('devitjobs.uk, devitjobs.com (0)');
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'on');
+  await page.keyboard.press('Escape');
   await choose(page, 'segment-filter', '');
+  await page.getByTestId('refresh').click();
+  await expect(page.getByTestId('source-filter-value')).toHaveText('devitjobs.uk, devitjobs.com');
+  await expect(byId(page, 'b1')).toBeVisible();
+  await expect(byId(page, 'a1')).toHaveCount(0);
+});
+
+// The owner, 2026-11-20 (task 0133): every board is listed however the other
+// drop-downs narrow, a catalogue board with nothing collected yet too.
+test('every board stays listed with 0, ticked, when another drop-down leaves it none', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.catalogSources = ['linkedin', 'devitjobs', 'remoteok'];
+  await open(page, fixture);
+  await choose(page, 'filter', 'expired');   // nothing expired
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
+  await expect(page.getByTestId('source-filter-value')).toHaveText(en['filter.source_all']);
+  await page.getByTestId('source-filter').click();
+  const rows = await page.getByTestId('source-filter-menu').locator('[role="option"]')
+    .evaluateAll((nodes) => nodes.map((n) => [n.textContent, n.dataset.state]));
+  expect(rows).toEqual([
+    [`${en['filter.source_all']} (0)`, 'on'],
+    [`${en['filter.source_free']} (0)`, 'on'],
+    ['devitjobs.uk, devitjobs.com (0)', 'on'],
+    ['linkedin.com (0)', 'on'],
+    ['remoteok (0)', 'on'],
+  ]);
+});
+
+// The owner, 2026-11-20 (task 0133): a board that appears is ticked; from
+// then on it is as the person sets it. The view keeps the boards hidden.
+test('a board a later run brings is shown and ticked while the boards hidden before stay hidden', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('work-ide-view', JSON.stringify({
+      active: 'sharp', views: { sharp: { statuses: ['new'], fresh: ['fresh'], sources: null, hiddenSources: ['linkedin'] } },
+    }));
+  });
+  const fixture = standardFixture();
+  fixture.rows.sharp.full.push(row('n1', { score: 75, source: 'remoteok' }));   // a board not seen before
+  await open(page, fixture);
+  await expect(byId(page, 'n1')).toBeVisible();
+  await expect(byId(page, 'b1')).toBeVisible();
+  await expect(byId(page, 'a1')).toHaveCount(0);
+  await page.getByTestId('source-filter').click();
+  await expect(page.getByTestId('source-option-remoteok')).toHaveAttribute('data-state', 'on');
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'on');
+  await expect(page.getByTestId('source-option-linkedin')).toHaveAttribute('data-state', 'off');
+  await expect(page.getByTestId('source-option-linkedin')).toHaveText('linkedin.com (2)');
+  // unticked now, it stays hidden with linkedin
+  await page.getByTestId('source-option-remoteok').click();
+  await expect(page.getByTestId('source-option-remoteok')).toHaveAttribute('data-state', 'off');
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await lastListing(page))[1]).toMatchObject({ sources: null, hiddenSources: ['linkedin', 'remoteok'] });
+  await expect(byId(page, 'n1')).toHaveCount(0);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('work-ide-view')));
+  expect(saved.views.sharp.hiddenSources).toEqual(['linkedin', 'remoteok']);
+});
+
+// A view saved before task 0133 named the boards shown; the app turns it once
+// into the boards hidden, the same boards ticked.
+test('a saved view naming the boards shown becomes the boards hidden, the same boards ticked', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return;   // once: a refresh keeps what the app saved
+    sessionStorage.setItem('seeded', '1');
+    localStorage.setItem('work-ide-view', JSON.stringify({
+      active: 'sharp',
+      views: {
+        sharp: {
+          segments: null, statuses: ['new'], fresh: ['fresh'], sources: ['devitjobs'], fits: null, companies: null,
+          ages: null, roles: null, text: '',
+        },
+      },
+    }));
+  });
+  const fixture = standardFixture();
+  fixture.catalogSources = ['remoteok'];   // in the catalogue, not among the boards shown
+  await open(page, fixture);
+  await expect(byId(page, 'b1')).toBeVisible();
+  await expect(byId(page, 'a1')).toHaveCount(0);
+  await expect(page.getByTestId('source-filter-value')).toHaveText('devitjobs.uk, devitjobs.com');
+  await expect.poll(async () => (await page.evaluate(() => JSON.parse(localStorage.getItem('work-ide-view'))))
+    .views.sharp).toMatchObject({ sources: null, hiddenSources: ['linkedin', 'remoteok'] });
+  await page.getByTestId('source-filter').click();
+  await expect(page.getByTestId('source-option-devitjobs')).toHaveAttribute('data-state', 'on');
+  await expect(page.getByTestId('source-option-linkedin')).toHaveAttribute('data-state', 'off');
+  await expect(page.getByTestId('source-option-remoteok')).toHaveAttribute('data-state', 'off');
+  await page.keyboard.press('Escape');
+
+  // the next list asked for carries the boards hidden, and a refresh keeps them
+  await choose(page, 'fit-filter', 'worth_a_look');
+  expect(await lastListing(page))
+    .toEqual(['sharp', view({ fits: ['worth_a_look'], hiddenSources: ['linkedin', 'remoteok'] })]);
   await page.getByTestId('refresh').click();
   await expect(page.getByTestId('source-filter-value')).toHaveText('devitjobs.uk, devitjobs.com');
   await expect(byId(page, 'b1')).toBeVisible();
@@ -1453,6 +1570,9 @@ test('"Company" sits between "Source" and "Category": all, the kinds, the interm
     [`${en['filter.company_kind.marketplace']} (2)`, 'on'],
     ['Proxify (1)', 'on'],
     ['Toptal (1)', 'on'],
+    // a kind with nothing in the view is listed too (task 0133)
+    [`${en['filter.company_kind.agency']} (0)`, 'on'],
+    [`${en['filter.company_kind.reposter']} (0)`, 'on'],
     [`${en['filter.company_kind.other']} (1)`, 'on'],
   ]);
   expect(await calls(page, 'listCompanies')).toContainEqual(['sharp', VIEW]);
@@ -1532,12 +1652,38 @@ test('the hidden companies survive a refresh and a change of market', async ({ p
   await expect(byId(page, 'a1')).toHaveCount(0);
 });
 
-test('a base without company kinds: every company is one "Other companies" row', async ({ page }) => {
+test('a base without company kinds: every company is one "Other companies" row, each kind listed with 0', async ({ page }) => {
   await open(page);
   await page.getByTestId('company-filter').click();
   const rows = await page.getByTestId('company-filter-menu').locator('[role="option"]')
-    .evaluateAll((nodes) => nodes.map((n) => n.textContent));
-  expect(rows).toEqual([`${en['filter.company_all']} (3)`, `${en['filter.company_kind.other']} (3)`]);
+    .evaluateAll((nodes) => nodes.map((n) => [n.textContent, n.dataset.state]));
+  expect(rows).toEqual([
+    [`${en['filter.company_all']} (3)`, 'on'],
+    [`${en['filter.company_kind.marketplace']} (0)`, 'on'],
+    [`${en['filter.company_kind.agency']} (0)`, 'on'],
+    [`${en['filter.company_kind.reposter']} (0)`, 'on'],
+    [`${en['filter.company_kind.other']} (3)`, 'on'],
+  ]);
+});
+
+// The owner, 2026-11-20 (task 0133): a view that leaves no company still
+// lists every row, with 0, and keeps the ticks.
+test('every company row stays listed with 0 when another drop-down leaves none', async ({ page }) => {
+  await open(page, companyFixture());
+  await choose(page, 'filter', 'expired');   // nothing expired
+  await expect(page.getByTestId('list').locator('article')).toHaveCount(0);
+  await page.getByTestId('company-filter').click();
+  const rows = await page.getByTestId('company-filter-menu').locator('[role="option"]')
+    .evaluateAll((nodes) => nodes.map((n) => [n.textContent, n.dataset.state]));
+  expect(rows).toEqual([
+    [`${en['filter.company_all']} (0)`, 'on'],
+    [`${en['filter.company_kind.marketplace']} (0)`, 'on'],
+    ['Proxify (0)', 'on'],
+    ['Toptal (0)', 'on'],
+    [`${en['filter.company_kind.agency']} (0)`, 'on'],
+    [`${en['filter.company_kind.reposter']} (0)`, 'on'],
+    [`${en['filter.company_kind.other']} (0)`, 'on'],
+  ]);
 });
 
 test('the company list stands in by level: all, the kinds, the companies', async ({ page }) => {

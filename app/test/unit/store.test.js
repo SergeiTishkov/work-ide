@@ -330,7 +330,7 @@ test('"shown" raises one class\'s limit; "fit" narrows the list, the counts and 
   assert.deepEqual(worth.map((r) => r.class), ['worth_a_look', 'worth_a_look', 'worth_a_look']);
   assert.equal(count(store, 'test', v('full', 'all', { fit: 'worth_a_look' })), 3);
   assert.deepEqual(store.sources('test', v('full', 'all', { fit: 'worth_a_look' })).map((s) => [s.source, s.total]),
-    [['devitjobs', 3]]);
+    [['devitjobs', 3], ['linkedin', 0]], 'a board the class leaves none is listed with 0 (task 0133)');
   assert.deepEqual(store.classTotals('test', v('full', 'all')), { hot_lead: 20, worth_a_look: 3 });
   assert.deepEqual(store.classTotals('test', v('full', 'all', { fit: 'worth_a_look' })),
     { hot_lead: 20, worth_a_look: 3 }, 'the "Fit" drop-down counts each class whatever is chosen in it');
@@ -341,7 +341,8 @@ test('"shown" raises one class\'s limit; "fit" narrows the list, the counts and 
   assert.equal(store.listing('test', v('full', 'applied', { fit: 'worth_a_look' })).length, 0);
   assert.equal(count(store, 'test', v('full', 'applied', { fit: 'worth_a_look' })), 0);
   assert.equal(count(store, 'test', v('full', 'applied', { fit: 'hot_lead' })), 1);
-  assert.deepEqual(store.sources('test', v('full', 'applied', { fit: 'worth_a_look' })), []);
+  assert.deepEqual(store.sources('test', v('full', 'applied', { fit: 'worth_a_look' })).map((s) => [s.source, s.total]),
+    [['devitjobs', 0], ['linkedin', 0]]);
   store.closeAll();
 });
 
@@ -491,13 +492,17 @@ test('the source narrows the listing, the counts and the class totals', () => {
   store.closeAll();
 });
 
-test('the source list counts each board under the status filter', () => {
+// The owner, 2026-11-20 (task 0133): every board is listed, 0 where the view
+// leaves it none.
+test('the source list counts each board under the status filter, 0 where it leaves none', () => {
   const { store } = setup();
   assert.deepEqual(store.sources('test', v('full', 'all')),
     [{ source: 'linkedin', site: null, paid: false, total: 20 }, { source: 'devitjobs', site: null, paid: false, total: 3 }]);
-  assert.deepEqual(store.sources('test', v('full', 'fresh_new')), [{ source: 'devitjobs', site: null, paid: false, total: 3 }]);
+  assert.deepEqual(store.sources('test', v('full', 'fresh_new')), [{ source: 'devitjobs', site: null, paid: false, total: 3 },
+    { source: 'linkedin', site: null, paid: false, total: 0 }]);
   store.setFeedback('test', 'old00', 'applied');
-  assert.deepEqual(store.sources('test', v('full', 'applied')), [{ source: 'linkedin', site: null, paid: false, total: 1 }]);
+  assert.deepEqual(store.sources('test', v('full', 'applied')), [{ source: 'linkedin', site: null, paid: false, total: 1 },
+    { source: 'devitjobs', site: null, paid: false, total: 0 }]);
   assert.deepEqual(store.listing('test', v('full', 'applied', { source: 'devitjobs' })), []);
   assert.equal(count(store, 'test', v('full', 'applied', { source: 'linkedin' })), 1);
   assert.equal(count(store, 'test', v('full', 'applied', { source: 'devitjobs' })), 0);
@@ -541,6 +546,56 @@ test('each board says whether it is paid, as the selection recorded', () => {
   db.close();
   assert.deepEqual(store.sources('test', v('full', 'all')).map((s) => [s.source, s.paid]),
     [['linkedin', false], ['devitjobs', true]]);
+  store.closeAll();
+});
+
+// The owner, 2026-11-20 (task 0133): every board is listed however the other
+// drop-downs narrow, a catalogue board the selection holds none of too.
+test('every board is listed with 0 under a narrowing filter, the catalogue boards too', () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  db.prepare("INSERT INTO meta (key, value) VALUES ('source_sites', ?)")
+    .run(JSON.stringify({ linkedin: 'linkedin.com', remoteok: 'remoteok.com' }));
+  db.close();
+  const rows = (view) => store.sources('test', view).map((s) => [s.source, s.site, s.total]);
+  assert.deepEqual(rows(v('full', 'all')),
+    [['linkedin', 'linkedin.com', 20], ['devitjobs', null, 3], ['remoteok', 'remoteok.com', 0]]);
+  assert.deepEqual(rows(v('full', 'all', { fit: 'worth_a_look' })),
+    [['devitjobs', null, 3], ['linkedin', 'linkedin.com', 0], ['remoteok', 'remoteok.com', 0]]);
+  assert.deepEqual(rows({ ...v('full', 'all'), statuses: [] }),
+    [['devitjobs', null, 0], ['linkedin', 'linkedin.com', 0], ['remoteok', 'remoteok.com', 0]],
+    'a view that leaves nothing still lists every board');
+  assert.deepEqual(rows(v('uk', 'all')).map(([source, , total]) => [source, total]),
+    [['linkedin', 10], ['devitjobs', 3], ['remoteok', 0]]);
+  store.closeAll();
+});
+
+// The owner, 2026-11-20 (task 0133): a new board is shown until the person
+// unticks it, so the view names the boards hidden.
+test('hiddenSources hides the boards named; a board the base did not hold before is shown', () => {
+  const { store, file } = setup();
+  const every = ['hot_lead', 'worth_a_look'];
+  const ids = (view) => store.listing('test', view, { expanded: every }).map((r) => r.id).sort();
+  const hideLinkedin = { ...v('full', 'all'), hiddenSources: ['linkedin'] };
+  assert.deepEqual(ids(hideLinkedin), ['new0', 'new1', 'new2']);
+  assert.equal(count(store, 'test', hideLinkedin), 3);
+  assert.deepEqual(store.classTotals('test', hideLinkedin), { worth_a_look: 3 });
+  assert.deepEqual(store.sources('test', hideLinkedin).map((s) => [s.source, s.total]),
+    [['linkedin', 20], ['devitjobs', 3]], 'the "Source" drop-down counts the hidden boards too');
+  assert.equal(count(store, 'test', { ...v('full', 'all'), hiddenSources: ['devitjobs'] }), 20);
+  assert.equal(count(store, 'test', { ...v('full', 'all'), hiddenSources: ['linkedin', 'devitjobs'] }), 0);
+  assert.equal(count(store, 'test', { ...v('full', 'all'), hiddenSources: [] }), 23, 'nothing hidden: every board');
+  assert.equal(count(store, 'test', { ...v('full', 'all', { source: 'linkedin' }), hiddenSources: ['linkedin'] }), 20,
+    'a view naming the boards shown is read as before');
+
+  const db = new DatabaseSync(file);
+  db.prepare("UPDATE vacancies SET data = json_set(data, '$.source', 'remoteok') WHERE id IN ('old00', 'old01')").run();
+  db.close();
+  const hideDevitjobs = { ...v('full', 'all'), hiddenSources: ['devitjobs'] };
+  assert.ok(ids(hideDevitjobs).includes('old00'), 'the new board is shown');
+  assert.equal(count(store, 'test', hideDevitjobs), 20);
+  assert.deepEqual(store.sources('test', hideDevitjobs).map((s) => [s.source, s.total]),
+    [['linkedin', 18], ['devitjobs', 3], ['remoteok', 2]]);
   store.closeAll();
 });
 
@@ -602,8 +657,31 @@ test('the company list: each intermediary by name, every other company one row',
   const chosen = { ...v('full', 'all'), companies: { kinds: ['other'], hidden: [] } };
   assert.deepEqual(store.companies('test', chosen), store.companies('test', v('full', 'all')),
     'the chosen companies aside');
-  assert.deepEqual(store.companies('test', v('full', 'all', { source: 'nowhere' })), []);
+  assert.deepEqual(store.companies('test', v('full', 'all', { source: 'nowhere' })), [
+    { kind: 'other', name: null, total: 0 },
+    { kind: 'marketplace', name: 'Proxify', total: 0 },
+    { kind: 'agency', name: 'Hays', total: 0 },
+  ], 'a view that leaves none still lists every company row, with 0 (task 0133)');
+  assert.deepEqual(store.companies('test', v('full', 'all', { fit: 'worth_a_look' })), [
+    { kind: 'marketplace', name: 'Proxify', total: 2 },
+    { kind: 'other', name: null, total: 1 },
+    { kind: 'agency', name: 'Hays', total: 0 },
+  ]);
   assert.deepEqual(store.companies('other', v('full', 'all')), []);
+  store.closeAll();
+});
+
+test('the company list holds the "other" row when every company is an intermediary (task 0133)', () => {
+  const { store, file } = setup();
+  const db = new DatabaseSync(file);
+  db.prepare("UPDATE vacancy_identity SET view = json_set(view, '$.company', 'Proxify')").run();
+  db.prepare("INSERT INTO meta (key, value) VALUES ('company_kinds', ?)")
+    .run(JSON.stringify({ Proxify: { kind: 'marketplace', name: 'Proxify' } }));
+  db.close();
+  assert.deepEqual(store.companies('test', v('full', 'all')), [
+    { kind: 'marketplace', name: 'Proxify', total: 23 },
+    { kind: 'other', name: null, total: 0 },
+  ]);
   store.closeAll();
 });
 
