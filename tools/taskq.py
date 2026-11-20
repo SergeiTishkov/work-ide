@@ -37,8 +37,10 @@ and it has a usage limit, task 0057). A task nobody can run now waits, with
 the reason in `waiting_for`.
 
 A COLLECTION IS A GROUP: the top (the agent's /top), LinkedIn beside it, the
-rest of the base after both, and a CV/CL batch after each of the three for
-what it brought or raised into a class (collection()). It is going until
+rest of the base after both, the unread vacancies checked open and read
+after the rest (task 0129), and a CV/CL batch after the top, LinkedIn and
+the rest-and-read for what they brought or raised into a class
+(collection()). It is going until
 the last task of the group ends, and no second one is queued meanwhile
 (active_collection(), task 0089).
 
@@ -278,9 +280,13 @@ def active_collection(conn: sqlite3.Connection, identity: Optional[str]) -> Opti
 def collection(conn: sqlite3.Connection, identity: str, *, origin: Optional[str] = None,
                linkedin: bool = True, documents: bool = True) -> dict:
     """One collection as a group (the owner, 2026-10-21): the top; LinkedIn
-    beside it; the rest of the base after both, if the top ended done; a
-    CV/CL batch after the top, one after LinkedIn and one after the rest, each
-    if that ended done (the rest's AI read raises stretch roles into a class).
+    beside it; the rest of the base after both, if the top ended done; the
+    unread vacancies read after the rest, if it ended done (a links task
+    with {"read": true}, task 0129), unless a links task of the identity is
+    already queued or going; a CV/CL batch after the top, one after LinkedIn
+    and one after the rest, each if that ended done (the rest's AI read
+    raises stretch roles into a class), the last also after the read,
+    however the read ended.
     A collection of the identity still going is not queued again, a click or
     a schedule alike: going until the last task of its group ends
     (active_collection; task 0089). Until 2026-10-23 only the top counted,
@@ -301,6 +307,11 @@ def collection(conn: sqlite3.Connection, identity: str, *, origin: Optional[str]
             made["linkedin"] = _insert(conn, "linkedin", identity, origin=origin, group_id=top)
             after_rest.append((made["linkedin"], False))
         made["rest"] = _insert(conn, "rest", identity, origin=origin, group_id=top, after=after_rest)
+        after_read = [(made["rest"], True)]
+        if not same_active(conn, "links", identity, None):
+            made["read"] = _insert(conn, "links", identity, origin=origin, group_id=top,
+                                   args={"read": True}, after=[(made["rest"], True)])
+            after_read.append((made["read"], False))
         if documents:
             made["cv_batch"] = _insert(conn, "cv_batch", identity, origin=origin, group_id=top,
                                        after=[(top, True)])
@@ -308,7 +319,7 @@ def collection(conn: sqlite3.Connection, identity: str, *, origin: Optional[str]
                 made["cv_batch_linkedin"] = _insert(conn, "cv_batch", identity, origin=origin,
                                                     group_id=top, after=[(made["linkedin"], True)])
             made["cv_batch_rest"] = _insert(conn, "cv_batch", identity, origin=origin, group_id=top,
-                                            after=[(made["rest"], True)])
+                                            after=after_read)
     return {"added": True, "task": get(conn, top), "group": group(conn, top), "ids": made}
 
 

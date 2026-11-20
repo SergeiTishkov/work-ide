@@ -21,6 +21,14 @@ little, since remote within one country carries it too; the text decides,
 usual collection. The score already works so: LinkedIn is
 `workplace_hidden`, its TELECOMMUTE not taken.
 
+The owner, 2026-11-20, agreed the plan for every collection: the cards
+scored as now, those the scripts refused not read; every other unread
+vacancy checked open first and read, with no cap on the count, newest
+first; a LinkedIn throttle (five 429s in a row) ends the reading for the
+night and the rest waits for the next; rescore and the AI check of what
+rose to the top; "remote not confirmed" stays hidden; what could not be
+read is tried again the next night. A longer night collection is fine.
+
 ## Implementation
 - `pipeline.py --links --read` (queue: `links` with `{"read": true}`):
   the unread vacancies (no text, not rejected, not a duplicate, not
@@ -36,4 +44,4 @@ usual collection. The score already works so: LinkedIn is
 ## Items
 - DONE - The one-off run: `pipeline.py --links --read`, its queue argument, tests, docs (ARCHITECTURE, RUNBOOK); the app's step list knows the links run's stage names (since task 0127 they were shown raw)
 - TO DO - The one-off run queued for SHARP, its result measured
-- TO DO - The nightly runs read every unread vacancy that is not refused, each checked open first, with no cap of pages (the plan, agreed with the owner first)
+- DONE - Every collection reads the unread: `taskq.collection` queues the links task with `{"read": true}` after the rest (if the rest ended done; not when a links task of the identity is already queued or going), and the CV/CL batch after the rest waits for it too; tests (tests/test_taskq.py, tests/test_schedules.py), docs (ARCHITECTURE)

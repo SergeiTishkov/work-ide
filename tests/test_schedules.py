@@ -82,7 +82,7 @@ def test_a_schedule_is_due_at_its_time_and_queues_a_collection_per_identity(conn
     queued = taskq.tasks(conn)
     assert {t["identity"] for t in queued} == {"sharp", "part"}
     assert {t["origin"] for t in queued} == {"schedule"}
-    assert {t["kind"] for t in queued} == {"collect", "linkedin", "rest", "cv_batch"}   # the group
+    assert {t["kind"] for t in queued} == {"collect", "linkedin", "rest", "links", "cv_batch"}   # the group
     assert due(conn, local(2026, 10, 21, 7, 1)) == [], "a run time is queued once"
     again = schedules.get(conn, made["id"], local(2026, 10, 21, 7, 1))
     assert again["last_result"] == "queued"

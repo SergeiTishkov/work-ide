@@ -332,6 +332,14 @@ which reads remote work from the text ("remote worldwide" +6, a bare
 again. Then the usual tail: rescore, the AI check of what rose to the top,
 a "rebuild" selection.
 
+Every collection runs it (the owner, 2026-11-20): `taskq.collection`
+queues it after the rest of the base, if the rest ended done, and the
+CV/CL batch after the rest waits for it, so the batch sees what the read
+raised into a class. There is no cap on the count, only the run's budget
+and LinkedIn's five 429s; what is left unread is asked again the next
+night, newest first. A links task of the identity already queued or going
+(a daily check, a one-off read) takes its place.
+
 ### The search-identity system (2026-07-31)
 
 The project became multi-user. The full description is in `docs/IDENTITIES.md`;
@@ -859,8 +867,9 @@ run started by the agent or a terminal. Decided with the owner, 2026-10-21
 - **Slots:** collect (the top, the rest of the base, a full pipeline, a
   clean-up), linkedin, documents, reputation; one task each at a time.
   "Collect" is a group: the top and LinkedIn side by side, the rest after
-  both (it runs when LinkedIn failed, not when the top did), a CV/CL batch
-  after each. The dependencies are rows (`task_after`), not code in the
+  both (it runs when LinkedIn failed, not when the top did), the unread
+  vacancies read after the rest (task 0129), a CV/CL batch after the top,
+  LinkedIn and the rest-and-read. The dependencies are rows (`task_after`), not code in the
   app.
 - **Reliability.** Task Scheduler starts the workers at boot and sign-in
   and restarts a failed one every minute; one worker per role; each beats
