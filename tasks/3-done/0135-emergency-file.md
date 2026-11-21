@@ -39,4 +39,4 @@ ends its work or commits, as long as the owner leaves it open.
 
 ## Items
 - DONE - The emergency file, the hook, the rule; `--linkedin --staged` and the entry on a failed merge; tests
-- TO DO - The fetch of 2026-11-20 merged (queued with `{"staged": true}` after the rest run)
+- DONE - The fetch of 2026-11-20 merged: queue task 305 (`{"staged": true}`, 2026-11-21, after both workers were restarted) took the kept 17 240 records without fetching again: 10 798 new vacancies, 6 442 updated; the emergency entry removed
