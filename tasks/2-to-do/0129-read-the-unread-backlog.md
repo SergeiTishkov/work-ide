@@ -43,5 +43,5 @@ read is tried again the next night. A longer night collection is fine.
 
 ## Items
 - DONE - The one-off run: `pipeline.py --links --read`, its queue argument, tests, docs (ARCHITECTURE, RUNBOOK); the app's step list knows the links run's stage names (since task 0127 they were shown raw)
-- TO DO - The one-off run queued for SHARP, its result measured
+- DONE - The one-off run queued for SHARP (queue task 306, 2026-11-21, 5 h 05 min): 871 of 1 003 links due were checked, 239 open and 632 closed; 231 LinkedIn descriptions read; 132 left for the next run (the LinkedIn budget ended). The AI check that followed read 14 vacancies and rejected all 14; the selection went from 1 463 listed to 590
 - DONE - Every collection reads the unread: `taskq.collection` queues the links task with `{"read": true}` after the rest (if the rest ended done; not when a links task of the identity is already queued or going), and the CV/CL batch after the rest waits for it too; tests (tests/test_taskq.py, tests/test_schedules.py), docs (ARCHITECTURE)
