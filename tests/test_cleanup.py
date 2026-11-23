@@ -67,6 +67,18 @@ def test_old_ones_go_but_the_funnel_and_unread_feedback_stay(isolated_data_dir):
     assert (found["kept_funnel"], found["kept_unreviewed"]) == (2, 1)
 
 
+def test_a_starred_vacancy_stays_whoever_starred_it(isolated_data_dir):
+    """Task 0139: the app's star keeps a vacancy out of every clean-up."""
+    both = {"sharp": ("new", "hot_lead", None), "partsharp": ("new", "hot_lead", None)}
+    _base({"old": ("2026-08-01", None, both), "starred_here": ("2026-08-01", None, both),
+           "starred_there": ("2026-08-01", None, both)})
+    with db.session() as conn:
+        conn.executemany("INSERT INTO stars (identity_id, vacancy_id, starred_at) VALUES (?, ?, ?)",
+                         [("sharp", "starred_here", db.now_iso()), ("partsharp", "starred_there", db.now_iso())])
+        found = cleanup.plan(conn, "sharp", ages=["older"], today=TODAY)
+    assert found["delete"] == ["old"] and found["kept_starred"] == 2
+
+
 def test_a_filter_holds_in_every_identity_that_has_the_vacancy(isolated_data_dir):
     _base({
         "both_expired": ("2026-10-10", None, {"sharp": ("expired", "hot_lead", None),

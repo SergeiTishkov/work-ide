@@ -166,6 +166,7 @@ function registerIpc(window) {
     return runCleanup({ root, python: pythonExecutable(root), identity, filters, dryRun: Boolean(dryRun) });
   });
   handle('set-feedback', (identity, id, status, reason) => data.call('setFeedback', identity, id, status, reason));
+  handle('set-star', (identity, id, on) => data.call('setStar', identity, id, Boolean(on)));
   handle('advance', (identity, id, step, comment) => data.call('advance', identity, id, step, comment));
   handle('step-back', (identity, id) => data.call('stepBack', identity, id));
   handle('edit-comment', (identity, id, kind, index, text) =>

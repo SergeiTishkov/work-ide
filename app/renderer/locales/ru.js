@@ -48,7 +48,7 @@
   'cleanup.close': 'Закрыть',
   'cleanup.would_delete': 'Будет удалено: {n}.',
   'cleanup.deleted': 'Удалено: {n}.',
-  'cleanup.kept': 'Остаются: {funnel} в откликах, {unreviewed} с неразобранным фидбеком, {other} — в другой идентичности ответ другой.',
+  'cleanup.kept': 'Остаются: {funnel} в откликах, {starred} в избранном, {unreviewed} с неразобранным фидбеком, {other} — в другой идентичности ответ другой.',
 
   'date.format': '{day}.{mm}.{year}',
   'date.months': 'янв фев мар апр мая июн июл авг сен окт ноя дек',
@@ -295,6 +295,7 @@
   'filter.declined': 'Отказали',
   'filter.count': '({n})',
 
+  'class.starred': '⭐ Избранное',
   'class.added_by_hand': '✋ Добавлено вручную',
   'class.hot_lead': '🔥 Горячие — смотреть в первую очередь',
   'class.worth_a_look': '👀 Стоит посмотреть',
@@ -329,6 +330,8 @@
   'score.part.title': 'Название позиции',
   'score.part.exporter': 'Рынок, экспортирующий разработчиков',
   'score.part.stretch': 'Натяжка для CV',
+  'row.star': 'В избранное',
+  'row.unstar': 'Убрать из избранного',
   'row.posted_on': '📅 Опубликована: {date}',
   'row.first_seen_on': '📥 Скачана: {date}',
   'row.date_unknown': 'не указано',

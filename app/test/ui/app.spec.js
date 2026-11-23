@@ -619,12 +619,14 @@ test('the keyboard: Enter or Space checks the row under the cursor and keeps the
   await page.keyboard.press('ArrowDown');
   await expect(page.getByTestId('fit-filter-menu')).toBeVisible();
   await expect(page.getByTestId('fit-option-all')).toHaveClass(/cursor/);
-  await page.keyboard.press('ArrowDown');   // the master row, "Added by hand", then "Hot leads"
+  await page.keyboard.press('ArrowDown');   // the master row, "Starred", "Added by hand", then "Hot leads"
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveAttribute('data-state', 'off');
   expect(await lastListing(page)).toEqual(['sharp', view({
-    fits: ['added_by_hand', 'worth_a_look', 'long_shot', 'never_say_never', 'ai_unscreened', 'engagement_unconfirmed'],
+    fits: ['starred', 'added_by_hand', 'worth_a_look', 'long_shot', 'never_say_never', 'ai_unscreened',
+      'engagement_unconfirmed'],
   })]);
   await expect(page.getByTestId('fit-filter-menu')).toBeVisible();
   await expect(page.getByTestId('fit-option-hot_lead')).toHaveClass(/cursor/);
@@ -1026,6 +1028,7 @@ test('a class with nothing left stays listed and keeps its tick', async ({ page 
   const rows = await page.getByTestId('fit-filter-menu').locator('[role="option"][data-value]')
     .evaluateAll((nodes) => nodes.map((n) => [n.dataset.value, n.textContent, n.dataset.state]));
   expect(rows).toEqual([
+    ['starred', `${en['class.starred']} (0)`, 'on'],   // every identity's, first (task 0139)
     ['added_by_hand', `${en['class.added_by_hand']} (0)`, 'on'],
     ['hot_lead', `${en['class.hot_lead']} (0)`, 'on'],
     ['worth_a_look', `${en['class.worth_a_look']} (1)`, 'on'],
@@ -1045,6 +1048,49 @@ test('a class with nothing left stays listed and keeps its tick', async ({ page 
   await expect(page.getByTestId('fit-option-ai_unscreened')).toHaveAttribute('data-state', 'off');
 });
 
+// The owner, 2026-11-24 (task 0139): a star on the card, a "Starred" fit first of all.
+test('the star moves a vacancy to "Starred", first in the list and in the fit drop-down, and back', async ({ page }) => {
+  await open(page, standardFixture());
+  const card = page.getByTestId('vacancy-a2r');
+  await expect(card.getByTestId('star')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('section-starred')).toHaveCount(0);
+
+  await card.getByTestId('star').click();
+  await expect(page.getByTestId('section-starred').getByTestId('vacancy-a2r')).toBeVisible();
+  await expect(page.getByTestId('vacancy-a2r').getByTestId('star')).toHaveAttribute('aria-pressed', 'true');
+  const sections = await page.locator('[data-testid^="section-"]').evaluateAll(
+    (nodes) => nodes.map((n) => n.dataset.testid).filter((id) => !id.startsWith('section-count')));
+  expect(sections[0]).toBe('section-starred');
+  expect(await calls(page, 'setStar')).toEqual([['sharp', 'a2r', true]]);
+
+  await page.getByTestId('fit-filter').click();
+  const options = await page.getByTestId('fit-filter-menu').locator('[role="option"][data-value]')
+    .evaluateAll((nodes) => nodes.map((n) => n.dataset.value));
+  expect(options[0]).toBe('starred');
+  await expect(page.getByTestId('fit-option-starred')).toContainText('1');
+  await page.keyboard.press('Escape');
+
+  await page.getByTestId('vacancy-a2r').getByTestId('star').click();
+  await expect(page.getByTestId('section-starred')).toHaveCount(0);
+  await expect(page.getByTestId('section-hot_lead').getByTestId('vacancy-a2r')).toBeVisible();
+});
+
+test('the star stays in the card\'s top right corner, on the title\'s line, wide or narrow', async ({ page }) => {
+  const fixture = standardFixture();
+  fixture.rows.sharp.full[0].view.title = 'Senior Software Engineer, Platform Reliability and Developer Experience, Payments';
+  for (const width of [1400, 420]) {
+    await page.setViewportSize({ width, height: 900 });
+    await open(page, fixture);
+    const card = await page.getByTestId('vacancy-a1').boundingBox();
+    const star = await page.getByTestId('vacancy-a1').getByTestId('star').boundingBox();
+    const title = await page.getByTestId('vacancy-a1').getByTestId('title').boundingBox();
+    expect(card.x + card.width - (star.x + star.width)).toBeLessThan(20);
+    expect(star.y - card.y).toBeLessThan(20);
+    expect(star.y).toBeLessThan(title.y + 20);              // on the title's first line
+    expect(title.x + title.width).toBeLessThanOrEqual(star.x + 1);   // the title never runs under it
+  }
+});
+
 // The owner, 2026-11-21 (task 0137): only the identity's own classes.
 test("the fit drop-down lists the identity's classes only, and any class that holds rows", async ({ page }) => {
   const fixture = standardFixture();
@@ -1053,7 +1099,8 @@ test("the fit drop-down lists the identity's classes only, and any class that ho
   await page.getByTestId('fit-filter').click();
   const listed = await page.getByTestId('fit-filter-menu').locator('[role="option"][data-value]')
     .evaluateAll((nodes) => nodes.map((n) => n.dataset.value));
-  expect(listed).toEqual(['added_by_hand', 'hot_lead', 'worth_a_look', 'long_shot', 'never_say_never', 'ai_unscreened']);
+  expect(listed).toEqual(['starred', 'added_by_hand', 'hot_lead', 'worth_a_look', 'long_shot', 'never_say_never',
+    'ai_unscreened']);
   await expect(page.getByTestId('fit-option-engagement_unconfirmed')).toHaveCount(0);
   await page.keyboard.press('Escape');
 

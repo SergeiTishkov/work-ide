@@ -95,12 +95,12 @@ def test_the_classes_agree_between_the_scripts_the_clean_up_and_the_app():
     unlisted = js_list("app/renderer/app.js", "UNLISTED_CLASSES")
     assert set(unlisted) <= set(listed)
     assert unlisted == list(selections.NOT_SHOWN)
-    # the app's sections: the person's own picks first, then the listed
-    # classes less the ones never listed (queries.sql), in the app's own
-    # order ("Never say never" right after "Long shots", task 0136)
+    # the app's sections: the starred and the person's own picks first, then
+    # the listed classes less the ones never listed (queries.sql), in the
+    # app's own order ("Never say never" right after "Long shots", task 0136)
     sections = js_keys("app/renderer/app.js", "CLASS_KEYS")
-    assert sections[0] == "added_by_hand"
-    assert sorted(sections[1:]) == sorted(c for c in listed if c not in unlisted)
+    assert sections[:2] == [selections.STAR_CLASS, selections.HAND_CLASS]
+    assert sorted(sections[2:]) == sorted(c for c in listed if c not in unlisted)
     assert len(sections) == len(set(sections))
 
 

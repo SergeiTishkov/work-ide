@@ -436,6 +436,15 @@ class Store {
     return this.record(identity, vacancyId).record;
   }
 
+  // The star on a card (task 0139): on lists the vacancy under "Starred",
+  // off returns it to its class. -> whether it is starred now.
+  setStar(identity, vacancyId, on) {
+    const { db } = this.record(identity, vacancyId);
+    db.prepare(this.queries[on ? 'star' : 'unstar']).run(
+      on ? { identity, id: vacancyId, at: this.clock() } : { identity, id: vacancyId });
+    return Boolean(on);
+  }
+
   // --- the application funnel (renderer/funnel.js decides, this writes) ---
 
   record(identity, vacancyId) {

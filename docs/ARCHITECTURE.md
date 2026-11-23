@@ -87,6 +87,18 @@ not accept silence. Every selection writes them to meta
 that still holds rows is listed all the same, and with no meta row yet every
 class is.
 
+A star in each card's top right corner (task 0139, the owner, 2026-11-24)
+lists the vacancy under "Starred", the first class of every identity, and
+takes it out of its own class; a second click puts it back. The app writes
+the table `stars` (identity, vacancy, date), added without a schema version
+step like `ai_screens`: the version step of 2026-11-20 (task 0131) failed a
+run that had loaded the old code 22 hours before. `view_pool` brings the
+starred vacancies the way it brings the applications, from any collection
+and any market, under the status rule of the selection's rows, a dead link
+left out; the clean-up never deletes a starred vacancy. The star is placed
+absolutely and the head row keeps 30 px for it, so a narrow card wraps the
+title and the badges, not the star.
+
 Every option of the drop-downs is listed whatever it holds (task 0133, the
 owner, 2026-11-20): a board, class, company kind or intermediary the other
 drop-downs leave empty stays, with 0, and keeps its tick. Until then an empty

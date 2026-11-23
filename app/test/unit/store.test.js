@@ -52,6 +52,41 @@ test('"Remote not confirmed" is neither listed nor counted (task 0098)', () => {
   assert.deepEqual(store.classTotals('test', all), { hot_lead: 1 });
 });
 
+// The owner, 2026-11-24 (task 0139): the star lists a vacancy under "Starred".
+test('a starred vacancy is listed under "starred" from any collection and market, a dead link aside', () => {
+  const file = createDatabase(path.join(tempDir(), 'test.sqlite'), {
+    vacancies: [
+      { id: 'h1', score: 50, class: 'hot_lead' },
+      { id: 'h2', score: 40, class: 'hot_lead' },
+      { id: 'old', score: 30, class: 'worth_a_look' },
+      { id: 'uk1', score: 20, class: 'long_shot', segments: ['uk'] },
+      { id: 'dead', score: 45, class: 'hot_lead' },
+    ],
+    segments: [{ slug: 'full', name: 'Everything', isDefault: true, everything: true },
+      { slug: 'uk', name: 'UK' }],
+    selections: [{ kind: 'run', items: ['h1', 'old'] }, { kind: 'run', items: ['h1', 'h2', 'uk1', 'dead'] }],
+  });
+  const raw = new DatabaseSync(file);
+  raw.prepare("UPDATE vacancies SET data = json_set(data, '$.link_check', json('{\"status\": \"dead\"}')) WHERE id = 'dead'").run();
+  raw.close();
+  const store = new Store({ schemaDir: SCHEMA_DIR, databasePathOf: (p) => (p === 'test' ? file : null) });
+  const view = v('full', 'no_feedback');
+  const listed = () => store.listing('test', view).map((r) => [r.id, r.class]);
+  // the selection lists the dead link; starred, it is listed nowhere
+  assert.deepEqual(listed(), [['h1', 'hot_lead'], ['dead', 'hot_lead'], ['h2', 'hot_lead']]);
+
+  for (const id of ['h2', 'old', 'uk1', 'dead']) assert.equal(store.setStar('test', id, true), true);
+  store.setStar('test', 'h2', true);   // again: one star
+  assert.deepEqual(listed(), [['h2', 'starred'], ['old', 'starred'], ['uk1', 'starred'], ['h1', 'hot_lead']]);
+  assert.deepEqual(store.classTotals('test', view), { starred: 3, hot_lead: 1 });
+  assert.deepEqual(store.listing('test', { ...view, fits: ['starred'] }).map((r) => r.id), ['h2', 'old', 'uk1']);
+
+  assert.equal(store.setStar('test', 'h2', false), false);
+  assert.deepEqual(listed(), [['old', 'starred'], ['uk1', 'starred'], ['h1', 'hot_lead'], ['h2', 'hot_lead']]);
+  assert.throws(() => store.setStar('test', 'nope', true), /no vacancy nope/);
+  store.closeAll();
+});
+
 test('segments of the latest selection, default marked', () => {
   const { store } = setup();
   const data = store.segments('test');

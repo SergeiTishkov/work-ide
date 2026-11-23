@@ -24,6 +24,7 @@
 --                                                     the agent's own "not for me"
 --   vacancy_identity.feedback_reviewed_at           - tools/feedback.py
 --   ai_screens                                      - the pipeline (tools/ai_screen.py)
+--   stars                                           - the app (the star on a card)
 --
 -- VERSIONS. 1-7: one file per identity (see git history). 8: one base for
 -- every identity — tools/merge_shared_base.py built it from the old files.
@@ -196,6 +197,17 @@ CREATE INDEX IF NOT EXISTS pipeline_runs_status ON pipeline_runs(status);
 -- brief it read it with. score.py uses an answer only while the text is the
 -- same. No foreign key: tools/cleanup.py deletes the rows with the vacancy.
 -- Added without a version step: a table of its own, which old code ignores.
+-- The vacancies a person starred (the owner, 2026-11-24, task 0139): the
+-- app's "Starred" section, first of all (schemas/queries.sql, STARRED). No
+-- foreign key: a starred vacancy is never cleaned up (tools/cleanup.py).
+-- Added without a version step, like ai_screens below: old code ignores it.
+CREATE TABLE IF NOT EXISTS stars (
+  identity_id TEXT NOT NULL,
+  vacancy_id  TEXT NOT NULL,
+  starred_at  TEXT NOT NULL,
+  PRIMARY KEY (identity_id, vacancy_id)
+);
+
 CREATE TABLE IF NOT EXISTS ai_screens (
   identity_id TEXT NOT NULL,
   vacancy_id  TEXT NOT NULL,
