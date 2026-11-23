@@ -2724,13 +2724,16 @@ def _score_personal_tech_bonus(text: str, title: str, profile: dict, criteria: d
     for name, cfg in groups.items():
         if not isinstance(cfg, dict):
             continue
-        matched = _matches(haystack, cfg.get("keywords") or [])
+        # A vocabulary name that cannot be a substring (".NET") is found by
+        # its patterns, as in stack_fit (task 0140, 2026-11-24: "Senior .NET
+        # Developer" with no text earned the stack's 3 points and no bonus).
+        matched = _names_technologies(haystack, cfg.get("keywords") or [])
         if not matched:
             continue
         # Exceptions matter where a technology is mentioned as adjacent rather
         # than as the substance of the role: "React + .NET" is a .NET vacancy,
         # not a Node one.
-        if _matches(haystack, cfg.get("unless") or []):
+        if _names_technologies(haystack, cfg.get("unless") or []):
             continue
         points = cfg.get("points", 0)
         total += points

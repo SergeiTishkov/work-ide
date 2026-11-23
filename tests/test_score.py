@@ -1805,6 +1805,36 @@ def test_personal_tech_bonus_prefers_one_known_stack_over_another():
     assert r_node["classification"] != "rejected", "this is a penalty, not a disqualification"
 
 
+def test_a_bare_dotnet_in_the_title_earns_the_personal_bonus():
+    """Task 0140: "Senior .NET Software Engineers - Remote, EST/CST Based", a
+    LinkedIn card with no text, earned the stack's 3 points and no .NET bonus:
+    the bonus matched substrings only, and ".net" is not one."""
+    profile = dict(PROFILE)
+    profile["personal_tech_bonus"] = {"dotnet": {"points": 12, "keywords": ["c#", ".NET"]}}
+
+    def bonus(title, text=""):
+        v = make_vacancy(title=title, description_text=text)
+        return score.score_vacancy(v, CRITERIA, profile)["score_breakdown"]["personal_tech_bonus"]
+
+    for title in ["Senior .NET Software Engineers - Remote, EST/CST Based", "Sr. .Net Developer",
+                  "Data Integration Developer-.Net", "Sviluppatore Dot Net", "Senior Dotnet Engineer"]:
+        assert bonus(title)["groups"]["dotnet"]["matched"] == [".NET"], title
+    # not a word of its own: a bare domain
+    assert bonus("Senior Engineer", "Equal Opportunity Commitment f12.net practices") == {}
+
+
+def test_dotnet_is_a_word_of_its_own_in_the_vocabulary():
+    """Task 0140: ".NET" is matched where it stands alone, not at the end of
+    another name or a domain."""
+    specs = score._pattern_specs_for([".NET"])
+    found = lambda text: score._matches_patterns(text, specs)
+    for text in [".net developer", "c#/.net", "developer-.net", "(.net 8)", "microsoft.net 4.8", "dotnet",
+                 "vb.net"]:   # VB.NET is .NET: test_webforms_not_claimed_as_personal_skill
+        assert found(text) == [".NET"], text
+    for text in ["asp.net", "harnly.net", "f12.net", "internet"]:
+        assert found(text) == [], text
+
+
 def test_node_mentioned_next_to_dotnet_is_not_penalised():
     """«ASP.NET Core with React and Node in the tooling» is a .NET vacancy with an
     adjacent stack, not a JS backend."""

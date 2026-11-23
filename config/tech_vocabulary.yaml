@@ -208,7 +208,12 @@ matching_patterns:
   ".NET":
     substring_unsafe: true
     patterns:
-      - '\.net\b'
+      # A word of its own (task 0140, 2026-11-24): not the end of a bare
+      # domain "f12.net" or of "ASP.NET" (found under its own name). A dash
+      # or a slash before it stays ("Developer-.Net", "C#/.NET"). VB.NET and
+      # Microsoft.NET are .NET (tests/test_score.py, 2026-08-05).
+      - '(?<![\w@])\.net\b'
+      - '\b(vb|microsoft)\.net\b'
       - '\bdotnet\b'
       # "Sr. Dot Net Developer", refused 2026-10-01 as "not a .NET/JS role".
       - '\bdot[ -]net\b'

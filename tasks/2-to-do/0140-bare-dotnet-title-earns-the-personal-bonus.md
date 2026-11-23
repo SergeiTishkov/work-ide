@@ -1,6 +1,6 @@
 # 0140 A bare ".NET" in the title earns the personal .NET bonus
 
-Source: the agent, 2026-11-24 (the owner asked why "Senior .NET Software Engineers - Remote, EST/CST Based" got 7 points)
+Source: the owner, 2026-11-24 (the owner asked why "Senior .NET Software Engineers - Remote, EST/CST Based" got 7 points)
 Scope: tools
 
 ## Business
@@ -19,6 +19,13 @@ Measured 2026-11-24 on SHARP: 875 vacancies have ".NET" in the title by the
 patterns and no dotnet bonus: 676 remote_unconfirmed, 177 rejected,
 22 never_say_never (869 new). Most are blind LinkedIn cards scored 7.
 
+The owner, 2026-11-24: ".NET" is easy to check, it is a word, not a
+substring; and "FDE" in a title is a forward deployed role too. Rescore the
+.NET and FDE vacancies, read their descriptions; the rest of "never say
+never" is marked "not for me".
+
 ## Items
-- TO DO - The personal tech bonus also matches a keyword's tech_matching patterns, as stack_fit does (`_pattern_specs_for`, `_matches_patterns`), so a title ".NET" earns the dotnet group
-- TO DO - Rescore (no AI re-read) and report how many cards change class
+- DONE - The vocabulary: ".NET" only as a word of its own (`(?<![\w@])\.net\b`, plus `vb.net` and `microsoft.net`)
+- DONE - The personal tech bonus matches its keywords and `unless` with `_names_technologies`, as the stack does; tests; TECH_MATCHING
+- DONE - SHARP (local, outside git): ".NET" in `personal_tech_bonus.dotnet.keywords`; `\bfde\b` in `extra_signals.forward_deployed.title_patterns`
+- TO DO - Rescore SHARP, read the descriptions of the .NET and FDE vacancies of "never say never", mark the rest of that class "not for me"
