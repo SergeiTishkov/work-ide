@@ -108,10 +108,26 @@ matching_patterns:
   ".NET":
     substring_unsafe: true
     patterns:
-      - '\.net\b'
+      - '(?<![\w@])\.net\b'
+      - '\b(vb|microsoft)\.net\b'
       - '\bdotnet\b'
     redundant_if: [".NET Core", ".NET Framework", "ASP.NET", "ASP.NET Core"]
 ```
+
+`.net` counts only as a word of its own (task 0140, 2026-11-24): a letter,
+a digit or `@` before it means another name (`ASP.NET`, found under its own
+name) or a domain (`f12.net`, left in the text by part 1). `VB.NET` and
+`Microsoft.NET` have a pattern of their own: VB.NET is .NET for the stack
+(2026-08-05). Measured on SHARP's 6,508 vacancies, the old `\.net\b`
+matched 46 titles and 94 texts that `(?<![\w@])\.net\b` alone does not;
+read by eye, they were `VB.NET`, `ASP.NET`, `Microsoft.NET` and domains.
+
+Every keyword list that can hold a technology name goes through
+`_names_technologies` (substring, then the vocabulary's patterns for the
+unsafe names): the stack, the primary language, the personal bonus
+(`personal_tech_bonus`, its `keywords` and `unless`). The bonus matched
+substrings alone until task 0140, so a title-only "Senior .NET Developer"
+earned the stack's 3 points and none of its +12: 875 SHARP vacancies.
 
 Three fields, each closing its own failure:
 
