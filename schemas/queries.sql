@@ -56,6 +56,13 @@
 -- run must not make an application disappear. Their freshness is counted the
 -- same way as everyone's.
 --
+-- STARRED (the owner, 2026-11-24, task 0139): a vacancy the person starred
+-- (table stars) is listed in the class 'starred', first of all, and not in
+-- its own class. Like an application it comes from every collection and
+-- every market, whatever :segments says, under the same status rule as the
+-- selection's rows; a dead link (link_check 'dead') is not listed unless it
+-- is an application. Never capped.
+--
 -- NOT LISTED. "Remote not confirmed" (remote_unconfirmed) never comes from
 -- the selection (the owner, 2026-10-24, task 0098: "I never look at these
 -- vacancies, take them out of the app"). The class stays in the data: the
@@ -158,6 +165,10 @@ in_markets AS (
     AND i.class <> 'remote_unconfirmed'
   GROUP BY i.vacancy_id
 ),
+-- the vacancies the person starred (STARRED)
+starred AS (
+  SELECT vacancy_id FROM stars WHERE identity_id = :identity
+),
 candidates AS (
   SELECT m.vacancy_id, m.class, m.class_position, m.section_limit, m.score,
          m.eligibility_rank, 0 AS application
@@ -165,9 +176,10 @@ candidates AS (
   -- verdict of the identity scanned (seconds on 46k rows, 2026-10-12)
   FROM in_markets m
   CROSS JOIN vacancy_identity v ON v.vacancy_id = m.vacancy_id AND v.identity_id = :identity
-  WHERE v.feedback_status = 'new'
-     OR (v.feedback_status IN ('rejected', 'bugged', 'expired')
-         AND v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0))
+  WHERE (v.feedback_status = 'new'
+         OR (v.feedback_status IN ('rejected', 'bugged', 'expired')
+             AND v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0)))
+    AND m.vacancy_id NOT IN (SELECT vacancy_id FROM starred)
   UNION ALL
   SELECT v.vacancy_id, json_extract(v.view, '$.classification'), NULL, NULL,
          COALESCE(json_extract(v.view, '$.score'), 0), 0, 1
@@ -175,6 +187,24 @@ candidates AS (
   WHERE v.identity_id = :identity AND v.view IS NOT NULL
     AND v.feedback_status IN ('applied', 'contacted', 'interview', 'awaiting_final',
                               'awaiting_offer', 'declined', 'offered', 'started')
+    AND v.vacancy_id NOT IN (SELECT vacancy_id FROM starred)
+  UNION ALL
+  -- STARRED: from any collection and market, first of all, never capped
+  SELECT v.vacancy_id, 'starred', -2, 1000000,
+         COALESCE(v.score, json_extract(v.view, '$.score'), 0), 0,
+         CASE WHEN v.feedback_status IN ('applied', 'contacted', 'interview', 'awaiting_final',
+                                         'awaiting_offer', 'declined', 'offered', 'started')
+              THEN 1 ELSE 0 END
+  FROM starred s
+  CROSS JOIN vacancy_identity v ON v.vacancy_id = s.vacancy_id AND v.identity_id = :identity
+  CROSS JOIN vacancies d ON d.id = s.vacancy_id
+  WHERE v.view IS NOT NULL
+    AND (v.feedback_status IN ('applied', 'contacted', 'interview', 'awaiting_final',
+                               'awaiting_offer', 'declined', 'offered', 'started')
+         OR ((v.feedback_status = 'new'
+              OR (v.feedback_status IN ('rejected', 'bugged', 'expired')
+                  AND v.feedback_selection_id >= COALESCE((SELECT id FROM baseline), 0)))
+             AND COALESCE(json_extract(d.data, '$.link_check.status'), '') <> 'dead'))
 ),
 joined AS (
   SELECT c.*, v.view, v.views, v.feedback_status, v.rejected_reason, v.bugged_reason,
@@ -397,6 +427,14 @@ FROM pipeline_runs
 WHERE status = 'running'
 ORDER BY id DESC
 LIMIT 1;
+
+-- name: star
+-- The star on a card (task 0139); starring again keeps the first date.
+INSERT INTO stars (identity_id, vacancy_id, starred_at) VALUES (:identity, :id, :at)
+ON CONFLICT(identity_id, vacancy_id) DO NOTHING;
+
+-- name: unstar
+DELETE FROM stars WHERE identity_id = :identity AND vacancy_id = :id;
 
 -- name: set_feedback
 -- The first answer on a vacancy. "applied" dates the start of the funnel;

@@ -580,8 +580,8 @@ def test_a_selection_carries_the_identitys_classes(isolated_data_dir):
     assert json.loads(value) == selections.listed_classes(score.load_criteria())
 
     base = {"classification_thresholds": {"hot_lead": 40, "worth_a_look": 28, "long_shot": 12}}
-    assert selections.listed_classes(base) == ["added_by_hand", "hot_lead", "worth_a_look", "long_shot",
-                                               "ai_unscreened"]
+    assert selections.listed_classes(base) == ["starred", "added_by_hand", "hot_lead", "worth_a_look",
+                                               "long_shot", "ai_unscreened"]
     sharp_like = {"classification_thresholds": {**base["classification_thresholds"], "never_say_never": 5}}
     assert "never_say_never" in selections.listed_classes(sharp_like)
     assert "engagement_unconfirmed" not in selections.listed_classes(sharp_like)

@@ -185,9 +185,13 @@ function installMockApi(fixture) {
       chosen = (everything.length ? everything : segments).map((s) => s.slug);
     }
     const byId = new Map();
+    // STARRED in schemas/queries.sql: every market, the class 'starred'
+    const starred = new Set((data.stars || {})[identity] || []);
     for (const [slug, rows] of Object.entries(data.rows[identity] || {})) {
       for (const row of rows) {
-        if (!byId.has(row.id) && (chosen.includes(slug) || FUNNEL.includes(row.feedback.status))) byId.set(row.id, row);
+        if (byId.has(row.id)) continue;
+        if (starred.has(row.id)) byId.set(row.id, { ...row, class: 'starred' });
+        else if (chosen.includes(slug) || FUNNEL.includes(row.feedback.status)) byId.set(row.id, row);
       }
     }
     return [...byId.values()];
@@ -331,7 +335,7 @@ function installMockApi(fixture) {
       record('cleanup', [identity, filters, dryRun]);
       // window.__holdCleanup: the answer waits for window.__releaseCleanup()
       if (window.__holdCleanup) await new Promise((resolve) => { window.__releaseCleanup = resolve; });
-      const reply = data.cleanupReply || { matched: 3, kept_funnel: 1, kept_unreviewed: 2, kept_other_identity: 0 };
+      const reply = data.cleanupReply || { matched: 3, kept_funnel: 1, kept_starred: 0, kept_unreviewed: 2, kept_other_identity: 0 };
       return { ...reply, dry_run: dryRun, deleted: dryRun ? 0 : reply.matched };
     },
     async listAges(identity, view) {
@@ -372,6 +376,14 @@ function installMockApi(fixture) {
         return { kind, name, total };
       }).sort((a, b) => b.total - a.total || a.kind.localeCompare(b.kind)
         || String(a.name).localeCompare(String(b.name)));
+    },
+    async setStar(identity, id, on) {
+      record('setStar', [identity, id, on]);
+      data.stars = data.stars || {};
+      const stars = new Set(data.stars[identity] || []);
+      if (on) stars.add(id); else stars.delete(id);
+      data.stars[identity] = [...stars];
+      return Boolean(on);
     },
     async setFeedback(identity, id, status, reason) {
       record('setFeedback', [identity, id, status, reason]);

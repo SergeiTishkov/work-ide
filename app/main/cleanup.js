@@ -34,7 +34,7 @@ function buildCleanupArgs(identity, filters, dryRun) {
   return args;
 }
 
-// { matched, deleted, kept_funnel, kept_unreviewed, kept_other_identity, dry_run }
+// { matched, deleted, kept_funnel, kept_starred, kept_unreviewed, kept_other_identity, dry_run }
 function runCleanup({ root, python, identity, filters, dryRun, run = execFile }) {
   const args = buildCleanupArgs(identity, filters, dryRun);
   return new Promise((resolve, reject) => {

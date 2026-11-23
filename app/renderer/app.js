@@ -54,7 +54,9 @@
     other: 'filter.company_kind.other',
   };
   const CLASS_KEYS = {
-    // the person's own picks first (tools/add_vacancy.py, task 0122)
+    // the vacancies the person starred, first of all (task 0139)
+    starred: 'class.starred',
+    // the person's own picks (tools/add_vacancy.py, task 0122)
     added_by_hand: 'class.added_by_hand',
     hot_lead: 'class.hot_lead',
     worth_a_look: 'class.worth_a_look',
@@ -67,6 +69,9 @@
   // Never listed (schemas/queries.sql, NOT LISTED; task 0098), also when a
   // view saved before still names it.
   const UNLISTED_CLASSES = ['remote_unconfirmed'];
+  // The class of a starred vacancy (schemas/queries.sql, STARRED): every
+  // identity has it, whatever its criteria.
+  const STARRED = 'starred';
   // A class's name; the applications view also holds rows of classes never
   // listed (low_priority, rejected, remote_unconfirmed), named as in the
   // clean-up (task 0128).
@@ -1931,7 +1936,10 @@
     else if (r) {
       outcome = el('p', { class: 'cleanup-outcome', testid: 'cleanup-outcome' },
         t(r.dry_run ? 'cleanup.would_delete' : 'cleanup.deleted', { n: r.dry_run ? r.matched : r.deleted }),
-        ' ', t('cleanup.kept', { funnel: r.kept_funnel, unreviewed: r.kept_unreviewed, other: r.kept_other_identity }));
+        ' ', t('cleanup.kept', {
+          funnel: r.kept_funnel, starred: r.kept_starred || 0, unreviewed: r.kept_unreviewed,
+          other: r.kept_other_identity,
+        }));
     }
     const counted = r && r.dry_run;
     return el('div', { class: 'overlay', testid: 'cleanup-overlay',
@@ -2319,7 +2327,7 @@
     const listed = state.listedClasses;
     const classes = [...order, ...Object.keys(totals).filter((cls) => !order.includes(cls))]
       .filter((cls) => !UNLISTED_CLASSES.includes(cls))
-      .filter((cls) => !listed || listed.includes(cls) || totals[cls] > 0);
+      .filter((cls) => !listed || cls === STARRED || listed.includes(cls) || totals[cls] > 0);
     const all = Object.values(totals).reduce((sum, n) => sum + n, 0);
     const options = classes.map((cls) => {
       const name = className(cls);
@@ -2640,10 +2648,34 @@
     return (item.views && item.views[I18n.language()]) || item.view || {};
   }
 
+  const STAR_PATH = 'M12 2.8l2.85 5.78 6.38.93-4.62 4.5 1.09 6.36L12 17.37l-5.7 3 1.09-6.36-4.62-4.5 6.38-.93z';
+
+  // The star in the card's top right corner (the owner, 2026-11-24, task
+  // 0139): on the title's line, and in the corner still when the card narrows.
+  function renderStar(item) {
+    const on = item.class === STARRED;
+    const label = t(on ? 'row.unstar' : 'row.star');
+    return el('button', {
+      type: 'button', class: on ? 'star on' : 'star', testid: 'star', title: label, 'aria-label': label,
+      'aria-pressed': on ? 'true' : 'false', onclick: () => toggleStar(item),
+      html: `<svg viewBox="0 0 24 24" width="18" height="18" fill="${on ? 'currentColor' : 'none'}" `
+        + `stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="${STAR_PATH}"/></svg>`,
+    });
+  }
+
+  // The list is read again: the vacancy moves to "Starred" or back to its class.
+  function toggleStar(item) {
+    return guarded(async () => {
+      await api.setStar(state.active, item.id, item.class !== STARRED);
+      await loadList();
+    });
+  }
+
   function renderRow(item) {
     const view = viewOf(item);
     const status = item.feedback.status;
     const children = [
+      renderStar(item),
       el('div', { class: 'row-head' },
         el('span', { class: 'score', testid: 'score' }, String(item.score)),
         el('a', {

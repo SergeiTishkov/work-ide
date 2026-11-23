@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('api', {
   // filters: { ages, statuses, classes } (main/cleanup.js); a dry run counts
   cleanup: (identity, filters, dryRun) => call('cleanup', identity, filters, Boolean(dryRun)),
   setFeedback: (identity, id, status, reason) => call('set-feedback', identity, id, status, reason ?? null),
+  setStar: (identity, id, on) => call('set-star', identity, id, Boolean(on)),
   advance: (identity, id, step, comment) => call('advance', identity, id, step, comment ?? ''),
   stepBack: (identity, id) => call('step-back', identity, id),
   editComment: (identity, id, kind, index, text) => call('edit-comment', identity, id, kind, index ?? null, text ?? ''),

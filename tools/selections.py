@@ -42,6 +42,9 @@ KINDS = ("run", "rebuild")
 # class, in every market, until a near-duplicate or a dead link takes them
 # out like any other row. The scripts' verdict stays in the base for the
 # record: the row carries the real score.
+# The class of a starred vacancy (task 0139): the app's star, read by the
+# view queries (schemas/queries.sql, STARRED); no selection writes it.
+STAR_CLASS = "starred"
 HAND_CLASS = "added_by_hand"
 HAND_CLASS_POSITION = -1
 PICKS_NAME = "added_by_hand.json"
@@ -258,7 +261,7 @@ def listed_classes(criteria: dict) -> list:
     import score
 
     thresholds = criteria.get("classification_thresholds") or {}
-    classes = [HAND_CLASS, "hot_lead", "worth_a_look", "long_shot"]
+    classes = [STAR_CLASS, HAND_CLASS, "hot_lead", "worth_a_look", "long_shot"]
     if thresholds.get(score.NEVER_SAY_NEVER) is not None:
         classes.append(score.NEVER_SAY_NEVER)
     classes.append("ai_unscreened")

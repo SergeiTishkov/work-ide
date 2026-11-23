@@ -15,6 +15,7 @@ answer for.
 Never deleted, whatever the filters:
   - a vacancy in the application funnel of any identity (applied ... started,
     declined): the person's own history;
+  - a vacancy any identity starred (the app's star, task 0139);
   - feedback not yet read by /feedback (bugged or rejected, no
     feedback_reviewed_at): a report on the filter that nobody has used yet.
 
@@ -77,7 +78,7 @@ def plan(conn, identity: str, ages=None, statuses=None, classes=None, today: dat
 
     `identity` is the tab the filters were chosen in; every other identity
     holding the vacancy has to match them too. Returns {"delete": [ids],
-    "kept_funnel": n, "kept_unreviewed": n, "kept_other_identity": n}."""
+    "kept_funnel": n, "kept_starred": n, "kept_unreviewed": n, "kept_other_identity": n}."""
     _check("age", ages, AGES)
     _check("status", statuses, selections.STATUSES)
     _check("class", classes, CLASSES)
@@ -85,6 +86,7 @@ def plan(conn, identity: str, ages=None, statuses=None, classes=None, today: dat
         raise ValueError("choose at least one filter: a cleanup without one would delete the base")
     bands = {row[0]: age_band(row[1], row[2], today) for row in conn.execute(
         "SELECT id, json_extract(data, '$.posted_at'), json_extract(data, '$.first_seen') FROM vacancies")}
+    starred = {row[0] for row in conn.execute("SELECT vacancy_id FROM stars")}
     rows = {}
     for vid, ident, status, cls, reviewed in conn.execute(
             "SELECT vacancy_id, identity_id, feedback_status, class, feedback_reviewed_at FROM vacancy_identity"):
@@ -95,13 +97,15 @@ def plan(conn, identity: str, ages=None, statuses=None, classes=None, today: dat
                 and (not statuses or status in statuses)
                 and (not classes or cls in classes))
 
-    result = {"delete": [], "kept_funnel": 0, "kept_unreviewed": 0, "kept_other_identity": 0}
+    result = {"delete": [], "kept_funnel": 0, "kept_starred": 0, "kept_unreviewed": 0, "kept_other_identity": 0}
     for vid, held in rows.items():
         own = [r for r in held if r[0] == identity]
         if not own or not matches(vid, own[0][1], own[0][2]):
             continue
         if any(r[1] in selections.FUNNEL for r in held):
             result["kept_funnel"] += 1
+        elif vid in starred:
+            result["kept_starred"] += 1
         elif any(r[1] in UNREVIEWED and not r[3] for r in held):
             result["kept_unreviewed"] += 1
         elif not all(matches(vid, r[1], r[2]) for r in held):
@@ -180,6 +184,7 @@ def main() -> None:
         return
     verb = "would delete" if args.dry_run else "deleted"
     print(f"{verb} {summary['matched']} vacancies; kept: {summary['kept_funnel']} in the funnel, "
+          f"{summary['kept_starred']} starred, "
           f"{summary['kept_unreviewed']} with feedback not yet reviewed, "
           f"{summary['kept_other_identity']} another identity answers differently")
 

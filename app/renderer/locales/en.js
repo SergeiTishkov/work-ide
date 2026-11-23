@@ -45,7 +45,7 @@
   'cleanup.close': 'Close',
   'cleanup.would_delete': 'Would delete: {n}.',
   'cleanup.deleted': 'Deleted: {n}.',
-  'cleanup.kept': 'Kept: {funnel} in applications, {unreviewed} with feedback not yet reviewed, {other} another identity answers differently.',
+  'cleanup.kept': 'Kept: {funnel} in applications, {starred} starred, {unreviewed} with feedback not yet reviewed, {other} another identity answers differently.',
 
   'date.format': '{day} {month} {year}',
   'date.months': 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec',
@@ -292,6 +292,7 @@
   'filter.declined': 'Rejected',
   'filter.count': '({n})',
 
+  'class.starred': '⭐ Starred',
   'class.added_by_hand': '✋ Added by hand',
   'class.hot_lead': '🔥 Hot leads — look at these first',
   'class.worth_a_look': '👀 Worth a look',
@@ -326,6 +327,8 @@
   'score.part.title': 'Title',
   'score.part.exporter': 'Market that exports developers',
   'score.part.stretch': 'A stretch for the CV',
+  'row.star': 'Star it: list it under "Starred"',
+  'row.unstar': 'Unstar it: back to its fit',
   'row.posted_on': '📅 Posted: {date}',
   'row.first_seen_on': '📥 Downloaded: {date}',
   'row.date_unknown': 'not stated',
